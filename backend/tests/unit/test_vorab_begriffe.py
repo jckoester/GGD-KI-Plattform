@@ -209,3 +209,111 @@ def test_unerwarteter_bezug_faellt_auf():
     abweichend = M.bezug_abweichungen(M.nachrichten(GRENZFAELLE),
                                       {"nwt": ["biologie"], "mathematik": ["nwt"]})
     assert len(abweichend) == 1 and "Standardabweichung" in abweichend[0]
+
+
+# ── Tor-Raster und Wahl der Tore (Schritt 3) ─────────────────────────────────
+
+ALKAN = M.Nachricht("Erzählsatz zu Alkanen", "fachlich", "erzaehlung", (None, "chemie"), ("chemie", "Alkane"),
+                    rahmen=1)
+
+
+def _raster(n, je_tor, profil=None):
+    """``je_tor``: Treffer je Tor-Paar; fehlende Paare = wie „Nennung aus"."""
+    aus = je_tor.get(M.TOR_AUS, [])
+    return {"nachricht": n, "profil": profil, "raster": {k: je_tor.get(k, aus) for k in M.TOR_RASTER}}
+
+
+def test_raster_zaehlt_neue_fehltreffer_gegen_nennung_aus():
+    w, u = T("Wasser", "chemie", "nennung", 0.49), T("Umwelt (GHS09)", "chemie", "nennung", 0.47)
+    lauf = _raster(EIS, {M.TOR_AUS: [w], (0.55, 0.50): [w, u]})
+    assert M.raster_zeile([lauf], M.TOR_AUS)["fehltreffer_neu"] == 0
+    z = M.raster_zeile([lauf], (0.55, 0.50))
+    assert z["fehltreffer_neu"] == 1 and z["gegenproben_neu"] == [1, 1]
+
+
+def test_raster_zaehlt_erzaehlsaetze_und_neue_nebentreffer():
+    alk = T("Alkane", "chemie", "nennung", 0.52)
+    alkine = T("Alkine", "chemie", "distanz", 0.44)
+    lauf = _raster(ALKAN, {M.TOR_AUS: [alkine], (0.55, None): [alk, alkine]})
+    z = M.raster_zeile([lauf], (0.55, None))
+    assert z["formen"]["erzaehlung"] == [1, 1] and z["nebentreffer_neu"] == 0
+
+
+def test_wahl_schliesst_jeden_neuen_fehltreffer_aus():
+    """Das weitere Tor fände mehr Erzählsätze — aber es brächte einen Fehltreffer."""
+    alk = T("Alkane", "chemie", "nennung", 0.57)
+    eis = T("Wasser", "chemie", "nennung", 0.57)
+    laeufe = [_raster(ALKAN, {(0.58, a): [alk] for a in (None, 0.46, 0.48, 0.50, 0.52)}),
+              _raster(EIS, {(0.58, a): [eis] for a in (None, 0.46, 0.48, 0.50, 0.52)})]
+    assert M.tore_waehlen(laeufe) == (0.50, None)     # alle anderen gleich gut → die engste
+
+
+def test_wahl_nimmt_die_meisten_erzaehlsaetze_dann_die_engere():
+    alk = T("Alkane", "chemie", "nennung", 0.53)
+    ab_054 = {(t, a): [alk] for t in (0.54, 0.55, 0.56, 0.58) for a in (None, 0.46, 0.48, 0.50, 0.52)}
+    assert M.tore_waehlen([_raster(ALKAN, ab_054)]) == (0.54, None)
+
+
+def test_keine_zulaessige_kombination():
+    eis = T("Wasser", "chemie", "nennung", 0.40)
+    alle = {k: [eis] for k in M.TOR_RASTER if k != M.TOR_AUS}
+    assert M.tore_waehlen([_raster(EIS, alle)]) is None
+
+
+def test_raster_ohne_jede_wirkung_faellt_auf():
+    gleich = _raster(ALKAN, {M.TOR_AUS: []})
+    assert M.raster_wirkungslos([gleich])
+    anders = _raster(ALKAN, {(0.58, 0.52): [T("Alkane", "chemie", "nennung", 0.57)]})
+    assert not M.raster_wirkungslos([gleich, anders])
+
+
+# ── Zweite Gegenprobenreihe (Format, nicht Inhalt) ───────────────────────────
+
+
+def test_zweite_reihe_mit_alltag_und_eigenen_erzaehlsaetzen():
+    daten = {"alltag": [{"fach": "chemie", "wort": "Eis", "satz": "Ein Eis, bitte."}],
+             "erzaehlsaetze": [{"fach": "mathematik", "titel": "Mitternachtsformel",
+                                "satz": "Mein Nachhilfelehrer meinte, ich soll die Mitternachtsformel nehmen."}]}
+    liste = M.nachrichten(daten)
+    eis = next(n for n in liste if n.art == "gegenprobe")
+    erz = next(n for n in liste if n.art == "fachlich")
+    assert (eis.form, eis.faecher, eis.wort) == ("alltag", (None, "chemie"), "Eis")
+    assert (erz.form, erz.faecher, erz.erwartet) == ("erzaehlung", (None, "mathematik"),
+                                                     ("mathematik", "Mitternachtsformel"))
+
+
+def test_unbekannter_schluessel_bricht_ab():
+    import pytest
+    with pytest.raises(SystemExit):
+        M.nachrichten({"alltags": []})
+
+
+def test_fehlerhafte_eintraege_werden_alle_genannt():
+    """Ein Tippfehler („title" statt „titel") oder ein leerer Satz — alle auf einmal, mit Nummer."""
+    daten = {"erzaehlsaetze": [{"fach": "chemie", "titel": "Ion", "satz": "Ich verstehe Ionen nicht."},
+                               {"fach": "chemie", "title": "Oxidation", "satz": "Was ist das?"}],
+             "alltag": [{"fach": "chemie", "wort": "", "satz": ""}]}
+    fehler = M.eintraege_pruefen(daten)
+    assert fehler == ["erzaehlsaetze Nr. 2: unbekanntes Feld „title“",
+                      "erzaehlsaetze Nr. 2: „titel“ fehlt oder ist leer",
+                      "alltag Nr. 1: „satz“ fehlt oder ist leer"]
+
+
+def test_wort_darf_leer_sein():
+    """`wort` dient nur dem Lesen — ein Alltagssatz ohne ist vollständig."""
+    assert M.eintraege_pruefen({"alltag": [{"fach": "chemie", "wort": None, "satz": "Ein Satz."}]}) == []
+
+
+def test_eigener_erzaehlsatz_ueber_fachgrenzen_und_mit_alternativen():
+    daten = {"erzaehlsaetze": [
+        {"fach": "mathematik", "chat": "nwt", "titel": "Median", "satz": "Der Median ist robust, warum?"},
+        {"fach": "mathematik", "titel": "n-te Wurzel", "auch": ["Wurzelziehen"],
+         "satz": "Warum darf man aus negativen Zahlen keine Wurzel ziehen?"}]}
+    median, wurzel = M.nachrichten(daten)
+    assert (median.art, median.faecher, median.erwartet, median.bezug) == (
+        "fachgrenze", ("nwt",), ("mathematik", "Median"), True)
+    assert wurzel.art == "fachlich" and wurzel.faecher == (None, "mathematik")
+    assert M.gefunden(wurzel, [T("Wurzelziehen", "mathematik", "nennung", 0.48)])
+    assert M.gefunden(wurzel, [T("n-te Wurzel", "mathematik", "distanz", 0.40)])
+    assert not M.gefunden(wurzel, [T("Wurzelziehen", "chemie", "nennung", 0.48)])
+    assert not M.gefunden(wurzel, [T("Potenz", "mathematik", "distanz", 0.40)])

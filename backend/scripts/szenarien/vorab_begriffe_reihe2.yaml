@@ -1,6 +1,6 @@
 alltag:
   - {fach: chemie, wort: reizend, satz: "Das ist ja reizend von dir, danke!"}
-  - {fach: chemie, title: Stoff, satz: "Dein Hemd ist aus einem tollen Stoff." }
+  - {fach: chemie, wort: Stoff, satz: "Dein Hemd ist aus einem tollen Stoff." }
   - {fach: chemie, wort: Radikal, satz: "Die Position der Linkspartei ist mir zu radikal"}
   - {fach: chemie, wort: Reduktion, satz: "Eine Reduktion der Arbeitszeit ist dringend angebracht."}
   - {fach: chemie, wort: Suspension, satz: "Aufgrund von schwerem Fehlverhalten wurde mit einer Suspension von 3 Tagen bestraft."}
@@ -16,9 +16,16 @@ alltag:
   - {fach: mathematik, wort: Basis, satz: "Auf Basis der vorliegenden Daten kann man das nicht entscheiden."}
   - {fach: nwt, wort: Objektivität, satz: "Der Artikel lässt die Objektivität des Autors vermissen."}
   - {fach: nwt, wort: Ausreißer, satz: "Da ist ja unser kleiner Ausreißer."}
-  - {fach: chemie, wort: , satz: ""}  
   - {fach: mathematik, wort: , satz: "Das ist ein entscheidender Faktor für die wirtschaftliche Entwicklung des Landes"}
-  - {fach: mathematik, wort: Potenz, satz: "Im Alter lässt die Potenz des Mannes stark nach."}    
+  - {fach: mathematik, wort: Potenz, satz: "Im Alter lässt die Potenz des Mannes stark nach."}
 erzaehlsaetze:
-    - {fach: mathematik, titel: Mitternachtsformel, satz: "Mein Nachhilfelehrer meinte, ich soll bei der Aufgabe die Mitternachtsformel nehmen."}
-    - {fach: chemie, title: , satz: ""}
+    - {fach: mathematik, titel: Mitternachtsformel, satz: "Meine Mutter meinte, ich soll bei quadratischen Gleichungen einfach immer die Mitternachtsformel nehmen."}
+    - {fach: chemie, titel: Oxidation , satz: "Ich habe gelesen, eine Oxidation nie ohne Reduktion stattfinden kann, stimmt das?."}
+    - {fach: mathematik, titel: Median , satz: "Auf Wikipedia steht, dass der Median gegen zufällige Messfehler resistent ist, warum ist das so?"}
+    - {fach: mathematik, titel: n-te Wurzel, auch: [Wurzelziehen], satz: "Ich verstehe nicht, warum man aus negativen Zahlen keine Wurzel ziehen darf."}
+    - {fach: chemie, titel: Stoffmenge , satz: "Im Video wurde erklärt, wie man die Stoffmenge aus der Masse berechnet, aber ich verstehe das nicht."}
+    - {fach: nwt, titel: Ausreißer, satz: "Ich habe gehört, dass man bei der Berechnung des Mittelwerts die Ausreißer weglassen kann, stimmt das?"}
+    - {fach: mathematik, titel: Probe, satz: "Mein Vater sagt, beim Gleichungen lösen muss man immer die Probe machen."}
+    - {fach: chemie, titel: Hydroxygruppe , satz: "Chatty sagt, damit sich ein organischer Stoff in Wasser löst, muss er eine Hydroxygruppe haben."}
+    - {fach: nwt, titel: Studie, satz: "Wir ist der Unterschied zwischen Laborbuch und Studie nicht klar."}
+    - {fach: mathematik, titel: "quadratische Gleichung" , satz: "Warum hat nicht jede quadratische Gleichung zwei Lösungen, die Mitternachtsformel hat doch x1,2"}

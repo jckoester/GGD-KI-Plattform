@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Fachbegriffe im Satz:** Nennt eine Nachricht einen Fachbegriff mitten im Satz („Letzte
+  Stunde haben wir etwas über Elektronegativität gelernt …"), kommt sein Eintrag jetzt in den
+  Kontext des Chats — auch gebeugt („eines Alkans" zu „Alkane"). Bisher klappte das nur bei
+  kurzen Fragen. Im Chat eines Fachs zählen die Begriffe dieses Fachs, seiner Bezugsfächer und
+  fachlose.
+
 ### Migration
 
 `alembic upgrade head` führt `0085` aus: Spalte `subjects.bezugsfaecher` — die Fächer, deren

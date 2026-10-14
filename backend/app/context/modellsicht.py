@@ -257,11 +257,12 @@ def fuer_modell(
         # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
         # `distanz` trägt die Vorab-Suche für die Zeile „Kontext" unter der Antwort
         # (0.14) — dem Modell sagt sie nichts, und ein Prompt-Feld mehr wäre eine
-        # Prompt-Änderung ohne Messung.
+        # Prompt-Änderung ohne Messung. Dasselbe gilt für `genannt` (Weg 2 der
+        # Vorab-Suche, 0.16): ein Messmerkmal, kein Wissen.
         eintrag = {
             k: v for k, v in t.items()
             if k not in ("node_id", "content", "subject_id", "fach", "metadata",
-                         "aliase", "distanz")
+                         "aliase", "distanz", "genannt")
         }
         if t.get("fach"):
             eintrag["fach"] = t["fach"]

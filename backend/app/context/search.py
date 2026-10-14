@@ -42,6 +42,7 @@ from app.context.embedding import generate_embedding
 from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
 from app.context.filters import Knotenfilter, wende_an
 from app.context.lookup import nachschlage_begriff, normalisiere_titel
+from app.context.nennung import genannt, namensindex
 from app.context.schemas import anzeige_felder
 from app.context.taxonomy import VORAB_TYPEN, rollen_typ_bonus
 from app.context.visibility import read_scope_clause
@@ -1269,18 +1270,46 @@ VORAB_SCHWELLE = 0.45
 #: geht es um Platz im Prompt **jeder** Nachricht, nicht nur der nachgeschlagenen.
 VORAB_MAX = 5
 
+#: Das **Tor** für einen im Satz genannten Begriff (0.16, Schritt 3; `app.context.nennung`):
+#: Er kommt herein, wenn seine **rohe** Distanz zur Nachricht darunter liegt — weiter als
+#: :data:`VORAB_SCHWELLE`, weil die Nennung schon sagt, dass er gemeint sein kann, aber nicht
+#: beliebig weit, weil „ein Eis essen" den Steckbrief Wasser nennt, ohne ihn zu meinen.
+#: Aliase sind strenger: Sie sind laut Pflege-Doku bewusst locker („Power" für Energie).
+#:
+#: Festgelegt am 14.10.2026 nach der vorab bestimmten Regel (Plan „Vorab-Suche-Begriffe",
+#: Schritt 3) am Tor-Raster des Prüfsatzes `vorab_begriffe.py`: kein neuer Fehltreffer, darunter
+#: die meisten Erzählsätze — 218 von 240. Zuvor hatte der Steckbrief Umwelt (GHS09) den Alias
+#: „Umwelt"; „Ich will etwas für die Umwelt tun." traf ihn bei 0,476, und die Regel wählte 0,46.
+#: ⚠️ **Das Tor fängt nicht jeden schlecht gewählten Alias.** Ein Alias wird genannt, sobald das
+#: Wort im Satz steht; ein Themenwort statt eines zweiten Namens ist dann ein Fehltreffer.
+VORAB_TOR_TITEL = 0.55
+VORAB_TOR_ALIAS = 0.50
+
+
+def _nennbar(profil: Suchprofil) -> set[int] | None:
+    """Aus welchen Fächern eine Nennung kommen darf: Fach der Konversation und seine
+    Bezugsfächer — ``None`` im Chat ohne Fach (dann aus allen). Fachlose immer."""
+    if profil.subject_id is None:
+        return None
+    return {profil.subject_id, *profil.bezugsfaecher}
+
 
 async def vorab(
     frage: str, profil: Suchprofil, db: AsyncSession, *, vektor=_SELBST_HOLEN
 ) -> list[dict]:
     """Was ohne Nachfrage in den Prompt darf — die Grundschicht jedes Chats (N11).
 
-    Zwei Wege hinein, und beide müssen **eng** sein, weil hier niemand um Kontext
-    gebeten hat:
+    Drei Wege hinein, und alle müssen **eng** sein, weil hier niemand um Kontext
+    gebeten hat — in dieser Reihenfolge, bis :data:`VORAB_MAX` erreicht ist:
 
     1. **Exakter Namens- oder Suchbegriff-Treffer.** Wer „Was ist ein Mol?" schreibt,
        nennt den Eintrag beim Namen — dafür braucht es keine Ähnlichkeitsschwelle.
-    2. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
+    2. **Im Satz genannt** (0.16, :mod:`app.context.nennung`): Titel oder Alias steht als
+       Wortfolge in der Nachricht, der Knoten stammt aus dem Fach der Konversation, einem
+       Bezugsfach oder keinem — und seine rohe Distanz liegt unter dem **Tor**
+       (:data:`VORAB_TOR_TITEL`, :data:`VORAB_TOR_ALIAS`). Ohne Tor holte „ein Eis essen"
+       den Steckbrief Wasser herein.
+    3. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
 
     Beschränkt auf :data:`app.context.taxonomy.VORAB_TYPEN` — die Arten, die
     Schüler:innen im Unterricht in die Hand bekommen. Bildungsplan-Kompetenzen und
@@ -1292,10 +1321,11 @@ async def vorab(
     rutschte ein fachfremder Knoten allein deshalb unter die Schwelle, weil er aus dem
     richtigen Fach kommt. Die Gegenprobe dazu steht in den Tests.
 
-    ⚠️ **Kein ILIKE-Rückfall.** Gibt es kein Embedding, steuert Weg 2 nichts bei. Eine
-    Teilstringsuche über *jede* Nachricht schriebe bei „Wie geht es dir?" alles in den
-    Prompt, was irgendwo „wie" enthält — im Werkzeugweg ist der Rückfall richtig, weil
-    dort jemand ausdrücklich gesucht hat.
+    ⚠️ **Kein ILIKE-Rückfall.** Gibt es kein Embedding, steuern Weg 2 und 3 nichts bei —
+    auch die Nennung nicht, weil ihr Tor eine Distanz braucht. Eine Teilstringsuche über
+    *jede* Nachricht schriebe bei „Wie geht es dir?" alles in den Prompt, was irgendwo
+    „wie" enthält — im Werkzeugweg ist der Rückfall richtig, weil dort jemand ausdrücklich
+    gesucht hat.
     """
     aus_profil = replace(profil, identifikation=VORAB_MAX)
     treffer: list[dict] = []
@@ -1317,6 +1347,11 @@ async def vorab(
         vektor = await vektor_oder_none(frage)
 
     if vektor is not None and len(treffer) < VORAB_MAX:
+        # Weg 2 liefert nur Kandidaten; ob sie hereinkommen, entscheidet unten das Tor.
+        nennungen = {
+            k: art for k, art in genannt(frage, await namensindex(db), _nennbar(profil)).items()
+            if k not in gesehen
+        }
         roh = ContextNode.embedding.cosine_distance(vektor)
         sortiert = roh
         aus_dem_fach = _aus_dem_fach(profil)
@@ -1325,25 +1360,45 @@ async def vorab(
         aus_eigenem_fach = _aus_eigenem_fach(profil)
         if aus_eigenem_fach is not None:
             sortiert = sortiert - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
-        stmt = (
+        basis = (
             _grundabfrage(profil)
             .add_columns(roh.label("distanz"))
             .where(ContextNode.content_type.in_(VORAB_TYPEN))
             .where(ContextNode.embedding.is_not(None))
-            .order_by(sortiert)
-            .limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
         )
-        for z in (await db.execute(stmt)).mappings().all():
+        durchs_tor = []
+        if nennungen:
+            # Die genannten Knoten **eigens** über ihre Kennung — nur sie, nur wenn es welche
+            # gibt. Sie in die Distanzabfrage zu falten (Rang als Spalte, genannte zuerst)
+            # kostete jede Nachricht 0,7 ms, auch ohne Nennung (A/B, 14.10.2026).
+            tor = {"titel": VORAB_TOR_TITEL, "alias": VORAB_TOR_ALIAS}
+            genannte = (await db.execute(
+                basis.where(ContextNode.id.in_([UUID(k) for k in nennungen]))
+            )).mappings().all()
+            durchs_tor = sorted(
+                (z for z in genannte if z["distanz"] <= tor[nennungen[str(z["id"])]]),
+                key=lambda z: z["distanz"],
+            )
+        vorn = {str(z["id"]) for z in durchs_tor}
+        # Was nicht durchs Tor kam, bleibt Kandidat der Distanz wie jeder andere: Es muss die
+        # Schwelle schaffen — eine Nennung kostet nie einen Treffer.
+        uebrige = (await db.execute(
+            basis.order_by(sortiert).limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
+        )).mappings().all()
+        for z in [*durchs_tor, *(z for z in uebrige if str(z["id"]) not in vorn)]:
             if len(treffer) >= VORAB_MAX:
                 break
-            if z["distanz"] > VORAB_SCHWELLE:
+            ist_nennung = str(z["id"]) in vorn
+            if not ist_nennung and z["distanz"] > VORAB_SCHWELLE:
                 continue
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
             if t["node_id"] in gesehen:
                 continue
             # Für die Zeile „Kontext" unter der Antwort (0.14): wie nah der Treffer lag.
-            # Ins Modell geht sie nicht — `fuer_modell` streift sie ab.
+            # Ins Modell geht sie nicht — `fuer_modell` streift sie ab, ebenso `genannt`.
             t["distanz"] = float(z["distanz"])
+            if ist_nennung:
+                t["genannt"] = True
             treffer.append(t)
             gesehen.add(t["node_id"])
 

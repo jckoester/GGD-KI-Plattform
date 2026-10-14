@@ -34,6 +34,16 @@ _UUID_OID = 2950
 
 
 @pytest.fixture(autouse=True)
+def _frischer_namensindex():
+    """Der Namensindex der Begriffsnennung (0.16) liegt 60 s im Speicher. Ohne Verwerfen
+    sähe ein Test die Knoten des vorigen — und seine eigenen, eben angelegten, nicht."""
+    from app.context import nennung
+    nennung.verwerfen()
+    yield
+    nennung.verwerfen()
+
+
+@pytest.fixture(autouse=True)
 def _kein_globaler_uuid_adapter():
     """Wacht darüber, dass niemand den UUID-Adapter prozessweit registriert.
 

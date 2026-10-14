@@ -17,8 +17,9 @@ import uuid
 import pytest
 
 from app.config import settings
-from app.context.search import VORAB_SCHWELLE, Suchprofil, vorab
-from app.db.models import ContextNode, Subject
+from app.context.search import (_KANDIDATEN_FAKTOR, VORAB_MAX, VORAB_SCHWELLE, VORAB_TOR_ALIAS,
+                                VORAB_TOR_TITEL, Suchprofil, vorab)
+from app.db.models import ContextNode, NodeAlias, Subject
 
 pytestmark = pytest.mark.asyncio
 
@@ -201,6 +202,128 @@ class TestBezugsfaecher:
         await db_session.flush()
         profil = await self._profil_im_chat(db_session, monkeypatch, None)
         assert profil.bezugsfaecher == ()
+
+
+class TestNennung:
+    """Weg 2 der Vorab-Suche: der im Satz genannte Begriff (0.16, Schritt 3).
+
+    Die Nennung bringt nur Kandidaten; herein kommt, wessen **rohe** Distanz unter dem Tor
+    liegt — weiter als die Schwelle, für Aliase enger als für Titel —, und nur aus dem Fach
+    der Konversation, seinen Bezugsfächern oder fachlos.
+    """
+
+    SATZ = "Letzte Stunde haben wir etwas über {} gelernt, das ich nicht ganz verstanden habe."
+    ZWISCHEN = (VORAB_SCHWELLE + VORAB_TOR_ALIAS) / 2          # über der Schwelle, unter beiden Toren
+    ZWISCHEN_TOREN = (VORAB_TOR_ALIAS + VORAB_TOR_TITEL) / 2   # nur für Titel nah genug
+
+    async def _vorab(self, db, frage, **extra):
+        return await vorab(frage, _profil(**extra), db, vektor=FRAGE)
+
+    async def test_genannt_und_nah_genug_kommt_mit(self, db_session, bestand):
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        await db_session.flush()
+        treffer = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert [(t["title"], t.get("genannt")) for t in treffer] == [("Elektronegativität", True)]
+
+    async def test_ohne_nennung_bleibt_er_draussen(self, db_session, bestand):
+        """Gegenprobe: derselbe Knoten, derselbe Abstand — nur nicht genannt."""
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        await db_session.flush()
+        assert await self._vorab(db_session, self.SATZ.format("die Bindung")) == []
+
+    async def test_hinter_dem_tor_bleibt_er_draussen(self, db_session, bestand):
+        """„Ein Eis essen" nennt den Steckbrief Wasser — gemeint ist er nicht."""
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Eis", VORAB_TOR_TITEL + 0.05))
+        await db_session.flush()
+        assert await self._vorab(db_session, "Wir wollen nachher ein Eis essen.") == []
+
+    async def test_alias_hat_das_engere_tor(self, db_session, bestand):
+        _, _, knoten = bestand
+        k = knoten("begriff", "Edelgasregel", self.ZWISCHEN_TOREN)
+        db_session.add(k)
+        await db_session.flush()
+        db_session.add(NodeAlias(node_id=k.id, alias="Oktettregel"))
+        await db_session.flush()
+        assert await self._vorab(db_session, self.SATZ.format("die Oktettregel")) == []
+        titel = [t["title"] for t in await self._vorab(db_session, self.SATZ.format("die Edelgasregel"))]
+        assert titel == ["Edelgasregel"]
+
+    async def test_endungen_im_satz(self, db_session, bestand):
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Ion", self.ZWISCHEN))
+        await db_session.flush()
+        assert [t["title"] for t in await self._vorab(db_session, "Ich verstehe Ionen nicht.")] == ["Ion"]
+
+    async def test_fach_ohne_bezug_kommt_ueber_die_nennung_nicht(self, db_session, bestand):
+        fach, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Fotosynthese", self.ZWISCHEN, subject=anderes))
+        await db_session.flush()
+        frage = self.SATZ.format("die Fotosynthese")
+        assert await self._vorab(db_session, frage, subject_id=fach.id) == []
+        mit_bezug = await self._vorab(db_session, frage, subject_id=fach.id, bezugsfaecher=(anderes.id,))
+        assert [t["title"] for t in mit_bezug] == ["Fotosynthese"]
+        assert [t["title"] for t in await self._vorab(db_session, frage)] == ["Fotosynthese"]
+
+    async def test_fachlose_zaehlen_immer(self, db_session, bestand):
+        fach, _, knoten = bestand
+        k = knoten("methodenblatt", "Gruppenpuzzle", self.ZWISCHEN, category="knowledge")
+        k.subject_id = None
+        db_session.add(k)
+        await db_session.flush()
+        treffer = await self._vorab(db_session, "Wir machen ein Gruppenpuzzle.", subject_id=fach.id)
+        assert [t["title"] for t in treffer] == ["Gruppenpuzzle"]
+
+    async def test_fachfremd_aber_nah_kommt_wie_bisher(self, db_session, bestand):
+        """Kriterium 2: Die Nennung kostet keinen heutigen Treffer. Ohne Bezug zählt sie nicht —
+        unter der Schwelle kommt der Knoten trotzdem, über die Distanz (F8 ist offen)."""
+        fach, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
+        await db_session.flush()
+        treffer = await self._vorab(db_session, "Wie funktioniert die schriftliche Addition?",
+                                    subject_id=fach.id)
+        assert [(t["title"], t.get("genannt")) for t in treffer] == [("Addition", None)]
+
+    async def test_fachbonus_oeffnet_das_tor_nicht(self, db_session, bestand):
+        """Wie bei der Schwelle: Das Tor gilt auf der rohen Distanz, nicht auf der sortierten."""
+        fach, _, knoten = bestand
+        db_session.add(knoten("begriff", "Elektronegativität", VORAB_TOR_TITEL + 0.02))
+        await db_session.flush()
+        frage = self.SATZ.format("Elektronegativität")
+        assert await self._vorab(db_session, frage, subject_id=fach.id) == []
+
+    async def test_nennungen_zuerst(self, db_session, bestand):
+        """F4: Nähere, ungenannte Knoten verdrängen den genannten nicht — auch nicht, wenn es
+        mehr sind, als die Abfrage an Kandidaten holt."""
+        _, _, knoten = bestand
+        n = VORAB_MAX * _KANDIDATEN_FAKTOR + 1
+        db_session.add_all([knoten("begriff", f"Nachbar {i:02d}", 0.10 + i / 1000) for i in range(n)])
+        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        await db_session.flush()
+        titel = [t["title"] for t in await self._vorab(db_session, self.SATZ.format("Elektronegativität"))]
+        assert len(titel) == VORAB_MAX and titel[0] == "Elektronegativität"
+        assert titel[1:] == [f"Nachbar {i:02d}" for i in range(VORAB_MAX - 1)]
+
+    async def test_ohne_vektor_keine_nennung(self, db_session, bestand):
+        """Das Tor braucht eine Distanz — ohne Embedding kein Rückfall auf den Namen allein."""
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        await db_session.flush()
+        frage = self.SATZ.format("Elektronegativität")
+        assert await vorab(frage, _profil(), db_session, vektor=None) == []
+
+    async def test_index_kennt_neue_begriffe_erst_nach_dem_verwerfen(self, db_session, bestand):
+        """Der Namensindex liegt im Speicher — wer ihn nicht verwirft, sieht den alten Stand."""
+        from app.context import nennung
+        _, _, knoten = bestand
+        assert await self._vorab(db_session, self.SATZ.format("Elektronegativität")) == []
+        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        await db_session.flush()
+        assert await self._vorab(db_session, self.SATZ.format("Elektronegativität")) == []
+        nennung.verwerfen()
+        assert len(await self._vorab(db_session, self.SATZ.format("Elektronegativität"))) == 1
 
 
 class TestAnker:
