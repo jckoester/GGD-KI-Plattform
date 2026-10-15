@@ -197,6 +197,24 @@ keinem Assistenten usw. mehr referenziert wird. Referenzierte Fächer werden nie
 sondern mit Referenzzählung gemeldet — dann muss erst die Referenz umgehängt werden,
 bevor die alte Zeile entfernt werden kann.
 
+### Bezugsfächer *(seit 0.16)*
+
+`bezugsfaecher` je Fach nennt die Fächer, deren Fachbegriffe es **mitliest** — etwa
+`bezugsfaecher: [biologie, chemie, physik, mathematik]` bei NwT. Gerichtet: NwT → Biologie
+heißt nicht Biologie → NwT; wer beides will, trägt beides ein. Sie wirken an drei Stellen:
+
+- **Chat:** Nennt eine Nachricht im NwT-Chat einen Biologie-Begriff, wird er angeboten;
+  ein näher liegender Begriff eines Fachs **ohne** Bezug kommt nicht als Inhalt in den
+  Prompt, sondern nur als Angebot (Entwicklerdoku: `docs/dev/kontextsuche.md`).
+- **Fachbegriff-Import:** Ein Verweis `[[Fotosynthese]]` in einer NwT-Datei findet den
+  Biologie-Eintrag. Kennen zwei Bezugsfächer denselben Titel, entsteht keine Verbindung.
+- Gleichnamige Begriffe in **verschiedenen** Fächern prüft der Import ohnehin über alle
+  Fächer, Bezug oder nicht.
+
+Jeder Slug muss selbst in der Datei stehen; sonst schreibt der Seed **nichts** und meldet
+den Eintrag. Die Querverweise des Bildungsplans sind als Vorlage zu breit (Biologie → Ethik,
+Religion ↔ Deutsch) — die Liste ist eine fachliche Entscheidung der Schule.
+
 ## Proxy-UI und Proxy-API erreichen
 
 Der Port des LiteLLM-Proxys ist **nur an `127.0.0.1` gebunden** (`docker-compose.yml`).

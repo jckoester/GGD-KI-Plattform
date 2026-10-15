@@ -63,6 +63,11 @@ aus dem Wissensspeicher der Schule, die der KI beim Antworten **vorlagen** — m
 einem Link zum Baustein. Die Plattform sucht zu jeder Nachricht selbst passende Bausteine
 heraus; schlägt der Assistent beim Antworten weitere nach, stehen sie mit dabei.
 
+Manche Bausteine nennt die Plattform der KI nur mit dem **Titel** und überlässt ihr, ob sie
+nachschlägt — etwa wenn ein Fachbegriff mitten in einem längeren Satz steht. Solche Angebote
+stehen **nicht** in der Zeile; sie lagen ja nicht vor. Schlägt der Assistent einen davon nach,
+erscheint er als „vom Assistenten nachgeschlagen“.
+
 **Die Zeile ist keine Quellenangabe.** Sie sagt, was vorlag — nicht, was die KI davon
 tatsächlich verwendet hat, und nicht, dass die Antwort stimmt. Eine Antwort kann falsch
 sein und trotzdem passende Bausteine unter sich haben. Im Zweifel öffnen Sie den Baustein

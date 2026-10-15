@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   das Modell mit der Suche im Wissensspeicher, wenn er für die Antwort zählt. Ebenso angeboten
   werden Einträge, die der Nachricht nahe, aber nicht sicher genug für den Prompt sind. Im Chat
   eines Fachs zählen die Begriffe dieses Fachs, seiner Bezugsfächer und fachlose.
+- **Bezugsfächer** je Fach in `subjects.yaml`: welche Fächer ein Fach mitliest — für Begriffe
+  im Chat und für Verweise im Fachbegriff-Import.
 - **Vorrang des Wissensspeichers:** neuer, optionaler Satz in `pedagogy.yaml`
   (`wissensspeicher_vorrang`).
 - **Statistik der Vorab-Suche** unter `/statistics/vorab`: je Woche, wie oft Einträge als

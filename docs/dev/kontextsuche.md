@@ -34,12 +34,14 @@ verrechnet werden:
 - **Aufzählung** — „alle, die …". Deterministische Filterabfrage mit Zählung vor dem
   Limit, Fassungs-Deduplizierung und Gruppierung.
 - **Vorab-Suche** (`vorab()`) — „was gehört vermutlich zu dieser Nachricht". Läuft zu
-  **jeder** Chat-Nachricht, ohne dass jemand danach fragt, und legt bis zu fünf Treffer
-  in den System-Prompt. Deshalb die einzige, die eine **Schwelle** kennt: exakter
-  Namens- oder Suchbegriff-Treffer, sonst Kosinus-Distanz ≤ `VORAB_SCHWELLE`. Beschränkt
-  auf `VORAB_TYPEN` — die Arten, die Schüler:innen im Unterricht in die Hand bekommen
-  (Flag `collection.schueler` der Taxonomie). Begründung und Messung: ADR-017, Nachtrag
-  „Vorab-Suche als Grundschicht".
+  **jeder** Chat-Nachricht, ohne dass jemand danach fragt, in **zwei Stufen** (seit 0.16):
+  bis zu fünf **sichere** Treffer als Inhalt im System-Prompt (exakter Namens- oder
+  Suchbegriff-Treffer, sonst Kosinus-Distanz ≤ `VORAB_SCHWELLE`), dazu bis zu fünf
+  **angebotene** Titel ohne Inhalt. Deshalb die einzige, die **Schwellen** kennt.
+  Beschränkt auf `VORAB_TYPEN` — die Arten, die Schüler:innen im Unterricht in die Hand
+  bekommen (Flag `collection.schueler` der Taxonomie). Einzelheiten unten unter „Die
+  Vorab-Suche: Zusage und Angebot"; Begründung und Messung: ADR-017, Nachträge
+  „Vorab-Suche als Grundschicht" und 14.10.2026.
 
 Jeder Abschnitt hat sein **eigenes Budget** (`Suchprofil`). Das ist keine Kosmetik: Ein
 gemeinsames Limit hieße, dass Namenstreffer die thematischen verdrängen — der Fehler, der
@@ -55,7 +57,7 @@ die Neukonzeption ausgelöst hat.
 | Werkzeug `search_context_nodes` | Identifikation + thematisch | `ASSISTANT_CONTEXT_LIMIT` |
 | Werkzeug `list_context_nodes` | Aufzählung | `ASSISTANT_CONTEXT_LIMIT` |
 | Assistent mit Wissensbereich | thematisch im Teilgraphen | `_ANKER_TOP_K` |
-| **Grundschicht jedes Chats** | Vorab-Suche (Name/Alias + Schwelle) | `VORAB_MAX` = 5 |
+| **Grundschicht jedes Chats** | Vorab-Suche: sicher (Name/Alias + Schwelle) und Angebot (Nennung + Band) | `VORAB_MAX` = 5 Inhalte, `VORAB_ANGEBOT_MAX` = 5 Titel |
 
 ---
 
@@ -192,6 +194,88 @@ Taxonomie und lässt den Embedding-Backfill laufen.
 
 ---
 
+## Die Vorab-Suche: Zusage und Angebot (0.16)
+
+**Ein Inhalt wird geglaubt, also muss er sicher sein. Ein Titel kostet nichts, also darf er
+breit sein.** Darauf beruht die Grundschicht seit 0.16 (Plan „Vorab-Suche-Begriffe" § 7,
+ADR-017, Nachtrag 14.10.2026). Bis 0.15 gab es nur Inhalte, und jeder Weg, Begriffe in
+Erzählsätzen zu finden („Letzte Stunde haben wir etwas über Elektronegativität gelernt …"),
+brachte Alltagswörter mit herein: „Stoff", „Probe" und „Reduktion" im Alltagssinn liegen so
+nah wie gewollte Nennungen. Gleichzeitig sucht gpt-oss ohne Anstoß praktisch nie selbst —
+mit einem Titel im Systemtext aber in rund zwei Dritteln der Fälle.
+
+| Stufe | Rolle | Was hineinkommt | Im Prompt |
+|---|---|---|---|
+| **sicher** | Zusage — darauf verlassen sich Prompt und Kontext-Zeile | Namenstreffer (`_kandidaten`); Distanz ≤ `VORAB_SCHWELLE`, im Chat mit Fach nur aus Fach, Bezugsfächern und fachlos (F8) | JSON-Block mit Lesehinweis, wie bisher |
+| **Angebot** | Bestleistung — das Modell holt, was es braucht | was **nicht sicher** ist und roh ≤ `VORAB_ANGEBOT` liegt: zuerst im Satz Genanntes (`nennung.py`), dann Distanz aus denselben 15 Kandidaten | ein Satz: „Im Wissensspeicher der Schule gibt es dazu/außerdem: Titel (Fach), … — den Inhalt holst du mit dem Werkzeug, wenn er für die Antwort zählt." |
+
+| Wert | Ort | Wirkung |
+|---|---|---|
+| `VORAB_SCHWELLE` = 0,45 | `search.py` | Grenze der sicheren Stufe. Liegt in der Lücke von `vorab_schwelle.py` (0,433 / 0,481) — nicht verschieben, ohne neu zu messen |
+| `VORAB_ANGEBOT` = 0,50 | `search.py` | Grenze des Angebots, rohe Distanz. Das Band-Raster des Prüfsatzes (0,46–0,55) zeigt, was ein breiteres Band kostete |
+| `VORAB_MAX` = 5 · `VORAB_ANGEBOT_MAX` = 5 | `search.py` | Deckel je Stufe. Was der Deckel aus der sicheren Stufe drängt, fällt ins Angebot, nicht durch beide |
+| `INDEX_TTL` = 60 s | `nennung.py` | Wie alt der Namensindex (Titel und Aliase im Speicher) höchstens ist; Neuaufbau rund 6 ms |
+
+**Die Nennung** (`app/context/nennung.py`): Titel und Aliase der Vorab-Typen als Wortfolgen in
+der Nachricht — an Wortgrenzen, längste zuerst, einfache Endungen auf **beiden** Seiten
+(„eines Alkans" ↔ „Alkane"), keine Komposita. Im Chat mit Fach zählen Begriffe dieses Fachs,
+seiner Bezugsfächer und fachlose; ohne Fach alle. Eine Nennung führt **nur zum Angebot**, nie
+zum Inhalt — auch ein Alias. Genannte Knoten, die schon unter den Kandidaten stehen, kommen
+aus deren Zeilen; nur fehlende holt eine kleine Zusatzabfrage.
+
+**Bezugsfächer** (`subjects.bezugsfaecher`, aus `config/subjects.yaml` per
+`seed_subjects.py`, Alembic 0085): gerichtet — „NwT liest Biologie mit" heißt nicht
+umgekehrt. Sie wirken an drei Stellen: Nennung, Fachfilter der sicheren Stufe (F8) und
+Verweise im Fachbegriff-Import (`docs/dev/fachbegriffe-import.md`).
+
+**Der Fachfilter (F8)** nimmt aus der sicheren Stufe Distanztreffer aus Fächern ohne Bezug —
+„schriftliche Addition" im Mathe-Chat traf sonst die Chemie-Addition (0,392). Sie fallen ins
+Angebot. Namenstreffer filtert er nicht, den freien Chat auch nicht. Gemessen 15.10.2026: die
+sieben Fehltreffer aus Fächern ohne Bezug fielen weg, kein erwarteter Knoten ging verloren.
+
+**Die Texte, die dazugehören:** Die Beschreibung von `search_context_nodes` beginnt mit der
+positiven Regel („Bei Fachbegriffen, Methoden oder Operatoren aus dem Unterricht suchst du vor
+der Antwort im Wissensspeicher der Schule"); der Vorrangsatz kommt als Schulkonfiguration aus
+`pedagogy.yaml` (`preambles.wissensspeicher_vorrang`, optional, direkt nach der Basis).
+
+**Was wo sichtbar ist:**
+- Die Zeile „Kontext" unter der Antwort zeigt sichere Treffer (`vorab`) und
+  Werkzeugergebnisse (`werkzeug`). **Angebote nicht** — sie lagen nicht vor
+  (`bausteine.Angebot` ist bewusst kein Baustein). Holt das Modell eines, steht es als
+  `werkzeug` da.
+- **Messkanal** `vorab_debug` (SSE, **nur außerhalb der Produktion**, nicht an `is_test`
+  gebunden): angebotene Knoten, welche davon im Werkzeugergebnis standen, Suchanfragen des
+  Modells. Die Oberfläche ignoriert ihn; `chat_probe.py` liest ihn.
+- **Statistik** `vorab_statistik` (Alembic 0086, `app/context/vorab_statistik.py`): je
+  Woche, Knoten, Stufe, Fach des Chats und Modell, ohne Personenbezug; gezählt nach dem
+  Speichern in eigener Transaktion, Vorschau-Chats nicht. Schlüssel `UNIQUE NULLS NOT
+  DISTINCT` — ohne die Klausel legte `ON CONFLICT` für den Chat ohne Fach jedes Mal eine neue
+  Zeile an. Lesen: `/statistics/vorab`, Bedeutung der Zahlen in
+  `docs/admin/vorab-statistik.md`. „Nachgeschlagen" heißt: im Werkzeugergebnis derselben
+  Antwort — nicht unbedingt gezielt geholt.
+
+**Messen** — `backend/scripts/vorab_begriffe.py`:
+- ohne `--chats`: der Prüfsatz gegen die echte `vorab()` — je Nachricht und Profil sichere
+  Treffer (Weg Name/Distanz) und Angebot (Nennung/Distanz), Schwellen 0,40–0,52, Band-Raster
+  0,46–0,55, Zeit;
+- mit `--chats`: Test-Chats in vorübergehenden Messgruppen, mit Messkanal und dem Abgleich
+  der Statistik (Tabelle vor und nach dem Lauf);
+- Szenarien `scripts/szenarien/vorab_begriffe.yaml` und `vorab_begriffe_reihe2.yaml` (die
+  zweite Reihe schrieb Jan, ungesehen beim Justieren).
+
+Stand 15.10.2026 (Plan § 7.8, „Ergebnis Schritt 5"): sichere Stufe gleich 0.15; erwarteter
+Knoten in 35/53 fachlichen Nachrichten sicher, mit nachgeschlagenen Angeboten 41–47/53;
+Angebot ohne sicheren Treffer zu rund zwei Dritteln nachgeschlagen, mit sicherem daneben
+fast nie.
+
+⚠️ **Was bleibt:** Ein Titel, der die Bedeutung selbst trägt, verbiegt eine Alltagsantwort
+auch ohne Suche („Das Thema können wir ausklammern." → Ausklammern). Und ein Knoten, der
+einem Alltagswort sehr nah liegt, wird manchmal nachgeschlagen („Ich will etwas für die
+Umwelt tun." → Umwelt (GHS09)) — der Testfall ist Schritt 7 des Plans. Die Statistik („oft
+angeboten, nie nachgeschlagen") ist die Liste, an der man solche Titel und Aliase findet.
+
+---
+
 ## Aliase — ein zweiter Titel, kein Metadatenfeld
 
 Seit Migration **0057** liegen weitere Namen in der Tabelle `node_aliases`, vorher als
@@ -255,7 +339,8 @@ Deshalb heißt die Zeile darunter „Kontext", nicht „Quellen".
   was `search_context_nodes` und `list_context_nodes` dem Modell zusätzlich geliefert
   haben. Die Werkzeuge hängen es an einen Sammler am `ToolContext` — eine Liste je Anfrage,
   weil der `ToolContext` je Aufruf neu entsteht.
-- **Nicht dabei:** Ankerkontext, angeheftete Knoten, Lernstand (`app/context/bausteine.py`).
+- **Nicht dabei:** Ankerkontext, angeheftete Knoten, Lernstand (`app/context/bausteine.py`)
+  — und das **Angebot** der Vorab-Suche (0.16): Dort stand nur ein Titel.
 - **Reihenfolge des ersten Auftretens**, jeder Knoten einmal; was vorab da war, bleibt
   `vorab`.
 - **Ähnlichkeit** (1 − Kosinusdistanz) nur bei thematischen Vorab-Treffern. Die Distanz
@@ -632,6 +717,7 @@ Gemessen am Entwicklungsbestand (01.09.2026, LiteLLM lokal):
 | Identifikation (exakter Abgleich + Trigramm) | ~50 ms |
 | Thematische Auswahl (nur Datenbank) | ~30 ms |
 | Aufzählung | ~15 ms |
+| Vorab-Suche ohne Embedding (0.16, beide Stufen) | ~7–10 ms; mit Nennung +1–2 % |
 
 Die Datenbank ist nicht der Engpass. Wer eine Suche schneller machen will, muss den
 Netzaufruf **vermeiden**, nicht die Abfragen optimieren.

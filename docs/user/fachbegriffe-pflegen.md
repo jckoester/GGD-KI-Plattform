@@ -126,6 +126,14 @@ machen den Eintrag auffindbar. Geantwortet wird immer mit `bevorzugter_begriff`.
 
 Ist ein Alias fachlich falsch, gehört die Richtigstellung als Fehlvorstellung daneben.
 
+Ein Suchbegriff wirkt auch **mitten im Satz** *(seit 0.16)*: Steht er in einer
+Chat-Nachricht, bietet die Plattform der KI den Eintrag mit seinem Titel an — sie holt ihn,
+wenn er für die Antwort zählt —, legt ihn aber nicht ungefragt in den Prompt. Wählen Sie
+Suchbegriffe deshalb als **zweite Namen** des Begriffs, nicht als Themenwörter: „Umwelt" am
+Gefahrenpiktogramm GHS09 ließe die KI bei jedem Satz über Umweltschutz an das Piktogramm
+denken. Welche Einträge oft angeboten und nie nachgeschlagen werden, zeigt die Statistik der
+Vorab-Suche (für Admins) — das ist die Liste zum Aufräumen.
+
 **3. Fehlvorstellungen im Wortlaut der Schüler:innen.** „Die Blasen in kochendem Wasser
 sind Luft" wirkt, „Aggregatzustandsänderung wird häufig fehlinterpretiert" nicht. Ein
 Assistent spricht die vermerkten Irrtümer an, wenn sie zur Frage passen — er zählt sie
