@@ -352,17 +352,6 @@ class TestAngebot:
         ergebnis = await self._vorab(db_session, "Wir machen ein Gruppenpuzzle.", subject_id=fach.id)
         assert self._angebot(ergebnis) == [("Gruppenpuzzle", "nennung")]
 
-    async def test_fachfremd_aber_nah_bleibt_sicher(self, db_session, bestand):
-        """Die sichere Stufe filtert nicht nach Fach (F8 ist offen): Unter der Schwelle kommt
-        der Knoten als Inhalt, wie bis 0.15."""
-        fach, anderes, knoten = bestand
-        db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
-        await db_session.flush()
-        ergebnis = await self._vorab(db_session, "Wie funktioniert die schriftliche Addition?",
-                                     subject_id=fach.id)
-        assert [t["title"] for t in ergebnis.sicher] == ["Addition"]
-        assert ergebnis.angebot == []
-
     async def test_fachbonus_oeffnet_das_band_nicht(self, db_session, bestand):
         """Wie bei der Schwelle: Das Band gilt auf der rohen Distanz, nicht auf der sortierten."""
         fach, _, knoten = bestand
@@ -393,6 +382,71 @@ class TestAngebot:
         assert self._angebot(await self._vorab(db_session, frage)) == [("Elektronegativität", "distanz")]
         nennung.verwerfen()
         assert self._angebot(await self._vorab(db_session, frage)) == [("Elektronegativität", "nennung")]
+
+
+class TestFachfilter:
+    """F8 (0.16): Im Chat mit Fach legt die sichere Stufe über die Distanz nur Knoten aus dem
+    Fach, seinen Bezugsfächern und fachlose als Inhalt vor. Ein Fach ohne Bezug wird angeboten.
+
+    Gemessen am 15.10.2026: „schriftliche Addition" im Mathe-Chat traf die Chemie-Addition
+    (0,392) — mit Filter fielen die sieben Fehltreffer aus Fächern ohne Bezug weg, kein
+    erwarteter Knoten ging verloren.
+    """
+
+    FRAGE = "Wie funktioniert die schriftliche Addition?"
+
+    async def _vorab(self, db, frage=FRAGE, **extra) -> Vorabergebnis:
+        return await vorab(frage, _profil(**extra), db, vektor=FRAGE)
+
+    async def test_fach_ohne_bezug_wird_angeboten_statt_eingefuegt(self, db_session, bestand):
+        fach, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, subject_id=fach.id)
+        assert ergebnis.sicher == []
+        assert [(t["title"], t["quelle"]) for t in ergebnis.angebot] == [("Addition", "distanz")]
+
+    async def test_mit_bezug_bleibt_er_sicher(self, db_session, bestand):
+        """Gegenprobe: derselbe Knoten, das andere Fach ist Bezugsfach."""
+        fach, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, subject_id=fach.id, bezugsfaecher=(anderes.id,))
+        assert [t["title"] for t in ergebnis.sicher] == ["Addition"]
+
+    async def test_im_freien_chat_gibt_es_keinen_filter(self, db_session, bestand):
+        _, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
+        await db_session.flush()
+        assert [t["title"] for t in (await self._vorab(db_session)).sicher] == ["Addition"]
+
+    async def test_fachlose_bleiben_sicher(self, db_session, bestand):
+        fach, _, knoten = bestand
+        k = knoten("methodenblatt", "Gruppenpuzzle", VORAB_SCHWELLE - 0.05, category="knowledge")
+        k.subject_id = None
+        db_session.add(k)
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, "Wir machen ein Gruppenpuzzle.", subject_id=fach.id)
+        assert [t["title"] for t in ergebnis.sicher] == ["Gruppenpuzzle"]
+
+    async def test_namenstreffer_filtert_er_nicht(self, db_session, bestand):
+        """Wer den Namen nennt, meint den Eintrag — auch aus einem Fach ohne Bezug."""
+        fach, anderes, knoten = bestand
+        db_session.add(knoten("begriff", "Addition", 0.9, subject=anderes))
+        await db_session.flush()
+        ergebnis = await vorab("Was ist eine Addition?", _profil(subject_id=fach.id), db_session,
+                               vektor=None)
+        assert [t["title"] for t in ergebnis.sicher] == ["Addition"]
+
+    async def test_ein_eigener_rueckt_nach(self, db_session, bestand):
+        """Der gefilterte Platz geht an den nächsten zulässigen Knoten unter der Schwelle."""
+        fach, anderes, knoten = bestand
+        db_session.add_all([knoten("begriff", "Addition", 0.20, subject=anderes),
+                            knoten("begriff", "Summand", 0.30)])
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, subject_id=fach.id)
+        assert [t["title"] for t in ergebnis.sicher] == ["Summand"]
+        assert [t["title"] for t in ergebnis.angebot] == ["Addition"]
 
 
 class TestAnker:

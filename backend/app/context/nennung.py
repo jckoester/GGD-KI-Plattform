@@ -23,7 +23,7 @@ geglaubt (Plan „Vorab-Suche-Begriffe", § 7).
 
 **Fachbezug:** In einem Chat mit Fach zählen nur Begriffe dieses Fachs, seiner Bezugsfächer
 (`subjects.bezugsfaecher`) und fachlose. Ein Begriff außerhalb kommt über die Nennung nicht
-herein — über die Distanz wie bisher schon (F8, gemessen gegen Ende von 0.16).
+herein, über die Distanz nur als Angebot (F8) — als Inhalt nur, wenn er beim Namen gefragt ist.
 
 **Kein Datenbankaufruf je Nachricht:** Die Namen liegen in einem Index im Speicher, der nach
 :data:`INDEX_TTL` Sekunden neu gelesen wird. Ein neuer Begriff wird also spätestens nach einer

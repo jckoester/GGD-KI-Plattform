@@ -31,6 +31,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Fachbegriffen, Methoden und Operatoren vor der Antwort im Wissensspeicher zu suchen.
 - **Fachbegriff-Export:** Verbindungen zu Einträgen anderer Fächer gehen mit, über deren
   Kennung. Bisher fielen sie weg.
+- **Vorab-Suche im Chat eines Fachs:** Einträge aus Fächern ohne Bezug legt sie nicht mehr als
+  Inhalt vor, sondern bietet sie nur an (etwa die Chemie-„Addition" im Mathe-Chat). Wer einen
+  Eintrag beim Namen nennt, bekommt ihn weiterhin; im Chat ohne Fach ändert sich nichts.
 
 ### Migration
 

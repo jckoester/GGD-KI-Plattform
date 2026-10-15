@@ -1298,8 +1298,9 @@ class Vorabergebnis:
 
 
 def _nennbar(profil: Suchprofil) -> set[int] | None:
-    """Aus welchen Fächern eine Nennung kommen darf: Fach der Konversation und seine
-    Bezugsfächer — ``None`` im Chat ohne Fach (dann aus allen). Fachlose immer."""
+    """Aus welchen Fächern eine Nennung — und ein Distanztreffer der sicheren Stufe (F8) —
+    kommen darf: Fach der Konversation und seine Bezugsfächer; ``None`` im Chat ohne Fach
+    (dann aus allen). Fachlose immer."""
     if profil.subject_id is None:
         return None
     return {profil.subject_id, *profil.bezugsfaecher}
@@ -1317,7 +1318,13 @@ async def vorab(
 
     1. **Exakter Namens- oder Suchbegriff-Treffer.** Wer „Was ist ein Mol?" schreibt,
        nennt den Eintrag beim Namen — dafür braucht es keine Ähnlichkeitsschwelle.
-    2. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
+    2. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE` — im Chat mit Fach nur aus
+       diesem Fach, seinen Bezugsfächern und fachlos (0.16, F8). Ein näher liegender Knoten
+       eines Fachs ohne Bezug wird **angeboten** statt eingefügt: „schriftliche Addition"
+       im Mathe-Chat traf sonst die Addition der Chemie (0,392). Gemessen 15.10.2026: Die
+       sieben Fehltreffer aus Fächern ohne Bezug fielen weg, kein erwarteter Knoten ging
+       verloren. Namenstreffer filtert das nicht — wer den Namen nennt, meint den Eintrag.
+       Im freien Chat gibt es kein Fach, also auch keinen Filter.
 
     *Angebot* — nur der Titel, bis :data:`VORAB_ANGEBOT_MAX`. Was nicht sicher ist und
     roh höchstens :data:`VORAB_ANGEBOT` entfernt liegt, aus zwei Quellen:
@@ -1383,10 +1390,15 @@ async def vorab(
     naechste = (await db.execute(
         basis.order_by(sortiert).limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
     )).mappings().all()
+    erlaubt = _nennbar(profil)
     for z in naechste:
         if len(sicher) >= VORAB_MAX:
             break
         if z["distanz"] > VORAB_SCHWELLE:
+            continue
+        # F8: Ein Fach ohne Bezug bleibt draußen — die Schleife des Angebots unten nimmt den
+        # Knoten auf, weil er nicht in `gesehen` steht.
+        if erlaubt is not None and z["subject_id"] is not None and z["subject_id"] not in erlaubt:
             continue
         t = _treffer(z, mit_metadaten=profil.mit_metadaten)
         if t["node_id"] in gesehen:
