@@ -638,9 +638,9 @@ categories:
             # `MODELL_METADATA`, das Modell braucht es nicht.
             hinweis: >-
               Leer lassen ist der Normalfall. „nur wenn genannt“ ist für Einträge, deren
-              Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind:
-              „Umwelt (GHS09)“ stand sonst bei „Ich will etwas für die Umwelt tun.“ im
-              Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff
+              Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind: Das
+              Piktogramm GHS09 („Umwelt“) stand sonst bei „Ich will etwas für die Umwelt
+              tun.“ im Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff
               in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Eine
               Frage, die ihn deutlich trifft, findet ihn weiter.
       - key: stoffsteckbrief

@@ -284,8 +284,9 @@ auch ohne Suche („Das Thema können wir ausklammern." → Ausklammern). Und ei
 Thema einem Alltagsthema nahe liegt, kommt über die Distanz — als Angebot („Ich will etwas
 für die Umwelt tun." → Umwelt (GHS09), 0,476), manchmal sogar als Inhalt („Wie kann ich im
 Alltag die Umwelt schützen?", 0,434). Gegen das Angebot hilft `nur wenn genannt`, gegen den
-Inhalt nur ein anderer Titel: Er geht in den Vektor ein („Toter Baum und Fisch (GHS09)"
-rückt beide Inhaltstreffer über die Schwelle, Plan Schritt 7). Die Statistik („oft
+Inhalt nur ein anderer Titel: Er geht in den Vektor ein — „Baum und toter Fisch (GHS09)"
+rückt beide Inhaltstreffer über die Schwelle (0,467 / 0,459; Plan Schritt 7, auf Dev so
+eingespielt und markiert, in 24 Umwelt-Test-Chats kein GHS09 mehr). Die Statistik („oft
 angeboten, nie nachgeschlagen") ist die Liste, an der man solche Titel und Aliase findet.
 
 ---

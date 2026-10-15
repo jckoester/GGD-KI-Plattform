@@ -390,7 +390,7 @@ export const FELD_SCHEMATA = {
       "werte": [
         "nur wenn genannt"
       ],
-      "hinweis": "Leer lassen ist der Normalfall. „nur wenn genannt“ ist für Einträge, deren Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind: „Umwelt (GHS09)“ stand sonst bei „Ich will etwas für die Umwelt tun.“ im Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Eine Frage, die ihn deutlich trifft, findet ihn weiter."
+      "hinweis": "Leer lassen ist der Normalfall. „nur wenn genannt“ ist für Einträge, deren Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind: Das Piktogramm GHS09 („Umwelt“) stand sonst bei „Ich will etwas für die Umwelt tun.“ im Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Eine Frage, die ihn deutlich trifft, findet ihn weiter."
     }
   },
   "stoffsteckbrief": {
