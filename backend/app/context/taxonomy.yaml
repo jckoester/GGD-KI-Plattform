@@ -626,6 +626,23 @@ categories:
             typ: text
             label: "Herkunft"
             hinweis: "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
+          angebot:
+            typ: auswahl
+            label: "Im Chat anbieten"
+            werte: ["nur wenn genannt"]
+            # ⚠️ **Sperrt nur das Angebot über die Distanz** (0.16, Plan „Vorab-Suche-Begriffe"
+            # § 7.9, gemessen 15.10.2026). Name, Nennung und die sichere Stufe bleiben:
+            # Dieselbe Sperre auch für die sichere Stufe verlor echte Fragen — „Piktogramm
+            # mit dem toten Fisch" findet GHS09 nur über die Distanz, die Nennung scheitert
+            # an der Beugung. Gelesen in `search.vorab()` (`NUR_WENN_GENANNT`); **nicht** in
+            # `MODELL_METADATA`, das Modell braucht es nicht.
+            hinweis: >-
+              Leer lassen ist der Normalfall. „nur wenn genannt“ ist für Einträge, deren
+              Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind:
+              „Umwelt (GHS09)“ stand sonst bei „Ich will etwas für die Umwelt tun.“ im
+              Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff
+              in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Eine
+              Frage, die ihn deutlich trifft, findet ihn weiter.
       - key: stoffsteckbrief
         label_de: "Stoffsteckbrief"
         icon: FlaskConical
@@ -746,6 +763,16 @@ categories:
             hinweis: >-
               Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des
               DEGINTU-Abgleichs.
+          angebot:
+            typ: auswahl
+            label: "Im Chat anbieten"
+            # Wie beim Fachbegriff — derselbe Wert, `search.NUR_WENN_GENANNT` liest beide.
+            werte: ["nur wenn genannt"]
+            hinweis: >-
+              Leer lassen ist der Normalfall. „nur wenn genannt“: Der Chat nennt den
+              Steckbrief nur, wenn Titel oder ein Suchbegriff in der Nachricht steht — nicht
+              schon, weil sie thematisch ähnlich ist. Für Stoffe, deren Name auch ein
+              Alltagsthema ist. Alltagsnamen zählen hier nicht als Nennung.
         # ⚠️ **`eigenschaften` und `ghs` bleiben ungeprüftes Metadata.** Die Feldtypen
         # (`int|text|auswahl|liste`) tragen weder verschachtelte Objekte noch gemischte
         # Listen, und `ghs` ist genau das: entweder ein Verweis oder ein Verweis **mit

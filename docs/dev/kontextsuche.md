@@ -207,7 +207,7 @@ mit einem Titel im Systemtext aber in rund zwei Dritteln der Fälle.
 | Stufe | Rolle | Was hineinkommt | Im Prompt |
 |---|---|---|---|
 | **sicher** | Zusage — darauf verlassen sich Prompt und Kontext-Zeile | Namenstreffer (`_kandidaten`); Distanz ≤ `VORAB_SCHWELLE`, im Chat mit Fach nur aus Fach, Bezugsfächern und fachlos (F8) | JSON-Block mit Lesehinweis, wie bisher |
-| **Angebot** | Bestleistung — das Modell holt, was es braucht | was **nicht sicher** ist und roh ≤ `VORAB_ANGEBOT` liegt: zuerst im Satz Genanntes (`nennung.py`), dann Distanz aus denselben 15 Kandidaten | ein Satz: „Im Wissensspeicher der Schule gibt es dazu/außerdem: Titel (Fach), … — den Inhalt holst du mit dem Werkzeug, wenn er für die Antwort zählt." |
+| **Angebot** | Bestleistung — das Modell holt, was es braucht | was **nicht sicher** ist und roh ≤ `VORAB_ANGEBOT` liegt: zuerst im Satz Genanntes (`nennung.py`), dann Distanz aus denselben 15 Kandidaten — außer Knoten mit `angebot: nur wenn genannt` | ein Satz: „Im Wissensspeicher der Schule gibt es dazu/außerdem: Titel (Fach), … — den Inhalt holst du mit dem Werkzeug, wenn er für die Antwort zählt." |
 
 | Wert | Ort | Wirkung |
 |---|---|---|
@@ -232,6 +232,17 @@ Verweise im Fachbegriff-Import (`docs/dev/fachbegriffe-import.md`).
 „schriftliche Addition" im Mathe-Chat traf sonst die Chemie-Addition (0,392). Sie fallen ins
 Angebot. Namenstreffer filtert er nicht, den freien Chat auch nicht. Gemessen 15.10.2026: die
 sieben Fehltreffer aus Fächern ohne Bezug fielen weg, kein erwarteter Knoten ging verloren.
+
+**Nur wenn genannt** (Feld `angebot` an `begriff` und `stoffsteckbrief`, im Editor „Im Chat
+anbieten"; `search.NUR_WENN_GENANNT`): Die Fachschaft nimmt einen Knoten aus dem Angebot über
+die **Distanz**. Für Einträge, deren Thema einem Alltagsthema nahe liegt, die aber nur
+fachlich gemeint sind — der Vektor trennt „die Umwelt schützen" nicht von „umweltgefährliche
+Stoffe". Name, Nennung und sichere Stufe bleiben. Gemessen 15.10.2026 (Plan § 7.9, zwölf neue
+Umwelt-Sätze, zwei Profile): Mit GHS09 markiert fallen alle Distanz-Angebote weg, keine
+echte GHS09-Frage geht verloren. Dieselbe Sperre auch für die sichere Stufe kostete sechs von
+neun echten Fragen den Inhalt („Piktogramm mit dem toten Fisch" trifft nur über die Distanz,
+die Nennung scheitert an der Beugung) — deshalb nicht. Die Kandidatenzeilen tragen
+`metadata` ohnehin; die Prüfung kostet keine Abfrage.
 
 **Die Texte, die dazugehören:** Die Beschreibung von `search_context_nodes` beginnt mit der
 positiven Regel („Bei Fachbegriffen, Methoden oder Operatoren aus dem Unterricht suchst du vor
@@ -269,9 +280,12 @@ Angebot ohne sicheren Treffer zu rund zwei Dritteln nachgeschlagen, mit sicherem
 fast nie.
 
 ⚠️ **Was bleibt:** Ein Titel, der die Bedeutung selbst trägt, verbiegt eine Alltagsantwort
-auch ohne Suche („Das Thema können wir ausklammern." → Ausklammern). Und ein Knoten, der
-einem Alltagswort sehr nah liegt, wird manchmal nachgeschlagen („Ich will etwas für die
-Umwelt tun." → Umwelt (GHS09)) — der Testfall ist Schritt 7 des Plans. Die Statistik („oft
+auch ohne Suche („Das Thema können wir ausklammern." → Ausklammern). Und ein Knoten, dessen
+Thema einem Alltagsthema nahe liegt, kommt über die Distanz — als Angebot („Ich will etwas
+für die Umwelt tun." → Umwelt (GHS09), 0,476), manchmal sogar als Inhalt („Wie kann ich im
+Alltag die Umwelt schützen?", 0,434). Gegen das Angebot hilft `nur wenn genannt`, gegen den
+Inhalt nur ein anderer Titel: Er geht in den Vektor ein („Toter Baum und Fisch (GHS09)"
+rückt beide Inhaltstreffer über die Schwelle, Plan Schritt 7). Die Statistik („oft
 angeboten, nie nachgeschlagen") ist die Liste, an der man solche Titel und Aliase findet.
 
 ---

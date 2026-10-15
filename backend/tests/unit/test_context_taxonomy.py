@@ -372,3 +372,29 @@ class TestModellMetadata:
 
         assert modell_metadata_felder("ik_kompetenz") == ()
         assert modell_metadata_felder(None) == ()
+
+
+class TestNurWennGenannt:
+    """Das Feld `angebot` (0.16, Plan „Vorab-Suche-Begriffe“ § 7.9): Die Fachschaft nimmt einen
+    Eintrag aus dem Angebot über die Distanz.
+
+    ⚠️ **Schlüssel und Wert stehen zweimal** — hier im Schema, in `search.NUR_WENN_GENANNT`
+    für `vorab()`. Laufen sie auseinander, wählt die Fachschaft im Editor einen Wert, den
+    niemand liest, und der Eintrag steht weiter im Angebot.
+    """
+
+    @pytest.mark.parametrize("typ", ["begriff", "stoffsteckbrief"])
+    def test_schema_kennt_den_wert_den_die_suche_liest(self, typ):
+        from app.context.search import NUR_WENN_GENANNT
+        from app.context.taxonomy import feld_schema
+
+        feld, wert = NUR_WENN_GENANNT
+        assert feld_schema(typ)[feld]["werte"] == [wert]
+
+    @pytest.mark.parametrize("typ", ["begriff", "stoffsteckbrief"])
+    def test_geht_nicht_ans_modell(self, typ):
+        """Eine Steuerangabe für die Suche, kein Fachwissen."""
+        from app.context.search import NUR_WENN_GENANNT
+        from app.context.taxonomy import modell_metadata_felder
+
+        assert NUR_WENN_GENANNT[0] not in modell_metadata_felder(typ)

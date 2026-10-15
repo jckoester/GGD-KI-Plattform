@@ -26,6 +26,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Gleichnamige Fachbegriffe anderer Fächer** legen Import und Editor nur noch mit
   Abgrenzung an; der Bericht nennt sie. Für den Bestand listet
   `scripts/fachbegriffe_kollisionen.py` die Paare.
+- **„Im Chat anbieten: nur wenn genannt"** an Fachbegriffen und Stoffsteckbriefen (im Vault
+  `angebot: nur wenn genannt`): Der Chat bietet den Eintrag dann nur an, wenn Titel oder
+  Suchbegriff in der Nachricht stehen — nicht schon bei thematischer Nähe. Für Einträge, deren
+  Thema alltäglich klingt, etwa GHS09 „Umwelt".
 
 ### Geändert
 

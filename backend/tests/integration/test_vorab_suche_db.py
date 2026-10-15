@@ -17,8 +17,9 @@ import uuid
 import pytest
 
 from app.config import settings
-from app.context.search import (_KANDIDATEN_FAKTOR, VORAB_ANGEBOT, VORAB_ANGEBOT_MAX, VORAB_MAX,
-                                VORAB_SCHWELLE, Suchprofil, Vorabergebnis, vorab)
+from app.context.search import (_KANDIDATEN_FAKTOR, NUR_WENN_GENANNT, VORAB_ANGEBOT,
+                                VORAB_ANGEBOT_MAX, VORAB_MAX, VORAB_SCHWELLE, Suchprofil,
+                                Vorabergebnis, vorab)
 from app.db.models import ContextNode, NodeAlias, Subject
 
 pytestmark = pytest.mark.asyncio
@@ -447,6 +448,75 @@ class TestFachfilter:
         ergebnis = await self._vorab(db_session, subject_id=fach.id)
         assert [t["title"] for t in ergebnis.sicher] == ["Summand"]
         assert [t["title"] for t in ergebnis.angebot] == ["Addition"]
+
+
+class TestNurWennGenannt:
+    """Feld `angebot: nur wenn genannt` (0.16, Plan § 7.9): kein Angebot über die Distanz.
+
+    Für Einträge, deren Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint
+    sind — „Umwelt (GHS09)“ stand bei „Ich will etwas für die Umwelt tun.“ im Angebot.
+    Name, Nennung und sichere Stufe bleiben: Echte GHS09-Fragen treffen über die Distanz.
+    """
+
+    SATZ = TestAngebot.SATZ
+    IM_BAND = TestAngebot.IM_BAND
+
+    @staticmethod
+    def _markiert(k: ContextNode) -> ContextNode:
+        feld, wert = NUR_WENN_GENANNT
+        k.metadata_ = {feld: wert}
+        return k
+
+    async def _vorab(self, db, frage, **extra) -> Vorabergebnis:
+        return await vorab(frage, _profil(**extra), db, vektor=FRAGE)
+
+    async def test_markiert_nicht_ueber_die_distanz(self, db_session, bestand):
+        """Gegenprobe im selben Lauf: der unmarkierte Nachbar, gleich nah, wird angeboten."""
+        _, _, knoten = bestand
+        db_session.add_all([self._markiert(knoten("begriff", "Umwelt (GHS09)", self.IM_BAND)),
+                            knoten("begriff", "Recycling", self.IM_BAND)])
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, "Ich will etwas für die Umwelt tun.")
+        assert ergebnis.sicher == []
+        assert [(t["title"], t["quelle"]) for t in ergebnis.angebot] == [("Recycling", "distanz")]
+
+    async def test_genannt_wird_angeboten(self, db_session, bestand):
+        _, _, knoten = bestand
+        db_session.add(self._markiert(knoten("begriff", "Elektronegativität", self.IM_BAND)))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert [(t["title"], t["quelle"]) for t in ergebnis.angebot] == [
+            ("Elektronegativität", "nennung")]
+
+    async def test_unter_der_schwelle_bleibt_sicher(self, db_session, bestand):
+        """„Was bedeutet das Piktogramm mit dem toten Fisch?“ trifft GHS09 nur so (0,412)."""
+        _, _, knoten = bestand
+        db_session.add(self._markiert(knoten("begriff", "Umwelt (GHS09)", VORAB_SCHWELLE - 0.05)))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, "Was bedeutet das Piktogramm mit dem toten Fisch?")
+        assert [t["title"] for t in ergebnis.sicher] == ["Umwelt (GHS09)"]
+
+    async def test_namenstreffer_bleibt(self, db_session, bestand):
+        _, _, knoten = bestand
+        k = self._markiert(knoten("begriff", "Umwelt (GHS09)", 0.9))
+        db_session.add(k)
+        await db_session.flush()
+        db_session.add(NodeAlias(node_id=k.id, alias="GHS09"))
+        await db_session.flush()
+        ergebnis = await vorab("GHS09", _profil(), db_session, vektor=None)
+        assert [t["title"] for t in ergebnis.sicher] == ["Umwelt (GHS09)"]
+
+    async def test_vom_fachfilter_genommen_faellt_ganz_weg(self, db_session, bestand):
+        """F8 schiebt einen Knoten aus einem Fach ohne Bezug ins Angebot — über die Distanz.
+        Markiert kommt er dort nicht an: Im Geographie-Chat stünde GHS09 sonst bei „Wie kann
+        ich im Alltag die Umwelt schützen?“ (0,434) im Angebot."""
+        fach, anderes, knoten = bestand
+        db_session.add(self._markiert(
+            knoten("begriff", "Umwelt (GHS09)", VORAB_SCHWELLE - 0.02, subject=anderes)))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, "Wie kann ich im Alltag die Umwelt schützen?",
+                                     subject_id=fach.id)
+        assert (ergebnis.sicher, ergebnis.angebot) == ([], [])
 
 
 class TestAnker:

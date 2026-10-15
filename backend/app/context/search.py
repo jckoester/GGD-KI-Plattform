@@ -1284,6 +1284,24 @@ VORAB_ANGEBOT = 0.50
 #: Wie viele Titel das Angebot höchstens nennt — Nennungen zuerst, dann Distanz.
 VORAB_ANGEBOT_MAX = 5
 
+#: Metadatenfeld und Wert, mit denen eine Fachschaft einen Knoten aus dem Angebot **über die
+#: Distanz** nimmt (0.16, Plan „Vorab-Suche-Begriffe" § 7.9). Für Einträge, deren Thema einem
+#: Alltagsthema nahe liegt, die aber nur fachlich gemeint sind: „Umwelt (GHS09)" stand bei
+#: „Ich will etwas für die Umwelt tun." im Angebot, und das Modell schlug es nach. Der Vektor
+#: trennt beides nicht — das Thema ist ja verwandt.
+#:
+#: Gemessen 15.10.2026 an zwölf neuen Umwelt-Sätzen: Die Sperre nimmt alle Distanz-Angebote
+#: und kostet keine echte GHS09-Frage. Sie gilt **nur** dem Angebot: In der sicheren Stufe
+#: kostete dieselbe Sperre sechs von neun echten Fragen den Inhalt — „Piktogramm mit dem toten
+#: Fisch" trifft GHS09 nur über die Distanz, die Nennung scheitert an der Beugung. Das Feld
+#: steht in `taxonomy.yaml` an `begriff` und `stoffsteckbrief`.
+NUR_WENN_GENANNT = ("angebot", "nur wenn genannt")
+
+
+def _nur_wenn_genannt(zeile) -> bool:
+    feld, wert = NUR_WENN_GENANNT
+    return (zeile["metadata"] or {}).get(feld) == wert
+
 
 @dataclass
 class Vorabergebnis:
@@ -1334,7 +1352,8 @@ async def vorab(
        Bezugsfach oder keinem. Zuerst, weil die Nennung sagt, dass er gemeint sein kann.
     2. **Distanz** — aus denselben Kandidaten wie Weg 2 der sicheren Stufe, ohne eigene
        Abfrage. So fällt auch ein Knoten unter der Schwelle, den der Deckel aus der
-       sicheren Stufe gedrängt hat, nicht durch beide Stufen.
+       sicheren Stufe gedrängt hat, nicht durch beide Stufen. Ausgenommen sind Knoten,
+       die ihre Fachschaft auf „nur wenn genannt“ gestellt hat (:data:`NUR_WENN_GENANNT`).
 
     Beschränkt auf :data:`app.context.taxonomy.VORAB_TYPEN` — die Arten, die
     Schüler:innen im Unterricht in die Hand bekommen. Bildungsplan-Kompetenzen und
@@ -1430,6 +1449,8 @@ async def vorab(
             if len(angebot) >= VORAB_ANGEBOT_MAX:
                 break
             if z["distanz"] > VORAB_ANGEBOT or str(z["id"]) in gesehen:
+                continue
+            if quelle == "distanz" and _nur_wenn_genannt(z):
                 continue
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
             t["distanz"] = float(z["distanz"])

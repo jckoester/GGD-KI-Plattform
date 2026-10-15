@@ -95,6 +95,14 @@ class TestWasGelesenWird:
         assert "verwandt" not in fiktivum.metadata
         assert "knotentyp" not in fiktivum.metadata
 
+    def test_angebot_kommt_aus_dem_frontmatter(self, seed):
+        """`angebot: nur wenn genannt` (0.16) braucht keine eigene Zeile im Import — es steht
+        im Feldschema. Fiele es dort weg, setzte die Fachschaft die Markierung im Vault, und
+        sie käme nie an."""
+        k = seed.lies_datei("Umweltding", "---\nknotentyp: begriff\ntitel: Umweltding\n"
+                            "angebot: nur wenn genannt\n---\n\nEin Umweltding ist erfunden.\n")
+        assert k.metadata["angebot"] == "nur wenn genannt"
+
     def test_freie_metadaten_gehen_mit(self, teststoff):
         """`eigenschaften` ist ein verschachteltes Objekt und deshalb kein Feld im
         Schema (AP2b) — mitgeschrieben wird es trotzdem."""

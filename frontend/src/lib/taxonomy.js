@@ -383,6 +383,14 @@ export const FELD_SCHEMATA = {
       "typ": "text",
       "label": "Herkunft",
       "hinweis": "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
+    },
+    "angebot": {
+      "typ": "auswahl",
+      "label": "Im Chat anbieten",
+      "werte": [
+        "nur wenn genannt"
+      ],
+      "hinweis": "Leer lassen ist der Normalfall. „nur wenn genannt“ ist für Einträge, deren Thema einem Alltagsthema nahe liegt, die aber nur fachlich gemeint sind: „Umwelt (GHS09)“ stand sonst bei „Ich will etwas für die Umwelt tun.“ im Angebot. Der Chat nennt den Eintrag dann nur, wenn Titel oder ein Suchbegriff in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Eine Frage, die ihn deutlich trifft, findet ihn weiter."
     }
   },
   "stoffsteckbrief": {
@@ -435,6 +443,14 @@ export const FELD_SCHEMATA = {
       "typ": "text",
       "label": "Herkunft",
       "hinweis": "Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des DEGINTU-Abgleichs."
+    },
+    "angebot": {
+      "typ": "auswahl",
+      "label": "Im Chat anbieten",
+      "werte": [
+        "nur wenn genannt"
+      ],
+      "hinweis": "Leer lassen ist der Normalfall. „nur wenn genannt“: Der Chat nennt den Steckbrief nur, wenn Titel oder ein Suchbegriff in der Nachricht steht — nicht schon, weil sie thematisch ähnlich ist. Für Stoffe, deren Name auch ein Alltagsthema ist. Alltagsnamen zählen hier nicht als Nennung."
     }
   }
 }

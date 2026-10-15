@@ -27,6 +27,7 @@ Abschnitten mit `##`. Zeilen im Kopf, die mit `#` beginnen, sind Anmerkungen.
 | `oberbegriff`, `verwandt`, `voraussetzung`, `vertieft_in` | Verweise `[[Dateiname]]` |
 | `illustrationen` | Datei unter `_Abb/` plus Beschreibung |
 | `quelle` | Herkunft des Entwurfs |
+| `angebot` | meist weglassen. `nur wenn genannt` für Einträge, die nur fachlich gemeint sind, deren Thema aber alltäglich klingt (GHS09 „Umwelt“) |
 
 Stoffsteckbriefe zusätzlich: `formel`, `smiles`, `trivialnamen`, `stoffklasse`,
 `teilchen`, `eigenschaften`, `nachweis`, `ghs`.

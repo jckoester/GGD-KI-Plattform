@@ -90,6 +90,7 @@ Zeilen im Kopf, die mit `#` beginnen, sind Anmerkungen und werden nicht eingespi
 | `oberbegriff`, `verwandt`, `voraussetzung`, `vertieft_in` | Verbindungen zu anderen Einträgen, als `[[Dateiname]]` |
 | `illustrationen` | Abbildungen mit Datei und Beschreibung |
 | `quelle` | woher der Entwurf stammt |
+| `angebot` | meist weglassen; `nur wenn genannt` für Einträge, deren Thema alltäglich klingt (siehe Punkt 2 unten) |
 
 Stoffsteckbriefe haben zusätzlich `formel`, `smiles`, `trivialnamen`, `stoffklasse`,
 `teilchen`, `eigenschaften`, `nachweis` und `ghs`.
@@ -133,6 +134,15 @@ Suchbegriffe deshalb als **zweite Namen** des Begriffs, nicht als Themenwörter:
 Gefahrenpiktogramm GHS09 ließe die KI bei jedem Satz über Umweltschutz an das Piktogramm
 denken. Welche Einträge oft angeboten und nie nachgeschlagen werden, zeigt die Statistik der
 Vorab-Suche (für Admins) — das ist die Liste zum Aufräumen.
+
+Manchmal liegt nicht ein Wort, sondern das **Thema** zu nah am Alltag: Das Piktogramm GHS09
+handelt von Umweltschäden, und die Plattform bot es auch ohne den Suchbegriff bei „Ich will
+etwas für die Umwelt tun.“ an. Für solche Einträge gibt es das Feld `angebot: nur wenn genannt`
+— in der Oberfläche **„Im Chat anbieten“**. Die Plattform bietet den Eintrag dann nur an, wenn
+sein Titel oder ein Suchbegriff in der Nachricht steht. Eine Frage, die ihn deutlich trifft
+(„Was bedeutet das Piktogramm mit dem toten Fisch?“), findet ihn weiter. Setzen Sie das Feld
+nur, wenn Ihnen ein Eintrag in fremden Zusammenhängen auffällt: Ohne es bietet die Plattform
+auch Umschreibungen an, die keinen Suchbegriff treffen.
 
 **3. Fehlvorstellungen im Wortlaut der Schüler:innen.** „Die Blasen in kochendem Wasser
 sind Luft" wirkt, „Aggregatzustandsänderung wird häufig fehlinterpretiert" nicht. Ein
