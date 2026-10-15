@@ -132,3 +132,30 @@ export function eingespielt(bericht) {
 export function brauchtEinbettung(bericht) {
   return (bericht?.neu ?? 0) > 0 || (bericht?.neu_einzubetten ?? 0) > 0;
 }
+
+/**
+ * Was der Import aus einem gleichnamigen Eintrag eines anderen Fachs gemacht hat (0.16, F7).
+ * Dieselben Schlüssel wie `KOLLISION_FOLGEN` im Backend.
+ */
+export const KOLLISION_FOLGEN = {
+    uebergangen: "nicht angelegt — ohne Abgrenzung",
+    abgegrenzt: "angelegt — mit Abgrenzung",
+    hinweis: "nur ein Hinweis — gleicher Suchbegriff",
+    bestand: "schon vorher so",
+};
+
+/**
+ * Die Kollisionen des Berichts, sperrende zuerst: Was nicht angelegt wurde, steht oben —
+ * es ist das Einzige, wozu jemand etwas tun muss.
+ */
+export function kollisionen(bericht) {
+    const rang = Object.keys(KOLLISION_FOLGEN);
+    return [...(bericht.kollisionen ?? [])].sort(
+        (a, b) => rang.indexOf(a.folge) - rang.indexOf(b.folge),
+    );
+}
+
+/** „„Fotosynthese“ (Biologie, gleicher Titel)" — der vorhandene Eintrag in einer Zeile. */
+export function gegenText(gegen) {
+    return `„${gegen.titel}“ (${gegen.fach ?? "fachlos"}, ${gegen.art})`;
+}

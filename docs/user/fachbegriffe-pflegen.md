@@ -147,6 +147,36 @@ Normalfall beim Aufbau. Der Bericht listet solche Verweise nach Häufigkeit auf:
 Ihre Arbeitsliste für die nächste Runde. Sobald das Ziel da ist, schließt der nächste
 Lauf die Lücke von selbst.
 
+## Begriffe anderer Fächer
+
+*Seit 0.16.*
+
+**Verweisen statt doppelt anlegen.** NwT braucht „Fotosynthese", Biologie hat den Eintrag
+schon: Verweisen Sie auf ihn, statt einen eigenen anzulegen. `[[Fotosynthese]]` findet ihn,
+wenn Biologie ein **Bezugsfach** von NwT ist (das legt die Schule in ihrer Fächerliste
+fest). Eindeutig in jedem Fach ist die **Kennung** des Eintrags, etwa `[[bio-fotosynthese]]`.
+Sie steht in seiner Detailansicht oben, neben Typ und Fassung. Führen zwei Bezugsfächer
+denselben Titel, entsteht über den Titel keine Verbindung — dann hilft nur die Kennung.
+
+**Ein eigener Eintrag braucht eine Abgrenzung.** Führt ein anderes Fach schon einen Begriff
+desselben Namens — oder ist Ihr Titel dort ein Suchbegriff —, legt die Plattform Ihren nur an,
+wenn er den vorhandenen unter `## Abgrenzung` nennt, mit dem Unterschied:
+
+```markdown
+## Abgrenzung
+
+- [[bio-fotosynthese]] – in NwT die Energiewandlung im Blatt, ohne die Stoffwechselchemie
+```
+
+Ohne Abgrenzung überspringt der Import die Datei und nennt den vorhandenen Eintrag. Im Editor
+fragt die Plattform beim Speichern nach („Mit Abgrenzung speichern"); den Unterschied tragen
+Sie danach unter „Verknüpfen" als Hinweis ein. Gleiche **Suchbegriffe** in zwei Fächern sind
+erlaubt — der Bericht nennt sie nur.
+
+Einträge, die schon vor 0.16 doppelt angelegt waren, bleiben bearbeitbar. Die Admins haben
+eine Liste davon; ob einer zurücktritt oder beide sich abgrenzen, entscheiden die
+Fachschaften.
+
 ## Abbildungen
 
 Legen Sie SVG-Dateien in einen Unterordner `_Abb/`, tragen Sie sie unter

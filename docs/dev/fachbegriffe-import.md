@@ -288,14 +288,53 @@ dann aus, wenn er gebraucht wird.
 ## Wohin ein Wikilink zeigt
 
 `[[Ziel]]` meint eine **Datei**, keinen Titel — gleichnamige Fassungen („Oxidation")
-wären über den Titel nicht zu unterscheiden. Gesucht wird deshalb zuerst im **Bündel**.
-Liegt das Ziel nicht darin (der Normalfall beim Hochladen einer einzelnen Datei),
-greift der Lauf auf den Bestand des Fachs zurück: abgeleitete Kennung, dann
-Herkunftsdatei, dann Titel. Tragen mehrere Knoten denselben Titel, entsteht **keine**
-Kante — eine davon zu greifen wäre geraten.
+wären über den Titel nicht zu unterscheiden. Aufgelöst wird in dieser Reihenfolge
+(`Verweisziele` in `fachbegriffe_import.py`); der erste Weg, der etwas findet, entscheidet:
 
-Gefunden wird nur, was der Import auch schreibt (`begriff`, `stoffsteckbrief`) und nur
-im selben Fach. Sonst hinge ein Chemiebegriff an einem gleichnamigen Curriculum-Kapitel.
+1. das **Bündel** (Dateiname),
+2. der Bestand des **eigenen Fachs**: abgeleitete Kennung, Herkunftsdatei, Titel,
+3. eine **Kennung in irgendeinem Fach** — `[[bio-fotosynthese]]` ist je Fach eindeutig und
+   trägt das Fachkürzel; sie gilt auch für Fächer ohne Bezug *(seit 0.16)*,
+4. der Bestand der **Bezugsfächer** (`subjects.bezugsfaecher`) *(seit 0.16)*.
+
+**Mehrdeutig heißt: keine Kante.** Zwei Fassungen im eigenen Fach, eine Kennung in zwei
+Fächern, ein Titel in zwei Bezugsfächern — eine davon zu greifen wäre geraten. Eindeutig
+macht es die Kennung des Ziels. Die Kante gehört dem eigenen Knoten; am fremden schreibt
+der Import nichts, die Rechte des anderen Fachs bleiben unberührt.
+
+Gefunden wird nur, was der Import auch schreibt (`begriff`, `stoffsteckbrief`). Sonst hinge
+ein Chemiebegriff an einem gleichnamigen Curriculum-Kapitel. Ein erneuter Import schließt
+offene Ziele, sobald sie da sind — die Kanten werden bei jedem Lauf neu gesetzt.
+
+## Gleichnamige Begriffe in anderen Fächern *(seit 0.16)*
+
+Einen Begriff, den ein anderes Fach schon führt, gibt es nur mit **Abgrenzung**
+(`app/context/fachbegriffe_kollision.py`, Plan „Vorab-Suche-Begriffe" F7):
+
+| Namensgleichheit (normalisiert) | Folge |
+|---|---|
+| Titel = fremder Titel | sperrt |
+| Titel = fremder Suchbegriff | sperrt |
+| Suchbegriff = fremder Titel | sperrt |
+| Suchbegriff = fremder Suchbegriff | nur Hinweis — Suchbegriffe sind locker („Energie" tragen mehrere) |
+
+- **Geprüft gegen alle Fächer**, nicht nur Bezugsfächer, und nur gegen **aktive, allgemein
+  lesbare** Einträge (`OFFENE_SCOPES`): Ein privater Entwurf ist kein Bestand des Fachs, und
+  sein Titel gehört in keine fremde Meldung. Fassungen im **selben** Fach lösen nichts aus.
+- **Abgegrenzt** ist, wer den vorhandenen Eintrag unter `## Abgrenzung` nennt (aufgelöst wie
+  oben, meist über seine Kennung). Ohne Abgrenzung: `uebergangen`, mit dem Rat, auf den
+  vorhandenen zu verweisen.
+- **Nur Neues sperrt.** Ein Knoten, der schon vor 0.16 kollidierte, wird weiter
+  aktualisiert (`bestand` im Bericht). Sperren kann auch eine Änderung — ein neuer Titel oder
+  Suchbegriff, der die Kollision erst schafft.
+- **Symmetrisch:** Wer zuerst da war, gewinnt kein Recht; der zweite braucht die Abgrenzung.
+- **Der Editor** prüft beim Anlegen und beim Ändern von Titel, Suchbegriffen oder Fach
+  genauso: **409** mit `{grund: "kollision", nachricht, kollisionen}`; die Oberfläche fragt
+  nach und schickt `abgrenzung_zu: [UUID]` — dann entsteht je Ziel eine Abgrenzungskante
+  (`related_to`, `art: abgrenzung`). Ziele müssen aktive Fachbegriffe sein, die die Person
+  lesen darf (sonst 422).
+- **Bestand:** `python scripts/fachbegriffe_kollisionen.py [--nur-offene]` listet die Paare,
+  die schon da sind — mit Art und ob einer den anderen abgrenzt. Exit-Code 1 bei offenen.
 
 ## Der Bericht
 
@@ -308,7 +347,9 @@ im selben Fach. Sonst hinge ein Chemiebegriff an einem gleichnamigen Curriculum-
 | `n Kanten, davon n angefasst` | Soll-Ist-Abgleich; gelöschte Kanten sind mitgezählt |
 | `Feld \`x\` verworfen — …` | Das Feld steht im Schema, sein **Wert** passt nicht. Der Knoten bleibt, das Feld fehlt |
 | `Wikilink-Ziel ohne Knoten` | Ein `[[Verweis]]` auf etwas, das es (noch) nicht gibt — die Arbeitsliste für die nächste Ausbaustufe |
-| `Ziel „x" ist im Bestand mehrdeutig` | Mehrere Knoten des Fachs tragen diesen Titel (zwei Fassungen). Im Bündel unterscheidet der Dateiname sie, außerhalb nicht — es entsteht keine Kante |
+| `Ziel „x" ist im Bestand mehrdeutig` | Mehrere Knoten tragen diesen Titel (zwei Fassungen, oder zwei Bezugsfächer), oder die Kennung gibt es in zwei Fächern — es entsteht keine Kante |
+| `ueber_fachgrenzen` | Kanten, die in ein anderes Fach führen (Bezugsfach oder Kennung), „Ziel (Fach)" mit Anzahl |
+| `kollisionen[]` | Gleichnamige Einträge anderer Fächer: Datei, vorhandener Eintrag (Fach, Kennung, Art), Folge `uebergangen` · `abgegrenzt` · `hinweis` · `bestand` |
 | `Fundstellen ohne Bildungsplan-Knoten` | Die `bildungsplan:`-Angabe trifft keine Kompetenz — meist ein Tippfehler in der Nummer |
 | `Fundstellen zeigen auf **archivierte** Knoten` | Die Kante entsteht, wirkt aber nicht: Die Nachbarschaft zeigt nur Aktives. Im Dev-System betrifft das die ganze Edition CH.V3, die erst ab 2027/28 gilt |
 | `n Vektoren verworfen` | So viele Knoten brauchen den Backfill-Lauf oben |
@@ -353,6 +394,11 @@ gegangen sind: eine `##`-Überschrift im Text, eine mehrzeilige Fehlvorstellung.
 Kreis: importieren → exportieren → wieder importieren. Gleich bleiben müssen Knoten,
 **Kanten** und Aliase. Kanten stecken nicht im Stand-Hash — ohne diese Zeile fiele ihr
 Verlust nicht auf.
+
+**Ziele in anderen Fächern** schreibt der Export über ihre **Kennung** (`[[bio-fotosynthese]]`)
+*(seit 0.16)* — der Import löst sie in jedem Fach auf. Bis dahin fielen solche Kanten beim
+Export weg und mit dem nächsten Import auch aus dem Speicher. Ein fremdes Ziel ohne Kennung
+kann das Format weiterhin nicht benennen; das steht im Beipackzettel.
 
 ⚠️ **Auch Kanten, die nicht vom Import stammen, gehen mit.** Wer in der Oberfläche
 verknüpft hat, soll das im Export wiederfinden; sonst wäre der Rückweg löchrig, und

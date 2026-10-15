@@ -41,6 +41,20 @@ Wikilink zeigt auf eine **Datei**, nicht auf einen Titel — gleichnamige Fassun
 („Oxidation") haben denselben Titel und wären über ihn nicht zu unterscheiden. Die
 Zuordnung Datei → Knoten-ID steht erst fest, wenn alle Knoten geschrieben sind.
 
+**Wohin ein Wikilink zeigt** (0.16, F6): erst ins Bündel, dann in den Bestand des eigenen
+Fachs, dann auf eine **Kennung** in irgendeinem Fach (`[[bio-fotosynthese]]` — je Fach
+eindeutig und mit Fachkürzel), zuletzt in den Bestand der **Bezugsfächer**
+(`subjects.bezugsfaecher`). Mehrdeutig heißt: keine Kante, eine Zeile im Bericht. Die Kante
+gehört dem eigenen Knoten; am fremden wird nichts geschrieben — die Rechte des anderen Fachs
+bleiben unberührt. Der Bericht nennt die Kanten, die über eine Fachgrenze geschlossen wurden.
+
+**Doppelte Begriffe über Fachgrenzen** (0.16, F7, :mod:`app.context.fachbegriffe_kollision`):
+Trägt ein anderes Fach schon einen Eintrag desselben Namens, wird ein **neuer** nur angelegt,
+wenn die Datei den vorhandenen unter `## Abgrenzung` nennt — sonst übergangen, mit dem Rat,
+auf ihn zu verweisen. Gilt auch, wenn eine geänderte Datei eine Kollision erst schafft (neuer
+Titel, neuer Suchbegriff). Was schon vorher kollidierte, meldet der Bericht nur; die
+Aufräumliste dafür liefert `scripts/fachbegriffe_kollisionen.py`.
+
 **Nicht auflösbare Wikilinks erzeugen keine Kante** (Entscheidung E3, 26.09.2026): Rund
 achtzig Ziele gibt es im Pilot noch nicht. Sie als Stub anzulegen flutete die Sammlung
 „Fachbegriffe", die Schüler:innen sehen. Der Bericht listet sie nach Häufigkeit — das
@@ -690,6 +704,30 @@ class Bilanz:
     #: Fundstellen, deren Knoten **archiviert** ist — die Kante entsteht, wirkt
     #: in der Oberfläche aber nicht (die Nachbarschaft zeigt nur Aktives).
     archivierte_ziele: Counter = field(default_factory=Counter)
+    #: Kanten, die über eine Fachgrenze geschlossen wurden (F6): „Ziel (Fach)" → Anzahl.
+    ueber_fachgrenzen: Counter = field(default_factory=Counter)
+    #: Gleichnamige Einträge anderer Fächer (F7), je Datei und vorhandenem Eintrag.
+    kollisionen: list["KollisionsZeile"] = field(default_factory=list)
+
+
+#: Was der Lauf aus einer Kollision gemacht hat (F7).
+KOLLISION_FOLGEN = {
+    "uebergangen": "nicht angelegt — ohne Abgrenzung",
+    "abgegrenzt": "angelegt — mit Abgrenzung",
+    "hinweis": "nur ein Hinweis — gleicher Suchbegriff",
+    "bestand": "schon vorher so — siehe Bestandsliste",
+}
+
+
+@dataclass
+class KollisionsZeile:
+    datei: str
+    titel: str
+    fach: str
+    #: Der vorhandene Eintrag (:class:`app.context.fachbegriffe_kollision.Kollision`).
+    gegen: Any
+    #: Ein Schlüssel aus :data:`KOLLISION_FOLGEN`.
+    folge: str
 
 
 async def _faecher(db: AsyncSession) -> dict[str, Subject]:
@@ -776,6 +814,88 @@ class Bestand:
     def mehrdeutig(self, ziel_datei: str) -> bool:
         schluessel = ziel_datei.strip().casefold()
         return schluessel in self.nach_titel and self.nach_titel[schluessel] is None
+
+
+class Verweisziele:
+    """Wohin ein Wikilink zeigt — auch über Fachgrenzen (0.16, F6).
+
+    In dieser Reihenfolge, und der erste Weg, der etwas findet, entscheidet:
+
+    1. das **Bündel** (dort steht die Zuordnung Datei → Knoten fest),
+    2. der Bestand des **eigenen Fachs** (Kennung, Herkunftsdatei, Titel),
+    3. eine **Kennung** in irgendeinem Fach (`[[bio-fotosynthese]]`) — die eindeutige Form,
+       auch für Fächer ohne Bezug,
+    4. der Bestand der **Bezugsfächer**.
+
+    Mehrdeutig — zwei Fassungen im eigenen Fach, eine Kennung in zwei Fächern, ein Name in
+    zwei Bezugsfächern — heißt: keine Kante. Eine davon zu greifen wäre geraten.
+
+    Die Bestände werden je Fach einmal gelesen und gemerkt. Wer nach dem Schreiben verkantet,
+    nimmt deshalb eine **neue** Instanz — sonst fehlten die eben geschriebenen Knoten.
+    """
+
+    MEHRDEUTIG = "mehrdeutig"
+
+    def __init__(self, db: AsyncSession, faecher: dict[str, Subject]):
+        self._db = db
+        self._faecher = faecher
+        self._bestand: dict[int, Bestand] = {}
+        self._kennungen: dict[str, list[tuple[Any, int | None]]] | None = None
+
+    async def bestand(self, fach: Subject) -> Bestand:
+        if fach.id not in self._bestand:
+            self._bestand[fach.id] = await _bestand(self._db, fach)
+        return self._bestand[fach.id]
+
+    def bezugsfaecher(self, fach: Subject) -> list[Subject]:
+        gefunden = (self._faecher.get(slug.casefold()) for slug in (fach.bezugsfaecher or []))
+        return [b for b in gefunden if b is not None and b.id != fach.id]
+
+    async def _nach_kennung(self, ziel: str) -> list[tuple[Any, int | None]]:
+        if self._kennungen is None:
+            self._kennungen = {}
+            for knoten_id, kennung, subject_id in (await self._db.execute(
+                sa.select(ContextNode.id, ContextNode.metadata_[SEED_ID].astext,
+                          ContextNode.subject_id)
+                .where(ContextNode.content_type.in_(TYPEN),
+                       ContextNode.metadata_[SEED_ID].astext.is_not(None))
+            )).all():
+                self._kennungen.setdefault(kennung, []).append((knoten_id, subject_id))
+        return self._kennungen.get(ziel.strip(), [])
+
+    async def aufloesen(
+        self, ziel: str, fach: Subject, nach_datei: Mapping[str, Any],
+    ) -> tuple[Any, Subject | None]:
+        """(Knoten-ID, fremdes Fach) — die ID ist ``None`` (nichts) oder
+        :attr:`MEHRDEUTIG`; das Fach nur, wenn das Ziel in einem **anderen** liegt."""
+        if ziel in nach_datei:
+            return nach_datei[ziel], None
+        eigen = await self.bestand(fach)
+        if eigen.mehrdeutig(ziel):
+            return self.MEHRDEUTIG, None
+        treffer = eigen.finde(ziel)
+        if treffer is not None:
+            return treffer, None
+
+        kennung = await self._nach_kennung(ziel)
+        if len(kennung) > 1:
+            return self.MEHRDEUTIG, None
+        if kennung:
+            knoten_id, subject_id = kennung[0]
+            anderes = next((f for f in self._faecher.values() if f.id == subject_id), None)
+            return knoten_id, anderes if subject_id != fach.id else None
+
+        funde: list[tuple[Any, Subject]] = []
+        for bezug in self.bezugsfaecher(fach):
+            bestand = await self.bestand(bezug)
+            if bestand.mehrdeutig(ziel):
+                return self.MEHRDEUTIG, None
+            treffer = bestand.finde(ziel)
+            if treffer is not None:
+                funde.append((treffer, bezug))
+        if len(funde) > 1:
+            return self.MEHRDEUTIG, None
+        return funde[0] if funde else (None, None)
 
 
 async def _bestand(db: AsyncSession, fach: Subject) -> Bestand:
@@ -1020,8 +1140,9 @@ async def _schreibe_kanten(
     db: AsyncSession,
     quelle: Quelldatei,
     von_id: Any,
+    fach: Subject,
     nach_datei: dict[str, Any],
-    bestand: Bestand,
+    ziele: Verweisziele,
     bp: dict[tuple[str, str, str], Any],
     editionen: dict[str, str],
     bilanz: Bilanz,
@@ -1032,27 +1153,30 @@ async def _schreibe_kanten(
     soll es beim nächsten Import nicht verlieren. Erkennbar sind die eigenen an
     `metadata.seed`.
 
-    Ein Wikilink zeigt zuerst ins **Bündel** (dort steht die Zuordnung Datei → Knoten
-    fest) und erst danach in den vorhandenen Bestand des Fachs — sonst hätte eine
-    einzeln hochgeladene Datei keine einzige Kante.
+    Ein Wikilink zeigt zuerst ins **Bündel** und erst danach in den vorhandenen Bestand —
+    sonst hätte eine einzeln hochgeladene Datei keine einzige Kante; über Fachgrenzen nach
+    den Regeln von :class:`Verweisziele`.
     """
     geplant: list[tuple[str, Any, dict]] = []
     for kante in quelle.kanten:
-        ziel_id = nach_datei.get(kante.ziel_datei) or bestand.finde(kante.ziel_datei)
+        ziel_id, anderes = await ziele.aufloesen(kante.ziel_datei, fach, nach_datei)
+        if ziel_id == Verweisziele.MEHRDEUTIG:
+            # Zwei Fassungen tragen denselben Titel („Oxidation"), oder zwei Bezugsfächer
+            # kennen den Namen. Eine davon zu greifen wäre geraten; die Kennung
+            # (`[[bio-fotosynthese]]`) unterscheidet sie.
+            bilanz.warnungen.append(
+                f"{quelle.datei}: Ziel „{kante.ziel_datei}“ ist im Bestand "
+                "mehrdeutig — keine Kante; eindeutig über die Kennung des Ziels"
+            )
+            continue
         if ziel_id is None:
-            if bestand.mehrdeutig(kante.ziel_datei):
-                # Zwei Fassungen tragen denselben Titel („Oxidation"). Eine davon zu
-                # greifen wäre geraten; im Bündel unterscheidet der Dateiname sie.
-                bilanz.warnungen.append(
-                    f"{quelle.datei}: Ziel „{kante.ziel_datei}“ ist im Bestand "
-                    "mehrdeutig — keine Kante"
-                )
-            else:
-                bilanz.offene_ziele[kante.ziel_datei] += 1
+            bilanz.offene_ziele[kante.ziel_datei] += 1
             continue
         if ziel_id == von_id:
             bilanz.warnungen.append(f"{quelle.datei}: Kante auf sich selbst, ausgelassen")
             continue
+        if anderes is not None:
+            bilanz.ueber_fachgrenzen[f"{kante.ziel_datei} ({anderes.name})"] += 1
         geplant.append((kante.relation, ziel_id, dict(kante.metadata)))
 
     for roh in quelle.fundstellen:
@@ -1140,6 +1264,8 @@ async def seed_in_session(
     jemand es dort hingeschrieben hat; es zu überstimmen, ohne es zu sagen, verwandelt
     einen Tippfehler in einen Knoten am falschen Ort.
     """
+    from app.context.fachbegriffe_kollision import ist_abgrenzung, kollisionen
+
     faecher = await _faecher(db)
     nach_datei: dict[str, Any] = {}
     zu_verkanten: list[tuple[Quelldatei, Any, Subject]] = []
@@ -1230,6 +1356,42 @@ async def seed_in_session(
             )
             continue
 
+        # F7: Trägt ein anderes Fach denselben Namen? Neu (oder durch die Datei neu
+        # entstanden) nur mit Abgrenzung; was schon vorher kollidierte, nur gemeldet.
+        gleiche = await kollisionen(
+            db, subject_id=fach.id, titel=quelle.titel, aliase=quelle.aliase,
+            ohne=vorhanden.id if vorhanden is not None else None,
+        )
+        if gleiche:
+            vorher: set = set()
+            if vorhanden is not None:
+                vorher = {k.node_id for k in await kollisionen(
+                    db, subject_id=fach.id, titel=vorhanden.title,
+                    aliase=await alias_dienst.lade(db, vorhanden.id), ohne=vorhanden.id,
+                )}
+            # Ein frischer Auflöser: Er sieht, was der Lauf bis hierher geschrieben hat.
+            ziele = Verweisziele(db, faecher)
+            abgegrenzt = {
+                (await ziele.aufloesen(k.ziel_datei, fach, nach_datei))[0]
+                for k in quelle.kanten if ist_abgrenzung(k.metadata)
+            }
+            fehlt = [k for k in gleiche
+                     if k.sperrend and k.node_id not in vorher and k.node_id not in abgegrenzt]
+            for k in gleiche:
+                folge = ("hinweis" if not k.sperrend else "abgegrenzt" if k.node_id in abgegrenzt
+                         else "bestand" if k.node_id in vorher else "uebergangen")
+                bilanz.kollisionen.append(KollisionsZeile(
+                    quelle.datei, quelle.titel, fach.name, k, folge))
+            if fehlt:
+                verweise = ", ".join(f"[[{k.kennung or k.titel}]]" for k in fehlt)
+                uebergangen(
+                    "gibt es schon in einem anderen Fach — "
+                    + "; ".join(k.als_text() for k in fehlt)
+                    + f". Ohne Abgrenzung nicht angelegt: Verweise auf den vorhandenen "
+                    f"Eintrag, oder nenne ihn unter `## Abgrenzung` ({verweise})."
+                )
+                continue
+
         knoten_id, zustand = await _schreibe_knoten(
             db, quelle, fach, gruppe_id, bilanz,
             stabile_id=stabile_id, vorhanden=vorhanden,
@@ -1246,16 +1408,15 @@ async def seed_in_session(
 
     bp_je_fach: dict[int, dict] = {}
     editionen_je_fach: dict[int, dict] = {}
-    bestand_je_fach: dict[int, Bestand] = {}
+    # Nach dem Knotendurchlauf angelegt, also einschließlich der eben geschriebenen — was
+    # in `nach_datei` steht, findet sich auch im Bestand wieder.
+    ziele = Verweisziele(db, faecher)
     for quelle, knoten_id, fach in zu_verkanten:
         if fach.id not in bp_je_fach:
             bp_je_fach[fach.id] = await _bp_knoten(db, fach.id)
             editionen_je_fach[fach.id] = await _editionen(db, fach.id)
-            # Nach dem Knotendurchlauf gelesen, also einschließlich der eben
-            # geschriebenen — was in `nach_datei` steht, findet sich hier wieder.
-            bestand_je_fach[fach.id] = await _bestand(db, fach)
         await _schreibe_kanten(
-            db, quelle, knoten_id, nach_datei, bestand_je_fach[fach.id],
+            db, quelle, knoten_id, fach, nach_datei, ziele,
             bp_je_fach[fach.id], editionen_je_fach[fach.id], bilanz,
         )
 

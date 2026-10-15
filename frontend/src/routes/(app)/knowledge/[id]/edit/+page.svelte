@@ -31,6 +31,7 @@
     import AliasFeld from "$lib/components/AliasFeld.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import KollisionsHinweis from "$lib/components/KollisionsHinweis.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
 
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
@@ -255,8 +256,12 @@
     }
 
     // ── Speichern ──────────────────────────────────────────────────────────
-    async function save() {
+    // Gleichnamiger Fachbegriff in einem anderen Fach (0.16, F7) — `null`, solange keiner meldet.
+    let kollision = $state(null);
+
+    async function save(abgrenzungZu = []) {
         errors = {};
+        kollision = null;
         if (!title.trim()) errors.title = "Pflichtfeld";
         if (!category) errors.category = "Pflichtfeld";
         if (!contentType) errors.contentType = "Pflichtfeld";
@@ -289,13 +294,14 @@
                 subject_id: subjectId,
                 min_grade: minGrade ? Number(minGrade) : null,
                 max_grade: maxGrade ? Number(maxGrade) : null,
+                abgrenzung_zu: abgrenzungZu,
             };
             await updateContextNode(id, payload);
             // Zurück zur Leseansicht (zeigt das gerenderte Ergebnis)
             goto(readUrl);
         } catch (e) {
-            if (e.status === 422) {
-                errors.general = e.message;
+            if (e.status === 409 && e.detail?.grund === "kollision") {
+                kollision = e.detail.kollisionen;
             } else {
                 errors.general = e.message;
             }
@@ -1197,6 +1203,15 @@
                 >
                     {savedMessage}
                 </div>
+            {/if}
+
+            {#if kollision}
+                <KollisionsHinweis
+                    kollisionen={kollision}
+                    {saving}
+                    onabgrenzen={() => save(kollision.map((k) => k.node_id))}
+                    onabbrechen={() => (kollision = null)}
+                />
             {/if}
 
             <!-- Fehler -->

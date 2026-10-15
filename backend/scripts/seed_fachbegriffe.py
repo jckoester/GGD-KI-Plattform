@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.context.fachbegriffe_import import Bilanz, importiere
+from app.context.fachbegriffe_import import KOLLISION_FOLGEN, Bilanz, importiere
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -113,6 +113,18 @@ def _berichte(bilanz: Bilanz, *, dry_run: bool) -> None:
             "Kanten entstehen, sind in der Oberfläche aber unsichtbar. Je Edition: %s",
             sum(bilanz.archivierte_ziele.values()),
             ", ".join(f"{k}: {n}" for k, n in bilanz.archivierte_ziele.most_common()),
+        )
+    if bilanz.kollisionen:
+        # F7 (0.16): gleichnamige Einträge anderer Fächer — übergangen, abgegrenzt, Hinweis.
+        logger.warning("%d gleichnamige Einträge in anderen Fächern:", len(bilanz.kollisionen))
+        for z in bilanz.kollisionen:
+            logger.warning("    %s: %s — %s", z.datei, z.gegen.als_text(),
+                           KOLLISION_FOLGEN[z.folge])
+    if bilanz.ueber_fachgrenzen:
+        logger.info(
+            "%d Kanten über Fachgrenzen geschlossen: %s",
+            sum(bilanz.ueber_fachgrenzen.values()),
+            ", ".join(f"{z} {n}×" for z, n in bilanz.ueber_fachgrenzen.most_common()),
         )
     if bilanz.offene_ziele:
         logger.info(

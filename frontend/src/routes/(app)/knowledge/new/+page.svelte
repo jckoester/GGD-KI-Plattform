@@ -25,6 +25,7 @@
   } from '$lib/stores/myGroups.js'
   import { subjects } from '$lib/stores/subjects.js'
   import PageBody from '$lib/components/PageBody.svelte'
+  import KollisionsHinweis from '$lib/components/KollisionsHinweis.svelte'
 
   // ── Query-Param-Defaults ────────────────────────────────────────────────
   const preGroupId = $page.url.searchParams.get('group_id')
@@ -134,8 +135,12 @@
   }
 
   // ── Speichern ──────────────────────────────────────────────────────────
-  async function save() {
+  // Gleichnamiger Fachbegriff in einem anderen Fach (0.16, F7) — `null`, solange keiner meldet.
+  let kollision = $state(null)
+
+  async function save(abgrenzungZu = []) {
     errors = {}
+    kollision = null
     if (!title.trim()) errors.title = 'Pflichtfeld'
     if (!category) errors.category = 'Pflichtfeld'
     if (!contentType) errors.contentType = 'Pflichtfeld'
@@ -162,13 +167,14 @@
         subject_id: subjectId,
         min_grade: minGrade ? Number(minGrade) : null,
         max_grade: maxGrade ? Number(maxGrade) : null,
+        abgrenzung_zu: abgrenzungZu,
       }
       const created = await createContextNode(payload)
       const backUrl = $page.url.searchParams.get('back')
       goto(backUrl ?? `/knowledge/${created.id}`)
     } catch (e) {
-      if (e.status === 422) {
-        errors.general = e.message
+      if (e.status === 409 && e.detail?.grund === 'kollision') {
+        kollision = e.detail.kollisionen
       } else {
         errors.general = e.message
       }
@@ -674,6 +680,15 @@
         Abbrechen
       </a>
     </div>
+
+    {#if kollision}
+      <KollisionsHinweis
+        kollisionen={kollision}
+        {saving}
+        onabgrenzen={() => save(kollision.map((k) => k.node_id))}
+        onabbrechen={() => (kollision = null)}
+      />
+    {/if}
 
     <!-- Fehler -->
     {#if errors.general}

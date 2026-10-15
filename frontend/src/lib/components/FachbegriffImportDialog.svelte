@@ -13,10 +13,13 @@
     import { Upload, Loader2, ExternalLink, FileDown } from "lucide-svelte";
     import { importiereFachbegriffe } from "$lib/api.js";
     import {
+        KOLLISION_FOLGEN,
         brauchtEinbettung,
         eingespielt,
         entwuerfe,
+        gegenText,
         gruppiert,
+        kollisionen,
         lohntSich,
         zusammenfassung,
     } from "$lib/fachbegriffe_import.js";
@@ -244,6 +247,46 @@
                     </ul>
                 </div>
             {/each}
+
+            {#if bericht.kollisionen?.length > 0}
+                <div class="mt-4">
+                    <h4 class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                        Gleichnamig in anderen Fächern ({bericht.kollisionen.length})
+                    </h4>
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Ein zweiter Eintrag zu einem Begriff, den ein anderes Fach schon führt,
+                        braucht eine klare Abgrenzung: Nenne den vorhandenen unter
+                        „## Abgrenzung“ — oder verweise auf ihn, statt einen eigenen anzulegen.
+                    </p>
+                    <ul class="mt-1.5 space-y-0.5 text-xs text-light-tx dark:text-dark-tx">
+                        {#each kollisionen(bericht) as k (k.datei + k.gegen.node_id)}
+                            <li>
+                                {k.titel}
+                                <span class="text-light-tx-3 dark:text-dark-tx-3">({k.datei})</span>
+                                ↔ {gegenText(k.gegen)}{#if k.gegen.kennung}
+                                    <code class="ml-1">[[{k.gegen.kennung}]]</code>{/if}
+                                — <span class={k.folge === "uebergangen"
+                                    ? "text-light-re dark:text-dark-re"
+                                    : "text-light-tx-2 dark:text-dark-tx-2"}
+                                >{KOLLISION_FOLGEN[k.folge]}</span>
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            {/if}
+
+            {#if bericht.ueber_fachgrenzen?.length > 0}
+                <div class="mt-4">
+                    <h4 class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                        Über Fachgrenzen verknüpft ({bericht.ueber_fachgrenzen.length})
+                    </h4>
+                    <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-1">
+                        {bericht.ueber_fachgrenzen
+                            .map((z) => `${z.ziel} (${z.anzahl}×)`)
+                            .join(" · ")}
+                    </p>
+                </div>
+            {/if}
 
             {#if bericht.warnungen.length > 0}
                 <div class="mt-4">

@@ -58,9 +58,12 @@ from app.context.schemas import (
     PkKompetenzRead,
     DateiErgebnisRead,
     FachbegriffImportBericht,
+    KollisionRead,
+    KollisionsZeileRead,
     ZielZaehlung,
 )
 from app.context import aliase as aliase_modul
+from app.context import fachbegriffe_kollision
 from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
@@ -748,6 +751,11 @@ async def create_node(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
+    abgrenzen = await _pruefe_kollisionen(
+        db, typ=payload.content_type, subject_id=payload.subject_id, titel=payload.title,
+        aliase=payload.aliase, abgrenzung_zu=payload.abgrenzung_zu, user=user,
+    )
+
     node = ContextNode(
         category=payload.category,
         content_type=payload.content_type,
@@ -773,6 +781,8 @@ async def create_node(
     # `methode` und `operator` aus den Aliasen; stünden sie noch nicht da, entstünde ein
     # Vektor ohne sie und niemand merkte es.
     await aliase_modul.setze(db, node.id, payload.aliase)
+    if abgrenzen:
+        db.add_all(_abgrenzungskanten(node.id, abgrenzen))
     await db.commit()
     await db.refresh(node)
 
@@ -781,6 +791,77 @@ async def create_node(
 
     await _aliase_setzen([node], db)
     return node
+
+
+async def _pruefe_kollisionen(
+    db: AsyncSession,
+    *,
+    typ: str | None,
+    subject_id: int | None,
+    titel: str,
+    aliase: list[str],
+    abgrenzung_zu: list[UUID],
+    user: JwtPayload,
+    node: ContextNode | None = None,
+) -> list[UUID]:
+    """Fachbegriffe über Fachgrenzen (0.16, F7) — dieselbe Regel wie im Import.
+
+    Trägt ein anderes Fach schon einen Begriff desselben Namens, gibt es den neuen nur mit
+    Abgrenzung: Sonst **409** mit den vorhandenen Einträgen, die Oberfläche fragt nach. Beim
+    Ändern zählt nur, was die Änderung **neu** schafft — eine Kollision aus der Zeit vor 0.16
+    blockiert keine Bearbeitung; sie steht in der Bestandsliste.
+
+    Gibt die Ziele zurück, zu denen eine Abgrenzungskante anzulegen ist — nur lesbare, aktive
+    Fachbegriffe, sonst **422**.
+    """
+    if typ not in fachbegriffe_kollision.TYPEN:
+        return []
+    ohne = node.id if node is not None else None
+    gleiche = await fachbegriffe_kollision.kollisionen(
+        db, subject_id=subject_id, titel=titel, aliase=aliase, ohne=ohne)
+    vorher: set[UUID] = set()
+    if node is not None:
+        vorher = {k.node_id for k in await fachbegriffe_kollision.kollisionen(
+            db, subject_id=node.subject_id, titel=node.title,
+            aliase=await aliase_modul.lade(db, node.id), ohne=ohne)}
+    neu = [k for k in gleiche if k.sperrend and k.node_id not in vorher]
+    schon = (await fachbegriffe_kollision.abgegrenzt(db, node.id, [k.node_id for k in neu])
+             if node is not None else set())
+    fehlt = [k for k in neu if k.node_id not in schon and k.node_id not in set(abgrenzung_zu)]
+    if fehlt:
+        raise HTTPException(status_code=409, detail={
+            "grund": "kollision",
+            "nachricht": (
+                "Diesen Begriff führt schon ein anderes Fach: "
+                + "; ".join(k.als_text() for k in fehlt)
+                + ". Ein zweiter Eintrag braucht eine klare Abgrenzung — sonst verweise auf "
+                "den vorhandenen."
+            ),
+            "kollisionen": [_kollision_read(k).model_dump(mode="json") for k in fehlt],
+        })
+
+    ziele = [z for z in dict.fromkeys(abgrenzung_zu) if z not in schon and z != ohne]
+    if ziele:
+        gueltig = set((await db.execute(
+            sa.select(ContextNode.id).where(
+                ContextNode.id.in_(ziele),
+                ContextNode.status == "active",
+                ContextNode.content_type.in_(fachbegriffe_kollision.TYPEN),
+                read_scope_clause(user.sub, user.roles),
+            )
+        )).scalars())
+        if set(ziele) - gueltig:
+            raise HTTPException(status_code=422, detail=(
+                "Abgrenzen lässt sich nur von einem aktiven Fachbegriff, den du lesen darfst."))
+    return ziele
+
+
+def _abgrenzungskanten(von: UUID, ziele: list[UUID]) -> list[ContextEdge]:
+    """Die Kanten aus ``abgrenzung_zu`` — wie eine Zeile unter `## Abgrenzung`, ohne Hinweis;
+    den trägt man im Verknüpfen-Dialog nach."""
+    return [ContextEdge(from_node_id=von, to_node_id=z, relation="related_to",
+                        metadata_={"art": fachbegriffe_kollision.ABGRENZUNG})
+            for z in ziele]
 
 
 # ── PATCH /api/context/nodes/{id} ─────────────────────────────────────────────
@@ -871,6 +952,21 @@ async def update_node(
     # Die Aliase liegen in einer eigenen Tabelle — sie dürfen nicht als Attribut auf
     # den Knoten gesetzt werden. `None` heißt „nicht angefasst", `[]` heißt „alle weg".
     neue_aliase = update_data.pop("aliase", None)
+    abgrenzung_zu = update_data.pop("abgrenzung_zu", None) or []
+
+    # Nur bei Fachbegriffen und nur, wenn sich ein Name oder das Fach ändert — sonst kann
+    # keine neue Kollision entstehen, und jeder andere Knoten bliebe ohne Zusatzabfrage.
+    abgrenzen: list[UUID] = []
+    if typ_danach in fachbegriffe_kollision.TYPEN and (
+        {"title", "subject_id", "content_type"} & set(update_data) or neue_aliase is not None
+    ):
+        abgrenzen = await _pruefe_kollisionen(
+            db, typ=typ_danach, subject_id=update_data.get("subject_id", node.subject_id),
+            titel=update_data.get("title", node.title),
+            aliase=(neue_aliase if neue_aliase is not None
+                    else await aliase_modul.lade(db, node.id)),
+            abgrenzung_zu=abgrenzung_zu, user=user, node=node,
+        )
 
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
@@ -879,6 +975,8 @@ async def update_node(
 
     if neue_aliase is not None:
         await aliase_modul.setze(db, node.id, neue_aliase)
+    if abgrenzen:
+        db.add_all(_abgrenzungskanten(node.id, abgrenzen))
 
     # Manuelle Titeländerung sperrt den Titel gegen einen BP-Re-Import (C1).
     if "title" in update_data:
@@ -2264,6 +2362,11 @@ def _zaehlung(counter) -> list[ZielZaehlung]:
     return [ZielZaehlung(ziel=z, anzahl=n) for z, n in counter.most_common()]
 
 
+def _kollision_read(k) -> KollisionRead:
+    return KollisionRead(node_id=k.node_id, titel=k.titel, fach=k.fach, kennung=k.kennung,
+                         art=k.beschreibung, sperrend=k.sperrend)
+
+
 @router.post("/fachbegriffe/import", response_model=FachbegriffImportBericht)
 async def importiere_fachbegriffe(
     hintergrund: BackgroundTasks,
@@ -2392,6 +2495,12 @@ async def importiere_fachbegriffe(
         offene_ziele=_zaehlung(bilanz.offene_ziele),
         offene_fundstellen=_zaehlung(bilanz.offene_fundstellen),
         archivierte_ziele=_zaehlung(bilanz.archivierte_ziele),
+        ueber_fachgrenzen=_zaehlung(bilanz.ueber_fachgrenzen),
+        kollisionen=[
+            KollisionsZeileRead(datei=z.datei, titel=z.titel, fach=z.fach,
+                                gegen=_kollision_read(z.gegen), folge=z.folge)
+            for z in bilanz.kollisionen
+        ],
     )
 
 

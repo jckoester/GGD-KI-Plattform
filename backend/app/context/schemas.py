@@ -26,6 +26,10 @@ class ContextNodeCreate(BaseModel):
     schuljahr: str | None = None
     # Weitere Namen (Migration 0057). Eigene Tabelle, deshalb kein Metadatenfeld.
     aliase: list[str] = Field(default_factory=list)
+    #: Gleichnamige Fachbegriffe anderer Fächer, von denen sich dieser abgrenzt (0.16, F7).
+    #: Ohne sie lehnt das Anlegen eines Begriffs ab, den ein anderes Fach schon führt; mit
+    #: ihnen entsteht je Ziel eine Abgrenzungskante.
+    abgrenzung_zu: list[UUID] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -47,6 +51,9 @@ class ContextNodeUpdate(BaseModel):
     # `None` heißt „nicht angefasst", `[]` heißt „alle entfernen" — der Unterschied
     # entscheidet, ob ein Formular ohne Aliasfeld die vorhandenen löscht.
     aliase: list[str] | None = None
+    #: Wie beim Anlegen (0.16, F7) — gebraucht, wenn ein neuer Titel oder Suchbegriff erst
+    #: eine Kollision mit einem anderen Fach schafft.
+    abgrenzung_zu: list[UUID] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -689,6 +696,28 @@ class ZielZaehlung(BaseModel):
     anzahl: int
 
 
+class KollisionRead(BaseModel):
+    """Ein gleichnamiger Eintrag eines anderen Fachs (0.16, F7) — im Bericht und im Editor."""
+
+    node_id: UUID
+    titel: str
+    fach: str | None = None
+    #: Kennung (`seed_id`) für den Verweis `[[…]]` über Fachgrenzen.
+    kennung: str | None = None
+    #: „gleicher Titel", „gleicher Suchbegriff" …
+    art: str
+    sperrend: bool
+
+
+class KollisionsZeileRead(BaseModel):
+    datei: str
+    titel: str
+    fach: str
+    gegen: KollisionRead
+    #: `uebergangen` · `abgegrenzt` · `hinweis` · `bestand`
+    folge: str
+
+
 class DateiErgebnisRead(BaseModel):
     """Eine Zeile der Importvorschau (AP4).
 
@@ -742,3 +771,7 @@ class FachbegriffImportBericht(BaseModel):
     offene_ziele: list[ZielZaehlung] = Field(default_factory=list)
     offene_fundstellen: list[ZielZaehlung] = Field(default_factory=list)
     archivierte_ziele: list[ZielZaehlung] = Field(default_factory=list)
+    #: Kanten, die über eine Fachgrenze geschlossen wurden (0.16, F6).
+    ueber_fachgrenzen: list[ZielZaehlung] = Field(default_factory=list)
+    #: Gleichnamige Einträge anderer Fächer (0.16, F7).
+    kollisionen: list[KollisionsZeileRead] = Field(default_factory=list)

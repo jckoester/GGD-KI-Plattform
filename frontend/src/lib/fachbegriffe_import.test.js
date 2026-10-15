@@ -10,6 +10,9 @@ import {
   gruppiert,
   lohntSich,
   zusammenfassung,
+  KOLLISION_FOLGEN,
+  gegenText,
+  kollisionen,
 } from './fachbegriffe_import.js'
 import { importiereFachbegriffe, ApiError } from './api.js'
 
@@ -255,5 +258,32 @@ describe('die Regel hängt auch wirklich am Knopf', () => {
     // `null` und risse die Seite mit.
     expect(block).toContain('Aus Dateien')
     expect(block).toContain('Als Zip')
+  })
+})
+
+describe('Gleichnamige Einträge anderer Fächer (0.16, F7)', () => {
+  const gegen = { node_id: 'x', titel: 'Fotosynthese', fach: 'Biologie', kennung: 'bio-fotosynthese',
+                  art: 'gleicher Titel', sperrend: true }
+
+  it('stellt das Nicht-Angelegte an den Anfang', () => {
+    const b = bericht({ kollisionen: [
+      { datei: 'A', titel: 'A', fach: 'NwT', gegen, folge: 'hinweis' },
+      { datei: 'B', titel: 'B', fach: 'NwT', gegen, folge: 'uebergangen' },
+      { datei: 'C', titel: 'C', fach: 'NwT', gegen, folge: 'abgegrenzt' },
+    ] })
+    expect(kollisionen(b).map((k) => k.datei)).toEqual(['B', 'C', 'A'])
+  })
+
+  it('kommt mit einem Bericht ohne Kollisionen aus', () => {
+    expect(kollisionen(bericht())).toEqual([])
+  })
+
+  it('nennt den vorhandenen Eintrag mit Fach und Art, fachlose ausdrücklich', () => {
+    expect(gegenText(gegen)).toBe('„Fotosynthese“ (Biologie, gleicher Titel)')
+    expect(gegenText({ ...gegen, fach: null })).toBe('„Fotosynthese“ (fachlos, gleicher Titel)')
+  })
+
+  it('kennt jede Folge, die das Backend meldet', () => {
+    expect(Object.keys(KOLLISION_FOLGEN)).toEqual(['uebergangen', 'abgegrenzt', 'hinweis', 'bestand'])
   })
 })

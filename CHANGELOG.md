@@ -18,11 +18,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Statistik der Vorab-Suche** unter `/statistics/vorab`: je Woche, wie oft Einträge als
   Inhalt vorlagen, angeboten und nachgeschlagen wurden; je Eintrag dieselben Zahlen, mit
   Filter nach Fach und Zeitraum und Export als CSV. Ohne Personenbezug.
+- **Verweise über Fachgrenzen im Fachbegriff-Import:** Ein `[[Ziel]]` findet Einträge der
+  Bezugsfächer, über seine Kennung (`[[bio-fotosynthese]]`) Einträge jedes Fachs. Der Bericht
+  nennt die so geschlossenen Verbindungen; die Kennung steht in der Detailansicht.
+- **Gleichnamige Fachbegriffe anderer Fächer** legen Import und Editor nur noch mit
+  Abgrenzung an; der Bericht nennt sie. Für den Bestand listet
+  `scripts/fachbegriffe_kollisionen.py` die Paare.
 
 ### Geändert
 
 - **Suche im Wissensspeicher:** Die Werkzeugbeschreibung fordert das Modell auf, bei
   Fachbegriffen, Methoden und Operatoren vor der Antwort im Wissensspeicher zu suchen.
+- **Fachbegriff-Export:** Verbindungen zu Einträgen anderer Fächer gehen mit, über deren
+  Kennung. Bisher fielen sie weg.
 
 ### Migration
 
@@ -46,6 +54,13 @@ den Eintrag.
 In `config/pedagogy.yaml` unter `preambles` den Schlüssel `wissensspeicher_vorrang` aus der
 `pedagogy.example.yaml` übernehmen — oder bewusst weglassen, wenn die Schule keinen
 Wissensspeicher pflegt; dann steht kein Vorrangsatz im Prompt. Danach das Backend neu starten.
+
+Gleichnamige Fachbegriffe, die schon in mehreren Fächern stehen, auflisten und den
+Fachschaften geben (sie blockieren nichts):
+
+```bash
+docker compose exec backend python scripts/fachbegriffe_kollisionen.py --nur-offene
+```
 
 ## [0.15.2] – 2026-10-14
 

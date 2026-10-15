@@ -156,8 +156,8 @@ def _kantenfelder(
             continue
         if not ziel:
             warnungen.append(
-                f"Kante `{relation}` zeigt auf einen Knoten außerhalb dieses Fachs — "
-                "das Format kann sie nicht benennen"
+                f"Kante `{relation}` zeigt auf einen Knoten außerhalb dieses Fachs ohne "
+                "Kennung — das Format kann sie nicht benennen"
             )
             continue
         if relation == "is_a":
@@ -352,10 +352,22 @@ async def _kanten_je_knoten(
         ).where(ContextEdge.from_node_id.in_(ids))
         .order_by(ContextEdge.relation, ContextEdge.id)
     )).all()
+    # Ziele in **anderen** Fächern über ihre Kennung (0.16, F6): `[[bio-fotosynthese]]` löst
+    # der Import in jedem Fach auf. Bis dahin fielen solche Kanten beim Export weg — und mit
+    # dem nächsten Import auch aus dem Speicher, denn der setzt seine Kanten aus der Datei.
+    fremd = {nach for _, _, nach, _ in zeilen if nach not in namen}
+    kennungen: dict[Any, str] = {}
+    if fremd:
+        kennungen = {
+            knoten_id: kennung for knoten_id, kennung in (await db.execute(
+                sa.select(ContextNode.id, ContextNode.metadata_[SEED_ID].astext)
+                .where(ContextNode.id.in_(fremd), ContextNode.content_type.in_(TYPEN))
+            )).all() if kennung
+        }
     je_knoten: dict[Any, list[tuple[str, str, dict]]] = {}
     for von, relation, nach, metadata in zeilen:
         je_knoten.setdefault(von, []).append(
-            (relation, namen.get(nach, ""), dict(metadata or {}))
+            (relation, namen.get(nach) or kennungen.get(nach, ""), dict(metadata or {}))
         )
     return je_knoten
 

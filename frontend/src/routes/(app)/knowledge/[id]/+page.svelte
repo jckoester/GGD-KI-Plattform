@@ -422,6 +422,14 @@
                     {#if node.metadata?.formel}
                         · {@html renderInlineMath(`$${node.metadata.formel}$`)}
                     {/if}
+                    <!-- Die Kennung (0.16): So nennt eine Datei eines anderen Fachs diesen
+                         Eintrag eindeutig — `[[bio-fotosynthese]]`, auch ohne Bezugsfach. -->
+                    {#if node.metadata?.seed_id && ["begriff", "stoffsteckbrief"].includes(node.content_type)}
+                        · <span
+                            title={`Verweis aus einer Datei eines anderen Fachs: [[${node.metadata.seed_id}]]`}
+                            >Kennung <code class="select-all">{node.metadata.seed_id}</code></span
+                        >
+                    {/if}
                 </p>
             </div>
             {#if alsMarkdown}
