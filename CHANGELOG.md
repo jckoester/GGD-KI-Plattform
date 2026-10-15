@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   eines Fachs zählen die Begriffe dieses Fachs, seiner Bezugsfächer und fachlose.
 - **Vorrang des Wissensspeichers:** neuer, optionaler Satz in `pedagogy.yaml`
   (`wissensspeicher_vorrang`).
+- **Statistik der Vorab-Suche** unter `/statistics/vorab`: je Woche, wie oft Einträge als
+  Inhalt vorlagen, angeboten und nachgeschlagen wurden; je Eintrag dieselben Zahlen, mit
+  Filter nach Fach und Zeitraum und Export als CSV. Ohne Personenbezug.
 
 ### Geändert
 
@@ -23,8 +26,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
-`alembic upgrade head` führt `0085` aus: Spalte `subjects.bezugsfaecher` — die Fächer, deren
-Fachbegriffe ein Fach mitliest. Rückrollbar.
+`alembic upgrade head` führt `0085` und `0086` aus: Spalte `subjects.bezugsfaecher` — die
+Fächer, deren Fachbegriffe ein Fach mitliest — und Tabelle `vorab_statistik`. Beides
+rückrollbar. `0086` braucht PostgreSQL 15 oder neuer.
 
 ### Nach dem Update
 

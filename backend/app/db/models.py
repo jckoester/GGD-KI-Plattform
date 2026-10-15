@@ -1857,3 +1857,71 @@ class ParkedLessonContent(Base):
         ),
     )
 
+
+
+# 27. vorab_statistik — Zähler der Vorab-Suche, ohne Personenbezug (0.16, ADR-011 Teil 6.3)
+class VorabStatistik(Base):
+    """Wie oft die Vorab-Suche einen Baustein vorlegte — und ob ein Angebot nachgeschlagen wurde.
+
+    **Zwei Zeilenarten in einer Tabelle**, unterschieden an ``node_id`` und ``stufe``:
+
+    - *Knotenzeile* (beide gesetzt): ``vorgelegt`` und — nur bei ``stufe = 'angebot'`` —
+      ``im_werkzeugergebnis``: Der angebotene Knoten stand im Werkzeugergebnis derselben
+      Antwort. Das ist „nachgeschlagen", nicht „gezielt geholt": Eine Suche nach etwas
+      anderem kann ihn ebenso mitbringen.
+    - *Wochenzeile* (beide leer): die Nenner, die Knotenzeilen nicht liefern — eine Nachricht
+      bietet bis zu fünf Knoten an. Die Zähler zählen **Nachrichten**.
+
+    In Zeilen der anderen Art bleiben die fremden Zähler 0.
+
+    ⚠️ **Der Schlüssel braucht ``NULLS NOT DISTINCT``.** Fach, Knoten und Stufe dürfen leer
+    sein; ohne die Klausel gälten zwei leere Werte als verschieden, und jedes
+    ``INSERT … ON CONFLICT`` legte für den Chat ohne Fach eine neue Zeile an, statt zu zählen.
+
+    **Kein Pseudonym, kein Bezug zu Konversation oder Nachricht** — nur Zählerstände. Deshalb
+    keine automatische Löschung; Zeilen eines gelöschten Knotens oder Fachs folgen ihm.
+    """
+
+    __tablename__ = "vorab_statistik"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Montag der ISO-Kalenderwoche, Ortszeit der Schule.
+    woche: Mapped[date] = mapped_column(nullable=False)
+    node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=True
+    )
+    stufe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Fach des Chats (Unterrichtsgruppe, sonst Fachzuordnung) — nicht das Fach des Knotens.
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True
+    )
+    #: Modell-Alias der Antwort (`chat-standard` …), nicht das Anbietermodell.
+    modell: Mapped[str] = mapped_column(Text, nullable=False)
+
+    vorgelegt: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    im_werkzeugergebnis: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    nachrichten: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    mit_sicher: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    mit_angebot: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    angebot_nachgeschlagen: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    suchen_ohne_angebot: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    #: Wie ``mit_angebot`` / ``angebot_nachgeschlagen``, nur Nachrichten **ohne** sicheren
+    #: Treffer. Daneben liegt ein Angebot fast nie nachgeschlagen (3b-Lauf 14.10.2026: 0/36,
+    #: ohne 8/13) — über alles gerechnet läse sich die Quote zu niedrig.
+    angebot_ohne_sicher: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    angebot_ohne_sicher_nachgeschlagen: Mapped[int] = mapped_column(
+        nullable=False, server_default="0"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "woche", "node_id", "stufe", "subject_id", "modell",
+            name="uq_vorab_statistik_schluessel", postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint("stufe IN ('sicher', 'angebot')", name="check_vorab_statistik_stufe"),
+        CheckConstraint(
+            "(node_id IS NULL) = (stufe IS NULL)", name="check_vorab_statistik_zeilenart"
+        ),
+        # Für die Kaskade beim Löschen eines Knotens — sonst ein Durchlauf je Löschung.
+        Index("idx_vorab_statistik_node", "node_id"),
+    )

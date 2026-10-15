@@ -1125,3 +1125,59 @@ async def test_messkanal_nie_in_der_produktion_auch_nicht_im_strom():
     ausgabe = await _chat_mit_angebot("production")
     assert "vorab_debug" not in ausgabe
     assert "Fertig." in ausgabe
+
+
+# ── Vorab-Statistik (0.16, Schritt 3c) ────────────────────────────────────────
+
+async def _chat_zaehlt(is_test: bool):
+    from app.context.bausteine import Angebot, Kontext
+
+    kontext = Kontext(text="", angebot=[Angebot("n-1", "Ion", "Chemie", "distanz")], subject_id=7)
+    zaehlen = AsyncMock()
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None,
+                          is_test=is_test)
+    with patch("app.chat.router.httpx.AsyncClient", return_value=_FakeHttpClient()), \
+         patch("app.chat.router._persist", new=AsyncMock(return_value=_NACHRICHT)), \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value=None)), \
+         patch("app.chat.router.kontext_fuer_frage", new=AsyncMock(return_value=kontext)), \
+         patch("app.chat.router.kontext_der_nachrichten", new=AsyncMock(return_value={})), \
+         patch("app.chat.router.vorab_zaehlen", new=zaehlen), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+        mock_settings.environment = "development"
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        ausgabe = await _stream_text(response)
+    return zaehlen, kontext, ausgabe
+
+
+@pytest.mark.asyncio
+async def test_antwort_wird_gezaehlt():
+    zaehlen, kontext, ausgabe = await _chat_zaehlt(is_test=False)
+    zaehlen.assert_awaited_once()
+    kw = zaehlen.await_args.kwargs
+    assert kw["kontext"] is kontext and kw["gesucht"] is False and kw["modell"] == "chat-standard"
+    assert "[DONE]" in ausgabe
+
+
+@pytest.mark.asyncio
+async def test_vorschau_zaehlt_nicht():
+    """ADR-016: Der Vorschaumodus des Editors ist kein Betrieb."""
+    zaehlen, _, ausgabe = await _chat_zaehlt(is_test=True)
+    zaehlen.assert_not_awaited()
+    assert "[DONE]" in ausgabe

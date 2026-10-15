@@ -217,6 +217,19 @@ async def bezugsfaecher_von(db: AsyncSession, subject_id: int | None) -> tuple[i
     return tuple(r[0] for r in zeilen.all())
 
 
+@dataclass
+class _Grundschicht:
+    """Was :func:`_grundschicht` liefert."""
+
+    #: Die sicheren Treffer, aufbereitet fürs Modell (``fuer_modell``).
+    eintraege: list[dict] = field(default_factory=list)
+    #: Ihre ``node_id``s — die Einträge tragen sie nicht mehr.
+    ids: set[str] = field(default_factory=set)
+    bausteine: list[Baustein] = field(default_factory=list)
+    angebot: list[Angebot] = field(default_factory=list)
+    subject_id: int | None = None
+
+
 async def _grundschicht(
     frage: str,
     db: AsyncSession,
@@ -227,7 +240,7 @@ async def _grundschicht(
     anchor_ids: Sequence[UUID],
     jwt_stufe: str | None,
     vektor,
-) -> tuple[list[dict], set[str], list[Baustein], list[Angebot]]:
+) -> _Grundschicht:
     """Die Vorab-Suche und ihre Aufbereitung fürs Modell (Paket 9, N11).
 
     Liefert die fertigen Einträge **und** ihre ``node_id``s — die Einträge selbst tragen
@@ -235,7 +248,7 @@ async def _grundschicht(
     Aufrufer braucht sie, um dieselben Knoten nicht ein zweites Mal aus dem Teilgraphen
     eines Ankers zu holen. Dazu die Bausteine für die Zeile „Kontext" unter der Antwort
     (0.14) — aus **denselben** Treffern, die in den Prompt gehen. Zuletzt das Angebot
-    (0.16): Titel, deren Inhalt nicht vorliegt.
+    (0.16): Titel, deren Inhalt nicht vorliegt, und das Fach, mit dem gesucht wurde.
 
     **Das Fach** kommt aus der Konversation (N11): ihre Unterrichtsgruppe, sonst ihre
     Fachzuordnung. Das Fach eines Assistenten steckt bereits darin — der Chat-Router
@@ -267,16 +280,17 @@ async def _grundschicht(
     ]
     treffer = ergebnis.sicher
     if not treffer:
-        return [], set(), [], angebot
+        return _Grundschicht(angebot=angebot, subject_id=subject_id)
 
     grenzen = await abgrenzungen_zu(db, [t["node_id"] for t in treffer])
     baender = await bp_baender_zu(db, treffer, stufe) if stufe is not None else {}
     merkmale = stufen_vermerke(treffer, stufe, baender)
-    return (
-        fuer_modell(treffer, grenzen, merkmale),
-        {t["node_id"] for t in treffer},
-        aus_treffern(treffer, VORAB),
-        angebot,
+    return _Grundschicht(
+        eintraege=fuer_modell(treffer, grenzen, merkmale),
+        ids={t["node_id"] for t in treffer},
+        bausteine=aus_treffern(treffer, VORAB),
+        angebot=angebot,
+        subject_id=subject_id,
     )
 
 
@@ -362,7 +376,7 @@ async def kontext_fuer_frage(
     # Datenbank arbeitet.
     vektor_task = asyncio.create_task(vektor_oder_none(query_text))
     try:
-        vorab_eintraege, vorab_ids, vorab_bausteine, angebot = await _grundschicht(
+        grund = await _grundschicht(
             query_text,
             db,
             pseudonym=pseudonym,
@@ -415,16 +429,16 @@ async def kontext_fuer_frage(
         # `ausschluss`: Was die Grundschicht schon vorgelegt hat, gehört nicht ein
         # zweites Mal in denselben Prompt — einmal als JSON-Eintrag, einmal als Absatz.
         thematisch_abschnitt = await thematisch(
-            query_text, profil, db, ausschluss=vorab_ids, vektor=await vektor_task
+            query_text, profil, db, ausschluss=grund.ids, vektor=await vektor_task
         )
         semantic_treffer = thematisch_abschnitt.treffer
         # Was der Anker-Weg als Inhalt bringt, liegt vor — ein Angebot dafür schickte das
         # Modell nach etwas suchen, das schon dasteht.
         im_inhalt = {t.get("node_id") for t in semantic_treffer}
-        angebot = [a for a in angebot if a.node_id not in im_inhalt]
+        grund.angebot = [a for a in grund.angebot if a.node_id not in im_inhalt]
 
     base = _assemble_context(
-        semantic_treffer, engagement_entries, pinned_nodes, vorab_eintraege, angebot
+        semantic_treffer, engagement_entries, pinned_nodes, grund.eintraege, grund.angebot
     )
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
@@ -433,7 +447,8 @@ async def kontext_fuer_frage(
         text = f"{planning_block}\n\n{base}" if base else planning_block
     else:
         text = base
-    return Kontext(text=text, bausteine=vorab_bausteine, angebot=angebot)
+    return Kontext(text=text, bausteine=grund.bausteine, angebot=grund.angebot,
+                   subject_id=grund.subject_id)
 
 
 async def stufe_der_person(

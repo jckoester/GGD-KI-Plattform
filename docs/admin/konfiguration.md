@@ -584,6 +584,10 @@ Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferen
   kennt das Modell ihn nicht und zitiert womöglich den Plan eines anderen Landes. Ebenso die
   **Anrede**: Mitgeliefert ist „du", wie in der Oberfläche; ohne Vorgabe wechseln die Modelle
   zwischen „du" und „Sie".
+- `preambles.wissensspeicher_vorrang` *(seit 0.16, optional)* — ein Satz direkt nach der
+  universellen Basis: Für Fachliches gilt der Wissensspeicher der Schule vor dem eigenen
+  Wissen des Modells. Mitgeliefert ist der gemessene Wortlaut. Pflegt Ihre Schule keinen
+  Wissensspeicher, lassen Sie den Schlüssel weg oder leer — dann steht kein Satz im Prompt.
 - `preambles.student_extension` / `teacher_extension` — Zielgruppen-Erweiterung; das
   Backend wählt nach `assistant.audience` (bzw. bei `audience: all` und ohne Assistent
   nach der Rolle der anfragenden Person).

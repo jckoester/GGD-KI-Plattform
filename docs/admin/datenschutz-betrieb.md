@@ -347,6 +347,21 @@ docker compose exec backend python scripts/cleanup_stale_conversations.py --dry-
 docker compose exec backend python scripts/cleanup_inactive_accounts.py --dry-run
 ```
 
+## Vorab-Statistik (seit 0.16)
+
+Die Tabelle `vorab_statistik` zählt, wie oft die Vorab-Suche Einträge des Wissensspeichers
+vorgelegt oder angeboten hat und ob das Modell angebotene nachgeschlagen hat — je
+Kalenderwoche, Eintrag, Stufe, Fach des Chats und Modell. **Kein Pseudonym, kein Bezug zu
+Konversation oder Nachricht**, Vorschau-Chats zählen nicht. Damit entstehen keine
+personenbezogenen Daten; ein Zusatz in den Datenschutzhinweisen (Art. 13) ist nicht nötig. In
+der Liste der Verarbeitungen für die DSFA steht sie der Vollständigkeit halber:
+
+| Bestand | Inhalt | Frist | Zugriff |
+|---|---|---|---|
+| `vorab_statistik` | Zählerstände ohne Personenbezug | keine automatische Löschung; Zeilen gelöschter Einträge oder Fächer verschwinden mit ihnen | Rollen `admin`, `statistics` (`/statistics/vorab`) |
+
+Bedeutung der Zahlen: [Vorab-Suche beobachten](vorab-statistik.md).
+
 ## De-Anonymisierung und Audit-Log
 
 Für begründete Ausnahmefälle (z. B. richterliche Anordnung, Missbrauchsverdacht)

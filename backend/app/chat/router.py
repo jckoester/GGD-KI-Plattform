@@ -63,6 +63,7 @@ from app.context.bausteine import (
 )
 from app.context.bausteine import speichere as bausteine_speichern
 from app.context.service import kontext_fuer_frage, stufe_der_person
+from app.context.vorab_statistik import zaehlen as vorab_zaehlen
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
 from app.context.search import (
@@ -2618,6 +2619,14 @@ async def chat(
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
+
+        # Vorab-Statistik (0.16): nach dem Speichern, eigene Transaktion, wirft nie. Vorschauen
+        # aus dem Editor zählen nicht (ADR-016) — sie sind kein Betrieb.
+        if _nachricht_id is not None and not conversation_is_test:
+            await vorab_zaehlen(
+                db, kontext=kontext, werkzeug_bausteine=_werkzeug_bausteine,
+                gesucht=bool(_suchanfragen), modell=model_used,
+            )
 
         _debug = _vorab_debug_ereignis(kontext.angebot, _werkzeug_bausteine, _suchanfragen)
         if _debug:

@@ -317,3 +317,45 @@ def test_eigener_erzaehlsatz_ueber_fachgrenzen_und_mit_alternativen():
     assert M.gefunden(wurzel, [T("n-te Wurzel", "mathematik", "distanz", 0.40)])
     assert not M.gefunden(wurzel, [T("Wurzelziehen", "chemie", "nennung", 0.48)])
     assert not M.gefunden(wurzel, [T("Potenz", "mathematik", "distanz", 0.40)])
+
+
+# ── Abgleich mit der Vorab-Statistik (Schritt 3c) ────────────────────────────
+
+def _chat(vorab=0, angebot=0, nachgeschlagen=0, werkzeuge=(), **extra):
+    return {"bausteine": [{"titel": f"S{i}", "herkunft": "vorab"} for i in range(vorab)]
+            + [{"titel": "W", "herkunft": "werkzeug"}],
+            "angebot": [{"node_id": f"a{i}", "titel": f"A{i}"} for i in range(angebot)],
+            "nachgeschlagen": [f"a{i}" for i in range(nachgeschlagen)],
+            "werkzeuge": list(werkzeuge), **extra}
+
+
+CHATS = [
+    _chat(vorab=2, angebot=1),                                          # sicher + Angebot daneben
+    _chat(angebot=2, nachgeschlagen=1, werkzeuge=["search_context_nodes"]),  # nur Angebot, geholt
+    _chat(werkzeuge=["search_context_nodes"]),                          # Suche ohne Angebot
+    {"grund": "HTTPError: weg"},                                        # abgebrochen
+]
+
+
+def test_erwartete_zaehler_aus_den_chats():
+    z = M.erwartete_zaehler(CHATS)
+    assert (z["nachrichten"], z["mit_sicher"], z["mit_angebot"], z["angebot_nachgeschlagen"]) == (3, 1, 2, 1)
+    assert (z["angebot_ohne_sicher"], z["angebot_ohne_sicher_nachgeschlagen"], z["suchen_ohne_angebot"]) == (1, 1, 1)
+    assert (z["sicher_vorgelegt"], z["angebot_vorgelegt"], z["im_werkzeugergebnis"]) == (2, 3, 1)
+
+
+def test_abgleich_stimmt_und_wird_bei_einem_falschen_zaehler_rot():
+    erwartet = M.erwartete_zaehler(CHATS)
+    vorher = dict.fromkeys(M.STATISTIK_SUMMEN, 10)
+    nachher = {k: 10 + v for k, v in erwartet.items()}
+    assert M.statistik_abgleich(erwartet, vorher, nachher) == []
+    nachher["angebot_nachgeschlagen"] += 1
+    assert M.statistik_abgleich(erwartet, vorher, nachher) == [
+        "angebot_nachgeschlagen: erwartet +1, gezählt +2"]
+
+
+def test_ohne_messkanal_kein_abgleich():
+    ohne = [{k: v for k, v in _chat().items() if k not in ("angebot", "nachgeschlagen")}]
+    stand = dict.fromkeys(M.STATISTIK_SUMMEN, 0)
+    assert "nicht möglich" in M._statistik_bericht(ohne, stand, stand)
+    assert "keine Tabelle" in M._statistik_bericht(ohne, None, None)

@@ -3,6 +3,7 @@ from typing import Literal, Tuple
 from zoneinfo import ZoneInfo
 import logging
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, text
@@ -10,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
-from app.db.models import ExchangeRate
+from app.context.visibility import read_scope_clause
+from app.context.vorab_statistik import ANGEBOT, SICHER
+from app.db.models import ContextNode, ExchangeRate, Subject, VorabStatistik as VS
 from app.db.session import get_db
 from app.litellm import systemkonto
 from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX, VALID_GRADES
@@ -320,4 +323,130 @@ async def get_spend(
         unvollstaendige_nachrichten=int(guete[0] or 0),
         ausstehende_nachrichten=int(guete[1] or 0),
         system=system,
+    )
+
+
+# ── Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.3) ────────────────────
+#
+# Gelesen wird `vorab_statistik` (ADR-011 Teil 6.3): Zählerstände ohne Personenbezug. Die
+# Quote heißt „nachgeschlagen", nicht „Trefferquote" — ein angebotener Knoten zählt, sobald er
+# im Werkzeugergebnis derselben Antwort stand, auch wenn das Modell etwas anderes suchte.
+
+class VorabWoche(BaseModel):
+    """Eine Wochenzeile — die Zähler zählen **Nachrichten**."""
+
+    woche: date
+    nachrichten: int
+    mit_sicher: int
+    mit_angebot: int
+    angebot_nachgeschlagen: int
+    angebot_ohne_sicher: int
+    angebot_ohne_sicher_nachgeschlagen: int
+    suchen_ohne_angebot: int
+
+
+class VorabKnoten(BaseModel):
+    node_id: str
+    #: ``None``, wenn die anfragende Person den Knoten nicht lesen darf (privat, fremde Gruppe).
+    titel: str | None
+    #: Fach des **Knotens** — der Filter dagegen gilt dem Fach des Chats.
+    fach: str | None
+    sicher: int
+    angeboten: int
+    nachgeschlagen: int
+
+
+class VorabFach(BaseModel):
+    id: int
+    name: str
+
+
+class VorabStatistikAntwort(BaseModel):
+    von: date
+    bis: date
+    wochen: list[VorabWoche]
+    knoten: list[VorabKnoten]
+    #: Die Fächer, zu denen es Zeilen gibt — für den Filter.
+    faecher: list[VorabFach]
+
+
+_VORAB_WOCHENZAEHLER = (
+    "nachrichten", "mit_sicher", "mit_angebot", "angebot_nachgeschlagen",
+    "angebot_ohne_sicher", "angebot_ohne_sicher_nachgeschlagen", "suchen_ohne_angebot",
+)
+
+
+@router.get("/vorab", response_model=VorabStatistikAntwort)
+async def get_vorab_statistik(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    subject_id: int | None = None,
+    ohne_fach: bool = False,
+    user: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> VorabStatistikAntwort:
+    """Wochenzeilen und Knoten der Vorab-Statistik für einen Zeitraum.
+
+    Der Zeitraum gilt wochenweise: Eine Woche zählt, wenn ihr Montag zwischen dem Montag der
+    Woche von ``from_date`` und ``to_date`` liegt. ``subject_id`` filtert auf Chats eines
+    Fachs, ``ohne_fach`` auf Chats ohne Fach; ohne beides zählen alle.
+    """
+    today = datetime.now(BERLIN).date()
+    bis = to_date or today
+    von = from_date or bis - timedelta(weeks=12)
+    if von > bis:
+        raise HTTPException(status_code=422, detail="Der Zeitraum beginnt nach seinem Ende.")
+    filter_ = [VS.woche >= von - timedelta(days=von.weekday()), VS.woche <= bis]
+    if ohne_fach:
+        filter_.append(VS.subject_id.is_(None))
+    elif subject_id is not None:
+        filter_.append(VS.subject_id == subject_id)
+
+    wochen = (await db.execute(
+        sa.select(VS.woche, *(sa.func.sum(getattr(VS, z)) for z in _VORAB_WOCHENZAEHLER))
+        .where(VS.node_id.is_(None), *filter_)
+        .group_by(VS.woche)
+        .order_by(VS.woche)
+    )).all()
+
+    summen = (
+        sa.select(
+            VS.node_id,
+            sa.func.sum(sa.case((VS.stufe == SICHER, VS.vorgelegt), else_=0)).label("sicher"),
+            sa.func.sum(sa.case((VS.stufe == ANGEBOT, VS.vorgelegt), else_=0)).label("angeboten"),
+            sa.func.sum(VS.im_werkzeugergebnis).label("nachgeschlagen"),
+        )
+        .where(VS.node_id.is_not(None), *filter_)
+        .group_by(VS.node_id)
+        .subquery()
+    )
+    # Sichtbarkeit beim Lesen, wie unter der Antwort: Wer einen Knoten nicht lesen darf,
+    # sieht hier nur, dass es ihn gibt — nicht seinen Titel.
+    sichtbar = read_scope_clause(user.sub, user.roles)
+    knoten = (await db.execute(
+        sa.select(
+            summen.c.node_id, sa.case((sichtbar, ContextNode.title), else_=None), Subject.name,
+            summen.c.sicher, summen.c.angeboten, summen.c.nachgeschlagen,
+        )
+        .join(ContextNode, ContextNode.id == summen.c.node_id)
+        .outerjoin(Subject, Subject.id == ContextNode.subject_id)
+        .order_by(summen.c.angeboten.desc(), summen.c.sicher.desc(), summen.c.node_id)
+    )).all()
+
+    faecher = (await db.execute(
+        sa.select(Subject.id, Subject.name)
+        .where(Subject.id.in_(sa.select(VS.subject_id).where(VS.subject_id.is_not(None))))
+        .order_by(Subject.name)
+    )).all()
+
+    return VorabStatistikAntwort(
+        von=von,
+        bis=bis,
+        wochen=[VorabWoche(woche=w[0], **{z: int(w[i + 1] or 0)
+                                          for i, z in enumerate(_VORAB_WOCHENZAEHLER)})
+                for w in wochen],
+        knoten=[VorabKnoten(node_id=str(k[0]), titel=k[1], fach=k[2], sicher=int(k[3] or 0),
+                            angeboten=int(k[4] or 0), nachgeschlagen=int(k[5] or 0))
+                for k in knoten],
+        faecher=[VorabFach(id=f[0], name=f[1]) for f in faecher],
     )

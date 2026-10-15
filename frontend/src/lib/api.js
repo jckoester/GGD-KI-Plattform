@@ -561,6 +561,24 @@ export async function saveImageModelMatrix(allowlists) {
   return res.json();
 }
 
+/**
+ * Vorab-Statistik (0.16): Wochenzeilen und Knoten für einen Zeitraum. ``fach`` ist eine
+ * Fach-ID, ``"ohne"`` für Chats ohne Fach oder ``null`` für alle.
+ */
+export async function getVorabStatistik(fromDate = null, toDate = null, fach = null) {
+  const url = new URL(`${BASE}/admin/stats/vorab`, location.href);
+  if (fromDate) url.searchParams.set("from_date", fromDate);
+  if (toDate) url.searchParams.set("to_date", toDate);
+  if (fach === "ohne") url.searchParams.set("ohne_fach", "true");
+  else if (fach) url.searchParams.set("subject_id", fach);
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+  // { von, bis, wochen: [{woche, nachrichten, …}], knoten: [{node_id, titel, fach, sicher,
+  //   angeboten, nachgeschlagen}], faecher: [{id, name}] }
+}
+
 export async function getHeatmap(teamId = null, model = null, weekOffset = 0) {
   const url = new URL(`${BASE}/admin/stats/heatmap`, location.href);
   if (teamId) url.searchParams.set("team_id", teamId);

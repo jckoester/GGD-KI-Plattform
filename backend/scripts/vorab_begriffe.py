@@ -48,7 +48,10 @@ viele Angebote bekäme eine Gegenprobe bei einem breiteren Band?); gewählt wird
 und die Alltags-Gegenproben als echte Chats in vorübergehenden Messgruppen ohne Stunden — je
 Chat Nachricht, Bausteine (vorab/werkzeug), Werkzeugaufrufe, Antwort und Dauer; dazu aus dem
 Messkanal `vorab_debug` (nur außerhalb der Produktion) das Angebot, was davon nachgeschlagen
-wurde, und die Suchanfragen des Modells. Sie werden gelesen, sie sind kein eigenes Kriterium. Schüler:in ist ein vorhandenes Dev-Konto mit Restbudget und
+wurde, und die Suchanfragen des Modells. Sie werden gelesen, sie sind kein eigenes Kriterium.
+Dazu der **Abgleich mit der Vorab-Statistik** (0.16, Schritt 3c): `vorab_statistik` vor und nach
+dem Lauf gelesen, die Differenz muss zu dem passen, was die Chats melden — während des Laufs
+darf auf der Instanz niemand sonst chatten. Schüler:in ist ein vorhandenes Dev-Konto mit Restbudget und
 vorübergehender Mitgliedschaft; ihr Pseudonym wird nicht ausgegeben. Am Ende sind die Gruppen
 samt Konversationen gelöscht.
 
@@ -688,6 +691,59 @@ async def _bestand_text() -> str:
 # ── Test-Chats ───────────────────────────────────────────────────────────────
 
 
+#: Die Summen, die der Abgleich mit `vorab_statistik` vergleicht (Plan § 7.3, § 7.4 Nr. 9).
+STATISTIK_SUMMEN = (
+    "nachrichten", "mit_sicher", "mit_angebot", "angebot_nachgeschlagen", "suchen_ohne_angebot",
+    "angebot_ohne_sicher", "angebot_ohne_sicher_nachgeschlagen", "sicher_vorgelegt",
+    "angebot_vorgelegt", "im_werkzeugergebnis",
+)
+
+
+def statistik_stand(conn) -> dict | None:
+    """Die Summen der ganzen Tabelle — ``None``, wenn es sie (noch) nicht gibt."""
+    import psycopg2
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT " + ", ".join(f"COALESCE(SUM({z}), 0)" for z in STATISTIK_SUMMEN[:7])
+                + ", COALESCE(SUM(vorgelegt) FILTER (WHERE stufe = 'sicher'), 0)"
+                  ", COALESCE(SUM(vorgelegt) FILTER (WHERE stufe = 'angebot'), 0)"
+                  ", COALESCE(SUM(im_werkzeugergebnis), 0) FROM vorab_statistik")
+            return dict(zip(STATISTIK_SUMMEN, (int(x) for x in cur.fetchone())))
+    except psycopg2.errors.UndefinedTable:
+        return None
+
+
+def erwartete_zaehler(chats: list[dict]) -> dict:
+    """Was die Statistik nach diesen Chats dazugezählt haben muss — aus Bausteinen, Werkzeugen
+    und Messkanal je Chat. Abgebrochene Chats zählen nicht."""
+    z = dict.fromkeys(STATISTIK_SUMMEN, 0)
+    for c in chats:
+        if "grund" in c:
+            continue
+        sicher = [b for b in c["bausteine"] if b["herkunft"] == "vorab"]
+        angebot, nach = c.get("angebot") or [], c.get("nachgeschlagen") or []
+        ohne_sicher = bool(angebot) and not sicher
+        z["nachrichten"] += 1
+        z["mit_sicher"] += bool(sicher)
+        z["mit_angebot"] += bool(angebot)
+        z["angebot_nachgeschlagen"] += bool(nach)
+        z["suchen_ohne_angebot"] += "search_context_nodes" in c["werkzeuge"] and not angebot
+        z["angebot_ohne_sicher"] += ohne_sicher
+        z["angebot_ohne_sicher_nachgeschlagen"] += ohne_sicher and bool(nach)
+        z["sicher_vorgelegt"] += len(sicher)
+        z["angebot_vorgelegt"] += len(angebot)
+        z["im_werkzeugergebnis"] += len(nach)
+    return z
+
+
+def statistik_abgleich(erwartet: dict, vorher: dict, nachher: dict) -> list[str]:
+    """Wo die Differenz der Tabelle nicht zu den Chats passt — leer, wenn alles stimmt."""
+    return [f"{k}: erwartet +{erwartet[k]}, gezählt +{nachher[k] - vorher[k]}"
+            for k in STATISTIK_SUMMEN if nachher[k] - vorher[k] != erwartet[k]]
+
+
 def _lade(name: str):
     """`scripts/` ist kein Paket (CLAUDE.md, „scripts/-Paketkonflikt") — über den Pfad laden."""
     spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(f"{name}.py"))
@@ -704,6 +760,8 @@ def verlauf_als_markdown(kopf: dict, chats: list[dict]) -> str:
     teile = [f"# Test-Chats „Begriff im Satz“ — {kopf['beginn']}", "",
              f"Chat ohne Assistent, als Schüler:in Stufe {kopf['stufe']}, in einer Messgruppe des Fachs · "
              f"Modell {kopf['modell']} · Datei `{kopf['datei']}`. Gelesen, kein eigenes Kriterium.", ""]
+    if kopf.get("statistik"):
+        teile += [f"**{kopf['statistik']}**", ""]
     for c in chats:
         n = c["nachricht"]
         kopfzeile = (f"{n.erwartet[1]} ({n.erwartet[0]}) · {n.gruppe}" if n.erwartet
@@ -751,6 +809,7 @@ def chats_fahren(args, daten: dict, liste: list[Nachricht]) -> list[dict]:
             "stufe": daten.get("stufe", 10), "modell": "?"}
     ergebnisse: list[dict] = []
     asyncio.run(vor_einer_messung(VORAB_TYPEN, trotzdem=args.trotzdem))
+    stand_vorher = statistik_stand(conn)
     try:
         for fach, g in gruppen.items():
             entfall.abbauen(conn, g)
@@ -789,6 +848,8 @@ def chats_fahren(args, daten: dict, liste: list[Nachricht]) -> list[dict]:
             ergebnisse.append(eintrag)
             if args.verlauf:
                 args.verlauf.write_text(verlauf_als_markdown(kopf, ergebnisse), encoding="utf-8")
+        kopf["statistik"] = _statistik_bericht(ergebnisse, stand_vorher, statistik_stand(conn))
+        print(kopf["statistik"], flush=True)
     finally:
         for g in gruppen.values():
             entfall.abbauen(conn, g)
@@ -797,6 +858,20 @@ def chats_fahren(args, daten: dict, liste: list[Nachricht]) -> list[dict]:
     if args.verlauf:
         args.verlauf.write_text(verlauf_als_markdown(kopf, ergebnisse), encoding="utf-8")
     return ergebnisse
+
+
+def _statistik_bericht(chats: list[dict], vorher: dict | None, nachher: dict | None) -> str:
+    """Eine Zeile zum Abgleich — oder warum er nicht möglich war."""
+    if vorher is None or nachher is None:
+        return "Statistik-Abgleich: keine Tabelle `vorab_statistik` (Stand vor 0.16, Schritt 3c)."
+    if any("grund" not in c and "angebot" not in c for c in chats):
+        return "Statistik-Abgleich: nicht möglich — ohne Messkanal `vorab_debug` (Produktion?)."
+    abweichend = statistik_abgleich(erwartete_zaehler(chats), vorher, nachher)
+    abgebrochen = sum("grund" in c for c in chats)
+    hinweis = f" ({abgebrochen} abgebrochene Chats nicht erwartet)" if abgebrochen else ""
+    if not abweichend:
+        return f"Statistik-Abgleich: stimmt — {len(STATISTIK_SUMMEN)} Summen{hinweis}."
+    return "Statistik-Abgleich: ABWEICHUNG" + hinweis + " — " + "; ".join(abweichend)
 
 
 # ── Aufruf ───────────────────────────────────────────────────────────────────

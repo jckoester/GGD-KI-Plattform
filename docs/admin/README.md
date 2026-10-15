@@ -72,6 +72,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [LiteLLM-Umzug](../runbooks/litellm-in-die-compose.md) — Runbook: einen bisher getrennt betriebenen Proxy in die Compose der Anwendung übernehmen
 - [Stundenplan-Integration](stundenplan-integration.md) — WebUntis: Servicekonto, Fachkürzel, Ferien-Import, Abgleich-Cron
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen
+- [Vorab-Suche beobachten](vorab-statistik.md) — Statistik unter `/statistics/vorab`: was der Wissensspeicher vorlegt und anbietet, was nachgeschlagen wird
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Speicherplatz freigeben, Schuljahreswechsel, Troubleshooting
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
 - [Rückmeldungen sichten](feedback.md) — Triage des Feedback-Kanals: Issue-Referenz, Zweckbindung der Kontaktangabe, Abgrenzung zur 4-Augen-Einsicht, Löschfristen

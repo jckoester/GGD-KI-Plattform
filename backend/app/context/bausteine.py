@@ -76,6 +76,9 @@ class Kontext:
     text: str
     bausteine: list[Baustein] = field(default_factory=list)
     angebot: list[Angebot] = field(default_factory=list)
+    #: Fach, mit dem die Vorab-Suche gesucht hat (Unterrichtsgruppe, sonst Fachzuordnung) —
+    #: für die Vorab-Statistik.
+    subject_id: int | None = None
 
 
 def aus_treffern(treffer: Iterable, herkunft: str) -> list[Baustein]:
