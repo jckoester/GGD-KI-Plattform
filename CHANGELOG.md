@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.16.0] – 2026-10-15
+
+Nennt eine Schüler:in einen Fachbegriff mitten im Satz, bietet der Chat dem Modell seinen Titel
+an, und das Modell holt den Inhalt aus dem Wissensspeicher, wenn er für die Antwort zählt; was
+sicher passt, liegt wie bisher als Inhalt vor. Fächer lesen die Begriffe ihrer Bezugsfächer mit,
+und eine Statistik zeigt, was angeboten und nachgeschlagen wurde. Zwei Migrationen — nach dem
+Update die Bezugsfächer eintragen und einspielen und einen Satz in `pedagogy.yaml` übernehmen
+(unten).
+
 ### Neu
 
 - **Fachbegriffe im Satz werden angeboten:** Nennt eine Nachricht einen Fachbegriff mitten im
