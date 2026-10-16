@@ -260,7 +260,10 @@ async def test_begriff_beim_schreiben(test_client, auth_headers, faecher, async_
         "refs": [{"node_id": str(knoten.id), "typ": "concept", "titel": "Vom Modell", "code": "X"}],
     })
     if not gilt:
-        assert "kein passender Begriff" in aus.get("error", ""), aus
+        # Kein passender Begriff: nicht eingetragen, gemeldet — der Aufruf selbst gelingt.
+        assert aus.get("ok") is True and aus.get("nicht_eingetragen"), aus
+        refs = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["refs"]
+        assert refs == []
         return
     assert aus.get("ok") is True, aus
     refs = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["refs"]
@@ -268,6 +271,105 @@ async def test_begriff_beim_schreiben(test_client, auth_headers, faecher, async_
     # fällt weg.
     assert refs == [{"node_id": str(knoten.id), "typ": "concept", "code": None,
                      "titel": knoten.title, "partiell": False, "content_type": art}]
+
+
+# ── Begriffe über den Titel (Messung 1, Plan § 16 A1) ────────────────────────
+#
+# Die Suchwerkzeuge geben keine Kennungen; das Modell trägt Begriffe über ihren Titel ein.
+
+
+async def _schreibe_begriffe(async_engine, stunde, *refs):
+    return await _rufe(async_engine, _handle_update_lesson_phases, {
+        "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}], "refs": list(refs)})
+
+
+async def _refs(client, h, stunde):
+    return (await client.get(f"/planning/lessons/{stunde}", headers=h)).json()["refs"]
+
+
+@pytest.mark.asyncio
+async def test_begriff_ueber_titel_und_alias(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    meso = await _begriff(async_engine, "Mesomerie")
+    benzol = await _begriff(async_engine, "Benzol", fach=BEZUG, art="stoffsteckbrief")
+    async with _sitzungen(async_engine)() as db:
+        db.add(NodeAlias(node_id=meso.id, alias="Resonanz"))
+        await db.commit()
+
+    aus = await _schreibe_begriffe(
+        async_engine, stunde,
+        {"typ": "concept", "titel": "a1-begriff  MESOMERIE"},     # Normalisierung wie die Namenssuche
+        {"typ": "concept", "titel": PRAEFIX + "Benzol"},          # aus dem Bezugsfach
+        {"typ": "concept", "titel": "Resonanz"},                   # Alias → derselbe, entfällt doppelt
+    )
+    assert aus.get("ok") is True and "nicht_eingetragen" not in aus, aus
+    assert [(r["node_id"], r["content_type"]) for r in await _refs(test_client, auth_headers, stunde)] == [
+        (str(meso.id), "begriff"), (str(benzol.id), "stoffsteckbrief")]
+
+
+@pytest.mark.asyncio
+async def test_fehlender_begriff_wird_gemeldet(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Fehlt einer, wird der Rest gespeichert — Phasen und vorhandene Begriffe."""
+    stunde = await _stunde(test_client, auth_headers)
+    kat = await _begriff(async_engine, "Katalysator")
+    await _begriff(async_engine, "Lewis-Schreibweise")
+    aus = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": PRAEFIX + "Katalysator"},
+                                   {"typ": "concept", "titel": PRAEFIX + "Lewis-Säure"})
+    assert aus.get("ok") is True, aus
+    assert [n["titel"] for n in aus["nicht_eingetragen"]] == [PRAEFIX + "Lewis-Säure"]
+    assert "Fachschaft" in aus["nicht_eingetragen"][0]["grund"]
+    assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(kat.id)]
+    phasen = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["phasen"]
+    assert [p["name"] for p in phasen] == ["Neu"]
+
+
+@pytest.mark.asyncio
+async def test_titel_findet_nichts_ausserhalb(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Fremdes Fach, archiviert, fremd-privat, Bauteil: über den Titel nicht erreichbar."""
+    stunde = await _stunde(test_client, auth_headers)
+    await _begriff(async_engine, "Fremd", fach=FREMD)
+    await _begriff(async_engine, "Archiv", status="archived")
+    await _begriff(async_engine, "Privat", read_scope="private", write_scope="private",
+                   owner_pseudonym=TEACHER2_PSEUDO)
+    await _begriff(async_engine, "Bauteil", art="bauteil")
+    aus = await _schreibe_begriffe(async_engine, stunde, *(
+        {"typ": "concept", "titel": PRAEFIX + t} for t in ("Fremd", "Archiv", "Privat", "Bauteil")))
+    assert len(aus["nicht_eingetragen"]) == 4, aus
+    assert await _refs(test_client, auth_headers, stunde) == []
+
+
+@pytest.mark.asyncio
+async def test_gleichnamige_fassungen(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    await _begriff(async_engine, "Oxidation", metadata_={"fassung": "Sauerstoffaufnahme"})
+    abgabe = await _begriff(async_engine, "Oxidation", metadata_={"fassung": "Elektronenabgabe"})
+    ohne = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": PRAEFIX + "Oxidation"})
+    grund = ohne["nicht_eingetragen"][0]["grund"]
+    assert "Elektronenabgabe" in grund and "Sauerstoffaufnahme" in grund
+    mit = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": PRAEFIX + "Oxidation",
+                                                          "fassung": "elektronenabgabe"})
+    assert "nicht_eingetragen" not in mit, mit
+    assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(abgabe.id)]
+
+
+@pytest.mark.asyncio
+async def test_eigenes_fach_vor_bezugsfach(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    eigen = await _begriff(async_engine, "Energie")
+    await _begriff(async_engine, "Energie", fach=BEZUG)
+    aus = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": PRAEFIX + "Energie"})
+    assert "nicht_eingetragen" not in aus, aus
+    assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(eigen.id)]
+
+
+@pytest.mark.asyncio
+async def test_begriffe_ohne_kennungen_mit_anleitung(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """`begriffe` trägt keine Kennungen mehr, aber die Anleitung zum Absatz."""
+    stunde = await _stunde(test_client, auth_headers)
+    await _begriff(async_engine, "Mesomerie")
+    begriffe, _ = await _begriffe(async_engine, stunde)
+    assert all("node_id" not in e for e in begriffe["eintraege"])
+    assert "Begriffe dieser Stunde" in begriffe["anleitung"]
 
 
 @pytest.mark.asyncio

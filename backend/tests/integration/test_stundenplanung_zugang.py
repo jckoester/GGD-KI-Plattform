@@ -500,8 +500,11 @@ async def test_fremde_private_kompetenz_ist_keine(test_client, auth_headers, gru
             "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}],
             "refs": [{"node_id": str(fremd.id), "typ": "concept"}],
         }, TEACHER1_PSEUDO)
-        # Seit 0.17 nennt die Meldung einen Begriff einen Begriff.
-        assert "kein passender Begriff" in aus.get("error", ""), aus
+        # Seit 0.17 weist ein unpassender Begriff den Aufruf nicht ab: Er bleibt draußen und
+        # wird gemeldet (Plan „Fachbegriffe der Stunde" § 16, A1).
+        assert aus.get("ok") is True and aus.get("nicht_eingetragen"), aus
+        refs = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["refs"]
+        assert refs == []
     finally:
         _aufraeumen(gruppen)
 

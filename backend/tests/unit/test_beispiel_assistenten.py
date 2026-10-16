@@ -118,3 +118,9 @@ class TestStundenentwurf:
         assert "Fachschaft" in abschnitt and "fehlt" in abschnitt
         refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
         assert "concept" in refs_regel
+        # Messung 1 (16.10.2026): Begriffe über den Titel, ohne Kennung; die Regel zum Absatz
+        # auch dort, wo der Vorschlag entsteht — den Abschnitt allein übersprang das Modell 6/6.
+        assert "`titel`" in refs_regel
+        schritt3 = text.split("**Schritt 3", 1)[1].split("**Schritt 4", 1)[0]
+        assert "Begriffe dieser Stunde" in schritt3
+        assert "`nicht_eingetragen`" in abschnitt

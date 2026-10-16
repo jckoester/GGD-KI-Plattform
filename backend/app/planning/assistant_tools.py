@@ -951,6 +951,14 @@ BEGRIFFE_ANZAHL = 15
 #: soll die Auswahl nicht allein bestimmen.
 _BESCHREIBUNG_MAX = 300
 
+#: Die Regel für Begriffe dort, wo das Modell gerade liest (Plan § 16, B). In Messung 1
+#: übersprang es den Prompt-Abschnitt „Fachbegriffe der Stunde" in 6 von 6 Läufen.
+BEGRIFFE_ANLEITUNG = (
+    "Arbeitest du Phasen aus, schließt dein Vorschlag mit einem eigenen Absatz „Begriffe dieser "
+    "Stunde: …“ — nur Begriffe, die die Stunde neu einführt, je mit der Phase. Eingetragen "
+    "wird nach Zustimmung als refs mit typ 'concept' und titel."
+)
+
 
 def _vergleichstext(stunde: ContextNode, meta: dict, zusammenhang: dict) -> str:
     """Womit die Begriffe der Stunde verglichen werden: der Entwurf, wie er gerade ist.
@@ -985,6 +993,10 @@ async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenh
     schreibt `refs` als ganze Liste und soll es behalten, auch wenn es nicht unter den
     nächsten ist. Ohne Vektor (Einbettungsdienst nicht erreichbar) kommen nur diese, mit
     ``hinweis``: Dann bleibt die Suche.
+
+    **Ohne Kennungen** (Messung 1): Eingetragen wird über den Titel (`_begriff_zum_titel`).
+    Fünfzehn Kennungen wären rund ein Viertel des Ergebnisses — und das Modell nannte sie in
+    drei von zwölf Läufen der Lehrkraft.
     """
     from app.context.search import vektor_oder_none
     from app.context.service import bezugsfaecher_von
@@ -999,14 +1011,14 @@ async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenh
             node_id = str(ref["node_id"])
             if node_id not in gesehen:
                 gesehen.add(node_id)
-                eintraege.append({"node_id": node_id, "titel": ref.get("titel"), "eingetragen": True})
+                eintraege.append({"titel": ref.get("titel"), "eingetragen": True})
 
     if stunde.subject_id is None:
-        return {"eintraege": eintraege,
+        return {"eintraege": eintraege, "anleitung": BEGRIFFE_ANLEITUNG,
                 "hinweis": "Die Stunde hat kein Fach — Begriffe nur über search_context_nodes."}
     vektor = await vektor_oder_none(_vergleichstext(stunde, meta, zusammenhang))
     if vektor is None:
-        return {"eintraege": eintraege,
+        return {"eintraege": eintraege, "anleitung": BEGRIFFE_ANLEITUNG,
                 "hinweis": ("Die Auswahl nach Ähnlichkeit ist gerade nicht verfügbar — "
                             "Begriffe über search_context_nodes suchen.")}
 
@@ -1041,7 +1053,7 @@ async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenh
                 sa.select(Subject.id, Subject.name).where(Subject.id.in_(bezug))
             )).all())
     for node_id, titel, fach_id, fassung in treffer:
-        eintrag = {"node_id": str(node_id), "titel": titel}
+        eintrag = {"titel": titel}
         # Gleichnamige Begriffe gibt es je Stufe zweimal („Oxidation" in Klasse 8 und 10).
         if fassung:
             eintrag["fassung"] = fassung
@@ -1050,7 +1062,7 @@ async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenh
         if fach_id != stunde.subject_id:
             eintrag["fach"] = faecher.get(fach_id)
         eintraege.append(eintrag)
-    return {"eintraege": eintraege}
+    return {"eintraege": eintraege, "anleitung": BEGRIFFE_ANLEITUNG}
 
 
 async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
@@ -1107,9 +1119,9 @@ register_tool(ChatTool(
                 "passen. Und das Vokabular der Sozialformen und Methoden (node_id, titel, "
                 "aliase), aus dem sozialform und methode als Knoten eingetragen werden. Und "
                 "begriffe: die zur Stunde passenden Fachbegriffe des Fachs und seiner "
-                "Bezugsfächer (node_id, titel, aliase, fach nur beim Bezugsfach; eingetragen = "
-                "steht schon in refs), aus denen Begriffe der Stunde als refs mit "
-                "typ 'concept' eingetragen werden."
+                "Bezugsfächer (titel, aliase, fassung, fach nur beim Bezugsfach; eingetragen = "
+                "steht schon in refs) samt anleitung — Begriffe der Stunde werden als refs mit "
+                "typ 'concept' und ihrem titel eingetragen."
             ),
             "parameters": {
                 "type": "object",
@@ -1205,72 +1217,152 @@ _REF_TYPEN = {"ik": ("ik_kompetenz",), "pk": ("pk_kompetenz",), "concept": BEGRI
 _REF_TYP_ZU = {art: typ for typ, arten in _REF_TYPEN.items() for art in arten}
 
 
-async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str | None]:
+async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
+                            stunde: ContextNode) -> tuple[ContextNode | None, str | None]:
+    """Ein Begriff der Stunde über seinen Titel oder Alias. → (Knoten, Grund, warum keiner)
+
+    Gesucht wird im Fach der Stunde und seinen Bezugsfächern, normalisiert wie die
+    Namenssuche (`normalisiere_titel`, derselbe Ausdruck wie ihr Index). Gibt es den Namen
+    in beiden, gilt das eigene Fach; gibt es ihn in mehreren Fassungen, entscheidet `fassung`.
+    """
+    from app.context.aliase import ALIAS_NORMALISIERT
+    from app.context.filters import TITEL_NORMALISIERT
+    from app.context.lookup import normalisiere_titel
+    from app.context.service import bezugsfaecher_von
+    from app.context.visibility import read_scope_clause
+    from app.db.models import NodeAlias
+
+    if stunde.subject_id is None:
+        return None, f"„{titel}“: Die Stunde hat kein Fach."
+    faecher = (stunde.subject_id, *await bezugsfaecher_von(ctx.db, stunde.subject_id))
+    schluessel = normalisiere_titel(titel)
+    treffer = list((await ctx.db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type.in_(BEGRIFF_TYPEN),
+            ContextNode.status == "active",
+            read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+            ContextNode.subject_id.in_(faecher),
+            sa.or_(
+                TITEL_NORMALISIERT == schluessel,
+                ContextNode.id.in_(sa.select(NodeAlias.node_id).where(ALIAS_NORMALISIERT == schluessel)),
+            ),
+        ).order_by(ContextNode.id)
+    )).scalars())
+    if fassung:
+        gewuenscht = fassung.strip().casefold()
+        treffer = [t for t in treffer
+                   if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
+    if len(treffer) > 1:
+        eigene = [t for t in treffer if t.subject_id == stunde.subject_id]
+        if len(eigene) == 1:
+            treffer = eigene
+    if len(treffer) == 1:
+        return treffer[0], None
+    if not treffer:
+        return None, (f"„{titel}“ gibt es im Wissensspeicher des Fachs nicht — nicht eingetragen. "
+                      "Die Fachschaft kann den Begriff anlegen.")
+    fassungen = ", ".join(sorted({str((t.metadata_ or {}).get("fassung") or "ohne Fassung") for t in treffer}))
+    return None, f"„{titel}“ gibt es mehrfach ({fassungen}) — mit fassung angeben, welcher gemeint ist."
+
+
+async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
+                        ) -> tuple[list[dict] | None, str | None, list[dict]]:
     """Kompetenzen und Begriffe des Modells nach der Regel des Planers (`LessonRefItem`).
-    → (Refs, Fehler)
+    → (Refs, Fehler, nicht eingetragene Begriffe)
 
     Bis 0.15 schrieb das Werkzeug `refs` ungeprüft in die Metadaten — anders als die Phasen.
     Ein unbekannter `typ` verschwand dann still aus der Kompetenzleiste, die nach ik/pk
     filtert; eine erfundene Kennung stand als Kompetenz ohne Knoten da.
 
-    Geprüft wird die Form, ein bekannter `typ` und dass es den Knoten gibt, passend zum Typ
-    und für die Person lesbar. Ein Begriff (`concept`) ist ein Knoten aus `BEGRIFF_TYPEN` —
-    bis 0.17 galt die ganze Kategorie, samt Bauteil und Arduino-Funktion. **Titel und Nummer
-    kommen aus dem Knoten**, nicht vom Modell: In der Leiste steht der Wortlaut des
-    Bildungsplans. Doppelte entfallen. Archivierte Knoten zählen — ein Curriculum verweist
-    teils auf Knoten eines älteren Imports.
+    **Kompetenzen:** Geprüft wird die Form, ein bekannter `typ` und dass es den Knoten gibt,
+    passend zum Typ und für die Person lesbar. Passt einer nicht, wird der ganze Aufruf
+    abgewiesen. Archivierte Knoten zählen — ein Curriculum verweist teils auf Knoten eines
+    älteren Imports.
+
+    **Begriffe** (`concept`, ein Knoten aus `BEGRIFF_TYPEN`) seit 0.17 **über den Titel**: Die
+    Suchwerkzeuge geben dem Modell keine Kennungen (`fuer_modell`). In Messung 1 fand es
+    „Katalysator" per Suche, suchte dann bis zum Rundenlimit nach der Kennung und fragte die
+    Lehrkraft nach einer „Node-ID". Eine mitgeschickte Kennung zählt, wenn sie passt; sonst
+    der Titel (:func:`_begriff_zum_titel`). Einen Begriff, den es nicht gibt, weist der
+    Aufruf **nicht** ab — das ist der Normalfall (Plan F6), keine Erfindung: Er bleibt
+    draußen, der Rest wird gespeichert, und der dritte Rückgabewert sagt dem Modell, was es
+    der Lehrkraft sagen soll.
+
+    **Titel und Nummer kommen aus dem Knoten**, nicht vom Modell: In der Leiste steht der
+    Wortlaut des Bildungsplans bzw. des Begriffs. Doppelte entfallen.
     """
     from app.context.visibility import read_scope_clause
     from app.planning.schemas import LessonRefItem
 
     if not isinstance(refs, list):
-        return None, "refs muss eine Liste von Kompetenzen und Begriffen sein"
-    items = []
+        return None, "refs muss eine Liste von Kompetenzen und Begriffen sein", []
+    eintraege: list = []          # LessonRefItem (Kompetenz) oder dict (Begriff), in Reihenfolge
     for nr, ref in enumerate(refs, 1):
+        if isinstance(ref, dict) and ref.get("typ") == "concept":
+            eintraege.append(ref)
+            continue
         try:
             item = LessonRefItem.model_validate(ref)
         except ValidationError as e:
             fehler = e.errors()[0]
             feld = ".".join(str(t) for t in fehler["loc"]) or "Eintrag"
-            return None, f"refs, Eintrag {nr}: {feld} — {fehler['msg']}"
+            return None, f"refs, Eintrag {nr}: {feld} — {fehler['msg']}", []
         if item.typ not in _REF_TYPEN:
-            return None, f"refs, Eintrag {nr}: typ muss ik, pk oder concept sein"
-        items.append(item)
+            return None, f"refs, Eintrag {nr}: typ muss ik, pk oder concept sein", []
+        eintraege.append(item)
 
+    kennungen = []
+    for e in eintraege:
+        roh = e.node_id if isinstance(e, LessonRefItem) else e.get("node_id")
+        try:
+            kennungen.append(roh if isinstance(roh, UUID) else UUID(str(roh)))
+        except (TypeError, ValueError):
+            pass
     knoten = {}
-    if items:
+    if kennungen:
         knoten = {n.id: n for n in (await ctx.db.execute(
             sa.select(ContextNode).where(
-                ContextNode.id.in_([i.node_id for i in items]),
+                ContextNode.id.in_(kennungen),
                 read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
             )
         )).scalars()}
 
     geprueft: list[dict] = []
+    nicht_eingetragen: list[dict] = []
     gesehen: set = set()
-    for nr, item in enumerate(items, 1):
-        n = knoten.get(item.node_id)
-        if n is None or n.content_type not in _REF_TYPEN[item.typ]:
-            if item.typ == "concept":
-                return None, (f"refs, Eintrag {nr}: kein passender Begriff mit node_id "
-                              f"{item.node_id} — übernimm Begriffe aus begriffe oder einem "
-                              "Treffer; fehlt ein Begriff im Wissensspeicher, trag ihn nicht ein")
-            return None, (f"refs, Eintrag {nr}: keine passende Kompetenz mit node_id "
-                          f"{item.node_id} — übernimm Kompetenzen so, wie sie im Kapitel "
-                          "oder im Treffer stehen")
+    for nr, e in enumerate(eintraege, 1):
+        if isinstance(e, LessonRefItem):
+            n = knoten.get(e.node_id)
+            if n is None or n.content_type not in _REF_TYPEN[e.typ]:
+                return None, (f"refs, Eintrag {nr}: keine passende Kompetenz mit node_id "
+                              f"{e.node_id} — übernimm Kompetenzen so, wie sie im Kapitel "
+                              "oder im Treffer stehen"), []
+            item = e
+            item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
+        else:
+            try:
+                n = knoten.get(UUID(str(e.get("node_id"))))
+            except (TypeError, ValueError):
+                n = None
+            if n is None or n.content_type not in BEGRIFF_TYPEN:
+                titel = str(e.get("titel") or "").strip()
+                if not titel:
+                    nicht_eingetragen.append({"titel": "", "grund": "Begriff ohne Titel — nicht eingetragen."})
+                    continue
+                n, grund = await _begriff_zum_titel(ctx, titel, e.get("fassung"), stunde)
+                if n is None:
+                    nicht_eingetragen.append({"titel": titel, "grund": grund})
+                    continue
+            # Ein Begriff hat keine Nummer; eine vom Modell mitgeschickte stünde sonst in der
+            # Leiste an seiner Stelle.
+            item = LessonRefItem(node_id=n.id, typ="concept", titel=n.title, code=None,
+                                 partiell=bool(e.get("partiell")), content_type=n.content_type)
         if item.node_id in gesehen:
             continue
         gesehen.add(item.node_id)
         item.titel = n.title
-        if item.typ == "concept":
-            # Ein Begriff hat keine Nummer; eine vom Modell mitgeschickte stünde sonst in der
-            # Leiste an seiner Stelle.
-            item.code = None
-            item.content_type = n.content_type
-        else:
-            item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
         geprueft.append(item.model_dump(mode="json"))
-    return geprueft, None
+    return geprueft, None, nicht_eingetragen
 
 
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
@@ -1304,8 +1396,9 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     if fehler:
         return {"error": fehler}
     refs = args.get("refs")
+    nicht_eingetragen: list[dict] = []
     if refs is not None:
-        refs, fehler = await _refs_pruefen(ctx, refs)
+        refs, fehler, nicht_eingetragen = await _refs_pruefen(ctx, refs, node)
         if fehler:
             return {"error": fehler}
 
@@ -1375,10 +1468,14 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
         except Exception:
             pass
 
-    return {
+    ergebnis = {
         "ok": True,
         "suggested_refs": suggested_refs[:10],
     }
+    if nicht_eingetragen:
+        # Was das Modell der Lehrkraft sagen soll: welcher Begriff fehlt und wer ihn anlegt.
+        ergebnis["nicht_eingetragen"] = nicht_eingetragen
+    return ergebnis
 
 
 register_tool(ChatTool(
@@ -1401,10 +1498,12 @@ register_tool(ChatTool(
                 "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "
                 "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
                 "einzeln nachschlagen. (4) refs sind Kompetenzen und Begriffe — Begriffe mit "
-                "typ 'concept' und node_id aus begriffe oder einem Treffer; refs nur setzen, "
-                "wenn die Lehrkraft zugestimmt hat. Gibt suggested_refs zurück: Kompetenzen "
-                "und Begriffe aus verknüpften Material-Knoten, die noch nicht in refs stehen — "
-                "nur vorschlagen, nicht ungefragt übernehmen."
+                "typ 'concept' und ihrem titel aus begriffe oder einem Treffer, ohne node_id; "
+                "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Gibt suggested_refs "
+                "zurück: Kompetenzen und Begriffe aus verknüpften Material-Knoten, die noch nicht "
+                "in refs stehen — nur vorschlagen, nicht ungefragt übernehmen. Und "
+                "nicht_eingetragen: Begriffe, die es im Fach nicht gibt — sag der Lehrkraft, "
+                "dass sie fehlen und die Fachschaft sie anlegen kann."
             ),
             "parameters": {
                 "type": "object",
@@ -1455,19 +1554,27 @@ register_tool(ChatTool(
                         "items": {
                             "type": "object",
                             "properties": {
-                                "node_id": {"type": "string"},
+                                "node_id": {
+                                    "type": "string",
+                                    "description": "Kompetenzen: Pflicht. Begriffe: weglassen — dort zählt titel.",
+                                },
                                 "typ": {"type": "string", "enum": ["ik", "pk", "concept"]},
                                 "code": {"type": "string"},
                                 "titel": {"type": "string"},
+                                "fassung": {
+                                    "type": "string",
+                                    "description": "Nur bei Begriffen, die es in mehreren Fassungen gibt.",
+                                },
                                 "partiell": {"type": "boolean"},
                             },
-                            "required": ["node_id", "typ"],
+                            "required": ["typ"],
                         },
                         "description": (
                             "Kompetenzen und Begriffe der Stunde (optional; nur setzen, wenn "
                             "die Lehrkraft zugestimmt hat). Immer die ganze Liste: bestehende "
-                            "aus get_lesson_detail behalten, neue so übernehmen, wie sie im "
-                            "Kapitel, in begriffe oder im Treffer stehen."
+                            "aus get_lesson_detail behalten, neue Kompetenzen so übernehmen, wie "
+                            "sie im Kapitel oder im Treffer stehen, neue Begriffe mit typ "
+                            "'concept' und titel."
                         ),
                     },
                 },
