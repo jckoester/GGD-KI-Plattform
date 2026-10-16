@@ -114,8 +114,11 @@ class TestStundenentwurf:
         assert "`begriffe`" in text
         abschnitt = text.split("## Fachbegriffe der Stunde", 1)[1].split("\n## ", 1)[0]
         assert "Begriffe dieser Stunde" in abschnitt
-        assert "`search_context_nodes`" in abschnitt
-        assert "Fachschaft" in abschnitt and "fehlt" in abschnitt
+        # Messung 5: Das Nachschlagen jedes Begriffs kostete die Runden zum Schreiben; seit A1
+        # prüft `update_lesson_phases` selbst und meldet, was fehlt.
+        assert "`search_context_nodes`" not in abschnitt
+        assert "schlag ihn nicht nach" in abschnitt
+        assert "Fachschaft" in abschnitt and "fehlen" in abschnitt
         refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
         assert "concept" in refs_regel
         # Messung 1 (16.10.2026): Begriffe über den Titel, ohne Kennung; die Regel zum Absatz
@@ -123,4 +126,9 @@ class TestStundenentwurf:
         assert "`titel`" in refs_regel
         schritt3 = text.split("**Schritt 3", 1)[1].split("**Schritt 4", 1)[0]
         assert "Begriffe dieser Stunde" in schritt3
+        # Messung 4: Beim Kürzen hängte das Modell den Absatz an — der Strich sagt jetzt, wann nicht.
+        assert "Nicht beim Kürzen" in schritt3
         assert "`nicht_eingetragen`" in abschnitt
+        # Messung 2: Die Zustimmung galt dem Modell nur für die Phasen.
+        schritt5 = text.split("**Schritt 5", 1)[1].split("\n## ", 1)[0]
+        assert "gilt die Zustimmung auch für sie" in schritt5

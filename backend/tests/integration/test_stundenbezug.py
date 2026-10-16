@@ -228,6 +228,52 @@ async def test_zeile_nennt_termin(test_client, auth_headers, db, async_engine):
     assert f"(9b Bezug {EIGENE}, Mo 3.3., 3.–4. Stunde)" in zeile
 
 
+@pytest.mark.asyncio
+async def test_zeile_verlangt_lesen_nur_mit_werkzeug(test_client, auth_headers, db, async_engine):
+    """0.17 (Plan „Fachbegriffe der Stunde" § 20, E): Mit `get_lesson_detail` sagt die Zeile,
+    dass zuerst gelesen wird; ohne das Werkzeug nicht — der Aufruf schlüge fehl."""
+    stunde = await _stunde(test_client, auth_headers, EIGENE, titel="Lesen")
+    async with _sitzungen(async_engine)() as s:
+        mit = await bezugszeile(s, UUID(stunde), SimpleNamespace(sub=TEACHER1_PSEUDO), mit_lesewerkzeug=True)
+        ohne = await bezugszeile(s, UUID(stunde), SimpleNamespace(sub=TEACHER1_PSEUDO))
+    assert mit.endswith("Lies sie mit get_lesson_detail, bevor du etwas vorschlägst oder beurteilst.")
+    assert "get_lesson_detail" not in ohne
+
+
+@pytest.mark.asyncio
+async def test_chat_mit_stundenassistent_verlangt_lesen(test_client, auth_headers, db):
+    """Die Verdrahtung im Chat: Mit einem Assistenten mit `lesson_planning` trägt die Zeile
+    den Lese-Satz, ohne Assistent nicht (`test_bezug_aus_der_entwurfsansicht`)."""
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO assistants (name, system_prompt, model, scope, status, audience,"
+                    " tool_groups, created_by, creator_role) VALUES ('Bezug-Lesen', 'Plane.', '',"
+                    " 'teachers', 'active', 'teacher', '[\"lesson_planning\"]'::jsonb, 'admin-bezug', 'admin')"
+                    " RETURNING id")
+        assistent = cur.fetchone()[0]
+    db.commit()
+    try:
+        stunde = await _stunde(test_client, auth_headers, EIGENE, titel="Mit Assistent")
+        resp, _, bezug = await _chat(test_client, auth_headers, group_id=EIGENE, stunde_node_id=stunde,
+                                     assistant_id=assistent)
+        assert resp is None, resp.text
+        assert "Lies sie mit get_lesson_detail" in bezug
+        _, _, ohne = await _chat(test_client, auth_headers, group_id=EIGENE, stunde_node_id=stunde)
+        assert "get_lesson_detail" not in ohne
+    finally:
+        with db.cursor() as cur:
+            cur.execute("DELETE FROM conversations WHERE assistant_id = %s", (assistent,))
+            cur.execute("DELETE FROM assistants WHERE id = %s", (assistent,))
+        db.commit()
+
+
+def test_stundenwerkzeuge_am_assistenten():
+    from app.planning.stundenbezug import mit_stundenwerkzeugen
+    assert mit_stundenwerkzeugen(SimpleNamespace(tool_groups=["lesson_planning"])) is True
+    assert mit_stundenwerkzeugen(SimpleNamespace(tool_groups=["planning"])) is False
+    assert mit_stundenwerkzeugen(SimpleNamespace(tool_groups=None)) is False
+    assert mit_stundenwerkzeugen(None) is False
+
+
 # ── PATCH: Gruppe wechseln ───────────────────────────────────────────────────
 
 

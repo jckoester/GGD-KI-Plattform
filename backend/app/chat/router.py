@@ -89,7 +89,7 @@ from app.pedagogy.hausversuche import (
     gefahr_fuer as hausversuch_gefahr,
 )
 from app.pedagogy.compose import compose_system_content, is_student_treatment
-from app.planning.stundenbezug import bezugszeile, stunde_fuer_bezug
+from app.planning.stundenbezug import bezugszeile, mit_stundenwerkzeugen, stunde_fuer_bezug
 from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
@@ -2055,7 +2055,10 @@ async def chat(
             pedagogy,
             student_treatment=student_treatment,
             stufe=await stufe_der_person(db, conversation_id, current_user.grade),
-            bezug=await bezugszeile(db, conversation_stunde_id, current_user),
+            bezug=await bezugszeile(
+                db, conversation_stunde_id, current_user,
+                mit_lesewerkzeug=mit_stundenwerkzeugen(active_assistant),
+            ),
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,

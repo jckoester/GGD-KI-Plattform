@@ -952,11 +952,16 @@ BEGRIFFE_ANZAHL = 15
 _BESCHREIBUNG_MAX = 300
 
 #: Die Regel für Begriffe dort, wo das Modell gerade liest (Plan § 16, B). In Messung 1
-#: übersprang es den Prompt-Abschnitt „Fachbegriffe der Stunde" in 6 von 6 Läufen.
+#: übersprang es den Prompt-Abschnitt „Fachbegriffe der Stunde" in 6 von 6 Läufen; in
+#: Messung 2 schickte es nach „Ja, übernehmen" die genannten Begriffe nicht mit — die
+#: Zustimmung galt ihm nur für die Phasen (§ 18, C); in Messung 4 hängte es den Absatz auch
+#: beim Kürzen an (§ 20, F).
 BEGRIFFE_ANLEITUNG = (
-    "Arbeitest du Phasen aus, schließt dein Vorschlag mit einem eigenen Absatz „Begriffe dieser "
-    "Stunde: …“ — nur Begriffe, die die Stunde neu einführt, je mit der Phase. Eingetragen "
-    "wird nach Zustimmung als refs mit typ 'concept' und titel."
+    "Arbeitest du Phasen aus oder legst du neue an — nicht beim Kürzen, Streichen oder bei "
+    "Fragen zur Stunde —, schließt dein Vorschlag mit einem eigenen Absatz „Begriffe dieser "
+    "Stunde: …“ — nur Begriffe, die die Stunde neu einführt, je mit der Phase. Die Zustimmung "
+    "zum Vorschlag gilt auch für diese Begriffe: Schreib sie im selben update_lesson_phases-"
+    "Aufruf als refs mit typ 'concept' und titel mit."
 )
 
 
@@ -1217,6 +1222,14 @@ _REF_TYPEN = {"ik": ("ik_kompetenz",), "pk": ("pk_kompetenz",), "concept": BEGRI
 _REF_TYP_ZU = {art: typ for typ, arten in _REF_TYPEN.items() for art in arten}
 
 
+#: Bindestriche, die das Modell statt „-" schreibt. `gpt-oss-120b` setzt durchweg den
+#: geschützten Bindestrich U+2011 („Arenium‑Ion") — in Messung 3 scheiterten daran alle
+#: Begriffe zweier Läufe, obwohl sie als Alias bestanden. Nur auf der Seite des Modells
+#: ersetzt: Die Normalisierung der Datenbankseite ist die des Index (`titel_normalisiert_sql`)
+#: und muss es bleiben. Das weiche Trennzeichen U+00AD fällt weg.
+_BINDESTRICHE = str.maketrans({"\u2010": "-", "\u2011": "-", "\u00ad": None})
+
+
 async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
                             stunde: ContextNode) -> tuple[ContextNode | None, str | None]:
     """Ein Begriff der Stunde über seinen Titel oder Alias. → (Knoten, Grund, warum keiner)
@@ -1235,7 +1248,7 @@ async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
     if stunde.subject_id is None:
         return None, f"„{titel}“: Die Stunde hat kein Fach."
     faecher = (stunde.subject_id, *await bezugsfaecher_von(ctx.db, stunde.subject_id))
-    schluessel = normalisiere_titel(titel)
+    schluessel = normalisiere_titel(titel.translate(_BINDESTRICHE))
     treffer = list((await ctx.db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type.in_(BEGRIFF_TYPEN),
@@ -1249,7 +1262,7 @@ async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
         ).order_by(ContextNode.id)
     )).scalars())
     if fassung:
-        gewuenscht = fassung.strip().casefold()
+        gewuenscht = fassung.translate(_BINDESTRICHE).strip().casefold()
         treffer = [t for t in treffer
                    if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
     if len(treffer) > 1:
@@ -1499,7 +1512,9 @@ register_tool(ChatTool(
                 "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
                 "einzeln nachschlagen. (4) refs sind Kompetenzen und Begriffe — Begriffe mit "
                 "typ 'concept' und ihrem titel aus begriffe oder einem Treffer, ohne node_id; "
-                "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Gibt suggested_refs "
+                "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Hat der zugestimmte "
+                "Vorschlag „Begriffe dieser Stunde“ genannt, gehören sie in diesen Aufruf. "
+                "Gibt suggested_refs "
                 "zurück: Kompetenzen und Begriffe aus verknüpften Material-Knoten, die noch nicht "
                 "in refs stehen — nur vorschlagen, nicht ungefragt übernehmen. Und "
                 "nicht_eingetragen: Begriffe, die es im Fach nicht gibt — sag der Lehrkraft, "

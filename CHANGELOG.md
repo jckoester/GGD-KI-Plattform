@@ -14,8 +14,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   oder Funktionen.
 - **Der Stundenassistent nennt die Fachbegriffe der Stunde:** Arbeitet er Phasen aus, nennt er in
   einem eigenen Absatz die Begriffe, die die Stunde einführt, je mit ihrer Phase, und trägt sie
-  nach Zustimmung ein. Fehlt ein Begriff im Wissensspeicher, sagt er das und trägt ihn nicht
-  ein (Prompt `config/prompts/stundenentwurf_assistent.md`).
+  nach Zustimmung ein — über ihren Titel oder einen Alias, im Fach und seinen Bezugsfächern. Fehlt
+  ein Begriff im Wissensspeicher, wird er nicht eingetragen; der Assistent sagt das und verweist
+  auf die Fachschaft (Prompt `config/prompts/stundenentwurf_assistent.md`).
 - **Fachbegriffe in der Kompetenzleiste:** Die Leiste der Entwurfsansicht heißt „Kompetenzen und
   Fachbegriffe" und zeigt Begriffe getrennt von den Kompetenzen, mit Symbol für Fachbegriff oder
   Stoffsteckbrief. Beim Bearbeiten lassen sich Begriffe des Fachs und seiner Bezugsfächer suchen,
@@ -30,6 +31,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- Hat ein Gespräch eine Bezugsstunde, hält die Systemzeile Assistenten mit Stundenplanung an,
+  die Stunde zu lesen, bevor sie etwas vorschlagen oder beurteilen — auch eigene
+  Stundenassistenten mit älterem Prompt.
 - Die nie gefüllten Vorschlags-Chips der Kompetenzleiste sind entfernt. Vorschläge aus
   verknüpftem Material bekommt weiterhin der Stundenassistent.
 

@@ -308,6 +308,20 @@ async def test_begriff_ueber_titel_und_alias(test_client, auth_headers, faecher,
 
 
 @pytest.mark.asyncio
+async def test_geschuetzter_bindestrich(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Messung 3: Das Modell schreibt „Arenium‑Ion" mit U+2011 — der Alias heißt „Arenium-Ion"."""
+    stunde = await _stunde(test_client, auth_headers)
+    sub = await _begriff(async_engine, "elektrophile Substitution")
+    async with _sitzungen(async_engine)() as db:
+        db.add(NodeAlias(node_id=sub.id, alias="Arenium-Ion"))
+        await db.commit()
+    aus = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": "Arenium\u2011Ion"},
+                                   {"typ": "concept", "titel": "Areni\u00adum\u2010Ion"})
+    assert "nicht_eingetragen" not in aus, aus
+    assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(sub.id)]
+
+
+@pytest.mark.asyncio
 async def test_fehlender_begriff_wird_gemeldet(test_client, auth_headers, faecher, async_engine, aufraeumen):
     """Fehlt einer, wird der Rest gespeichert — Phasen und vorhandene Begriffe."""
     stunde = await _stunde(test_client, auth_headers)
@@ -370,6 +384,7 @@ async def test_begriffe_ohne_kennungen_mit_anleitung(test_client, auth_headers, 
     begriffe, _ = await _begriffe(async_engine, stunde)
     assert all("node_id" not in e for e in begriffe["eintraege"])
     assert "Begriffe dieser Stunde" in begriffe["anleitung"]
+    assert "nicht beim Kürzen" in begriffe["anleitung"]
 
 
 @pytest.mark.asyncio

@@ -51,8 +51,22 @@ async def stunde_fuer_bezug(db: AsyncSession, stunde_id: UUID, user) -> ContextN
     return stunde
 
 
-async def bezugszeile(db: AsyncSession, stunde_id: UUID | None, user) -> str | None:
-    """Die Systemzeile zur Bezugsstunde — None ohne Bezug oder ohne Lesezugang."""
+def mit_stundenwerkzeugen(assistant) -> bool:
+    """Hat der Assistent die Stundenwerkzeuge (Fähigkeit `lesson_planning`)? Ohne Assistent nicht."""
+    return assistant is not None and "lesson_planning" in (getattr(assistant, "tool_groups", None) or ())
+
+
+async def bezugszeile(db: AsyncSession, stunde_id: UUID | None, user, *,
+                      mit_lesewerkzeug: bool = False) -> str | None:
+    """Die Systemzeile zur Bezugsstunde — None ohne Bezug oder ohne Lesezugang.
+
+    ``mit_lesewerkzeug``: Der Assistent hat `get_lesson_detail` (Fähigkeit
+    `lesson_planning`). Dann sagt die Zeile, dass er die Stunde zuerst liest — in der
+    Messung zu 0.17 (Plan „Fachbegriffe der Stunde" § 20, Befund E) beantwortete das Modell
+    „Wie gehen die Schüler:innen bei der Chromatografie vor?" in 3 von 3 Läufen aus eigenem
+    Wissen, ohne den Entwurf. Ohne das Werkzeug fehlt der Satz: Ein Assistent, der es nicht
+    hat, würde sonst zu einem Aufruf angehalten, der scheitert.
+    """
     if stunde_id is None:
         return None
     stunde = await _stunde(db, stunde_id)
@@ -80,4 +94,6 @@ async def bezugszeile(db: AsyncSession, stunde_id: UUID | None, user) -> str | N
         f"Bezugsstunde dieser Unterhaltung: „{stunde.title}“{klammer}, Kennung {stunde.id}. "
         "Ist von „der Stunde“ die Rede, ist diese gemeint; die Stundenwerkzeuge nehmen sie, "
         "wenn keine Kennung angegeben ist."
+        + (" Lies sie mit get_lesson_detail, bevor du etwas vorschlägst oder beurteilst."
+           if mit_lesewerkzeug else "")
     )
