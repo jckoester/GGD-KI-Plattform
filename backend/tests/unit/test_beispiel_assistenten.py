@@ -105,3 +105,16 @@ class TestStundenentwurf:
         assert "`zusammenhang`" in text
         abschnitt = text.split("## Was die Phasen bedeuten", 1)[1].split("\n## ", 1)[0]
         assert "**Sicherung:**" in abschnitt
+
+    def test_fachbegriffe_der_stunde(self):
+        """0.17 (A1): `begriffe` kommt mit dem Entwurf; der Assistent nennt die eingeführten
+        Begriffe in einem eigenen Absatz (Plan F4), nur aus Werkzeugergebnissen, und trägt einen
+        fehlenden nicht ein (F6). Begriffe stehen als `typ` „concept“ in `refs`."""
+        text = _prompt(_eintrag("Stundenentwurf"))
+        assert "`begriffe`" in text
+        abschnitt = text.split("## Fachbegriffe der Stunde", 1)[1].split("\n## ", 1)[0]
+        assert "Begriffe dieser Stunde" in abschnitt
+        assert "`search_context_nodes`" in abschnitt
+        assert "Fachschaft" in abschnitt and "fehlt" in abschnitt
+        refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
+        assert "concept" in refs_regel

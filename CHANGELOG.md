@@ -12,6 +12,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`begriffe`). Was schon als Begriff eingetragen ist, steht immer dabei. Begriffe der Stunde
   (`refs` mit `typ: concept`) sind nur noch Fachbegriffe und Stoffsteckbriefe, nicht mehr Bauteile
   oder Funktionen.
+- **Der Stundenassistent nennt die Fachbegriffe der Stunde:** Arbeitet er Phasen aus, nennt er in
+  einem eigenen Absatz die Begriffe, die die Stunde einführt, je mit ihrer Phase, und trägt sie
+  nach Zustimmung ein. Fehlt ein Begriff im Wissensspeicher, sagt er das und trägt ihn nicht
+  ein (Prompt `config/prompts/stundenentwurf_assistent.md`).
 
 ### Behoben
 
@@ -29,6 +33,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine übertragene, offen gebliebene Kompetenz behält in der Folgestunde Typ und Titel; bisher
   kam jede als inhaltsbezogene Kompetenz ohne Titel an.
 - Material-Vorschläge des Stundenassistenten (`suggested_refs`) erkennen verknüpfte Begriffe.
+
+### Nach dem Update
+
+Den Prompt des schulweiten Assistenten „Stundenentwurf" im Editor aus
+`config/prompts/stundenentwurf_assistent.md` übernehmen — das Update ändert ihn nicht, er liegt
+in der Datenbank. Neu sind die Zeile zu `begriffe` unter „Schritt 2", der Abschnitt
+„Fachbegriffe der Stunde" und die erweiterte Zeile zu `refs`.
 
 ## [0.16.0] – 2026-10-15
 
