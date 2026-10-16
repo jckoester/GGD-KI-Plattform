@@ -3,6 +3,7 @@
   import { neuerChatPfad } from '$lib/chatziel.js'
   import { passendeAssistenten } from '$lib/assistentenwahl.js'
   import { user } from '$lib/stores/user.js'
+  import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
   import {
@@ -24,6 +25,7 @@
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
+  import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import PhaseTable from '$lib/components/planner/PhaseTable.svelte'
   import AssistentenKnopf from '$lib/components/AssistentenKnopf.svelte'
 
@@ -31,6 +33,10 @@
   const nodeId = $derived(data.nodeId)
   const slug = $derived(data.slug)
   const groupId = $derived(data.groupId)
+  // Bei eingeklappter Sidebar sagte nichts auf der Seite, zu welcher Gruppe der Entwurf
+  // gehört (Jan, 16.10.2026). Dieselbe Quelle wie die Jahresübersicht; im Archiv-Fall
+  // (keine Mitgliedschaft mehr) fehlt die Gruppe dort — dann bleibt die Zeile, wie sie war.
+  const gruppe = $derived($myTeachingGroups.find(g => g.id === groupId) ?? null)
 
 
   let lesson = $state(null)
@@ -320,6 +326,10 @@
     <div class="flex-shrink-0 border-b border-light-ui-3 dark:border-dark-ui-3 px-4 py-3 bg-light-bg dark:bg-dark-bg">
       <!-- Breadcrumb -->
       <nav class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2 flex items-center gap-1.5 flex-wrap">
+        {#if gruppe}
+          <a href="/subjects/{slug}/groups/{groupId}" class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl">{gruppe.name}</a>
+          <span>›</span>
+        {/if}
         <a href={plannerBase} class="hover:text-light-bl dark:hover:text-dark-bl">Jahresübersicht</a>
         {#if lesson.ue}
           <span>›</span>
@@ -574,13 +584,13 @@
       {#if reviewMode && reviewStep === 'refs'}
         <section class="border border-orange-200 dark:border-orange-900 rounded-lg p-4 space-y-3 bg-orange-50/40 dark:bg-orange-950/10">
           <h3 class="text-sm font-semibold text-light-tx dark:text-dark-tx">
-            Welche Kompetenzen wurden durch die offenen Phasen nicht behandelt?
+            Welche Kompetenzen und Begriffe wurden durch die offenen Phasen nicht behandelt?
           </h3>
           <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-            Markierte Kompetenzen werden nicht als „eingeführt" gespeichert.
+            Markierte Einträge werden nicht als „eingeführt" gespeichert.
           </p>
           {#if refs.length === 0}
-            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">Keine Kompetenzen zugeordnet.</p>
+            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">Keine Kompetenzen oder Begriffe zugeordnet.</p>
           {:else}
             <div class="space-y-1.5">
               {#each refs as ref}
@@ -598,7 +608,10 @@
                     }}
                     class="rounded"
                   />
-                  <span class="text-light-tx dark:text-dark-tx">
+                  <span class="text-light-tx dark:text-dark-tx inline-flex items-center gap-1">
+                    {#if ref.typ === 'concept'}
+                      <NodeTypeIcon category="concept" contentType={ref.content_type ?? 'begriff'} size={12} />
+                    {/if}
                     {ref.code ?? ''} {ref.titel ?? ref.node_id}
                     {#if ref.partiell}<span class="text-xs text-light-tx-2 dark:text-dark-tx-2">[partiell]</span>{/if}
                   </span>

@@ -106,5 +106,14 @@
 </div>
 {% endif %}
 
+{% if begriffe_html %}
+<div class="kompetenzen">
+  <strong>Fachbegriffe:</strong>
+  {% for b in begriffe_html %}
+    {{ b | safe }}{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
 </body>
 </html>

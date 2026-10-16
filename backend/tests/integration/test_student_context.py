@@ -243,6 +243,30 @@ async def test_exam_scope_explizite_ue_refs_offen_und_nachbereitung(db_session, 
 
 
 @pytest.mark.asyncio
+async def test_exam_scope_fuehrt_begriffe_als_begriffe(db_session, seed_sc_group):
+    """Ein eingeführter Fachbegriff gehört zum Umfang (0.17) — mit `typ`, damit ein Lernplan
+    ihn als Begriff nennt; ein offen gebliebener nicht."""
+    ue = _ue("Aromaten")
+    K, B, B_OFFEN = (str(uuid4()) for _ in range(3))
+    stunde = _stunde_mit_refs(
+        "Benzol",
+        refs=[{"node_id": K, "typ": "ik", "titel": "Kompetenz", "code": "3.4.5(1)"},
+              {"node_id": B, "typ": "concept", "titel": "Mesomerie"},
+              {"node_id": B_OFFEN, "typ": "concept", "titel": "Hückel-Regel"}],
+        refs_offen=[B_OFFEN],
+    )
+    db_session.add_all([ue, stunde])
+    db_session.add_all([
+        _slot(date(2026, 3, 10), ue_id=ue.id, stunde_id=stunde.id, nachbereitet=True),
+        _slot(date(2026, 3, 20), kategorie="pruefung", ue_id=ue.id),
+    ])
+    await db_session.flush()
+
+    scope = await get_exam_scope(db_session, GROUP_ID, today=date(2026, 3, 15))
+    assert [(r.node_id, r.typ) for r in scope.refs] == [(K, "ik"), (B, "concept")]
+
+
+@pytest.mark.asyncio
 async def test_exam_scope_slot_historie_fallback(db_session, seed_sc_group):
     ue = _ue("UE-Historie")
     db_session.add(ue)

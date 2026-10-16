@@ -120,3 +120,22 @@ describe("Komponenten (Quelltext)", () => {
         expect(phasen).not.toContain("onSuggestCompetences")
     })
 })
+
+describe("Entwurfsseite (Schritt 4)", () => {
+    const SEITE = quelle("routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte")
+
+    it("die Nachbereitung fragt nach Kompetenzen und Begriffen, Begriffe mit Symbol", () => {
+        const schritt = SEITE.slice(SEITE.indexOf("reviewStep === 'refs'"))
+        expect(schritt).toContain("Welche Kompetenzen und Begriffe wurden durch die offenen Phasen nicht behandelt?")
+        expect(schritt).toContain("Markierte Einträge werden nicht")
+        expect(schritt).toMatch(/ref\.typ === 'concept'[\s\S]*?<NodeTypeIcon/)
+    })
+
+    it("nennt die Unterrichtsgruppe im Kopf", () => {
+        // Bei eingeklappter Sidebar war sonst nicht zu sehen, zu welcher Gruppe der Entwurf
+        // gehört (Jan, 16.10.2026). Quelle wie in der Jahresübersicht.
+        expect(SEITE).toContain("$myTeachingGroups.find(g => g.id === groupId)")
+        const kopf = SEITE.slice(SEITE.indexOf("<!-- Breadcrumb -->"), SEITE.indexOf("Jahresübersicht</a>"))
+        expect(kopf).toContain("{gruppe.name}")
+    })
+})

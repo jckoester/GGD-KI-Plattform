@@ -155,6 +155,9 @@ class ExamScopeRef:
     node_id: str
     titel: str | None = None
     code: str | None = None
+    # „ik", „pk" oder „concept" (Fachbegriff, seit 0.17) — damit ein Lernplan Begriffe als
+    # Begriffe nennen kann, nicht als Kompetenzen.
+    typ: str | None = None
 
 
 @dataclass
@@ -265,7 +268,8 @@ async def get_exam_scope(
             for r in stunde.metadata_.get("refs") or []:
                 nid = str(r.get("node_id")) if r.get("node_id") else None
                 if nid and nid not in offen and nid not in refs:
-                    refs[nid] = ExamScopeRef(node_id=nid, titel=r.get("titel"), code=r.get("code"))
+                    refs[nid] = ExamScopeRef(node_id=nid, titel=r.get("titel"), code=r.get("code"),
+                                             typ=r.get("typ"))
 
     return ExamScope(
         exam_date=exam.date, unit_titles=unit_titles, topics=topics, refs=list(refs.values())

@@ -22,6 +22,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   hinzufügen und entfernen; Kompetenzen bleiben dabei unberührt.
 - `GET /context/nodes` kennt `mit_bezugsfaechern`: Mit `subject_id` kommen auch die Knoten der
   Bezugsfächer dieses Fachs.
+- **Begriffe in Export, Nachbereitung und Klassenarbeit:** Der Markdown-Export führt Begriffe als
+  `fachbegriffe:` neben `kompetenzen:`, das PDF in einem eigenen Abschnitt „Fachbegriffe". Die
+  Nachbereitung fragt nach offenen Kompetenzen **und** Begriffen. Der Umfang einer Klassenarbeit
+  (`get_exam_scope`) nennt den Typ jedes Eintrags.
+- Der Stundenentwurf nennt im Kopf seine Unterrichtsgruppe — auch bei eingeklappter Seitenleiste.
 
 ### Geändert
 
@@ -44,6 +49,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine übertragene, offen gebliebene Kompetenz behält in der Folgestunde Typ und Titel; bisher
   kam jede als inhaltsbezogene Kompetenz ohne Titel an.
 - Material-Vorschläge des Stundenassistenten (`suggested_refs`) erkennen verknüpfte Begriffe.
+- Markdown-Export einer Stunde: Die Frontmatter ist wieder gültiges YAML, wenn eine Kompetenz nur
+  teilweise gefördert wird (`[…]`) oder ein Titel Komma oder Doppelpunkt enthält; Obsidian las sie
+  bisher nicht. Ein Eintrag ohne Nummer erscheint mit Titel statt als „None".
 
 ### Nach dem Update
 

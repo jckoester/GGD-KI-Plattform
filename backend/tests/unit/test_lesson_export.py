@@ -89,7 +89,7 @@ datum: 2026-09-15
 gruppe: 10b
 ue: Stoffwechsel
 verfuegbar_min: 90
-kompetenzen: [3.1.2, K1[…]]
+kompetenzen: [3.1.2, "K1[…]"]
 ---"""
 
 
@@ -97,6 +97,15 @@ def test_markdown_frontmatter():
     md = export_markdown(_make_export())
     for line in EXPECTED_MD_FRONTMATTER.splitlines():
         assert line in md, f"Erwartete Zeile nicht gefunden: {line!r}"
+
+
+def test_markdown_frontmatter_ist_gueltiges_yaml():
+    """Bis 0.17 stand `K1[…]` ohne Anführungszeichen in der Liste — eine eckige Klammer in
+    einer Flow-Liste ist für YAML kaputt, und Obsidian las den ganzen Kopf nicht."""
+    import yaml
+
+    kopf = yaml.safe_load(export_markdown(_make_export()).split("---", 2)[1])
+    assert kopf["kompetenzen"] == ["3.1.2", "K1[…]"]
 
 
 def test_markdown_stundenziel():
@@ -163,6 +172,56 @@ def test_markdown_no_refs_no_kompetenzen_key():
 def test_markdown_partiell_suffix():
     md = export_markdown(_make_export())
     assert "K1[…]" in md
+
+
+# ── Begriffe der Stunde (0.17, A1 Schritt 4) ─────────────────────────────────
+
+_BEGRIFFE = [
+    {"typ": "concept", "code": None, "titel": "Benzol", "partiell": False, "content_type": "stoffsteckbrief"},
+    {"typ": "concept", "code": None, "titel": "Mesomerie", "partiell": False},
+]
+
+
+def _gemischt():
+    return _make_export(refs=_make_export().refs + _BEGRIFFE)
+
+
+def _frontmatter(md: str) -> list[str]:
+    return md.split("---", 2)[1].strip().splitlines()
+
+
+def test_markdown_begriffe_getrennt_von_kompetenzen():
+    zeilen = _frontmatter(export_markdown(_gemischt()))
+    assert 'kompetenzen: [3.1.2, "K1[…]"]' in zeilen
+    assert "fachbegriffe: [Benzol, Mesomerie]" in zeilen
+
+
+def test_markdown_ohne_begriffe_wie_bisher():
+    """Ein Entwurf ohne Begriffe exportiert wie in 0.16 — ohne `fachbegriffe:`."""
+    md = export_markdown(_make_export())
+    assert "fachbegriffe:" not in md
+    for line in EXPECTED_MD_FRONTMATTER.splitlines():
+        assert line in md
+
+
+def test_markdown_nur_begriffe_kein_kompetenzen_schluessel():
+    zeilen = _frontmatter(export_markdown(_make_export(refs=_BEGRIFFE)))
+    assert not any(z.startswith("kompetenzen:") for z in zeilen)
+    assert "fachbegriffe: [Benzol, Mesomerie]" in zeilen
+
+
+def test_markdown_frontmatter_bleibt_yaml():
+    """Titel mit Komma oder Doppelpunkt zerlegten die Liste; `code: null` stand als „None" da."""
+    import yaml
+
+    md = export_markdown(_make_export(refs=[
+        {"typ": "ik", "code": None, "titel": "Säuren, Basen: Neutralisation", "partiell": False},
+        {"typ": "concept", "code": None, "titel": "Säure-Base-Reaktion, Brønsted", "partiell": False},
+    ]))
+    kopf = yaml.safe_load(md.split("---", 2)[1])
+    assert kopf["kompetenzen"] == ["Säuren, Basen: Neutralisation"]
+    assert kopf["fachbegriffe"] == ["Säure-Base-Reaktion, Brønsted"]
+    assert "None" not in md
 
 
 # ── DOCX smoke ────────────────────────────────────────────────────────────────
@@ -269,6 +328,20 @@ class TestFormelnImStundenPdf:
     async def test_ohne_kompetenzen_kein_block(self):
         html = await self._pdf_html(_make_export(refs=[]))
         assert "Kompetenzen:" not in html
+        assert "Fachbegriffe:" not in html
+
+    @pytest.mark.asyncio
+    async def test_begriffe_im_eigenen_block(self):
+        html = await self._pdf_html(_gemischt())
+        kompetenzen, begriffe = html.split("Fachbegriffe:", 1)
+        assert "Benzol" not in kompetenzen.split("Kompetenzen:", 1)[1]
+        assert "Benzol" in begriffe and "Mesomerie" in begriffe
+
+    @pytest.mark.asyncio
+    async def test_nur_begriffe_kein_kompetenzblock(self):
+        html = await self._pdf_html(_make_export(refs=_BEGRIFFE))
+        assert "Kompetenzen:" not in html
+        assert "Fachbegriffe:" in html
 
 
 # ── Phasen ohne Dauer (0.13, P1) ──────────────────────────────────────────────

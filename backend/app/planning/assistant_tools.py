@@ -1614,7 +1614,7 @@ async def _handle_get_exam_scope(args: dict, ctx: ToolContext) -> dict:
         "unit_titles": scope.unit_titles,
         "topics": scope.topics,
         "refs": [
-            {"node_id": r.node_id, "titel": r.titel, "code": r.code}
+            {"node_id": r.node_id, "titel": r.titel, "code": r.code, "typ": r.typ}
             for r in scope.refs
         ],
     }
@@ -1630,8 +1630,9 @@ register_tool(ChatTool(
             "name": "get_exam_scope",
             "description": (
                 "Liefert Termin und Umfang der nächsten Klassenarbeit der Gruppe: "
-                "betroffene UE(s), Themenliste und die zu lernenden Kompetenzen "
-                "(refs mit node_id/titel/code) für Lernplan und Übungsauswahl. "
+                "betroffene UE(s), Themenliste und die zu lernenden Kompetenzen und "
+                "Fachbegriffe (refs mit node_id/titel/code/typ; typ 'concept' ist ein "
+                "Fachbegriff) für Lernplan und Übungsauswahl. "
                 "Read-only. Gibt {exam: null} zurück, wenn keine Prüfung geplant ist."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},

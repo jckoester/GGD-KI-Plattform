@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import logging
 from dataclasses import dataclass, field
@@ -82,12 +83,33 @@ class LessonExport:
     phasen: list[ExportPhase]
     refs: list[dict]  # [{typ, code, titel, partiell}]
 
+    # Seit 0.17 stehen in `refs` auch Begriffe der Stunde (`typ: concept`). Der Export führt
+    # sie getrennt: Unter „Kompetenzen" stünde ein Begriff sonst mit seinem Titel neben den
+    # Nummern des Bildungsplans.
+    @property
+    def kompetenzen(self) -> list[dict]:
+        return [r for r in self.refs if r.get("typ") != "concept"]
+
+    @property
+    def fachbegriffe(self) -> list[dict]:
+        return [r for r in self.refs if r.get("typ") == "concept"]
+
 
 def _slugify(s: str) -> str:
     s = s.lower().strip()
     s = re.sub(r"[äöü]", lambda m: {"ä": "ae", "ö": "oe", "ü": "ue"}[m.group()], s)
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-")[:60] or "stunde"
+
+
+_YAML_HEIKEL = re.compile(r"[,:\[\]{}#&*!|>'\"%@`]|^\s|\s$|^-")
+
+
+def _yaml_eintrag(text: str) -> str:
+    """Ein Eintrag einer Flow-Liste im Frontmatter — in Anführungszeichen, wo YAML ihn sonst
+    zerlegte. „Säure, Base" wären ohne sie zwei Einträge; ein Titel mit Doppelpunkt brächte
+    die ganze Kopfzeile zu Fall."""
+    return json.dumps(text, ensure_ascii=False) if _YAML_HEIKEL.search(text) else text
 
 
 def _display_linked(item: dict) -> str:
@@ -177,12 +199,17 @@ def export_markdown(data: LessonExport) -> str:
         f"ue: {data.ue_titel}",
         f"verfuegbar_min: {data.verfuegbare_min}",
     ]
-    if data.refs:
+    if data.kompetenzen:
+        # `or` statt Vorgabewert: Ein gespeicherter Eintrag trägt `"code": null`, und
+        # `get("code", …)` lieferte dann `None` — im Frontmatter stand „None".
         kompetenzen = [
-            f"{r.get('code', r.get('titel', ''))}{'[…]' if r.get('partiell') else ''}"
-            for r in data.refs
+            _yaml_eintrag(f"{r.get('code') or r.get('titel') or ''}{'[…]' if r.get('partiell') else ''}")
+            for r in data.kompetenzen
         ]
         lines.append(f"kompetenzen: [{', '.join(kompetenzen)}]")
+    if data.fachbegriffe:
+        fachbegriffe = [_yaml_eintrag(r.get("titel") or "") for r in data.fachbegriffe]
+        lines.append(f"fachbegriffe: [{', '.join(fachbegriffe)}]")
     lines += ["---", ""]
 
     if data.stundenziel:
@@ -244,7 +271,11 @@ async def export_pdf(data: LessonExport) -> bytes:
             ),
             "partiell": bool(r.get("partiell")),
         }
-        for r in data.refs
+        for r in data.kompetenzen
+    ]
+    # Begriffe mit ihrem Titel, durch denselben Prärenderer (Formeln in Titeln).
+    begriffe_html = [
+        await render_markdown_inline_for_pdf(str(r.get("titel") or "")) for r in data.fachbegriffe
     ]
 
     env = Environment(
@@ -260,6 +291,7 @@ async def export_pdf(data: LessonExport) -> bytes:
         beschreibungen=beschreibungen,
         stundenziel_html=stundenziel_html,
         refs_html=refs_html,
+        begriffe_html=begriffe_html,
         zeiten=zeitspalte(data.phasen),
         total=total,
         ohne_dauer=ohne_dauer_zusatz(ohne),
