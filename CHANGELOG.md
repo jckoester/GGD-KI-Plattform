@@ -17,7 +17,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Der Suchvektor einer Stunde folgt jetzt Änderungen an Titel, Kompetenzen, Begriffen und
   Reflexion — im Planer, durch den Assistenten, in der Nachbereitung und bei einer Übertragung.
-  Bisher blieb der Vektor des ersten nächtlichen Laufs.
+  Ebenso der einer Unterrichtseinheit, wenn sich ihr Titel ändert. Bisher blieb der Vektor des
+  ersten nächtlichen Laufs.
 - Eine übertragene, offen gebliebene Kompetenz behält in der Folgestunde Typ und Titel; bisher
   kam jede als inhaltsbezogene Kompetenz ohne Titel an.
 - Material-Vorschläge des Stundenassistenten (`suggested_refs`) erkennen verknüpfte Begriffe.

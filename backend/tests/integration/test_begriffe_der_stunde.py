@@ -428,3 +428,28 @@ async def test_uebertragung_traegt_den_begriff_als_begriff(
     assert refs == gespeichert["refs"]
     assert refs[0]["typ"] == "concept" and refs[0]["titel"] == begriff.title
     assert not await _hat_vektor(async_engine, ziel)
+
+
+@pytest.mark.asyncio
+async def test_einheit_titel_verwirft_ihren_vektor(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Dieselbe Lücke bei der Einheit: Ihr Titel steht im Vektor, die Farbe nicht."""
+    ue = (await test_client.post(f"/planning/groups/{GRUPPE}/units", headers=auth_headers,
+                                 json={"titel": "Aromaten", "farbe": 0})).json()["id"]
+    async with _sitzungen(async_engine)() as db:
+        n = await db.get(ContextNode, UUID(ue))
+        n.metadata_ = {**n.metadata_, "refs": [{"node_id": str(n.id), "typ": "ik", "titel": "3.3.1(1) Aromaten"}]}
+        await db.commit()
+    await _vektor_setzen(async_engine, ue)
+
+    with patch("app.planning.service.enqueue_embedding_job", AsyncMock()) as einbetten:
+        resp = await test_client.patch(f"/planning/groups/{GRUPPE}/units/{ue}", headers=auth_headers,
+                                       json={"farbe": 3})
+        assert resp.status_code == 200, resp.text
+        assert await _hat_vektor(async_engine, ue)
+        einbetten.assert_not_awaited()
+
+        resp = await test_client.patch(f"/planning/groups/{GRUPPE}/units/{ue}", headers=auth_headers,
+                                       json={"titel": "Aromaten und Benzol"})
+        assert resp.status_code == 200, resp.text
+    assert not await _hat_vektor(async_engine, ue)
+    einbetten.assert_awaited_once()

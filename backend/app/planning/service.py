@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
+from app.context.embedding import eingabe_ohne_aliase, enqueue_embedding_job, vektor_veraltet
 from app.db.models import ContextEdge, ContextNode, Group, LessonSlot
 from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
@@ -139,6 +140,7 @@ async def update_unit_node(
     ):
         raise HTTPException(status_code=404, detail="Unterrichtseinheit nicht gefunden")
 
+    vektor_vorher = eingabe_ohne_aliase(node)
     if titel is not None:
         titel = titel.strip()
         if not titel:
@@ -173,7 +175,11 @@ async def update_unit_node(
                 )
             )
 
+    # Der Titel steht im Vektor der Einheit, Farbe und Kapitel nicht (`embedding_input`).
+    veraltet = vektor_veraltet(node, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(node.id, db)
     await db.refresh(node)
     return node
 
