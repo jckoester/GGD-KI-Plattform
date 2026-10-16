@@ -185,7 +185,7 @@ def test_ohne_erwartung_keine_kaestchen():
 def test_die_szenarien_tragen_erwartungen():
     """D5: Ohne Erwartung gibt es nichts anzukreuzen — und die Abnahme schließt die Bewertung ein."""
     import yaml
-    for datei in ("stundenentwurf.yaml", "stunde_finden.yaml"):
+    for datei in ("stundenentwurf.yaml", "stunde_finden.yaml", "fachbegriffe_der_stunde.yaml"):
         faelle = yaml.safe_load((_PFAD.parent / "szenarien" / datei).read_text(encoding="utf-8"))["faelle"]
         assert all(f.get("erwartung", "").strip() for f in faelle), datei
         assert not any("neue_phasen_hoechstens" in f for f in faelle), "seit D1 ohne Wirkung"
@@ -236,3 +236,130 @@ def test_notizen_unter_der_bewertung():
     assert messung.notizen(darunter) == [("x · Lauf 1", "Die Phase ist eine Sicherung, aber nicht so benannt.")]
     assert messung.notizen(text.replace("Notiz: ", "Notiz: gleich daneben")) == [("x · Lauf 1", "gleich daneben")]
     assert messung.notizen(text) == []
+
+
+# ── Begriffe der Stunde (0.17, Plan „Fachbegriffe der Stunde", Schritt 5) ────
+#
+# Je Kriterium ein richtiger Lauf und ein Fehlgriff. Fach 6 (Chemie) liest Biologie (7) mit;
+# Mathe (2) ist fremd.
+
+INFO = {"fach": 6, "erlaubt": {6, 7}, "knoten": {
+    "b-sub": {"titel": "elektrophile Substitution", "aliase": ["σ-Komplex"], "subject_id": 6},
+    "b-el": {"titel": "Elektrophil", "aliase": [], "subject_id": 6},
+    "b-kat": {"titel": "Katalysator", "aliase": [], "subject_id": 6},
+    "b-lewis": {"titel": "Lewis-Schreibweise", "aliase": [], "subject_id": 6},
+    "b-chl": {"titel": "Chlorophyll", "aliase": [], "subject_id": 7},
+    "b-pot": {"titel": "Potenz", "aliase": [], "subject_id": 2},
+}}
+IK = {"node_id": "ik-1", "typ": "ik", "code": "3.4.5(4)", "titel": "Mechanismen", "partiell": False}
+
+
+def _b(node_id):
+    return {"node_id": node_id, "typ": "concept", "titel": INFO["knoten"][node_id]["titel"], "partiell": False}
+
+
+def _mit_refs(refs):
+    stand = copy.deepcopy(AUSGANG)
+    stand["entwuerfe"][STUNDE]["metadata"]["refs"] = refs
+    return stand
+
+
+def _begriffs_lauf(fall_begriffe, *, vorher, nachher, antwort, schreibt=True, phasen=GUT):
+    """Zwei Züge; im zweiten wird geschrieben (Phasen und `refs`)."""
+    ausgang = _mit_refs(vorher)
+    zug1 = _zug(["get_lesson_detail"], antwort=antwort)
+    zug1["stand"] = copy.deepcopy(ausgang)
+    zug2 = _zug(["update_lesson_phases"] if schreibt else [], antwort="Gespeichert.")
+    zug2["stand"] = _mit_refs(nachher)
+    if schreibt:
+        zug2["stand"]["entwuerfe"][STUNDE]["metadata"]["phasen"] = phasen
+    fall = {"id": "b", "stunde": {}, "zuege": ["…", "Ja"], "zustimmung_ab": 2, "begriffe": fall_begriffe}
+    return messung.bewerte(fall, ausgang, [zug1, zug2], stunde=STUNDE, begriffe=INFO)
+
+
+BEGRIFFE_ANTWORT = ("Erarbeitung: … Begriffe dieser Stunde: elektrophile Substitution (Erarbeitung), "
+                "Elektrophil (Erarbeitung). Soll ich das übernehmen?")
+
+
+def test_begriffe_vorschlagen_besteht():
+    k = _begriffs_lauf({"absatz": True, "geschrieben": True}, vorher=[IK],
+                       nachher=[IK, _b("b-sub"), _b("b-el")], antwort=BEGRIFFE_ANTWORT)
+    assert all(k.values()), k
+    assert {"begriffsabsatz", "begriffe_geschrieben", "begriffe_aus_fach",
+            "begriffe_wie_genannt", "kompetenzen_erhalten"} <= set(k)
+
+
+@pytest.mark.parametrize("nachher, antwort, kriterium", [
+    ([IK, _b("b-sub")], "Erarbeitung: … Soll ich das übernehmen?", "begriffsabsatz"),       # kein Absatz
+    ([IK], BEGRIFFE_ANTWORT, "begriffe_geschrieben"),                                           # nichts eingetragen
+    ([IK, _b("b-pot")], BEGRIFFE_ANTWORT + " Potenz", "begriffe_aus_fach"),                     # fremdes Fach
+    ([IK, _b("b-sub"), _b("b-kat")], BEGRIFFE_ANTWORT, "begriffe_wie_genannt"),                 # nicht vorgeschlagen
+    ([_b("b-sub"), _b("b-el")], BEGRIFFE_ANTWORT, "kompetenzen_erhalten"),                      # Kompetenz weg
+])
+def test_begriffs_fehlgriffe_werden_erkannt(nachher, antwort, kriterium):
+    k = _begriffs_lauf({"absatz": True, "geschrieben": True}, vorher=[IK], nachher=nachher, antwort=antwort)
+    assert k[kriterium] is False, k
+
+
+def test_gebeugt_genannt_zaehlt():
+    k = _begriffs_lauf({"absatz": True, "geschrieben": True}, vorher=[], nachher=[_b("b-sub")],
+                       antwort="Begriffe dieser Stunde: Mechanismus der elektrophilen Substitution (Erarbeitung)")
+    assert k["begriffe_wie_genannt"] is True
+
+
+def test_bezugsfach():
+    gut = _begriffs_lauf({"geschrieben": True, "aus_bezugsfach": True}, vorher=[],
+                         nachher=[_b("b-chl"), _b("b-sub")], antwort="…")
+    assert gut["begriff_aus_bezugsfach"] is True and gut["begriffe_aus_fach"] is True
+    nur_eigen = _begriffs_lauf({"geschrieben": True, "aus_bezugsfach": True}, vorher=[],
+                               nachher=[_b("b-sub")], antwort="…")
+    assert nur_eigen["begriff_aus_bezugsfach"] is False
+
+
+FEHLT_GUT = ("„Katalysator“ trage ich ein. „Lewis-Säure“ gibt es im Wissensspeicher nicht — "
+             "die Fachschaft kann den Begriff anlegen.")
+
+
+def test_begriff_fehlt_besteht():
+    k = _begriffs_lauf({"fehlt": "Lewis-Säure", "nur": ["Katalysator"]}, vorher=[],
+                       nachher=[_b("b-kat")], antwort=FEHLT_GUT)
+    assert all(k.values()), k
+
+
+@pytest.mark.parametrize("nachher, antwort, kriterium", [
+    ([_b("b-kat"), _b("b-lewis")], FEHLT_GUT, "nur_vorhandene_eingetragen"),   # Fehlzuordnung
+    ([], FEHLT_GUT, "vorhandene_eingetragen"),                                  # Katalysator vergessen
+    ([_b("b-kat")], "Ich trage Katalysator und Lewis-Säure ein.", "fehlen_gesagt"),  # Fehlen verschwiegen
+])
+def test_begriff_fehlt_fehlgriffe(nachher, antwort, kriterium):
+    k = _begriffs_lauf({"fehlt": "Lewis-Säure", "nur": ["Katalysator"]}, vorher=[], nachher=nachher,
+                       antwort=antwort)
+    assert k[kriterium] is False, k
+
+
+def test_begriffe_behalten():
+    vorher = [IK, _b("b-pot")]
+    gut = _begriffs_lauf({"absatz": False, "unveraendert": True}, vorher=vorher, nachher=vorher,
+                         antwort="Übungsaufgaben: 25 → 20 Min. Soll ich das übernehmen?")
+    assert all(gut.values()), gut
+    weg = _begriffs_lauf({"absatz": False, "unveraendert": True}, vorher=vorher, nachher=[IK],
+                         antwort="Übungsaufgaben: 25 → 20 Min.")
+    assert weg["refs_unveraendert"] is False
+    mit_absatz = _begriffs_lauf({"absatz": False, "unveraendert": True}, vorher=vorher, nachher=vorher,
+                                antwort="Gekürzt. Begriffe dieser Stunde: Potenz")
+    assert mit_absatz["kein_begriffsabsatz"] is False
+
+
+def test_ohne_begriffs_angaben_keine_begriffs_kriterien():
+    """Die 0.15-Fälle ohne `begriffe` und ohne vorbelegte Kompetenzen bewerten wie bisher."""
+    k = _begriffs_lauf({}, vorher=[], nachher=[], antwort="Soll ich das übernehmen?")
+    assert not {n for n in k if "begriff" in n or n.startswith(("refs_", "kompetenzen_erhalten", "fehlen"))}
+
+
+def test_verlauf_zeigt_refs_auch_ohne_phasenaenderung():
+    lauf = {"fall": "begriff-fehlt", "lauf": 1, "bestanden": True, "kriterien": {}, "zuege": [],
+            "vorher": GUT, "nachher": GUT, "refs_vorher": [], "refs_nachher": [_b("b-kat")]}
+    md = messung.verlauf_als_markdown({"datei": "x", "beginn": "", "modell": "m", "assistent": 1,
+                                       "assistent_name": "A", "prompt": "p"}, [lauf])
+    assert "**Kompetenzen und Begriffe:** — → Katalysator (B)" in md
+

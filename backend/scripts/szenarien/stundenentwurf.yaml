@@ -65,6 +65,8 @@ faelle:
       - "Ich habe in dieser Stunde nur 70 Minuten. Wie kürze ich den Entwurf?"
       - "Ja, so übernehmen."
     zustimmung_ab: 2
+    # 0.17: Beim Kürzen kein Absatz „Begriffe dieser Stunde" (Prompt, Plan F4).
+    begriffe: {absatz: false}
     erwartung: >-
       Kommt durch Kürzen und Streichen auf höchstens 70 Minuten — Vertiefung zuerst —, ohne neue
       Phasen. Je Änderung eine Zeile mit Grund, Beschreibungen unverändert, Zeitbilanz „… von 70".

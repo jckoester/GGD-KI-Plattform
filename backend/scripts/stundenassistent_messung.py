@@ -47,6 +47,7 @@ import importlib.util
 import json
 import re
 import sys
+import uuid
 from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
@@ -137,7 +138,18 @@ def stand(conn, gruppen: list[int]) -> dict:
     return {"entwuerfe": entwuerfe, "slots": slots, "kanten": kanten}
 
 
-def zuruecksetzen(conn, ausgang: dict, gruppen: list[int]) -> None:
+def vektoren(conn, entwuerfe) -> dict[str, str | None]:
+    """Die Vektoren der Entwürfe als Text — für das Zurücksetzen, nicht für die Kriterien.
+
+    Seit 0.17 verwirft jedes Schreiben, das Titel, `refs` oder Reflexion ändert, den Vektor
+    der Stunde und bettet neu ein (`vektor_veraltet`). Setzte die Messung nur Titel und
+    Metadaten zurück, stünden die Dev-Stunden danach ohne oder mit fremdem Vektor da.
+    """
+    return dict(_alle(conn, "SELECT id::text, embedding::text FROM context_nodes WHERE id::text = ANY(%s)",
+                      list(entwuerfe)))
+
+
+def zuruecksetzen(conn, ausgang: dict, gruppen: list[int], ausgang_vektoren: dict | None = None) -> None:
     jetzt = stand(conn, gruppen)
     with conn.cursor() as cur:
         for slot, stunde in jetzt["slots"].items():
@@ -154,6 +166,9 @@ def zuruecksetzen(conn, ausgang: dict, gruppen: list[int]) -> None:
         neue_kanten = sorted(stand(conn, gruppen)["kanten"] - ausgang["kanten"])
         if neue_kanten:
             cur.execute("DELETE FROM context_edges WHERE id::text = ANY(%s)", (neue_kanten,))
+        for kennung, vektor in (ausgang_vektoren or {}).items():
+            cur.execute("UPDATE context_nodes SET embedding = %s::vector WHERE id = %s "
+                        "AND embedding IS DISTINCT FROM %s::vector", (vektor, kennung, vektor))
 
 
 def kompetenznummern_des_fachs(conn, stunde: str) -> set[str]:
@@ -197,6 +212,123 @@ def hat_kapitel(conn, stunde: str) -> bool:
         JOIN context_edges ref ON ref.from_node_id = teil.to_node_id AND ref.relation = 'references'
         JOIN context_nodes k ON k.id = ref.to_node_id AND k.content_type = 'kapitel'
         WHERE teil.from_node_id::text = %s AND teil.relation = 'part_of' LIMIT 1""", stunde))
+
+
+# ── Messgruppen und vorbelegte Einträge (0.17, Fachbegriffe der Stunde) ─────
+
+
+def messgruppe_abbauen(conn, gruppe: dict) -> None:
+    """Die Messgruppe samt Konversationen und Knoten — wie `entfall_messung.abbauen`.
+
+    Konversationen und Knoten zuerst: Ihre Gruppenspalten stehen auf `SET NULL`. Termine,
+    Snapshots und Mitgliedschaften gehen per `CASCADE` mit der Gruppe.
+    """
+    gid = gruppe["id"]
+    name = _eins(conn, "SELECT name FROM groups WHERE id = %s", gid)
+    if name is not None and name != gruppe["name"]:
+        raise SystemExit(f"Gruppe {gid} heißt „{name}“, nicht „{gruppe['name']}“ — fremde Gruppe, Abbruch.")
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM conversations WHERE group_id = %s", (gid,))
+        cur.execute("DELETE FROM context_nodes WHERE write_scope_group_id = %s OR read_scope_group_id = %s",
+                    (gid, gid))
+        cur.execute("DELETE FROM groups WHERE id = %s", (gid,))
+
+
+def messgruppe_aufbauen(conn, gruppe: dict, pseudonym: str) -> None:
+    """Eine Unterrichtsgruppe der Mess-Lehrkraft mit einem Termin und seinem Entwurf."""
+    messgruppe_abbauen(conn, gruppe)
+    fach = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", gruppe["fach"])
+    if fach is None:
+        raise SystemExit(f"Fach „{gruppe['fach']}“ gibt es nicht — falsche Instanz?")
+    gid, st = gruppe["id"], gruppe["stunde"]
+    phasen = [{"id": str(uuid.uuid4()), "prio": "kern", **p} for p in st["phasen"]]
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO groups (id, name, slug, type, subject_id) VALUES (%s, %s, %s, 'teaching_group', %s)",
+                    (gid, gruppe["name"], f"messung-begriffe-{gid}", fach))
+        cur.execute("INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) "
+                    "VALUES (%s, %s, 'teacher', 'eigen')", (gid, pseudonym))
+        cur.execute("INSERT INTO context_nodes (category, content_type, title, metadata, owner_pseudonym, "
+                    "read_scope, write_scope, read_scope_group_id, write_scope_group_id, subject_id, status) "
+                    "VALUES ('artifact', 'unterrichtsstunde', %s, %s, %s, 'group_teachers', 'group_teachers', "
+                    "%s, %s, %s, 'active') RETURNING id",
+                    (st["titel"], psycopg2.extras.Json({"phasen": phasen, "refs": [],
+                                                        "stundenziel": st.get("stundenziel", "")}),
+                     pseudonym, gid, gid, fach))
+        knoten = cur.fetchone()[0]
+        cur.execute("INSERT INTO lesson_slots (group_id, date, start_period, periods, halbjahr, stunde_node_id) "
+                    "VALUES (%s, %s, 1, %s, 1, %s)", (gid, st["datum"], st.get("stunden", 1), knoten))
+
+
+def refs_aufloesen(conn, stunde: str, eintraege: list[dict]) -> list[dict]:
+    """`refs_vorher` eines Falls → Einträge, wie der Planer sie speichert.
+
+    Eine Kompetenz über ihre Nummer — zuerst aus dem Kapitel der Einheit, sonst im Fach
+    (aktive vor archivierten); ein Begriff über seinen Titel im Fach oder einem Bezugsfach.
+    """
+    refs = []
+    for e in eintraege:
+        if e["typ"] == "concept":
+            zeile = _alle(conn, """
+                SELECT n.id::text, n.title, n.content_type FROM context_nodes n
+                JOIN context_nodes s ON s.id::text = %s JOIN subjects f ON f.id = s.subject_id
+                JOIN subjects nf ON nf.id = n.subject_id
+                WHERE n.content_type IN ('begriff', 'stoffsteckbrief') AND n.status = 'active'
+                  AND n.title = %s AND (nf.id = f.id OR nf.slug = ANY(f.bezugsfaecher))
+                ORDER BY n.created_at LIMIT 1""", stunde, e["titel"])
+            if not zeile:
+                raise SystemExit(f"Begriff „{e['titel']}“ fehlt im Fach der Stunde — falsche Instanz?")
+            kennung, titel, art = zeile[0]
+            refs.append({"node_id": kennung, "typ": "concept", "code": None, "titel": titel,
+                         "partiell": False, "content_type": art})
+        else:
+            art = "ik_kompetenz" if e["typ"] == "ik" else "pk_kompetenz"
+            zeile = _alle(conn, """
+                SELECT k.id::text, k.title FROM context_nodes k JOIN context_nodes s ON s.id::text = %s
+                WHERE k.content_type = %s AND k.subject_id = s.subject_id
+                  AND k.metadata->>'kompetenz_nr' = %s
+                ORDER BY (k.id::text = ANY(%s)) DESC, (k.status = 'active') DESC, k.created_at DESC
+                LIMIT 1""", stunde, art, e["kompetenz_nr"], list(_kapitel_ik_kennungen(conn, stunde)))
+            if not zeile:
+                raise SystemExit(f"Kompetenz {e['kompetenz_nr']} fehlt im Fach der Stunde — falsche Instanz?")
+            refs.append({"node_id": zeile[0][0], "typ": e["typ"], "code": e["kompetenz_nr"],
+                         "titel": zeile[0][1], "partiell": False})
+    return refs
+
+
+def _kapitel_ik_kennungen(conn, stunde: str) -> set[str]:
+    return {k for (k,) in _alle(conn, """
+        SELECT DISTINCT ik.id::text FROM context_edges teil
+        JOIN context_edges ref ON ref.from_node_id = teil.to_node_id AND ref.relation = 'references'
+        JOIN context_nodes k ON k.id = ref.to_node_id AND k.content_type = 'kapitel'
+        JOIN context_edges seq ON seq.to_node_id = k.id AND seq.relation = 'part_of'
+        JOIN context_nodes l ON l.id = seq.from_node_id AND l.content_type = 'lernsequenz'
+        JOIN context_edges r ON r.from_node_id = l.id AND r.relation = 'references'
+        JOIN context_nodes ik ON ik.id = r.to_node_id AND ik.content_type = 'ik_kompetenz'
+        WHERE teil.from_node_id::text = %s AND teil.relation = 'part_of'""", stunde)}
+
+
+def refs_vorbelegen(conn, stunde: str, refs: list[dict]) -> None:
+    with conn.cursor() as cur:
+        cur.execute("UPDATE context_nodes SET metadata = jsonb_set(metadata, '{refs}', %s) WHERE id = %s",
+                    (psycopg2.extras.Json(refs), stunde))
+
+
+def begriffe_info(conn, stunde: str) -> dict:
+    """Was die Begriffs-Kriterien über die Knoten wissen müssen — ohne Datenbank in `bewerte`.
+
+    ``fach``: Fach der Stunde; ``erlaubt``: Fach und Bezugsfächer; ``knoten``: jeder aktive
+    Fachbegriff und Stoffsteckbrief mit Titel, Aliasen und Fach.
+    """
+    fach, bezug = _alle(conn, "SELECT s.id, s.bezugsfaecher FROM context_nodes n JOIN subjects s "
+                              "ON s.id = n.subject_id WHERE n.id::text = %s", stunde)[0]
+    erlaubt = {fach} | {i for (i,) in _alle(conn, "SELECT id FROM subjects WHERE slug = ANY(%s)", list(bezug or []))}
+    knoten = {}
+    for kennung, titel, fach_id, aliase in _alle(conn, """
+            SELECT n.id::text, n.title, n.subject_id, coalesce(array_agg(a.alias) FILTER (WHERE a.alias IS NOT NULL), '{}')
+            FROM context_nodes n LEFT JOIN node_aliases a ON a.node_id = n.id
+            WHERE n.content_type IN ('begriff', 'stoffsteckbrief') GROUP BY 1, 2, 3"""):
+        knoten[kennung] = {"titel": titel, "aliase": list(aliase), "subject_id": fach_id}
+    return {"fach": fach, "erlaubt": erlaubt, "knoten": knoten}
 
 
 # ── Ein Lauf und seine Bewertung ─────────────────────────────────────────────
@@ -254,14 +386,16 @@ def kompetenznummern(text: str) -> list[str]:
 
 def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
             ziel: str | None = None, nummern: set[str] | None = None,
-            kapitel: bool = False, kapitel_nummern: set[str] | None = None) -> dict[str, bool]:
+            kapitel: bool = False, kapitel_nummern: set[str] | None = None,
+            begriffe: dict | None = None) -> dict[str, bool]:
     """Die Kriterien aus dem Plan — je Fall nur die, die auf ihn zutreffen.
 
     ``stunde`` ist die Bezugsstunde des Falls (oder None), ``ziel`` der Entwurf des Termins
     aus ``waehlt``. Für Fälle mit ``kompetenzen``: ``nummern`` sind die Kompetenznummern,
     die es im Fach der Stunde gibt, ``kapitel`` sagt, ob der Entwurf ein Curriculum-Kapitel
-    mitbringt. Ohne Datenbank, damit sich prüfen lässt, dass die Kriterien Fehlgriffe
-    überhaupt erkennen (`tests/unit/test_stundenassistent_messung.py`).
+    mitbringt. ``begriffe`` (0.17) kommt aus :func:`begriffe_info`. Ohne Datenbank, damit
+    sich prüfen lässt, dass die Kriterien Fehlgriffe überhaupt erkennen
+    (`tests/unit/test_stundenassistent_messung.py`).
     """
     k: dict[str, bool] = {}
 
@@ -327,6 +461,88 @@ def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
             ik = [n for n in genannt if n.startswith("3.")]
             k["kompetenzen_aus_dem_kapitel"] = bool(ik) and all(
                 n in (kapitel_nummern or set()) for n in ik)
+
+    k.update(_begriffs_kriterien(fall, ausgang, zuege, stunde=stunde, info=begriffe))
+    return k
+
+
+# „Begriffe dieser Stunde" — der eigene Absatz, den der Prompt verlangt (Plan F4).
+_BEGRIFFSABSATZ = re.compile(r"begriffe\s+dieser\s+stunde", re.IGNORECASE)
+# Woran man erkennt, dass die Antwort einen Begriff als fehlend benennt (F6).
+_FEHLT = re.compile(r"fehlt|fehlen|nicht im wissensspeicher|gibt es (?:dort |im wissensspeicher )?(?:noch )?nicht|"
+                    r"nicht vorhanden|nicht gefunden|nicht angelegt|fachschaft", re.IGNORECASE)
+
+
+def _genannt(namen: list[str], text: str) -> bool:
+    """Steht einer der Namen im Text — auch gebeugt? Jedes Wort mit gekürzter Endung
+    („elektrophile Substitution" trifft „der elektrophilen Substitution")."""
+    t = text.casefold()
+    for name in namen:
+        woerter = [w for w in re.split(r"[\s\-]+", name.casefold()) if w]
+        if woerter and all(w[: max(4, len(w) - 2)] in t for w in woerter):
+            return True
+    return False
+
+
+def _refs(entwurf) -> list[dict]:
+    return list((entwurf or {}).get("metadata", {}).get("refs") or [])
+
+
+def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde, info) -> dict[str, bool]:
+    """Die Kriterien zu Begriffen der Stunde (Plan „Fachbegriffe der Stunde", Schritt 5).
+
+    ``fall["begriffe"]``:
+    - ``absatz``: true — die erste Antwort hat den Absatz „Begriffe dieser Stunde";
+      false — sie hat ihn nicht (Kürzen, Fragen).
+    - ``geschrieben``: Nach der Zustimmung steht mindestens ein neuer Begriff in `refs`; jeder
+      stammt aus dem Fach oder einem Bezugsfach; mit ``absatz`` steht jeder neue auch in der
+      ersten Antwort.
+    - ``aus_bezugsfach``: Mindestens ein neuer Begriff stammt aus einem Bezugsfach.
+    - ``nur``: Titel, die eingetragen werden sollen — genau diese, kein anderer.
+    - ``fehlt``: ein Begriff, den es nicht gibt — die Antwort sagt, dass er fehlt.
+    - ``unveraendert``: `refs` nach dem Schreiben gleich denen davor.
+    Dazu immer, wenn vorher Kompetenzen eingetragen waren und geschrieben wurde: Sie sind noch da.
+    """
+    b = fall.get("begriffe") or {}
+    k: dict[str, bool] = {}
+    if "absatz" in b:
+        hat = bool(_BEGRIFFSABSATZ.search(zuege[0]["antwort"]))
+        k["begriffsabsatz" if b["absatz"] else "kein_begriffsabsatz"] = hat == b["absatz"]
+    if "fehlt" in b:
+        text = "\n".join(z["antwort"] for z in zuege)
+        k["fehlen_gesagt"] = _genannt([b["fehlt"]], text) and bool(_FEHLT.search(text))
+
+    ab = fall.get("zustimmung_ab")
+    if not (ab and stunde):
+        return k
+    vorher = _refs(ausgang["entwuerfe"].get(stunde))
+    nachher = _refs(zuege[-1]["stand"]["entwuerfe"].get(stunde))
+    kompetenzen_vorher = {r.get("node_id") for r in vorher if r.get("typ") != "concept"}
+    if kompetenzen_vorher:
+        k["kompetenzen_erhalten"] = kompetenzen_vorher <= {r.get("node_id") for r in nachher}
+    begriffe_vorher = {r.get("node_id") for r in vorher if r.get("typ") == "concept"}
+    neu = [r for r in nachher if r.get("typ") == "concept" and r.get("node_id") not in begriffe_vorher]
+    knoten = (info or {}).get("knoten", {})
+
+    def fach(r):
+        return knoten.get(r.get("node_id"), {}).get("subject_id")
+
+    if b.get("geschrieben"):
+        k["begriffe_geschrieben"] = bool(neu)
+        k["begriffe_aus_fach"] = all(fach(r) in (info or {}).get("erlaubt", set()) for r in neu)
+        if b.get("absatz"):
+            k["begriffe_wie_genannt"] = all(
+                _genannt([r.get("titel") or ""] + knoten.get(r.get("node_id"), {}).get("aliase", []),
+                         zuege[0]["antwort"]) for r in neu)
+    if b.get("aus_bezugsfach"):
+        k["begriff_aus_bezugsfach"] = any(fach(r) not in (None, (info or {}).get("fach")) for r in neu)
+    if "nur" in b:
+        titel = {knoten.get(r.get("node_id"), {}).get("titel") for r in neu}
+        k["nur_vorhandene_eingetragen"] = titel <= set(b["nur"])
+        k["vorhandene_eingetragen"] = set(b["nur"]) <= titel
+    if b.get("unveraendert"):
+        k["refs_unveraendert"] = ([(r.get("node_id"), r.get("typ")) for r in nachher]
+                                  == [(r.get("node_id"), r.get("typ")) for r in vorher])
     return k
 
 
@@ -353,6 +569,14 @@ def _phase_kurz(p: dict) -> str:
     zeile = f"{p.get('name')} ({', '.join(teile)})"
     beschreibung = " / ".join(z.strip() for z in (p.get("beschreibung") or "").splitlines() if z.strip())
     return zeile + (f" — {beschreibung}" if beschreibung else "")
+
+
+def _refs_kurz(refs) -> str:
+    """`refs` in einer Zeile: Kompetenzen mit Nummer, Begriffe mit Titel und „(B)"."""
+    if not refs:
+        return "—"
+    return ", ".join(f"{r.get('titel')} (B)" if r.get("typ") == "concept" else (r.get("code") or r.get("titel") or "?")
+                     for r in refs)
 
 
 def _zitat(text: str, fehler: str | None = None) -> str:
@@ -428,6 +652,10 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
             if l.get("ziel_nachher") != l.get("ziel_vorher"):
                 zeilen += ["", f"Stundenziel: „{l.get('ziel_vorher') or ''}“ → „{l.get('ziel_nachher') or ''}“"]
             zeilen.append("")
+        # Eigens, nicht nur bei geänderten Phasen: Ein Lauf kann allein `refs` schreiben (0.17).
+        if l.get("refs_nachher") != l.get("refs_vorher"):
+            zeilen += [f"**Kompetenzen und Begriffe:** {_refs_kurz(l.get('refs_vorher'))} → "
+                       f"{_refs_kurz(l.get('refs_nachher'))}", ""]
         if l.get("erwartung"):
             zeilen += _bewertungsblock(l["erwartung"])
     return "\n".join(zeilen) + "\n"
@@ -476,15 +704,23 @@ def main() -> None:
     asyncio.run(vor_einer_messung(trotzdem=args.trotzdem))
     conn = verbindung()
     pseudonym = lehrkraft_der_gruppe(conn, daten["lehrkraft_der_gruppe"])
+    # Eigene Messgruppen (0.17) vor allem anderen: Ihre Entwürfe gehören zum Ausgangsstand.
+    messgruppen = daten.get("messgruppen") or []
+    for gruppe in messgruppen:
+        messgruppe_aufbauen(conn, gruppe, pseudonym)
     gruppen = gruppen_der_lehrkraft(conn, pseudonym)
     assistent = args.assistent or stundenassistent(conn)
+    vorbelegt: dict[str, list[dict]] = {}
     for fall in faelle:
         if "stunde" in fall and stunde_am(conn, **fall["stunde"]) is None:
             raise SystemExit(f"{fall['id']}: kein Entwurf am {fall['stunde']} — falsche Instanz?")
         if "stunde" in fall and (fehler := aufbau_fehler(fall, hat_kapitel(conn, stunde_am(conn, **fall["stunde"])))):
             raise SystemExit(fehler)
+        if fall.get("refs_vorher"):
+            vorbelegt[fall["id"]] = refs_aufloesen(conn, stunde_am(conn, **fall["stunde"]), fall["refs_vorher"])
 
     ausgang = stand(conn, gruppen)
+    ausgang_vektoren = vektoren(conn, ausgang["entwuerfe"])
     beginn = _eins(conn, "SELECT now()")
     name, prompt = _alle(conn, "SELECT name, system_prompt FROM assistants WHERE id = %s", assistent)[0]
     kopf = {"datei": args.datei.name, "beginn": datetime.now().strftime("%d.%m.%Y, %H:%M"),
@@ -499,7 +735,12 @@ def main() -> None:
                           headers={"Cookie": f"session={token}"}) as client:
             for fall in faelle:
                 for nr in range(1, args.laeufe + 1):
-                    zuruecksetzen(conn, ausgang, gruppen)
+                    zuruecksetzen(conn, ausgang, gruppen, ausgang_vektoren)
+                    # Vorbelegte `refs` (0.17): Ausgang dieses Laufs ist der Stand **mit** ihnen.
+                    lauf_ausgang = ausgang
+                    if fall["id"] in vorbelegt:
+                        refs_vorbelegen(conn, stunde_am(conn, **fall["stunde"]), vorbelegt[fall["id"]])
+                        lauf_ausgang = stand(conn, gruppen)
                     try:
                         zuege, konversation = lauf(client, conn, fall, assistent, gruppen)
                     except (httpx.HTTPError, SystemExit) as fehler:
@@ -515,11 +756,12 @@ def main() -> None:
                         konversationen.append(konversation)
                     bezug = stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None
                     kriterien = bewerte(
-                        fall, ausgang, zuege, stunde=bezug,
+                        fall, lauf_ausgang, zuege, stunde=bezug,
                         ziel=stunde_am(conn, **fall["waehlt"]) if "waehlt" in fall else None,
                         nummern=kompetenznummern_des_fachs(conn, bezug) if bezug and "kompetenzen" in fall else None,
                         kapitel=bool(bezug) and hat_kapitel(conn, bezug),
                         kapitel_nummern=kompetenznummern_des_kapitels(conn, bezug) if bezug else None,
+                        begriffe=begriffe_info(conn, bezug) if bezug and "begriffe" in fall else None,
                     )
                     bestanden = all(kriterien.values())
                     werkzeuge = " | ".join(" → ".join(_werkzeuge(z)) or "—" for z in zuege)
@@ -536,7 +778,7 @@ def main() -> None:
                     })
                     kopf["modell"] = zuege[0].get("modell") or kopf["modell"]
                     stunde = stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None
-                    vorher = ausgang["entwuerfe"].get(stunde) if stunde else None
+                    vorher = lauf_ausgang["entwuerfe"].get(stunde) if stunde else None
                     nachher = zuege[-1]["stand"]["entwuerfe"].get(stunde) if stunde else None
                     laeufe.append({
                         "fall": fall["id"], "lauf": nr, "bestanden": bestanden, "kriterien": kriterien,
@@ -546,6 +788,7 @@ def main() -> None:
                         "nachher": _phasen(nachher) if nachher else None,
                         "ziel_vorher": (vorher or {}).get("metadata", {}).get("stundenziel"),
                         "ziel_nachher": (nachher or {}).get("metadata", {}).get("stundenziel"),
+                        "refs_vorher": _refs(vorher), "refs_nachher": _refs(nachher),
                         "zuege": [{"frage": z["frage"], "werkzeuge": _werkzeuge(z), "antwort": z["antwort"],
                                    "zeit": z["zeit"], "fehler": z.get("fehler")} for z in zuege],
                         "erwartung": fall.get("erwartung"),
@@ -553,11 +796,13 @@ def main() -> None:
                     if args.verlauf:
                         args.verlauf.write_text(verlauf_als_markdown(kopf, laeufe), encoding="utf-8")
     finally:
-        zuruecksetzen(conn, ausgang, gruppen)
+        zuruecksetzen(conn, ausgang, gruppen, ausgang_vektoren)
         with conn.cursor() as cur:
             cur.execute("DELETE FROM conversations WHERE (id::text = ANY(%s)) OR (pseudonym = %s "
                         "AND assistant_id = %s AND created_at >= %s)",
                         (konversationen, pseudonym, assistent, beginn))
+        for gruppe in messgruppen:
+            messgruppe_abbauen(conn, gruppe)
         conn.close()
 
     print("\nFall                           bestanden  nicht erfüllt")

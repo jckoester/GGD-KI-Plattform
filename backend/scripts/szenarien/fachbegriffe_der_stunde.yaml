@@ -1,0 +1,111 @@
+# Messung zu 0.17 (Päckchen A1, Plan „Fachbegriffe der Stunde", Schritt 5).
+#
+#   python scripts/stundenassistent_messung.py --datei scripts/szenarien/fachbegriffe_der_stunde.yaml
+#
+# Vier Fälle zu Begriffen der Stunde. Dazu laufen die 0.15-Fälle `kompetenz-vorschlagen`,
+# `skizze-ausarbeiten` und `zeit-kuerzen` aus `stundenentwurf.yaml` als Regression.
+#
+# Neu gegenüber `stundenentwurf.yaml`:
+# - `refs_vorher`: `refs`, die vor **jedem** Lauf am Entwurf stehen und danach wieder weg
+#   sind — eine Kompetenz über ihre Nummer, ein Begriff über seinen Titel. Die Dev-Stunden
+#   tragen keine `refs`; ohne Vorbelegung prüfte „Kompetenzen bleiben erhalten" nichts.
+# - `begriffe`: die Kriterien zu Begriffen (`_begriffs_kriterien` im Skript).
+# - `messgruppen`: eine eigene Unterrichtsgruppe der Mess-Lehrkraft mit einem Entwurf, vom
+#   Skript auf- und am Ende samt Konversationen abgebaut.
+#
+# Kriterien vor dem ersten Lauf festgelegt (16.10.2026); die Erwartung beurteilt Jan im
+# Verlauf (Kästchen unter jedem Lauf).
+
+lehrkraft_der_gruppe: 33
+
+messgruppen:
+  # Kopie der NwT-Stunde „Photosynthse, DC von Chlorophyll" (Gruppe 32, 24.09.), dort ohne
+  # Phasen. NwT liest Biologie und Chemie mit — Fotosynthese und Chlorophyll stehen in der
+  # Biologie, Chromatografie in der Chemie.
+  - id: 98017
+    name: "Messung Begriffe NwT"
+    fach: nwt
+    stunde:
+      datum: 2026-10-21
+      stunden: 1
+      titel: "Photosynthse, DC von Chlorophyll"
+      stundenziel: "Die Schüler:innen trennen Blattfarbstoffe chromatografisch und erklären, warum Blätter grün sind."
+      phasen:
+        - name: Einstieg
+          dauer_min: 5
+          beschreibung: "Warum werden Blätter im Herbst gelb und rot? Vermutungen sammeln."
+        - name: Erarbeitung
+          dauer_min: 25
+          beschreibung: "Versuch: Blattfarbstoffe aus Spinat trennen"
+        - name: Sicherung
+          dauer_min: 10
+          beschreibung: "Chromatogramm deuten: Welche Farbstoffe stecken in einem grünen Blatt?"
+        - name: Hausaufgabe
+          beschreibung: "Ergebnis im Heft festhalten"
+
+faelle:
+  # Fall 1 — Phasen ausarbeiten: Der Assistent nennt die eingeführten Begriffe von sich aus
+  # und schreibt sie nach Zustimmung (Abnahme 2). Gruppe 33, 13.10. (ohne Einheit): Der Plan
+  # sah den 12.10. vor, der hat aber keine Erarbeitung (Praktikum).
+  - id: begriffe-vorschlagen
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    refs_vorher:
+      - {typ: ik, kompetenz_nr: "3.4.5(4)"}
+    zuege:
+      - "Arbeite die erste Erarbeitung (20 Minuten) aus: Wie erschließen die Schüler:innen den Mechanismus?"
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    begriffe: {absatz: true, geschrieben: true}
+    erwartung: >-
+      Arbeitet die erste Erarbeitung konkret aus (Quellen, Arbeitsauftrag, Ergebnis) und nennt
+      am Ende „Begriffe dieser Stunde" mit Phase — Begriffe, die beim Mechanismus neu sind
+      (etwa elektrophile Substitution mit σ-Komplex, Elektrophil, Reaktionsmechanismus), nicht
+      Benzol oder Aromaten, die wiederholt werden. Nach „Ja" stehen genau diese als Begriffe in
+      der Leiste, die Kompetenz 3.4.5(4) bleibt.
+
+  # Fall 2 — ein Begriff fehlt im Wissensspeicher (F6, Abnahme 3). Die Lehrkraft nennt ihn
+  # selbst: Der Entwurf vom 12.10. enthält keinen fehlenden Begriff. „Lewis-Säure" gibt es auf
+  # Dev nicht, wohl aber „Lewis-Schreibweise" — die Falle für eine Fehlzuordnung.
+  - id: begriff-fehlt
+    stunde: {gruppe: 33, datum: 2026-10-12}
+    zuege:
+      - "In dieser Stunde lernen die Schüler:innen die Begriffe Katalysator und Lewis-Säure kennen. Trag sie als Begriffe der Stunde ein."
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    begriffe: {fehlt: "Lewis-Säure", nur: [Katalysator]}
+    erwartung: >-
+      Schlägt „Katalysator" vor und sagt, dass es „Lewis-Säure" im Wissensspeicher nicht gibt
+      und die Fachschaft den Begriff anlegen kann — ohne einen ähnlichen (etwa
+      Lewis-Schreibweise) an seine Stelle zu setzen. Nach „Ja" steht nur Katalysator in der
+      Leiste. Phasen unverändert.
+
+  # Fall 3 — Begriffe aus Bezugsfächern (F2). Der Plan sah Physik vor; Physik-Begriffe gibt
+  # es nicht. Stattdessen NwT mit Biologie und Chemie.
+  - id: begriffe-bezugsfach
+    stunde: {gruppe: 98017, datum: 2026-10-21}
+    zuege:
+      - "Arbeite die Erarbeitung aus: Wie gehen die Schüler:innen bei der Chromatografie vor?"
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    begriffe: {absatz: true, geschrieben: true, aus_bezugsfach: true}
+    erwartung: >-
+      Arbeitet den Versuch aus (Extraktion, Laufmittel, Auftragen, Entwickeln, Beobachten)
+      und nennt als Begriffe der Stunde, was die Schüler:innen neu lernen — etwa Chromatografie,
+      Chlorophyll —, je mit Phase. Nach „Ja" stehen sie in der Leiste, mit ihrem Fach.
+
+  # Fall 4 — Phasen ändern wirft keine Begriffe weg (Regression, Abnahme 2). Beim Kürzen kein
+  # Begriffsabsatz (Prompt, F4).
+  - id: begriffe-behalten
+    stunde: {gruppe: 36, datum: 2026-10-05}
+    refs_vorher:
+      - {typ: ik, kompetenz_nr: "3.3.1(3)"}
+      - {typ: concept, titel: "Potenz"}
+      - {typ: concept, titel: "Rechengesetze für Potenzen"}
+    zuege:
+      - "Kürze „Übungsaufgaben (einfach bis mittel)“ um 5 Minuten."
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    begriffe: {absatz: false, unveraendert: true}
+    erwartung: >-
+      Kürzt genau diese Phase von 25 auf 20 Minuten, nennt die Zeitbilanz und sonst nichts.
+      Kompetenz und Begriffe stehen danach unverändert in der Leiste.
