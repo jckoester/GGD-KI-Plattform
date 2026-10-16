@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Fachbegriffe zum Stundenentwurf:** `get_lesson_detail` liefert dem Stundenassistenten die
+  Fachbegriffe und Stoffsteckbriefe des Fachs und seiner Bezugsfächer, die zum Entwurf passen
+  (`begriffe`). Was schon als Begriff eingetragen ist, steht immer dabei. Begriffe der Stunde
+  (`refs` mit `typ: concept`) sind nur noch Fachbegriffe und Stoffsteckbriefe, nicht mehr Bauteile
+  oder Funktionen.
+
+### Behoben
+
+- Der Suchvektor einer Stunde folgt jetzt Änderungen an Titel, Kompetenzen, Begriffen und
+  Reflexion — im Planer, durch den Assistenten, in der Nachbereitung und bei einer Übertragung.
+  Bisher blieb der Vektor des ersten nächtlichen Laufs.
+- Eine übertragene, offen gebliebene Kompetenz behält in der Folgestunde Typ und Titel; bisher
+  kam jede als inhaltsbezogene Kompetenz ohne Titel an.
+- Material-Vorschläge des Stundenassistenten (`suggested_refs`) erkennen verknüpfte Begriffe.
+
 ## [0.16.0] – 2026-10-15
 
 Nennt eine Schüler:in einen Fachbegriff mitten im Satz, bietet der Chat dem Modell seinen Titel

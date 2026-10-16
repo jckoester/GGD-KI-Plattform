@@ -24,6 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
 from app.config import settings
+from app.context.embedding import (
+    eingabe_ohne_aliase,
+    enqueue_embedding_job,
+    vektor_veraltet,
+)
 from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
 from app.planning import zuordnung
@@ -1307,6 +1312,7 @@ async def patch_lesson(
 
     await create_snapshot(db, group_id, reason="edit", created_by=user.sub)
 
+    vektor_vorher = eingabe_ohne_aliase(lesson)
     now = datetime.now(timezone.utc)
     if payload.titel is not None:
         lesson.title = payload.titel
@@ -1332,7 +1338,11 @@ async def patch_lesson(
     lesson.metadata_ = meta
     lesson.updated_at = now
     await synchronisiere_materialkanten(db, lesson.id, meta)
+    # Titel und `refs` stehen im Vektor der Stunde, die Phasen nicht (`embedding_input`).
+    veraltet = vektor_veraltet(lesson, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(lesson.id, db)
 
     # Der neue Stand gehört in die Antwort: Ein Client mit Vorbedingung braucht ihn für
     # den nächsten Schreibversuch. Ohne ihn müsste er nach jedem Schreiben neu lesen —

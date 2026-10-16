@@ -500,7 +500,8 @@ async def test_fremde_private_kompetenz_ist_keine(test_client, auth_headers, gru
             "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}],
             "refs": [{"node_id": str(fremd.id), "typ": "concept"}],
         }, TEACHER1_PSEUDO)
-        assert "keine passende Kompetenz" in aus.get("error", ""), aus
+        # Seit 0.17 nennt die Meldung einen Begriff einen Begriff.
+        assert "kein passender Begriff" in aus.get("error", ""), aus
     finally:
         _aufraeumen(gruppen)
 

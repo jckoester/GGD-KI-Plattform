@@ -234,9 +234,16 @@ class LessonPhaseItem(BaseModel):
             raise ValueError(f"Ungültige Prio '{self.prio}'; erlaubt: {VALID_PRIOS}")
 
 
+#: Was als Begriff der Stunde in `refs` stehen darf (`typ: "concept"`, 0.17). Nicht die
+#: ganze Kategorie `concept`: Zu ihr gehören auch `bauteil` (läuft aus) und `funktion` — eine
+#: Arduino-Funktion ist kein Fachbegriff. Der Stoffsteckbrief gehört dazu: Eine Stunde über
+#: Aromaten führt Benzol ein, und das ist ein Steckbrief (Plan „Fachbegriffe der Stunde", F1).
+BEGRIFF_TYPEN = ("begriff", "stoffsteckbrief")
+
+
 class LessonRefItem(BaseModel):
     node_id: UUID
-    typ: str  # "ik" | "pk" | "concept"
+    typ: str  # "ik" | "pk" | "concept" (Knoten aus BEGRIFF_TYPEN)
     code: Optional[str] = None
     titel: Optional[str] = None
     partiell: bool = False

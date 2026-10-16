@@ -31,6 +31,12 @@ def _make_slot(
 def _make_stunde(node_id=None, phasen=None, refs=None):
     node = MagicMock()
     node.id = node_id or uuid4()
+    # Echte Werte: Die Nachbereitung vergleicht den Eingabetext des Vektors vorher und
+    # nachher (`vektor_veraltet`), und der entsteht aus Typ, Titel und Metadaten.
+    node.category = "artifact"
+    node.content_type = "unterrichtsstunde"
+    node.title = "Stunde"
+    node.content = None
     node.metadata_ = {
         "phasen": phasen or [],
         "refs": refs or [],

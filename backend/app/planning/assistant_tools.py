@@ -19,6 +19,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.embedding import eingabe_ohne_aliase, enqueue_embedding_job, vektor_veraltet
 from app.context.stunden import als_stundenzahl
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.planning import stunde_finden
@@ -29,6 +30,7 @@ from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
 from app.planning.permissions import zugang_zur_stunde
 from app.planning.reflow_service import build_reflow_context
+from app.planning.schemas import BEGRIFF_TYPEN
 from app.planning.snapshots import restore_snapshot
 from app.planning.student_context import get_exam_scope
 
@@ -939,6 +941,118 @@ async def _vokabular(ctx: ToolContext, fach_id: int | None) -> dict:
     return vokabular
 
 
+#: So viele Begriffe kommen nach Ähnlichkeit mit dem Entwurf (Plan F3). Bewusst ohne
+#: Schwelle: Das Modell wählt aus, und ob ein Band wie bei der Vorab-Suche nötig ist, zeigt
+#: erst die Messung. Kosten: rund 3 000 Zeichen je Aufruf (vier Dev-Stunden, 16.10.2026:
+#: 2 800–3 300), rund ein Viertel davon Kennungen — so viel wie `zusammenhang`.
+BEGRIFFE_ANZAHL = 15
+
+#: Je Phasenbeschreibung höchstens so viel Text im Vergleich — eine lange Beschreibung
+#: soll die Auswahl nicht allein bestimmen.
+_BESCHREIBUNG_MAX = 300
+
+
+def _vergleichstext(stunde: ContextNode, meta: dict, zusammenhang: dict) -> str:
+    """Womit die Begriffe der Stunde verglichen werden: der Entwurf, wie er gerade ist.
+
+    Titel, Stundenziel, Phasen (Name und gekürzte Beschreibung), Einheit und Kapitel.
+    **Nicht der gespeicherte Stundenvektor:** Eine neue Stunde hat noch keinen, und er trägt
+    das Thema ohne die Phasen (`embedding_input`). Welche Begriffe eine Stunde einführt, steht
+    aber gerade in den Phasen.
+    """
+    teile = [stunde.title, meta.get("stundenziel")]
+    for phase in meta.get("phasen") or []:
+        if isinstance(phase, dict):
+            teile.append(phase.get("name"))
+            beschreibung = phase.get("beschreibung")
+            if isinstance(beschreibung, str):
+                teile.append(beschreibung[:_BESCHREIBUNG_MAX])
+    teile.append((zusammenhang.get("einheit") or {}).get("titel"))
+    teile.append((zusammenhang.get("kapitel") or {}).get("titel"))
+    return "\n".join(t.strip() for t in teile if isinstance(t, str) and t.strip())
+
+
+async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenhang: dict) -> dict:
+    """Die Fachbegriffe, die zum Entwurf passen — aus dem Fach und seinen Bezugsfächern.
+
+    Kommt mit dem Entwurf wie `vokabular`, aber nicht vollständig: Chemie allein hat über
+    hundert Begriffe. Ausgewählt wird nach Ähnlichkeit mit :func:`_vergleichstext`; die
+    nächsten :data:`BEGRIFFE_ANZAHL`, die die Person lesen darf. Bezugsfächer gehören dazu
+    (seit 0.16 pflegt das Leitfach einen geteilten Begriff): Eine NwT-Stunde zur
+    Chromatografie führt einen Begriff der Chemie ein.
+
+    Was schon als Begriff in `refs` steht, steht **immer** vorn (``eingetragen``) — das Modell
+    schreibt `refs` als ganze Liste und soll es behalten, auch wenn es nicht unter den
+    nächsten ist. Ohne Vektor (Einbettungsdienst nicht erreichbar) kommen nur diese, mit
+    ``hinweis``: Dann bleibt die Suche.
+    """
+    from app.context.search import vektor_oder_none
+    from app.context.service import bezugsfaecher_von
+    from app.context.visibility import read_scope_clause
+    from app.db.models import NodeAlias
+
+    db = ctx.db
+    eintraege: list[dict] = []
+    gesehen: set[str] = set()
+    for ref in meta.get("refs") or []:
+        if isinstance(ref, dict) and ref.get("typ") == "concept" and ref.get("node_id"):
+            node_id = str(ref["node_id"])
+            if node_id not in gesehen:
+                gesehen.add(node_id)
+                eintraege.append({"node_id": node_id, "titel": ref.get("titel"), "eingetragen": True})
+
+    if stunde.subject_id is None:
+        return {"eintraege": eintraege,
+                "hinweis": "Die Stunde hat kein Fach — Begriffe nur über search_context_nodes."}
+    vektor = await vektor_oder_none(_vergleichstext(stunde, meta, zusammenhang))
+    if vektor is None:
+        return {"eintraege": eintraege,
+                "hinweis": ("Die Auswahl nach Ähnlichkeit ist gerade nicht verfügbar — "
+                            "Begriffe über search_context_nodes suchen.")}
+
+    bezug = await bezugsfaecher_von(db, stunde.subject_id)
+    bedingungen = [
+        ContextNode.content_type.in_(BEGRIFF_TYPEN),
+        ContextNode.status == "active",
+        read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+        ContextNode.subject_id.in_((stunde.subject_id, *bezug)),
+        ContextNode.embedding.is_not(None),
+    ]
+    if gesehen:
+        bedingungen.append(ContextNode.id.not_in([UUID(i) for i in gesehen]))
+    treffer = (await db.execute(
+        sa.select(ContextNode.id, ContextNode.title, ContextNode.subject_id,
+                  ContextNode.metadata_["fassung"].as_string())
+        .where(*bedingungen)
+        .order_by(ContextNode.embedding.cosine_distance(vektor), ContextNode.id)
+        .limit(BEGRIFFE_ANZAHL)
+    )).all()
+
+    aliase: dict = {}
+    faecher: dict = {}
+    if treffer:
+        for node_id, alias in (await db.execute(
+            sa.select(NodeAlias.node_id, NodeAlias.alias)
+            .where(NodeAlias.node_id.in_([t[0] for t in treffer]))
+        )).all():
+            aliase.setdefault(node_id, []).append(alias)
+        if bezug:
+            faecher = dict((await db.execute(
+                sa.select(Subject.id, Subject.name).where(Subject.id.in_(bezug))
+            )).all())
+    for node_id, titel, fach_id, fassung in treffer:
+        eintrag = {"node_id": str(node_id), "titel": titel}
+        # Gleichnamige Begriffe gibt es je Stufe zweimal („Oxidation" in Klasse 8 und 10).
+        if fassung:
+            eintrag["fassung"] = fassung
+        if aliase.get(node_id):
+            eintrag["aliase"] = sorted(aliase[node_id])
+        if fach_id != stunde.subject_id:
+            eintrag["fach"] = faecher.get(fach_id)
+        eintraege.append(eintrag)
+    return {"eintraege": eintraege}
+
+
 async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
     node_str = _stunden_kennung(args, ctx)
     if not node_str:
@@ -957,6 +1071,7 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
     )
     slot = slot_result.scalar_one_or_none()
 
+    zusammenhang = await _zusammenhang(ctx, node)
     return {
         "id": str(node.id),
         "titel": node.title,
@@ -968,8 +1083,9 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
             "periods": slot.periods,
             "verfuegbare_min": slot.periods * 45,
         } if slot else None,
-        "zusammenhang": await _zusammenhang(ctx, node),
+        "zusammenhang": zusammenhang,
         "vokabular": await _vokabular(ctx, node.subject_id),
+        "begriffe": await _begriffe(ctx, node, meta, zusammenhang),
     }
 
 
@@ -989,7 +1105,11 @@ register_tool(ChatTool(
                 "Bildungsplan-Fassung und Lernsequenzen mit ihren Kompetenzen (in der Form "
                 "von refs); ohne Kapitel die Curricula, die zu Fach und Jahrgang der Gruppe "
                 "passen. Und das Vokabular der Sozialformen und Methoden (node_id, titel, "
-                "aliase), aus dem sozialform und methode als Knoten eingetragen werden."
+                "aliase), aus dem sozialform und methode als Knoten eingetragen werden. Und "
+                "begriffe: die zur Stunde passenden Fachbegriffe des Fachs und seiner "
+                "Bezugsfächer (node_id, titel, aliase, fach nur beim Bezugsfach; eingetragen = "
+                "steht schon in refs), aus denen Begriffe der Stunde als refs mit "
+                "typ 'concept' eingetragen werden."
             ),
             "parameters": {
                 "type": "object",
@@ -1078,27 +1198,33 @@ def _nachbereitete_fehlen(gespeichert, neu: list[dict]) -> str | None:
             "nachbereitete Phase nur in der Entwurfsansicht entfernen lässt.")
 
 
-# typ → was der Knoten dazu sein muss: Bausteinart (ik, pk) bzw. Kategorie (concept).
-_REF_TYPEN = {"ik": "ik_kompetenz", "pk": "pk_kompetenz", "concept": None}
+# typ → welche Bausteinarten der Knoten dazu sein darf.
+_REF_TYPEN = {"ik": ("ik_kompetenz",), "pk": ("pk_kompetenz",), "concept": BEGRIFF_TYPEN}
+
+# Bausteinart → typ des Eintrags in `refs` (Umkehrung von `_REF_TYPEN`).
+_REF_TYP_ZU = {art: typ for typ, arten in _REF_TYPEN.items() for art in arten}
 
 
 async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str | None]:
-    """Die Kompetenzen des Modells nach der Regel des Planers (`LessonRefItem`). → (Refs, Fehler)
+    """Kompetenzen und Begriffe des Modells nach der Regel des Planers (`LessonRefItem`).
+    → (Refs, Fehler)
 
     Bis 0.15 schrieb das Werkzeug `refs` ungeprüft in die Metadaten — anders als die Phasen.
     Ein unbekannter `typ` verschwand dann still aus der Kompetenzleiste, die nach ik/pk
     filtert; eine erfundene Kennung stand als Kompetenz ohne Knoten da.
 
     Geprüft wird die Form, ein bekannter `typ` und dass es den Knoten gibt, passend zum Typ
-    und für die Person lesbar. **Titel und Nummer kommen aus dem Knoten**, nicht vom Modell:
-    In der Leiste steht der Wortlaut des Bildungsplans. Doppelte entfallen. Archivierte
-    Knoten zählen — ein Curriculum verweist teils auf Knoten eines älteren Imports.
+    und für die Person lesbar. Ein Begriff (`concept`) ist ein Knoten aus `BEGRIFF_TYPEN` —
+    bis 0.17 galt die ganze Kategorie, samt Bauteil und Arduino-Funktion. **Titel und Nummer
+    kommen aus dem Knoten**, nicht vom Modell: In der Leiste steht der Wortlaut des
+    Bildungsplans. Doppelte entfallen. Archivierte Knoten zählen — ein Curriculum verweist
+    teils auf Knoten eines älteren Imports.
     """
     from app.context.visibility import read_scope_clause
     from app.planning.schemas import LessonRefItem
 
     if not isinstance(refs, list):
-        return None, "refs muss eine Liste von Kompetenzen sein"
+        return None, "refs muss eine Liste von Kompetenzen und Begriffen sein"
     items = []
     for nr, ref in enumerate(refs, 1):
         try:
@@ -1124,11 +1250,11 @@ async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str 
     gesehen: set = set()
     for nr, item in enumerate(items, 1):
         n = knoten.get(item.node_id)
-        art = _REF_TYPEN[item.typ]
-        passt = n is not None and (
-            n.content_type == art if art else n.category == "concept"
-        )
-        if not passt:
+        if n is None or n.content_type not in _REF_TYPEN[item.typ]:
+            if item.typ == "concept":
+                return None, (f"refs, Eintrag {nr}: kein passender Begriff mit node_id "
+                              f"{item.node_id} — übernimm Begriffe aus begriffe oder einem "
+                              "Treffer; fehlt ein Begriff im Wissensspeicher, trag ihn nicht ein")
             return None, (f"refs, Eintrag {nr}: keine passende Kompetenz mit node_id "
                           f"{item.node_id} — übernimm Kompetenzen so, wie sie im Kapitel "
                           "oder im Treffer stehen")
@@ -1136,7 +1262,7 @@ async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str 
             continue
         gesehen.add(item.node_id)
         item.titel = n.title
-        if art:
+        if item.typ != "concept":
             item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
         geprueft.append(item.model_dump(mode="json"))
     return geprueft, None
@@ -1180,6 +1306,7 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
 
     await create_snapshot(db, group_id, reason="assistant", created_by=ctx.user.sub)
 
+    vektor_vorher = eingabe_ohne_aliase(node)
     meta = dict(node.metadata_ or {})
     # Der Assistent liefert Roh-Dicts aus den Werkzeug-Argumenten und geht nicht
     # durch `LessonPhaseItem` — ohne diesen Schritt hätten seine Phasen nie eine
@@ -1198,7 +1325,11 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node.metadata_ = meta
     node.updated_at = datetime.now(timezone.utc)
     await synchronisiere_materialkanten(db, node.id, meta)
+    # `refs` stehen im Vektor der Stunde, die Phasen nicht (`embedding_input`).
+    veraltet = vektor_veraltet(node, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(node.id, db)
 
     # Kompetenz-Sog: nur aus verknüpften Material-Knoten. Methode/Sozialform sind
     # kontrolliertes Vokabular ohne eigene Kompetenzen.
@@ -1224,13 +1355,14 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
             )
             for edge in edges_result.scalars().all():
                 comp = await db.get(ContextNode, edge.to_node_id)
-                if comp and comp.content_type in ("ik_kompetenz", "pk_kompetenz", "concept"):
+                # Bis 0.17 stand hier `"concept"` unter den Bausteinarten — das ist eine
+                # Kategorie, keine Art; ein Begriff fiel durch.
+                if comp and comp.content_type in _REF_TYP_ZU:
                     comp_id = str(comp.id)
                     if comp_id not in existing_ref_ids and comp_id not in dismissed:
                         suggested_refs.append({
                             "node_id": comp_id,
-                            "typ": "ik" if comp.content_type == "ik_kompetenz" else
-                                   "pk" if comp.content_type == "pk_kompetenz" else "concept",
+                            "typ": _REF_TYP_ZU[comp.content_type],
                             "titel": comp.title,
                             "partiell": False,
                             "quelle": nid_str,
@@ -1263,9 +1395,11 @@ register_tool(ChatTool(
                 "Lehrkraft Minuten will; dann das Feld weglassen, nie 0. (3) sozialform und "
                 "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "
                 "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
-                "einzeln nachschlagen. (4) refs nur setzen, wenn die Lehrkraft zugestimmt hat. "
-                "Gibt suggested_refs zurück: Kompetenzen aus verknüpften Material-Knoten, "
-                "die noch nicht in refs stehen — nur vorschlagen, nicht ungefragt übernehmen."
+                "einzeln nachschlagen. (4) refs sind Kompetenzen und Begriffe — Begriffe mit "
+                "typ 'concept' und node_id aus begriffe oder einem Treffer; refs nur setzen, "
+                "wenn die Lehrkraft zugestimmt hat. Gibt suggested_refs zurück: Kompetenzen "
+                "und Begriffe aus verknüpften Material-Knoten, die noch nicht in refs stehen — "
+                "nur vorschlagen, nicht ungefragt übernehmen."
             ),
             "parameters": {
                 "type": "object",
@@ -1325,10 +1459,10 @@ register_tool(ChatTool(
                             "required": ["node_id", "typ"],
                         },
                         "description": (
-                            "Kompetenzen der Stunde (optional; nur setzen, wenn die Lehrkraft "
-                            "zugestimmt hat). Immer die ganze Liste: bestehende aus "
-                            "get_lesson_detail behalten, neue so übernehmen, wie sie im Kapitel "
-                            "oder im Treffer stehen."
+                            "Kompetenzen und Begriffe der Stunde (optional; nur setzen, wenn "
+                            "die Lehrkraft zugestimmt hat). Immer die ganze Liste: bestehende "
+                            "aus get_lesson_detail behalten, neue so übernehmen, wie sie im "
+                            "Kapitel, in begriffe oder im Treffer stehen."
                         ),
                     },
                 },

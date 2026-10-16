@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.embedding import eingabe_ohne_aliase, enqueue_embedding_job, vektor_veraltet
 from app.db.models import ContextNode, LessonSlot, NodeEngagement
 
 #: Was eine Nachbereitung über eine Phase sagen kann. Andere gespeicherte Werte — etwa
@@ -58,6 +59,7 @@ async def complete_review(
     if stunde is None:
         raise ValueError("Stunde nicht gefunden")
 
+    vektor_vorher = eingabe_ohne_aliase(stunde)
     meta = dict(stunde.metadata_ or {})
     # ⚠️ Kopien, nicht die gespeicherten Phasen selbst: Wer sie in place ändert, ändert
     # auch den Vergleichswert, an dem SQLAlchemy erkennt, ob es etwas zu schreiben gibt —
@@ -145,7 +147,11 @@ async def complete_review(
     slot.nachbereitet_auto = auto
     slot.updated_at = now
 
+    # Die Reflexion steht im Vektor der Stunde (`embedding_input`).
+    veraltet = vektor_veraltet(stunde, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(stunde.id, db)
 
     open_phases = [
         p.get("name", "")
@@ -172,6 +178,7 @@ async def undo_review(db: AsyncSession, slot_id: UUID, *, group_id: int) -> int:
         .returning(NodeEngagement.id)
     )
     deleted_count = len(result.fetchall())
+    neu_einbetten = None
 
     slot = await db.get(LessonSlot, slot_id)
     if slot:
@@ -182,6 +189,7 @@ async def undo_review(db: AsyncSession, slot_id: UUID, *, group_id: int) -> int:
         if slot.stunde_node_id:
             stunde = await db.get(ContextNode, slot.stunde_node_id)
             if stunde:
+                vektor_vorher = eingabe_ohne_aliase(stunde)
                 meta = dict(stunde.metadata_ or {})
                 # Kopien — aus demselben Grund wie in `complete_review`.
                 meta["phasen"] = [dict(p) for p in meta.get("phasen", [])]
@@ -196,6 +204,11 @@ async def undo_review(db: AsyncSession, slot_id: UUID, *, group_id: int) -> int:
                 meta["refs_offen"] = []
                 stunde.metadata_ = meta
                 stunde.updated_at = datetime.now(timezone.utc)
+                # Ohne die Reflexion gehört auch ihr Anteil nicht mehr in den Vektor.
+                if vektor_veraltet(stunde, vektor_vorher):
+                    neu_einbetten = stunde.id
 
     await db.commit()
+    if neu_einbetten is not None:
+        await enqueue_embedding_job(neu_einbetten, db)
     return deleted_count

@@ -600,3 +600,38 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
             )
         )
         await db.commit()
+
+
+def eingabe_ohne_aliase(node: ContextNode) -> str | None:
+    """:func:`einbettungstext` für Typen, die keine Aliase einbetten — ohne Abfrage.
+
+    Für den Vergleich vor und nach einer Änderung (:func:`vektor_veraltet`). Ein Typ mit
+    Aliasen im Eingabetext bekäme hier den falschen Text; er wird abgewiesen statt still
+    falsch verglichen.
+    """
+    if braucht_aliase(node):
+        raise ValueError(f"{node.content_type} bettet Aliase ein — einbettungstext mit Aliasen rufen")
+    return einbettungstext(node, [])
+
+
+def vektor_veraltet(node: ContextNode, vorher: str | None) -> bool:
+    """Hat eine Änderung den Eingabetext verschoben? Dann wird der Vektor verworfen. → ob ja
+
+    Für Schreibwege, die nicht über ``PATCH /context/nodes`` laufen — dort zieht der Router
+    den Vektor selbst nach. Bis 0.17 tat das keiner der Planungswege: Eine Stunde behielt
+    den Vektor ihres ersten Backfills, und was danach an Begriffen, Kompetenzen oder
+    Reflexion dazukam, war für die Suche unsichtbar.
+
+    Aufruf: ``vorher = eingabe_ohne_aliase(node)`` vor der Änderung, diese Funktion vor dem
+    Commit, :func:`enqueue_embedding_job` danach, wenn sie ``True`` lieferte. Gleicher Text,
+    kein Modellaufruf: Eine geänderte Phase berührt den Vektor einer Stunde nicht.
+
+    ⚠️ **Verworfen, nicht bloß neu gerechnet.** Scheitert das sofortige Einbetten, holt der
+    nächtliche Backfill den Knoten nach — er nimmt nur Knoten ohne Vektor; ein alter bliebe
+    für immer stehen. Und hat der Knoten keine Substanz mehr (alle Begriffe entfernt), steht
+    er danach ohne Vektor da statt mit dem alten.
+    """
+    if eingabe_ohne_aliase(node) == vorher:
+        return False
+    node.embedding = None
+    return True

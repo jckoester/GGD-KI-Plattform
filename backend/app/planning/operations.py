@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.embedding import eingabe_ohne_aliase, enqueue_embedding_job, vektor_veraltet
 from app.planning.ausfall import AUSFALL, setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.einordnung import ordne_entwurf_ein
@@ -397,11 +398,18 @@ def _apply_transfer(src: ContextNode, dst: ContextNode, phase_ids: list[str]) ->
     # An den Anfang der Folgestunde.
     dst_meta = dict(dst.metadata_ or {})
     dst_meta["phasen"] = moved + list(dst_meta.get("phasen", []))
-    # refs_offen der Quelle als refs der Zielstunde mitführen (dedupliziert).
+    # refs_offen der Quelle als refs der Zielstunde mitführen (dedupliziert) — **so, wie sie
+    # in der Quelle stehen**. Bis 0.17 wurde jeder als `{"node_id", "typ": "ik"}` übertragen:
+    # ein Begriff stand danach als Kompetenz da, und jeder Eintrag ohne Titel zeigte in der
+    # Leiste seine Kennung. Nur ein offener ref, der in der Quelle fehlt, bleibt beim alten Rest.
     src_offen = list(src_meta.get("refs_offen", []))
     if src_offen:
         existing = {str(r.get("node_id")) for r in dst_meta.get("refs", [])}
-        carried = [{"node_id": str(nid), "typ": "ik"} for nid in src_offen if str(nid) not in existing]
+        quelle = {str(r.get("node_id")): r for r in src_meta.get("refs", []) if isinstance(r, dict)}
+        carried = [
+            dict(quelle.get(str(nid)) or {"node_id": str(nid), "typ": "ik"})
+            for nid in src_offen if str(nid) not in existing
+        ]
         dst_meta["refs"] = list(dst_meta.get("refs", [])) + carried
         src_meta["refs_offen"] = []
     # Übertragene Phasen aus der Quelle entfernen.
@@ -452,6 +460,11 @@ async def apply_operations(
         return ExecutionResult(applied=0, errors=errors)
 
     snap = await create_snapshot(db, group_id, reason="reflow", label=summary, created_by=created_by)
+    # Eine Übertragung trägt offene `refs` in die Zielstunde — die stehen in ihrem Vektor.
+    vektor_vorher = {
+        lid: eingabe_ohne_aliase(n) for lid, n in lessons.items()
+        if n.content_type == "unterrichtsstunde"
+    }
 
     nachrueck_hinweise: list[str] = []
     for op in ops:
@@ -517,7 +530,10 @@ async def apply_operations(
 
     hinweise = nachrueck_hinweise + await _pruefe_halben_umzug(db, group_id, ops)
 
+    veraltet = [lid for lid, vorher in vektor_vorher.items() if vektor_veraltet(lessons[lid], vorher)]
     await db.commit()
+    for lid in veraltet:
+        await enqueue_embedding_job(lid, db)
     return ExecutionResult(
         applied=len(ops), errors=[], snapshot_id=str(snap.id), hinweise=hinweise
     )
