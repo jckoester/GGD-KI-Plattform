@@ -453,3 +453,124 @@ async def test_einheit_titel_verwirft_ihren_vektor(test_client, auth_headers, fa
         assert resp.status_code == 200, resp.text
     assert not await _hat_vektor(async_engine, ue)
     einbetten.assert_awaited_once()
+
+
+# ── „Rückgängig" nimmt die ganze Stunde zurück ───────────────────────────────
+#
+# Bis 0.17 stellte ein Snapshot nur Phasen wieder her, und nur die von Stunden, die Phasen
+# hatten. Schrieb der Assistent Begriffe, nahm „Rückgängig" sie nicht zurück.
+
+
+async def _neuester_snapshot(client, h, grund):
+    snaps = (await client.get(f"/planning/groups/{GRUPPE}/snapshots", headers=h)).json()
+    return next(s["id"] for s in snaps if s["reason"] == grund)
+
+
+async def _entwurf(client, h, stunde):
+    return (await client.get(f"/planning/lessons/{stunde}", headers=h)).json()
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_nimmt_begriffe_und_stundenziel_zurueck(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    stunde = await _stunde(test_client, auth_headers, slot_id=await _termin(async_engine, 12))
+    begriff = await _begriff(async_engine, "Mesomerie", 0.10)
+    vorher = await _entwurf(test_client, auth_headers, stunde)
+
+    aus = await _rufe(async_engine, _handle_update_lesson_phases, {
+        "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}], "stundenziel": "Anderes Ziel",
+        "refs": [{"node_id": str(begriff.id), "typ": "concept"}]})
+    assert aus.get("ok") is True, aus
+    await _vektor_setzen(async_engine, stunde)
+
+    snap = await _neuester_snapshot(test_client, auth_headers, "assistant")
+    with patch("app.planning.snapshots.enqueue_embedding_job", AsyncMock()) as einbetten:
+        resp = await test_client.post(f"/planning/snapshots/{snap}/restore", headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+    nachher = await _entwurf(test_client, auth_headers, stunde)
+    assert nachher["refs"] == vorher["refs"] == []
+    assert nachher["stundenziel"] == vorher["stundenziel"]
+    assert [p["name"] for p in nachher["phasen"]] == [p["name"] for p in vorher["phasen"]]
+    # Die Begriffe sind aus dem Vektor heraus — er wird verworfen und neu gebildet.
+    assert not await _hat_vektor(async_engine, stunde)
+    einbetten.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_nimmt_den_titel_zurueck(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers, titel="Alter Titel", slot_id=await _termin(async_engine, 13))
+    resp = await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={"titel": "Neuer Titel"})
+    assert resp.status_code == 200, resp.text
+    snap = await _neuester_snapshot(test_client, auth_headers, "edit")
+    await test_client.post(f"/planning/snapshots/{snap}/restore", headers=auth_headers)
+    assert (await _entwurf(test_client, auth_headers, stunde))["titel"] == "Alter Titel"
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_leert_eine_leere_stunde_wieder(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    """Eine Stunde ohne Phasen bekommt welche — „Rückgängig" macht sie wieder leer."""
+    slot = await _termin(async_engine, 14)
+    ue = (await test_client.post(f"/planning/groups/{GRUPPE}/units", headers=auth_headers,
+                                 json={"titel": "Leer", "farbe": 0})).json()["id"]
+    stunde = (await test_client.post(f"/planning/units/{ue}/lessons", headers=auth_headers,
+                                     json={"titel": "Leer", "slot_id": slot})).json()["id"]
+    assert (await _entwurf(test_client, auth_headers, stunde))["phasen"] == []
+
+    await _rufe(async_engine, _handle_update_lesson_phases, {
+        "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}]})
+    snap = await _neuester_snapshot(test_client, auth_headers, "assistant")
+    await test_client.post(f"/planning/snapshots/{snap}/restore", headers=auth_headers)
+    assert (await _entwurf(test_client, auth_headers, stunde))["phasen"] == []
+
+
+@pytest.mark.asyncio
+async def test_alter_snapshot_laesst_begriffe_stehen(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Ein Snapshot von vor 0.17 kennt nur Phasen — `refs` und Titel bleiben, wie sie sind."""
+    from app.db.models import SlotPlanSnapshot
+
+    stunde = await _stunde(test_client, auth_headers, slot_id=await _termin(async_engine, 15))
+    begriff = await _begriff(async_engine, "Mesomerie", 0.10)
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={
+        "refs": [{"node_id": str(begriff.id), "typ": "concept", "titel": begriff.title}]})
+    async with _sitzungen(async_engine)() as db:
+        alt = SlotPlanSnapshot(group_id=GRUPPE, reason="edit", payload={
+            "slots": [], "stunden_phasen": {stunde: [{"id": "p-alt", "name": "Alt", "dauer_min": 45}]}})
+        db.add(alt)
+        await db.commit()
+    await test_client.post(f"/planning/snapshots/{alt.id}/restore", headers=auth_headers)
+    nachher = await _entwurf(test_client, auth_headers, stunde)
+    assert [p["name"] for p in nachher["phasen"]] == ["Alt"]
+    assert [r["node_id"] for r in nachher["refs"]] == [str(begriff.id)]
+    assert nachher["titel"] == "Aromaten"
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_einer_uebertragung_nimmt_die_refs_mit(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    begriff = await _begriff(async_engine, "Mesomerie", 0.10)
+    quelle_slot, ziel_slot = await _termin(async_engine, 19), await _termin(async_engine, 20)
+    quelle = await _stunde(test_client, auth_headers, titel="Quelle", slot_id=quelle_slot)
+    ziel = await _stunde(test_client, auth_headers, titel="Ziel", slot_id=ziel_slot)
+    await test_client.patch(f"/planning/lessons/{quelle}", headers=auth_headers, json={
+        "refs": [{"node_id": str(begriff.id), "typ": "concept", "titel": begriff.title}]})
+    erarbeitung = next(p["id"] for p in (await _entwurf(test_client, auth_headers, quelle))["phasen"]
+                       if p["name"] == "Erarbeitung")
+    await test_client.post(f"/planning/slots/{quelle_slot}/review", headers=auth_headers, json={
+        "phasen_status": {erarbeitung: "offen"}, "refs_offen": [str(begriff.id)]})
+    async with _sitzungen(async_engine)() as db:
+        ergebnis = await apply_operations(db, GRUPPE, [TransferPhases(
+            op="transfer_phases", from_lesson_id=quelle, to_lesson_id=ziel, phase_ids=[erarbeitung])],
+            summary="Erarbeitung übertragen")
+    assert (await _entwurf(test_client, auth_headers, ziel))["refs"] != []
+
+    await test_client.post(f"/planning/snapshots/{ergebnis.snapshot_id}/restore", headers=auth_headers)
+    nachher = await _entwurf(test_client, auth_headers, ziel)
+    assert nachher["refs"] == []
+    assert [p["name"] for p in nachher["phasen"]] == ["Einstieg", "Erarbeitung"]
+    # Und die Quelle führt den Begriff wieder als offen.
+    async with _sitzungen(async_engine)() as db:
+        assert (await db.get(ContextNode, UUID(quelle))).metadata_["refs_offen"] == [str(begriff.id)]

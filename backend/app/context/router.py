@@ -65,7 +65,11 @@ from app.context.schemas import (
 from app.context import aliase as aliase_modul
 from app.context import fachbegriffe_kollision
 from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
-from app.context.embedding import enqueue_embedding_job
+from app.context.embedding import (
+    eingabe_mit_aliasen,
+    enqueue_embedding_job,
+    vektor_veraltet_mit_aliasen,
+)
 from app.context.grades import parse_grade_band
 from app.context.meine_bausteine import (
     herkunft,
@@ -968,6 +972,13 @@ async def update_node(
             abgrenzung_zu=abgrenzung_zu, user=user, node=node,
         )
 
+    # Felder, aus denen der Eingabetext des Vektors entsteht (`_build_embedding_input`); ein
+    # geänderter Scope oder ein neues `valid_until` gehören nicht dazu. `aliase` schon: Bei
+    # `methode` und `operator` stehen sie im Eingabetext. Ebenso der Typ.
+    eingabe_beruehrt = bool({"content", "title", "metadata_", "content_type"} & set(update_data)
+                            or neue_aliase is not None)
+    vektor_vorher = await eingabe_mit_aliasen(db, node) if eingabe_beruehrt else None
+
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
         attr = field if field != "metadata_" else "metadata_"
@@ -982,17 +993,22 @@ async def update_node(
     if "title" in update_data:
         node.title_locked = True
 
+    # Geänderter Text: den alten Vektor verwerfen, bevor neu eingebettet wird (0.17). Bis
+    # dahin blieb er stehen, wenn das Einbetten scheiterte — der Backfill nimmt nur Knoten
+    # ohne Vektor und holte ihn nie nach — oder wenn der Knoten danach keine Substanz mehr
+    # hatte (`enqueue_embedding_job` kehrt dann früh zurück).
+    if eingabe_beruehrt:
+        await vektor_veraltet_mit_aliasen(db, node, vektor_vorher)
+
     await db.commit()
     await db.refresh(node)
 
     # ⚠️ Der Vektor muss der Änderung folgen. Bis AP5a wurde `enqueue_embedding_job` nur
     # beim **Anlegen** und Kopieren gerufen: Wer eine Definition überarbeitete, änderte
     # den Text, nicht den Vektor — der Baustein blieb thematisch unter seiner alten
-    # Fassung auffindbar, ohne jeden Hinweis. Betroffen sind nur die Felder, aus denen
-    # der Input gebildet wird (`_build_embedding_input`); ein geänderter Scope oder ein
-    # neues `valid_until` ändern ihn nicht und kosten deshalb keinen Modellaufruf.
-    # `aliase` gehört dazu: Bei `methode` und `operator` stehen sie im Eingabetext.
-    if {"content", "title", "metadata_"} & set(update_data) or neue_aliase is not None:
+    # Fassung auffindbar, ohne jeden Hinweis. Betroffen sind nur die Felder des
+    # Eingabetexts (`eingabe_beruehrt` oben); ein geänderter Scope kostet keinen Modellaufruf.
+    if eingabe_beruehrt:
         await enqueue_embedding_job(node.id, db)
 
     await _aliase_setzen([node], db)
@@ -1012,9 +1028,14 @@ async def update_node_title(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    vektor_vorher = await eingabe_mit_aliasen(db, node)
     node.title = payload.title
     node.title_locked = True
+    # Bei vielen Typen steht der Titel im Vektor (bis 0.17 zog dieser Weg ihn nicht nach).
+    veraltet = await vektor_veraltet_mit_aliasen(db, node, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(node.id, db)
     await db.refresh(node)
     return node
 
@@ -1089,6 +1110,7 @@ async def verwalte_node(
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     await _check_write_permission(node, user, db)
 
+    vektor_vorher = await eingabe_mit_aliasen(db, node)
     if payload.title is not None:
         node.title = payload.title
         # Wie im generischen Editor: Ein von Hand gesetzter Titel wird gegen den
@@ -1106,7 +1128,11 @@ async def verwalte_node(
     if payload.valid_until_gesetzt:
         node.valid_until = payload.valid_until
 
+    # Umbenennen ändert bei vielen Typen den Vektor (bis 0.17 zog dieser Weg ihn nicht nach).
+    veraltet = await vektor_veraltet_mit_aliasen(db, node, vektor_vorher)
     await db.commit()
+    if veraltet:
+        await enqueue_embedding_job(node.id, db)
     await db.refresh(node)
     await _schreibrechte_setzen([node], user, db)
     return node

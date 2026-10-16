@@ -614,13 +614,20 @@ def eingabe_ohne_aliase(node: ContextNode) -> str | None:
     return einbettungstext(node, [])
 
 
+def _verwerfen_wenn_geaendert(node: ContextNode, vorher: str | None, jetzt: str | None) -> bool:
+    if jetzt == vorher:
+        return False
+    node.embedding = None
+    return True
+
+
 def vektor_veraltet(node: ContextNode, vorher: str | None) -> bool:
     """Hat eine Änderung den Eingabetext verschoben? Dann wird der Vektor verworfen. → ob ja
 
-    Für Schreibwege, die nicht über ``PATCH /context/nodes`` laufen — dort zieht der Router
-    den Vektor selbst nach. Bis 0.17 tat das keiner der Planungswege: Eine Stunde behielt
-    den Vektor ihres ersten Backfills, und was danach an Begriffen, Kompetenzen oder
-    Reflexion dazukam, war für die Suche unsichtbar.
+    Bis 0.17 zog kein Planungsweg den Vektor nach: Eine Stunde behielt den Vektor ihres
+    ersten Backfills, und was danach an Begriffen, Kompetenzen oder Reflexion dazukam, war
+    für die Suche unsichtbar. Für Typen mit Aliasen im Eingabetext (die Wege über
+    ``/context/nodes``): :func:`vektor_veraltet_mit_aliasen`.
 
     Aufruf: ``vorher = eingabe_ohne_aliase(node)`` vor der Änderung, diese Funktion vor dem
     Commit, :func:`enqueue_embedding_job` danach, wenn sie ``True`` lieferte. Gleicher Text,
@@ -631,7 +638,20 @@ def vektor_veraltet(node: ContextNode, vorher: str | None) -> bool:
     für immer stehen. Und hat der Knoten keine Substanz mehr (alle Begriffe entfernt), steht
     er danach ohne Vektor da statt mit dem alten.
     """
-    if eingabe_ohne_aliase(node) == vorher:
-        return False
-    node.embedding = None
-    return True
+    return _verwerfen_wenn_geaendert(node, vorher, eingabe_ohne_aliase(node))
+
+
+async def eingabe_mit_aliasen(db: AsyncSession, node: ContextNode) -> str | None:
+    """:func:`einbettungstext` samt Aliasen, wo der Typ sie einbettet (`methode`, `operator`).
+
+    Liest die Aliase aus der Sitzung — nach ``aliase.setze`` also schon die neuen.
+    """
+    from app.context import aliase as aliase_modul
+
+    aliase = await aliase_modul.lade(db, node.id) if braucht_aliase(node) else []
+    return einbettungstext(node, aliase)
+
+
+async def vektor_veraltet_mit_aliasen(db: AsyncSession, node: ContextNode, vorher: str | None) -> bool:
+    """:func:`vektor_veraltet` für jeden Typ — ``vorher`` aus :func:`eingabe_mit_aliasen`."""
+    return _verwerfen_wenn_geaendert(node, vorher, await eingabe_mit_aliasen(db, node))

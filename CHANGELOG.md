@@ -19,6 +19,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Reflexion — im Planer, durch den Assistenten, in der Nachbereitung und bei einer Übertragung.
   Ebenso der einer Unterrichtseinheit, wenn sich ihr Titel ändert. Bisher blieb der Vektor des
   ersten nächtlichen Laufs.
+- Bausteine: Ändert sich der Text, wird der alte Suchvektor verworfen, bevor neu eingebettet
+  wird. Scheitert das Einbetten, holt der nächtliche Lauf ihn nach; bisher blieb der alte
+  stehen. Umbenennen über „Meine Bausteine" und die Titelkorrektur ziehen den Vektor jetzt
+  ebenfalls nach.
+- „Rückgängig" im Unterrichtsplan stellt auch Titel, Stundenziel, Kompetenzen und Begriffe
+  einer Stunde wieder her, nicht nur die Phasen — ebenso Phasen, die eine leere Stunde erst
+  bekommen hatte, und nach einer Übertragung die offenen Einträge der Quellstunde.
 - Eine übertragene, offen gebliebene Kompetenz behält in der Folgestunde Typ und Titel; bisher
   kam jede als inhaltsbezogene Kompetenz ohne Titel an.
 - Material-Vorschläge des Stundenassistenten (`suggested_refs`) erkennen verknüpfte Begriffe.
