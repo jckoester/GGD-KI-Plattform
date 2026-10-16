@@ -45,10 +45,8 @@
   // Lokale Arbeitskopie der Phasen + refs
   let phasen = $state([])
   let refs = $state([])
-  let refsDismissed = $state([])
   let stundenziel = $state('')
   let titel = $state('')
-  let suggestions = $state([])
 
   // Nachbereiten-Modus
   let reviewMode = $state(false)
@@ -70,7 +68,6 @@
       lesson = await getLesson(nodeId)
       phasen = mitPhasenKennungen(lesson.phasen)
       refs = lesson.refs ?? []
-      refsDismissed = lesson.refs_dismissed ?? []
       stundenziel = lesson.stundenziel ?? ''
       titel = lesson.titel
     } catch (e) {
@@ -129,7 +126,6 @@
           material: p.material ?? [],
         })),
         refs,
-        refs_dismissed: refsDismissed,
       })
     } catch (e) {
       saveError = e.message
@@ -148,16 +144,6 @@
     scheduleSave()
   }
 
-  function onDismissSuggestion(nodeId_) {
-    refsDismissed = [...refsDismissed, nodeId_]
-    suggestions = suggestions.filter(s => s.node_id !== nodeId_)
-    scheduleSave()
-  }
-
-  function onSuggestCompetences(_linkedNodeId) {
-    // Keine direkte Lookup-Möglichkeit im Frontend — Backend gibt Vorschläge beim PATCH zurück
-    // Hier wird nur getriggert; tatsächliche Vorschläge kommen vom nächsten Save
-  }
 
   // ── Export ───────────────────────────────────────────────────────────────────
   async function download(format) {
@@ -487,14 +473,12 @@
 
       <!-- Kompetenz-Leiste -->
       <section>
-        <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2">Kompetenzen</h2>
+        <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2">Kompetenzen und Fachbegriffe</h2>
         <CompetenceBar
           {refs}
-          {suggestions}
           subjectId={lesson.subject_id}
           grade={lesson.grade}
           onChange={onRefsChange}
-          onDismissSuggestion={onDismissSuggestion}
         />
       </section>
 
@@ -548,7 +532,6 @@
             verfuegbareMin={lesson.slot?.verfuegbare_min ?? 45}
             subjectId={lesson.subject_id}
             onChange={reviewMode ? () => {} : onPhasenChange}
-            onSuggestCompetences={onSuggestCompetences}
             onMaterialCreate={openMaterialCreate}
             {reviewMode}
             {reviewStatus}

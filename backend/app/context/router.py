@@ -383,6 +383,10 @@ async def list_nodes(
     status: str | None = Query(default=None),
     subject_slug: str | None = Query(default=None),
     subject_id: int | None = Query(default=None, description="Direkte Subject-ID-Filterung"),
+    mit_bezugsfaechern: bool = Query(
+        default=False,
+        description="Mit `subject_id`: auch Knoten der Bezugsfächer dieses Fachs (subjects.yaml)",
+    ),
     subject_id_or_global: int | None = Query(
         default=None,
         description="Knoten dieses Fachs ODER fach­unabhängige (subject_id IS NULL)",
@@ -407,6 +411,16 @@ async def list_nodes(
     # Die Feldfilter stehen in `app.context.filters` — dieselbe Übersetzung benutzt die
     # Aufzählung der Suchschicht (ADR-017). Zwei Fassungen derselben Bedingungen gäben
     # irgendwann verschiedene Antworten auf dieselbe Frage.
+    # Bezugsfächer löst der Server auf, nicht der Client: Welche Fächer ein Fach mitliest,
+    # steht an einer Stelle (`bezugsfaecher_von`) — dieselbe Regel wie im Chat (0.16).
+    # Gebraucht von der Begriffssuche der Kompetenzleiste (0.17).
+    subject_ids: tuple[int, ...] = ()
+    if mit_bezugsfaechern and subject_id is not None:
+        from app.context.service import bezugsfaecher_von
+
+        subject_ids = (subject_id, *await bezugsfaecher_von(db, subject_id))
+        subject_id = None
+
     query = _visibility_filter(select(ContextNode), user, status_override=status)
     query = wende_an(query, Knotenfilter(
         q=q,
@@ -414,6 +428,7 @@ async def list_nodes(
         content_type=tuple(content_type or ()),
         exclude_content_type=tuple(exclude_content_type or ()),
         subject_id=subject_id,
+        subject_ids=subject_ids,
         subject_id_or_global=subject_id_or_global,
         subject_slug=subject_slug,
         group_id=group_id,

@@ -1262,7 +1262,12 @@ async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str 
             continue
         gesehen.add(item.node_id)
         item.titel = n.title
-        if item.typ != "concept":
+        if item.typ == "concept":
+            # Ein Begriff hat keine Nummer; eine vom Modell mitgeschickte stünde sonst in der
+            # Leiste an seiner Stelle.
+            item.code = None
+            item.content_type = n.content_type
+        else:
             item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
         geprueft.append(item.model_dump(mode="json"))
     return geprueft, None

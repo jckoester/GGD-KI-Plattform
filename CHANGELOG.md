@@ -16,6 +16,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   einem eigenen Absatz die Begriffe, die die Stunde einführt, je mit ihrer Phase, und trägt sie
   nach Zustimmung ein. Fehlt ein Begriff im Wissensspeicher, sagt er das und trägt ihn nicht
   ein (Prompt `config/prompts/stundenentwurf_assistent.md`).
+- **Fachbegriffe in der Kompetenzleiste:** Die Leiste der Entwurfsansicht heißt „Kompetenzen und
+  Fachbegriffe" und zeigt Begriffe getrennt von den Kompetenzen, mit Symbol für Fachbegriff oder
+  Stoffsteckbrief. Beim Bearbeiten lassen sich Begriffe des Fachs und seiner Bezugsfächer suchen,
+  hinzufügen und entfernen; Kompetenzen bleiben dabei unberührt.
+- `GET /context/nodes` kennt `mit_bezugsfaechern`: Mit `subject_id` kommen auch die Knoten der
+  Bezugsfächer dieses Fachs.
+
+### Geändert
+
+- Die nie gefüllten Vorschlags-Chips der Kompetenzleiste sind entfernt. Vorschläge aus
+  verknüpftem Material bekommt weiterhin der Stundenassistent.
 
 ### Behoben
 

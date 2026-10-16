@@ -264,10 +264,10 @@ async def test_begriff_beim_schreiben(test_client, auth_headers, faecher, async_
         return
     assert aus.get("ok") is True, aus
     refs = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["refs"]
-    # Titel aus dem Knoten; ein Begriff hat keine Nummer — der Code des Modells bleibt
-    # unangetastet, wie bisher bei concept.
-    assert refs == [{"node_id": str(knoten.id), "typ": "concept", "code": "X",
-                     "titel": knoten.title, "partiell": False}]
+    # Titel und Bausteinart aus dem Knoten; ein Begriff hat keine Nummer — die des Modells
+    # fällt weg.
+    assert refs == [{"node_id": str(knoten.id), "typ": "concept", "code": None,
+                     "titel": knoten.title, "partiell": False, "content_type": art}]
 
 
 @pytest.mark.asyncio
@@ -574,3 +574,28 @@ async def test_rueckgaengig_einer_uebertragung_nimmt_die_refs_mit(
     # Und die Quelle führt den Begriff wieder als offen.
     async with _sitzungen(async_engine)() as db:
         assert (await db.get(ContextNode, UUID(quelle))).metadata_["refs_offen"] == [str(begriff.id)]
+
+
+# ── Die Suche der Leiste: Fach samt Bezugsfächern (Schritt 3) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_knotenliste_mit_bezugsfaechern(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    await _begriff(async_engine, "Eigen")
+    await _begriff(async_engine, "Bezug", fach=BEZUG, art="stoffsteckbrief")
+    await _begriff(async_engine, "Fremd", fach=FREMD)
+    await _begriff(async_engine, "Privat fremd", read_scope="private", write_scope="private",
+                   owner_pseudonym=TEACHER2_PSEUDO)
+
+    async def titel(**params):
+        resp = await test_client.get("/context/nodes", headers=auth_headers, params={
+            "q": PRAEFIX, "content_type": ["begriff", "stoffsteckbrief"], **params})
+        assert resp.status_code == 200, resp.text
+        return sorted(n["title"].removeprefix(PRAEFIX) for n in resp.json())
+
+    assert await titel(subject_id=FACH, mit_bezugsfaechern="true") == ["Bezug", "Eigen"]
+    # Ohne den Schalter wie bisher nur das Fach selbst.
+    assert await titel(subject_id=FACH) == ["Eigen"]
+    # Bezugsfächer sind gerichtet: Das Bezugsfach liest das Fach nicht mit.
+    assert await titel(subject_id=BEZUG, mit_bezugsfaechern="true") == ["Bezug"]
+

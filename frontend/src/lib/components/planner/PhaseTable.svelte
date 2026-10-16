@@ -8,7 +8,6 @@
      * - phasen: array of phase objects
      * - verfuegbareMin: available minutes from slot (default 45)
      * - onChange(newPhasen)
-     * - onSuggestCompetences(nodeId) — called when a node is linked (method/material)
      * - onMaterialCreate(phase, index) — called when ✦ is clicked on missing material
      * - reviewMode: bool — aktiviert Nachbereiten-Modus (Status-Buttons statt Aktionen)
      * - reviewStatus: Map<phase_id, 'erledigt'|'offen'|'gestrichen'> — aktueller Status
@@ -18,7 +17,6 @@
         phasen = [],
         verfuegbareMin = 45,
         onChange,
-        onSuggestCompetences = null,
         onMaterialCreate = null,
         subjectId = null,
         reviewMode = false,
@@ -61,13 +59,6 @@
     function updatePhase(i, updated) {
         const next = [...phasen];
         next[i] = updated;
-        // Kompetenz-Sog nur aus Material-Knoten (Methode/Sozialform sind Vokabular).
-        if (onSuggestCompetences) {
-            for (const mat of updated.material || []) {
-                if (mat?.typ === "node" && mat.node_id)
-                    onSuggestCompetences(mat.node_id);
-            }
-        }
         onChange(next);
     }
 

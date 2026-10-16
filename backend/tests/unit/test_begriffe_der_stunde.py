@@ -74,3 +74,16 @@ def test_begriff_typen_sind_konzepte_mit_vektor():
     for typ in BEGRIFF_TYPEN:
         assert CONTENT_TYPE_TO_CATEGORY[typ] == "concept"
         assert typ in EMBEDDING_CONTENT_TYPES
+
+
+def test_frontend_kennt_dieselben_typen():
+    """Die Leiste sucht mit ihrer eigenen Liste (`frontend/src/lib/begriffe_der_stunde.js`).
+    Liefe sie auseinander, böte die Suche Knoten an, die das Werkzeug beim Schreiben abweist —
+    oder verschwiege welche, die es annimmt."""
+    import re
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[3] / "frontend/src/lib/begriffe_der_stunde.js").read_text(encoding="utf-8")
+    liste = re.search(r"export const BEGRIFF_TYPEN = \[([^\]]*)\]", js)
+    assert liste, "BEGRIFF_TYPEN nicht gefunden"
+    assert tuple(re.findall(r"'([a-z_]+)'", liste.group(1))) == BEGRIFF_TYPEN

@@ -44,6 +44,8 @@ class Knotenfilter:
     content_type: tuple[str, ...] = ()
     exclude_content_type: tuple[str, ...] = ()
     subject_id: int | None = None
+    # Eines dieser Fächer — etwa ein Fach samt seinen Bezugsfächern (0.17, `mit_bezugsfaechern`).
+    subject_ids: tuple[int, ...] = ()
     subject_id_or_global: int | None = None
     subject_slug: str | None = None
     group_id: int | None = None
@@ -90,6 +92,8 @@ def wende_an(stmt, f: Knotenfilter):
     """Die gesetzten Bedingungen an eine Abfrage über ``context_nodes`` hängen."""
     if f.subject_id is not None:
         stmt = stmt.where(ContextNode.subject_id == f.subject_id)
+    if f.subject_ids:
+        stmt = stmt.where(ContextNode.subject_id.in_(f.subject_ids))
 
     # Dieses Fach **plus** die fachunabhängigen Knoten (z. B. Vokabular).
     if f.subject_id_or_global is not None:

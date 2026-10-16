@@ -1,0 +1,80 @@
+/**
+ * Begriffe der Stunde in der Kompetenzleiste (0.17, Päckchen A1, Schritt 3).
+ *
+ * Ein Begriff steht in `refs` neben den Kompetenzen, mit `typ: 'concept'`. Die Leiste zeigt
+ * beide getrennt, und jede Gruppe wird für sich bearbeitet: Kompetenzen ändern lässt die
+ * Begriffe stehen und umgekehrt.
+ */
+
+/**
+ * Was als Begriff der Stunde gilt — dieselbe Liste wie `BEGRIFF_TYPEN` in
+ * `backend/app/planning/schemas.py` (ein Backend-Test vergleicht beide).
+ */
+export const BEGRIFF_TYPEN = ['begriff', 'stoffsteckbrief']
+
+/** So viele Treffer zeigt die Suche der Leiste. */
+export const SUCHGRENZE = 20
+
+export function istBegriff(ref) {
+  return ref?.typ === 'concept'
+}
+
+/** `refs` getrennt: Kompetenzen (ik/pk) und Begriffe — je in der gespeicherten Reihenfolge. */
+export function aufteilen(refs) {
+  const kompetenzen = []
+  const begriffe = []
+  for (const ref of refs ?? []) (istBegriff(ref) ? begriffe : kompetenzen).push(ref)
+  return { kompetenzen, begriffe }
+}
+
+/** Der Eintrag in `refs` für einen Treffer aus `GET /context/nodes`. */
+export function begriffAusTreffer(node) {
+  return {
+    node_id: node.id,
+    typ: 'concept',
+    titel: node.title,
+    partiell: false,
+    content_type: node.content_type,
+  }
+}
+
+/** Einen Begriff dazu — nur, wenn er noch nicht drinsteht. Kompetenzen bleiben. */
+export function mitBegriff(refs, eintrag) {
+  if ((refs ?? []).some((r) => r.node_id === eintrag.node_id)) return refs
+  return [...(refs ?? []), eintrag]
+}
+
+/** Einen Begriff weg. Kompetenzen bleiben, auch eine mit derselben Kennung nicht. */
+export function ohneBegriff(refs, nodeId) {
+  return (refs ?? []).filter((r) => !(istBegriff(r) && r.node_id === nodeId))
+}
+
+/** Die Parameter der Suche: Begriffe des Fachs und seiner Bezugsfächer, aktive. */
+export function suchparameter(q, subjectId) {
+  const params = { q, content_type: BEGRIFF_TYPEN, status: 'active', limit: SUCHGRENZE }
+  if (subjectId != null) {
+    params.subject_id = subjectId
+    params.mit_bezugsfaechern = true
+  }
+  return params
+}
+
+/**
+ * Treffer ordnen: Wer mit dem Gesuchten beginnt, zuerst, dann alphabetisch.
+ *
+ * Der Endpunkt sortiert nach Anlagedatum — für eine Liste richtig, für eine Suche nicht:
+ * Bei „Sub" stünde der zuletzt importierte Begriff vor „Substitution".
+ */
+export function ordneTreffer(treffer, q) {
+  const gesucht = (q ?? '').trim().toLocaleLowerCase('de')
+  const rang = (n) => ((n.title ?? '').toLocaleLowerCase('de').startsWith(gesucht) ? 0 : 1)
+  return [...(treffer ?? [])].sort(
+    (a, b) => rang(a) - rang(b) || (a.title ?? '').localeCompare(b.title ?? '', 'de'),
+  )
+}
+
+/** Fachname am Treffer — nur, wenn er aus einem Bezugsfach stammt. */
+export function bezugsfach(node, subjectId, faecher) {
+  if (node?.subject_id == null || node.subject_id === subjectId) return null
+  return faecher?.[node.subject_id]?.name ?? null
+}

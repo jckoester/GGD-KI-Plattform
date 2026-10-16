@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any, Optional  # noqa: F401 — Any used in LessonRead
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 
 # ── Wochenmuster ──────────────────────────────────────────────────────────────
@@ -247,6 +247,18 @@ class LessonRefItem(BaseModel):
     code: Optional[str] = None
     titel: Optional[str] = None
     partiell: bool = False
+    # Nur bei Begriffen: welche Bausteinart — die Leiste zeigt danach das Symbol (Fachbegriff
+    # oder Stoffsteckbrief). Ältere Einträge haben es nicht; dann gilt das Standardsymbol.
+    content_type: Optional[str] = None
+
+    @model_serializer(mode="wrap")
+    def _ohne_leeren_typ(self, handler):
+        # Ohne Typ kein Schlüssel: Kompetenzen tragen ihn nie, und ein `"content_type": null`
+        # an jedem gespeicherten Eintrag wäre nur Rauschen.
+        daten = handler(self)
+        if daten.get("content_type") is None:
+            daten.pop("content_type", None)
+        return daten
 
 
 class LessonUpdate(BaseModel):

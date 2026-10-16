@@ -1,27 +1,34 @@
 <script>
   import IKSelector from '$lib/components/IKSelector.svelte'
   import PKSelector from '$lib/components/PKSelector.svelte'
+  import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
+  import BegriffSelector from './BegriffSelector.svelte'
+  import { aufteilen, mitBegriff, ohneBegriff } from '$lib/begriffe_der_stunde.js'
 
   /**
+   * Kompetenzen und Fachbegriffe der Stunde — beide in `refs`, getrennt angezeigt und
+   * bearbeitet (Begriffe seit 0.17).
+   *
    * Props:
-   * - refs: array of {node_id, typ, code, titel, partiell}
-   * - suggestions: array of {node_id, typ, code, titel, partiell, quelle}
+   * - refs: array of {node_id, typ, code, titel, partiell, content_type?}
    * - subjectId: for selectors
    * - readonly: boolean
    * - onChange(newRefs)
-   * - onDismissSuggestion(nodeId)
+   *
+   * Die Vorschlags-Chips (`suggestions`) sind 0.17 entfallen: Die Seite füllte sie nie.
+   * Vorschläge aus verknüpftem Material bekommt der Stundenassistent (`suggested_refs`).
    */
   const {
     refs = [],
-    suggestions = [],
     subjectId = null,
     grade = null,
     readonly = false,
     onChange = () => {},
-    onDismissSuggestion = () => {},
   } = $props()
 
   let editing = $state(false)
+
+  const getrennt = $derived(aufteilen(refs))
 
   // IKSelector / PKSelector erwarten jeweils ihr eigenes Format
   let ikSelected = $derived(
@@ -64,11 +71,6 @@
     onChange([...filtered, ...added])
   }
 
-  function acceptSuggestion(s) {
-    if (refs.some(r => r.node_id === s.node_id)) return
-    onChange([...refs, { node_id: s.node_id, typ: s.typ, code: s.code, titel: s.titel, partiell: false }])
-  }
-
   const chipBase = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium'
   function chipColor(typ) {
     // Semantische Tokens (kein rohes Palettengrün/-blau/-lila) — Muster wie HinweisChip:
@@ -80,9 +82,9 @@
 </script>
 
 <div class="space-y-2">
-  <!-- Chips -->
+  <!-- Chips: Kompetenzen -->
   <div class="flex flex-wrap gap-1.5 items-center min-h-[26px]">
-    {#each refs as ref (ref.node_id)}
+    {#each getrennt.kompetenzen as ref (ref.node_id)}
       <span class="{chipBase} {chipColor(ref.typ)}" title={ref.titel ?? ref.code ?? ''}>
         {ref.code ?? ref.titel ?? ref.node_id}
         {#if ref.partiell}<span class="opacity-60">[…]</span>{/if}
@@ -90,7 +92,7 @@
     {/each}
 
     {#if refs.length === 0 && !editing}
-      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">Keine Kompetenzen</span>
+      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">Keine Kompetenzen oder Begriffe</span>
     {/if}
 
     {#if !readonly && !editing}
@@ -104,24 +106,14 @@
     {/if}
   </div>
 
-  <!-- Vorschlags-Chips -->
-  {#if suggestions.length > 0}
+  <!-- Chips: Begriffe — mit Symbol, damit Fachbegriff und Stoffsteckbrief zu unterscheiden sind -->
+  {#if getrennt.begriffe.length > 0}
     <div class="flex flex-wrap gap-1.5 items-center">
-      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Vorschläge:</span>
-      {#each suggestions as s (s.node_id)}
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                     border border-dashed {chipColor(s.typ)} opacity-75">
-          + {s.code ?? s.titel ?? s.node_id}
-          <button
-            onclick={() => acceptSuggestion(s)}
-            title="Übernehmen"
-            class="hover:opacity-100 opacity-70 font-bold ml-0.5"
-          >✓</button>
-          <button
-            onclick={() => onDismissSuggestion(s.node_id)}
-            title="Verwerfen"
-            class="hover:opacity-100 opacity-70 ml-0.5"
-          >✕</button>
+      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Begriffe:</span>
+      {#each getrennt.begriffe as ref (ref.node_id)}
+        <span class="{chipBase} {chipColor(ref.typ)}" title={ref.titel ?? ''}>
+          <NodeTypeIcon category="concept" contentType={ref.content_type ?? 'begriff'} size={12} />
+          {ref.titel ?? ref.node_id}
         </span>
       {/each}
     </div>
@@ -150,6 +142,17 @@
           {grade}
           selected={pkSelected}
           onchange={onPkChange}
+        />
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-1">
+          Fachbegriffe
+        </div>
+        <BegriffSelector
+          begriffe={getrennt.begriffe}
+          {subjectId}
+          onAdd={(eintrag) => onChange(mitBegriff(refs, eintrag))}
+          onRemove={(nodeId) => onChange(ohneBegriff(refs, nodeId))}
         />
       </div>
       <div class="flex justify-end">
