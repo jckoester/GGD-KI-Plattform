@@ -50,6 +50,7 @@ from app.calendar.router import router as calendar_router
 from app.feedback.router import router as feedback_router
 from app.groups.router import router as group_join_router
 from app.ui.router import router as ui_router
+from app.neuigkeiten.router import router as neuigkeiten_router
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +199,12 @@ async def lifespan(app: FastAPI):
     from app.chat.image_models import load_image_models
     load_image_models()
 
+    # Startup-Check: Hinweise auf Neuerungen. Hart wie die Bildarten — die Datei kommt mit
+    # dem Release, ein Fehler darin (doppelte id, unbekannte Rolle) gehört vor den Start,
+    # nicht in die Startseite.
+    from app.neuigkeiten.quelle import alle as neuigkeiten
+    neuigkeiten()
+
     # Startup-Check: Mailversand. Bewusst **weich** — Mail ist nicht der Zweck dieser
     # Anwendung, und ein Tippfehler in der Absenderadresse soll den Chat nicht
     # abschalten. Eine halbe Konfiguration meldet sich trotzdem, statt erst bei der
@@ -296,5 +303,6 @@ app.include_router(render_router)
 app.include_router(artifacts_router)
 app.include_router(calendar_router)
 app.include_router(ui_router)
+app.include_router(neuigkeiten_router)
 app.include_router(feedback_router)
 app.include_router(group_join_router)

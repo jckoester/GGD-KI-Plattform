@@ -62,3 +62,32 @@ async def anzeige_limit(db: AsyncSession, pseudonym: str) -> int:
     except (TypeError, ValueError):
         return ANZEIGE_VORGABE
     return max(ANZEIGE_MIN, min(ANZEIGE_MAX, wert))
+
+
+# ── Hinweise auf Neuerungen (0.17, `app/neuigkeiten`) ────────────────────────
+#
+# Wie `anzeige_limit`: Das Einstellungs-Dict verlässt dieses Modul nicht. Die Neuigkeiten
+# brauchen nur zwei Werte daraus — die Darstellungsstufe und die weggeklickten Hinweise.
+
+NEUIGKEITEN_SCHLUESSEL = "neuigkeiten_gelesen"
+
+
+async def ui_stufe(db: AsyncSession, pseudonym: str, rollen: list[str]) -> int | None:
+    """Die wirksame Darstellungsstufe (`stufe_fuer`); ``None``: Für die Rolle gibt es keine."""
+    from app.ui.levels import stufe_fuer
+
+    return stufe_fuer(await get_preferences(db, pseudonym), rollen)
+
+
+async def neuigkeiten_gelesen(db: AsyncSession, pseudonym: str) -> set[str]:
+    """Die Kennungen der Hinweise, die die Person weggeklickt hat."""
+    wert = (await get_preferences(db, pseudonym)).get(NEUIGKEITEN_SCHLUESSEL)
+    return {str(x) for x in wert} if isinstance(wert, list) else set()
+
+
+async def neuigkeit_gelesen_merken(db: AsyncSession, pseudonym: str, kennung: str) -> None:
+    """Hängt die Kennung an — doppelt wird nichts, ein zweiter Aufruf ändert nichts."""
+    gelesen = await neuigkeiten_gelesen(db, pseudonym)
+    if kennung in gelesen:
+        return
+    await patch_preferences(db, pseudonym, {NEUIGKEITEN_SCHLUESSEL: sorted(gelesen | {kennung})})

@@ -80,6 +80,9 @@ schlägt an, falls dort wieder eine entsteht.
 Clients prüfen daran Fähigkeiten: Das Obsidian-Plugin schreibt Phasen erst zurück, wenn
 `/health` mindestens 0.13.0 nennt. `GET /planning/groups` gibt es ab 0.13.1.
 
+Zur Release-Vorbereitung gehört auch die Frage, ob eine Neuerung einen Hinweis auf der
+Startseite braucht ([Hinweise auf Neuerungen](neuigkeiten.md)).
+
 ## Skripte (`backend/scripts/`)
 
 Alle Skripte sind eigenständig ausführbar und können sowohl direkt als auch

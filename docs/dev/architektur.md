@@ -54,6 +54,7 @@ Cron-Container (separat):
 | `ratelimit/` | Drosselung: Regeln aus `rate_limits.yaml`, Zähler, FastAPI-Abhängigkeit |
 | `render/` | Server-Rendering (Phase 17): CircuiTikZ/MathJax über den Node-Sidecar, Plot-Auswertung, Cache |
 | `ui/` | Darstellungsstufen: `ui_levels.yaml` laden und ausliefern — was die Oberfläche zeigt, nicht was sie darf |
+| `neuigkeiten/` | Hinweise auf Neuerungen für die Startseite: `neuigkeiten.yaml` laden und prüfen, je Person filtern (Rolle, geschlossen, Kontoalter, Ablauf, Darstellungsstufe — eine Regel in `quelle.py`), schließen ([neuigkeiten.md](neuigkeiten.md)) |
 
 ## Privacy-Invariante
 

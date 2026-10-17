@@ -2,7 +2,9 @@
     import { goto } from '$app/navigation'
     import { MessageSquare } from 'lucide-svelte'
     import { user } from '$lib/stores/user.js'
-    import { getAssistants, getMeinTag, getMeinTagSchueler } from '$lib/api.js'
+    import { getAssistants, getMeinTag, getMeinTagSchueler, getNeuigkeiten } from '$lib/api.js'
+    import { schliessen } from '$lib/neuigkeiten.js'
+    import InfoBanner from '$lib/components/InfoBanner.svelte'
     import {
         KEIN_NAECHSTER,
         zeigtSchuelerTag,
@@ -19,6 +21,15 @@
 
     let tag = $state(null)
     let tagFehler = $state(null)
+
+    // Hinweise auf Neuerungen (0.17). Wer was sieht, entscheidet der Server; fehlt die
+    // Antwort, fehlen nur die Hinweise.
+    let neuigkeiten = $state([])
+    $effect(() => {
+        getNeuigkeiten()
+            .then((d) => (neuigkeiten = d))
+            .catch(() => {})
+    })
     const lage = $derived({
         hatGruppen: tag?.hat_gruppen ?? false,
         hatPlanung: tag?.hat_planung ?? false,
@@ -73,6 +84,7 @@
             !!tag && !isTeacher && !!tag.naechster
             && zeigtSchuelerTag(tag.naechster, tag.hat_gruppen),
         fehler: !!tagFehler,
+        neuigkeiten: neuigkeiten.length > 0,
     })
 
     // Steht nichts darunter, gehört das Chatfeld in die Mitte — so war die Seite vor den
@@ -103,6 +115,18 @@
     class:justify-center={!hatKacheln}
 >
     <div class="w-full max-w-xl flex flex-col gap-6">
+
+        <!-- Hinweise auf Neuerungen -->
+        {#if kacheln.neuigkeiten}
+            {#each neuigkeiten as n (n.id)}
+                <InfoBanner
+                    title={n.titel}
+                    message={n.text}
+                    href={n.link}
+                    onclose={async () => (neuigkeiten = await schliessen(neuigkeiten, n.id))}
+                />
+            {/each}
+        {/if}
 
         <!-- Begrüßung -->
         <div class="text-center">

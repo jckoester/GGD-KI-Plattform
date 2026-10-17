@@ -2892,3 +2892,19 @@ export async function unparkEintrag(id, toSlotId) {
     return res.json()
 }
 
+
+/** Hinweise auf Neuerungen für die eigene Rolle (Startseite, 0.17). */
+export async function getNeuigkeiten() {
+    const res = await fetch(`${BASE}/neuigkeiten`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Hinweise konnten nicht geladen werden')
+    return res.json()
+}
+
+/** Einen Hinweis wegklicken — gilt auf jedem Gerät, nicht nur in diesem Browser. */
+export async function neuigkeitGelesen(id) {
+    const res = await fetch(`${BASE}/neuigkeiten/${encodeURIComponent(id)}/gelesen`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, 'Der Hinweis konnte nicht geschlossen werden')
+}

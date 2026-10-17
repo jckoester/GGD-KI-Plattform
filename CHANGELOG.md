@@ -33,6 +33,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Nachbereitung fragt nach offenen Kompetenzen **und** Begriffen. Der Umfang einer Klassenarbeit
   (`get_exam_scope`) nennt den Typ jedes Eintrags.
 - Der Stundenentwurf nennt im Kopf seine Unterrichtsgruppe — auch bei eingeklappter Seitenleiste.
+- **Hinweise auf Neuerungen:** Die Startseite zeigt Hinweise auf Neuerungen, die die eigene
+  Rolle betreffen, bis man sie schließt — auf jedem Gerät. Wer sein Konto später angelegt hat,
+  sieht ältere Hinweise nicht; ein Hinweis zu einem Bereich erscheint nur, wenn dieser in der
+  eigenen Darstellungsstufe sichtbar ist. Der erste stellt die Fachbegriffe im Stundenentwurf
+  vor.
 
 ### Geändert
 

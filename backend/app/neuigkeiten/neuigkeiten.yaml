@@ -1,0 +1,29 @@
+# Hinweise auf Neuerungen — erscheinen auf der Startseite, bis die Person sie wegklickt.
+#
+# Kommt mit dem Release; die Schule pflegt die Datei nicht. Wie man einen Eintrag schreibt
+# und wer ihn sieht: docs/dev/neuigkeiten.md.
+#
+# Felder:
+# - id: eindeutig und nie wiederverwendet — an ihr hängt „weggeklickt"
+# - version: das Release, das die Neuerung bringt
+# - datum: ab wann; wer sein Konto später angelegt hat, sieht den Hinweis nicht
+# - rollen: student, teacher, admin (ein Admin sieht auch Hinweise für Lehrkräfte)
+# - titel, text: kurz, in der Sie-Form
+# - link (optional): eine Seite der Plattform, etwa /help/unterrichtsplanung
+# - bis (optional): letzter Tag der Anzeige
+# - eintrag (optional): Navigationseintrag aus config/ui_levels.yaml — nur wer ihn in seiner
+#   Darstellungsstufe sieht, bekommt den Hinweis
+
+- id: "0.17-fachbegriffe"
+  version: "0.17.0"
+  datum: 2026-10-17
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Fachbegriffe im Stundenentwurf"
+  text: >-
+    Der Stundenassistent schlägt jetzt die Fachbegriffe einer Stunde vor und trägt sie nach
+    Ihrer Zustimmung ein. Die Leiste über dem Entwurf heißt „Kompetenzen und Fachbegriffe";
+    dort können Sie Begriffe auch selbst suchen und hinzufügen. Haben Sie einen eigenen
+    Stundenassistenten, übernehmen Sie den Abschnitt „Fachbegriffe der Stunde" aus dem
+    schulweiten Prompt.
+  link: /help/unterrichtsplanung
