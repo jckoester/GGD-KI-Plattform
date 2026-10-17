@@ -53,6 +53,9 @@ nach dem Update den Prompt des schulweiten Stundenassistenten übernehmen (unten
   Stundenassistenten mit älterem Prompt.
 - Die nie gefüllten Vorschlags-Chips der Kompetenzleiste sind entfernt. Vorschläge aus
   verknüpftem Material bekommt weiterhin der Stundenassistent.
+- Barrierefreiheit: Formularfelder sind mit ihren Beschriftungen verknüpft (vor allem im
+  Knoten-Editor), Dialoge als solche ausgezeichnet, die Knoten im Wissensgraph per Tastatur
+  erreichbar (Tab, Enter) und Symbolknöpfe im Wochenmuster beschriftet.
 
 ### Behoben
 
