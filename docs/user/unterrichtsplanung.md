@@ -140,9 +140,10 @@ Den Stundenentwurf öffnen Sie über den Titel einer Stunde oder den Stift in de
 Jahresübersicht — oder über den Stundentitel auf der
 [Startseite](erste-schritte.md#die-startseite). Gibt es noch keinen Entwurf, entsteht er
 beim Klick; eine Unterrichtseinheit braucht es dafür nicht, die Zuordnung können Sie
-nachholen. Er besteht aus dem **Verlaufsplan** (Phasen) und einer **Kompetenz-Leiste**.
+nachholen. Er besteht aus dem **Verlaufsplan** (Phasen) und der Leiste **„Kompetenzen und
+Fachbegriffe“**.
 
-> 📷 *Screenshot folgt: Stundenentwurf mit Phasentabelle, Zeitbudget-Balken und Kompetenz-Leiste.*
+> 📷 *Screenshot folgt: Stundenentwurf mit Phasentabelle, Zeitbudget-Balken und der Leiste „Kompetenzen und Fachbegriffe“.*
 <!-- Ersetzen durch: ![Stundenentwurf](/help-images/unterrichtsplanung/stundenentwurf.png) -->
 
 ### Phasen
@@ -167,10 +168,33 @@ liegen oder einen Überhang haben.
 > 📷 *Screenshot folgt: Methodenspalte mit gestapelter Sozialform/Methode und der Vorschlagsliste.*
 <!-- Ersetzen durch: ![Sozialform und Methode](/help-images/unterrichtsplanung/methode-sozialform.png) -->
 
+### Kompetenzen und Fachbegriffe
+
+Unter dem Verlaufsplan steht, was die Stunde fördert und einführt: die **Kompetenzen** aus
+dem Bildungsplan und die **Fachbegriffe** der Stunde. Fachbegriffe sind Begriffe und
+Stoffsteckbriefe aus dem Wissensspeicher Ihres Fachs; ein Symbol zeigt, welches von beiden.
+
+Über **„✎ bearbeiten“** wählen Sie Kompetenzen und Begriffe aus:
+
+1. Unter **Fachbegriffe** tippen Sie in **„Begriff suchen …“** einen Namen ein. Gesucht wird
+   im Fach der Unterrichtsgruppe und in seinen **Bezugsfächern** — in NwT etwa auch in
+   Biologie, Chemie und Physik. Begriffe aus einem Bezugsfach tragen den Fachnamen.
+2. Ein Klick auf einen Treffer fügt ihn hinzu, **✕** entfernt ihn wieder.
+3. Findet die Suche einen Begriff nicht, gibt es ihn im Wissensspeicher noch nicht. Anlegen
+   kann ihn Ihre Fachschaft.
+
+Kompetenzen und Begriffe bearbeiten Sie getrennt: Wer Kompetenzen ändert, lässt die Begriffe
+stehen und umgekehrt.
+
+Hat der Stundenassistent einen Begriff unter einem anderen Namen genannt, steht dieser
+hinter dem Titel — etwa **„elektrophile Substitution · σ-Komplex, Arenium-Ion“**. Im
+Wissensspeicher sind das Aliase desselben Begriffs.
+
 ### Export
 
 Den fertigen Entwurf exportieren Sie über die Export-Zeile im Kopf als **Markdown**
-(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**.
+(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**. Markdown und
+PDF führen Kompetenzen und Fachbegriffe getrennt auf; im DOCX fehlen beide noch.
 
 ### Mit dem Stundenassistenten planen
 
@@ -181,6 +205,17 @@ müssen ihm die Stunde nicht beschreiben. Er arbeitet Skizzen aus, ergänzt oder
 formuliert ein Stundenziel und schlägt Kompetenzen vor. **Geschrieben wird erst, wenn Sie
 zustimmen.** Eine Phase ohne Dauer bleibt ohne, bis Sie Minuten wollen; bereits
 nachbereitete Phasen behalten ihren Stand.
+
+**Fachbegriffe:** Arbeitet der Assistent Phasen aus, schließt sein Vorschlag meist mit dem
+Absatz **„Begriffe dieser Stunde“** — Phase für Phase, was die Stunde neu einführt oder nur
+anspricht. Stimmen Sie dem Vorschlag zu, trägt er diese Begriffe in die Leiste ein. Danach
+sagt er, was eingetragen ist und welche Begriffe es im Wissensspeicher nicht gibt; die kann
+Ihre Fachschaft anlegen. Sie können ihn auch direkt bitten: „Trag Katalysator als Begriff
+ein.“
+
+Verlassen Sie sich nicht darauf, dass die Liste vollständig ist: Der Assistent übersieht
+manchmal einen Begriff oder lässt den Absatz weg. Prüfen Sie die Leiste und ergänzen Sie
+über **„✎ bearbeiten“**, was fehlt.
 
 Der Bezug bleibt am Chat: Öffnen Sie ihn später aus dem Verlauf, weiß der Assistent noch,
 um welche Stunde es geht. Weitere Wege zu ihm:
@@ -213,14 +248,29 @@ mit passendem Fach, dann Ihr eigener ohne Fach, dann der schulweite; die übrige
 der Auswahl hinter dem Pfeil. Spätere Änderungen am schulweiten Assistenten übernimmt Ihrer
 nicht — er gehört Ihnen.
 
+**Eigener Assistent aus der Zeit vor den Fachbegriffe-Vorschlägen (Version 0.17):** Er kennt den
+Abschnitt **„Fachbegriffe der Stunde“** noch nicht und schlägt deshalb keine Begriffe vor. So
+holen Sie ihn nach:
+
+1. Legen Sie wie oben einen **neuen** eigenen Stundenassistenten an. Er bekommt den heutigen
+   Prompt des schulweiten Assistenten, samt Abschnitt.
+2. Übertragen Sie Ihre **„Meine Planungsgewohnheiten“** aus dem alten Assistenten in den neuen.
+3. Löschen Sie den alten unter **Meine Assistenten**.
+
+Haben Sie Ihren Prompt darüber hinaus selbst umgeschrieben, kopieren Sie stattdessen die
+Abschnitte zu Fachbegriffen aus dem neuen Assistenten in Ihren alten.
+
 ---
 
 ## Nachbereiten
 
 Nach einer Stunde halten Sie über **Nachbereiten** fest, welche Phasen erledigt,
 offen oder gestrichen wurden, und schreiben optional eine Kurzreflexion. Die
-behandelten Kompetenzen fließen damit in den Lernstand der Klasse ein (das nutzen
-die Schüler-Assistenten als „Vorwissen").
+behandelten Kompetenzen und Fachbegriffe fließen damit in den Lernstand der Klasse ein (das
+nutzen die Schüler-Assistenten als „Vorwissen"). Blieben Phasen offen, fragt der Dialog,
+welche Kompetenzen und Begriffe dadurch nicht behandelt wurden. Die übrigen zählen zum
+Umfang der nächsten Klassenarbeit, den die Assistenten in Chats mit Gruppenbezug kennen
+(siehe [Datenschutz](datenschutz.md)).
 
 Die Knöpfe beginnen mit dem Stand, den eine Phase schon hat: Eine Phase, die der
 Assistent vorab gestrichen hat, steht bereits auf *gestrichen*, alle übrigen auf

@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.17.0] – 2026-10-17
+
+Der Stundenassistent nennt die Fachbegriffe einer Stunde und trägt sie nach Zustimmung ein; die
+Leiste über dem Entwurf heißt „Kompetenzen und Fachbegriffe", Begriffe lassen sich dort auch von
+Hand suchen und hinzufügen. Die Startseite zeigt Hinweise auf Neuerungen. Keine Migration —
+nach dem Update den Prompt des schulweiten Stundenassistenten übernehmen (unten).
+
 ### Neu
 
 - **Fachbegriffe zum Stundenentwurf:** `get_lesson_detail` liefert dem Stundenassistenten die
@@ -67,12 +74,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   teilweise gefördert wird (`[…]`) oder ein Titel Komma oder Doppelpunkt enthält; Obsidian las sie
   bisher nicht. Ein Eintrag ohne Nummer erscheint mit Titel statt als „None".
 
+### Migration
+
+Keine. Begriffe der Stunde stehen in den Metadaten des Entwurfs (JSONB).
+
 ### Nach dem Update
 
-Den Prompt des schulweiten Assistenten „Stundenentwurf" im Editor aus
-`config/prompts/stundenentwurf_assistent.md` übernehmen — das Update ändert ihn nicht, er liegt
-in der Datenbank. Neu sind die Zeile zu `begriffe` unter „Schritt 2", der Abschnitt
-„Fachbegriffe der Stunde" und die erweiterte Zeile zu `refs`.
+1. Den Prompt des schulweiten Assistenten „Stundenentwurf" im Editor **vollständig** durch
+   `config/prompts/stundenentwurf_assistent.md` ersetzen — das Update ändert ihn nicht, er liegt
+   in der Datenbank. Geändert sind die Schritte 2 bis 5, der Abschnitt „Fachbegriffe der
+   Stunde", die Zeile zu `refs` und die Regel „Kennungen behalten".
+2. Prüfen, dass Fachbegriffe und Stoffsteckbriefe Vektoren haben — ohne sie bekommt der
+   Assistent keine Begriffe zum Entwurf. Der nächtliche Einbettungslauf zieht fehlende nach;
+   wie man den Stand prüft: [Embeddings: Knoten ohne Vektor](docs/admin/updates-und-wartung.md#embeddings-knoten-ohne-vektor).
 
 ## [0.16.0] – 2026-10-15
 

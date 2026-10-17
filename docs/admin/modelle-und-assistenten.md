@@ -287,7 +287,7 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
 | Fähigkeit | Funktionen | Freischaltung |
 |---|---|---|
 | `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien, Ausfall (mit Nachrücken) sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
-| `lesson_planning` | **Stundenplanung:** Stundenentwurf lesen und Phasen, Stundenziel, Kompetenzen schreiben (`get_lesson_detail`, `update_lesson_phases`); eine Stunde aus Angaben im Chat finden und als Bezug setzen (`finde_stunde`, `waehle_stunde`); Einheit samt Kapitel lesen (`get_unit_detail`, auch in `planning`) | **Lehrkräfte**, auch **ohne Gruppenbezug** — den Zugang zur einzelnen Stunde prüft jede Funktion selbst |
+| `lesson_planning` | **Stundenplanung:** Stundenentwurf lesen — samt passender Fachbegriffe des Fachs und seiner Bezugsfächer (`begriffe`) — und Phasen, Stundenziel, Kompetenzen und Fachbegriffe schreiben (`get_lesson_detail`, `update_lesson_phases`; Begriffe über Titel oder Alias, fehlende meldet `nicht_eingetragen`); eine Stunde aus Angaben im Chat finden und als Bezug setzen (`finde_stunde`, `waehle_stunde`); Einheit samt Kapitel lesen (`get_unit_detail`, auch in `planning`) | **Lehrkräfte**, auch **ohne Gruppenbezug** — den Zugang zur einzelnen Stunde prüft jede Funktion selbst |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
 | `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
@@ -310,6 +310,23 @@ kopiert vom **ersten aktiven schulweiten** Assistenten mit Stundenplanung den **
 Prompt, dazu Modell, Temperatur und max. Tokens, in einen privaten Assistenten. Den pflegen
 Sie also im Editor wie jeden anderen; eine Änderung gilt für Kopien, die danach entstehen —
 vorhandene folgen ihr nicht. Gibt es keinen schulweiten, bekommt die Lehrkraft eine Meldung.
+
+**Fachbegriffe der Stunde (seit 0.17).** Der Prompt hat einen Abschnitt „Fachbegriffe der
+Stunde“: Arbeitet der Assistent Phasen aus, nennt er die Begriffe, die die Stunde einführt
+oder anspricht, und trägt sie nach Zustimmung ein. Dafür liefert `get_lesson_detail` die
+Begriffe des Fachs, die dem Entwurf am nächsten sind; sie brauchen Vektoren, die der
+nächtliche Einbettungslauf nachzieht. Begriffe, die es im Wissensspeicher nicht gibt, trägt
+das Werkzeug nicht ein; der Assistent verweist dann auf die Fachschaft.
+
+⚠️ **Nach dem Update auf 0.17 den Prompt im Editor nachziehen.** Ein bestehender schulweiter
+Stundenassistent behält seinen alten Prompt. Übernehmen Sie den Inhalt von
+`config/prompts/stundenentwurf_assistent.md` in den System-Prompt. Eigene Stundenassistenten
+der Lehrkräfte folgen nicht; die Startseite weist Lehrkräfte darauf hin, und die Hilfe
+erklärt, wie sie nachziehen.
+
+Das Modell bleibt `chat-standard`. In den Messungen zu 0.17 nannte es die Begriffe meist,
+aber nicht immer vollständig; `chat-komplex` war genauer, kostet aber etwa das Dreifache je
+Unterhaltung.
 
 ### Verschiebe-Assistent einrichten
 
