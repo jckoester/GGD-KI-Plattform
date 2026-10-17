@@ -14,7 +14,9 @@
 #   Skript auf- und am Ende samt Konversationen abgebaut.
 #
 # Kriterien vor dem ersten Lauf festgelegt (16.10.2026); die Erwartung beurteilt Jan im
-# Verlauf (Kästchen unter jedem Lauf).
+# Verlauf (Kästchen unter jedem Lauf). Vor M10 (17.10.2026, Plan § 26) ergänzt: `deckt_ab`,
+# `nicht_eingefuehrt` und — mit `absatz` und `geschrieben` — die Zählung genannt → Knoten →
+# eingetragen samt `nichts_verloren` und `fehlende_genannt`.
 
 lehrkraft_der_gruppe: 33
 
@@ -55,7 +57,11 @@ faelle:
       - "Arbeite die erste Erarbeitung (20 Minuten) aus: Wie erschließen die Schüler:innen den Mechanismus?"
       - "Ja, übernehmen."
     zustimmung_ab: 2
-    begriffe: {absatz: true, geschrieben: true}
+    begriffe:
+      absatz: true
+      geschrieben: true
+      deckt_ab: [elektrophile Substitution, Elektrophil, Reaktionsmechanismus]
+      nicht_eingefuehrt: [Benzol, Aromaten]
     erwartung: >-
       Arbeitet die erste Erarbeitung konkret aus (Quellen, Arbeitsauftrag, Ergebnis) und nennt
       am Ende „Begriffe dieser Stunde" mit Phase — Begriffe, die beim Mechanismus neu sind
@@ -87,7 +93,11 @@ faelle:
       - "Arbeite die Erarbeitung aus: Wie gehen die Schüler:innen bei der Chromatografie vor?"
       - "Ja, übernehmen."
     zustimmung_ab: 2
-    begriffe: {absatz: true, geschrieben: true, aus_bezugsfach: true}
+    begriffe:
+      absatz: true
+      geschrieben: true
+      aus_bezugsfach: true
+      deckt_ab: [Chromatografie, Chlorophyll]
     erwartung: >-
       Arbeitet den Versuch aus (Extraktion, Laufmittel, Auftragen, Entwickeln, Beobachten)
       und nennt als Begriffe der Stunde, was die Schüler:innen neu lernen — etwa Chromatografie,

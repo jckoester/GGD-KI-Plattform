@@ -224,6 +224,17 @@ def test_markdown_frontmatter_bleibt_yaml():
     assert "None" not in md
 
 
+def test_begriffe_mit_aliasen():
+    """Nennt die Stunde einen Begriff unter Aliasen (Plan § 26), stehen sie im Export dabei."""
+    import yaml
+
+    se = {"typ": "concept", "code": None, "titel": "elektrophile Substitution", "partiell": False,
+          "aliase": ["σ-Komplex", "Arenium-Ion"]}
+    md = export_markdown(_make_export(refs=[se]))
+    kopf = yaml.safe_load(md.split("---", 2)[1])
+    assert kopf["fachbegriffe"] == ["elektrophile Substitution (σ-Komplex, Arenium-Ion)"]
+
+
 # ── DOCX smoke ────────────────────────────────────────────────────────────────
 
 
@@ -336,6 +347,12 @@ class TestFormelnImStundenPdf:
         kompetenzen, begriffe = html.split("Fachbegriffe:", 1)
         assert "Benzol" not in kompetenzen.split("Kompetenzen:", 1)[1]
         assert "Benzol" in begriffe and "Mesomerie" in begriffe
+
+    @pytest.mark.asyncio
+    async def test_begriff_mit_aliasen(self):
+        html = await self._pdf_html(_make_export(refs=[
+            {"typ": "concept", "titel": "elektrophile Substitution", "aliase": ["σ-Komplex"]}]))
+        assert "elektrophile Substitution (σ-Komplex)" in html.split("Fachbegriffe:", 1)[1]
 
     @pytest.mark.asyncio
     async def test_nur_begriffe_kein_kompetenzblock(self):

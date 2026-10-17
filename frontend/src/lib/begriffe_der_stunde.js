@@ -27,6 +27,21 @@ export function aufteilen(refs) {
   return { kompetenzen, begriffe }
 }
 
+/**
+ * Die Aliase, unter denen die Stunde einen Begriff nennt („σ-Komplex, Arenium-Ion" bei
+ * „elektrophile Substitution") — leer, wenn sie ihn unter seinem Titel nennt.
+ */
+export function aliaseText(ref) {
+  return (ref?.aliase ?? []).filter(Boolean).join(', ')
+}
+
+/** Titel und Aliase in einer Zeile, etwa für den Tooltip. */
+export function begriffAnzeige(ref) {
+  const titel = ref?.titel ?? ref?.node_id ?? ''
+  const aliase = aliaseText(ref)
+  return aliase ? `${titel} · ${aliase}` : titel
+}
+
 /** Der Eintrag in `refs` für einen Treffer aus `GET /context/nodes`. */
 export function begriffAusTreffer(node) {
   return {

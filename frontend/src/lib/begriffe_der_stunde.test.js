@@ -11,8 +11,8 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getContextNodes } from "./api.js"
 import {
-    BEGRIFF_TYPEN, SUCHGRENZE, aufteilen, begriffAusTreffer, bezugsfach, mitBegriff,
-    ohneBegriff, ordneTreffer, suchparameter,
+    BEGRIFF_TYPEN, SUCHGRENZE, aliaseText, aufteilen, begriffAnzeige, begriffAusTreffer,
+    bezugsfach, mitBegriff, ohneBegriff, ordneTreffer, suchparameter,
 } from "./begriffe_der_stunde.js"
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -48,6 +48,21 @@ describe("Begriffe und Kompetenzen getrennt", () => {
     it("entfernt nur Begriffe — eine Kompetenz mit derselben Kennung bleibt", () => {
         const gleicheKennung = { ...IK, node_id: "b-1" }
         expect(ohneBegriff([gleicheKennung, BENZOL], "b-1")).toEqual([gleicheKennung])
+    })
+
+    it("zeigt die Aliase hinter dem Titel — ohne Aliase nur den Titel", () => {
+        const se = { node_id: "b-2", typ: "concept", titel: "elektrophile Substitution",
+                     aliase: ["σ-Komplex", "Arenium-Ion"] }
+        expect(aliaseText(se)).toBe("σ-Komplex, Arenium-Ion")
+        expect(begriffAnzeige(se)).toBe("elektrophile Substitution · σ-Komplex, Arenium-Ion")
+        expect(aliaseText(BENZOL)).toBe("")
+        expect(begriffAnzeige(BENZOL)).toBe("Benzol")
+    })
+
+    it("Kompetenzen ändern lässt die Aliase eines Begriffs stehen", () => {
+        const se = { node_id: "b-2", typ: "concept", titel: "elektrophile Substitution", aliase: ["σ-Komplex"] }
+        expect(mitBegriff([IK, se], BENZOL)).toEqual([IK, se, BENZOL])
+        expect(ohneBegriff([IK, se, BENZOL], "b-1")[1].aliase).toEqual(["σ-Komplex"])
     })
 
     it("der Eintrag aus einem Treffer trägt Typ, Titel und Bausteinart", () => {

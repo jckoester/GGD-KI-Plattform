@@ -18,7 +18,7 @@
   import { getContextNodes } from '$lib/api.js'
   import { subjectMap } from '$lib/stores/subjects.js'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
-  import { begriffAusTreffer, bezugsfach, ordneTreffer, suchparameter } from '$lib/begriffe_der_stunde.js'
+  import { aliaseText, begriffAusTreffer, bezugsfach, ordneTreffer, suchparameter } from '$lib/begriffe_der_stunde.js'
 
   let { begriffe = [], subjectId = null, onAdd, onRemove } = $props()
 
@@ -96,6 +96,7 @@
                      bg-light-pu/20 text-light-pu dark:bg-dark-pu/20 dark:text-dark-pu">
           <NodeTypeIcon category="concept" contentType={b.content_type ?? 'begriff'} size={12} />
           {b.titel ?? b.node_id}
+          {#if aliaseText(b)}<span class="font-normal opacity-80">· {aliaseText(b)}</span>{/if}
           <button
             onclick={() => onRemove(b.node_id)}
             class="opacity-70 hover:opacity-100 ml-0.5"

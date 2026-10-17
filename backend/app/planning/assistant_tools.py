@@ -1018,7 +1018,10 @@ async def _begriffe(ctx: ToolContext, stunde: ContextNode, meta: dict, zusammenh
             node_id = str(ref["node_id"])
             if node_id not in gesehen:
                 gesehen.add(node_id)
-                eintraege.append({"titel": ref.get("titel"), "eingetragen": True})
+                eintrag = {"titel": ref.get("titel"), "eingetragen": True}
+                if ref.get("aliase"):
+                    eintrag["aliase"] = list(ref["aliase"])
+                eintraege.append(eintrag)
 
     if stunde.subject_id is None:
         return {"eintraege": eintraege, "anleitung": BEGRIFFE_ANLEITUNG,
@@ -1280,6 +1283,28 @@ async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
     return None, f"„{titel}“ gibt es mehrfach ({fassungen}) — mit fassung angeben, welcher gemeint ist."
 
 
+async def _aliase_des_begriffs(ctx: ToolContext, knoten: ContextNode, namen: list[str]) -> list[str]:
+    """Welche der Namen Aliase dieses Begriffs sind — in der Schreibweise des Speichers.
+
+    Der Titel selbst zählt nicht, ebenso wenig ein Name, der zu keinem Alias passt: Das
+    Modell kann keinen Alias erfinden, der dann in der Leiste stünde.
+    """
+    from app.context.aliase import ALIAS_NORMALISIERT
+    from app.context.lookup import normalisiere_titel
+    from app.db.models import NodeAlias
+
+    titel = normalisiere_titel(knoten.title or "")
+    gesucht = [s for s in (normalisiere_titel(str(n).translate(_BINDESTRICHE)) for n in namen if n)
+               if s and s != titel]
+    if not gesucht:
+        return []
+    gefunden = dict((await ctx.db.execute(
+        sa.select(ALIAS_NORMALISIERT, NodeAlias.alias)
+        .where(NodeAlias.node_id == knoten.id, ALIAS_NORMALISIERT.in_(gesucht))
+    )).all())
+    return list(dict.fromkeys(gefunden[s] for s in gesucht if s in gefunden))
+
+
 async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
                         ) -> tuple[list[dict] | None, str | None, list[dict]]:
     """Kompetenzen und Begriffe des Modells nach der Regel des Planers (`LessonRefItem`).
@@ -1305,6 +1330,11 @@ async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
 
     **Titel und Nummer kommen aus dem Knoten**, nicht vom Modell: In der Leiste steht der
     Wortlaut des Bildungsplans bzw. des Begriffs. Doppelte entfallen.
+
+    **Aliase** (seit 0.17, nach Messung 9): Nennt das Modell einen Begriff unter einem Alias
+    („σ-Komplex"), steht in `refs` der Knoten („elektrophile Substitution") und der Alias in
+    seinen `aliase`. Mehrere Aliase desselben Knotens werden ein Eintrag. Aliase, die schon
+    am Entwurf stehen, bleiben, auch wenn das Modell sie nicht mitschickt.
     """
     from app.context.visibility import read_scope_clause
     from app.planning.schemas import LessonRefItem
@@ -1342,9 +1372,13 @@ async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
             )
         )).scalars()}
 
+    bisher = {str(r.get("node_id")): list(r.get("aliase") or [])
+              for r in ((stunde.metadata_ or {}).get("refs") or [])
+              if isinstance(r, dict) and r.get("typ") == "concept"}
     geprueft: list[dict] = []
     nicht_eingetragen: list[dict] = []
     gesehen: set = set()
+    begriffe: dict = {}           # Kennung → ihr Eintrag in `geprueft`, für weitere Aliase
     for nr, e in enumerate(eintraege, 1):
         if isinstance(e, LessonRefItem):
             n = knoten.get(e.node_id)
@@ -1354,13 +1388,14 @@ async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
                               "oder im Treffer stehen"), []
             item = e
             item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
+            item.aliase = []
         else:
+            titel = str(e.get("titel") or "").strip()
             try:
                 n = knoten.get(UUID(str(e.get("node_id"))))
             except (TypeError, ValueError):
                 n = None
             if n is None or n.content_type not in BEGRIFF_TYPEN:
-                titel = str(e.get("titel") or "").strip()
                 if not titel:
                     nicht_eingetragen.append({"titel": "", "grund": "Begriff ohne Titel — nicht eingetragen."})
                     continue
@@ -1368,15 +1403,26 @@ async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
                 if n is None:
                     nicht_eingetragen.append({"titel": titel, "grund": grund})
                     continue
+            mitgeschickt = e.get("aliase") if isinstance(e.get("aliase"), list) else []
+            aliase = await _aliase_des_begriffs(ctx, n, [titel, *mitgeschickt])
+            if n.id in begriffe:
+                eintrag = begriffe[n.id]
+                eintrag["aliase"] = list(dict.fromkeys([*eintrag.get("aliase", []), *aliase]))
+                if not eintrag["aliase"]:
+                    del eintrag["aliase"]
+                continue
             # Ein Begriff hat keine Nummer; eine vom Modell mitgeschickte stünde sonst in der
             # Leiste an seiner Stelle.
             item = LessonRefItem(node_id=n.id, typ="concept", titel=n.title, code=None,
-                                 partiell=bool(e.get("partiell")), content_type=n.content_type)
+                                 partiell=bool(e.get("partiell")), content_type=n.content_type,
+                                 aliase=list(dict.fromkeys([*bisher.get(str(n.id), []), *aliase])))
         if item.node_id in gesehen:
             continue
         gesehen.add(item.node_id)
         item.titel = n.title
         geprueft.append(item.model_dump(mode="json"))
+        if item.typ == "concept":
+            begriffe[item.node_id] = geprueft[-1]
     return geprueft, None, nicht_eingetragen
 
 
@@ -1487,6 +1533,14 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
         "ok": True,
         "suggested_refs": suggested_refs[:10],
     }
+    if refs is not None:
+        # Was jetzt als Begriff am Entwurf steht, unter welchem Titel und mit welchen Aliasen:
+        # Daran misst das Modell seine Liste (Prompt, Schritt 5). Ohne das meldete es
+        # „σ-Komplex eingetragen", während die Leiste „elektrophile Substitution" zeigte.
+        eingetragen = [{"titel": r.get("titel"), **({"aliase": r["aliase"]} if r.get("aliase") else {})}
+                       for r in refs if r.get("typ") == "concept"]
+        if eingetragen:
+            ergebnis["eingetragen"] = eingetragen
     if nicht_eingetragen:
         # Was das Modell der Lehrkraft sagen soll: welcher Begriff fehlt und wer ihn anlegt.
         ergebnis["nicht_eingetragen"] = nicht_eingetragen
@@ -1513,12 +1567,15 @@ register_tool(ChatTool(
                 "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "
                 "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
                 "einzeln nachschlagen. (4) refs sind Kompetenzen und Begriffe — Begriffe mit "
-                "typ 'concept' und ihrem titel aus begriffe oder einem Treffer, ohne node_id; "
+                "typ 'concept' und ihrem titel aus begriffe oder einem Treffer (Titel oder "
+                "Alias), ohne node_id; "
                 "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Hat der zugestimmte "
                 "Vorschlag „Begriffe dieser Stunde“ genannt, gehören sie in diesen Aufruf. "
                 "Gibt suggested_refs "
                 "zurück: Kompetenzen und Begriffe aus verknüpften Material-Knoten, die noch nicht "
-                "in refs stehen — nur vorschlagen, nicht ungefragt übernehmen. Und "
+                "in refs stehen — nur vorschlagen, nicht ungefragt übernehmen. Dazu "
+                "eingetragen: die Begriffe, die jetzt am Entwurf stehen — ein Alias steht unter "
+                "aliase beim titel des Begriffs, zu dem er gehört. Und "
                 "nicht_eingetragen: Begriffe, die es im Fach nicht gibt — sag der Lehrkraft, "
                 "dass sie fehlen und die Fachschaft sie anlegen kann."
             ),
@@ -1583,6 +1640,14 @@ register_tool(ChatTool(
                                     "description": "Nur bei Begriffen, die es in mehreren Fassungen gibt.",
                                 },
                                 "partiell": {"type": "boolean"},
+                                "aliase": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": (
+                                        "Nur bei Begriffen: aus get_lesson_detail übernehmen. "
+                                        "Einen neuen Alias nennst du als titel."
+                                    ),
+                                },
                             },
                             "required": ["typ"],
                         },
@@ -1738,7 +1803,8 @@ async def _handle_get_exam_scope(args: dict, ctx: ToolContext) -> dict:
         "unit_titles": scope.unit_titles,
         "topics": scope.topics,
         "refs": [
-            {"node_id": r.node_id, "titel": r.titel, "code": r.code, "typ": r.typ}
+            {"node_id": r.node_id, "titel": r.titel, "code": r.code, "typ": r.typ,
+             **({"aliase": r.aliase} if r.aliase else {})}
             for r in scope.refs
         ],
     }

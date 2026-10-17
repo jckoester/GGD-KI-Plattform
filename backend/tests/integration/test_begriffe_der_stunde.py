@@ -321,6 +321,81 @@ async def test_geschuetzter_bindestrich(test_client, auth_headers, faecher, asyn
     assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(sub.id)]
 
 
+# ── Aliase als Namen der Stunde (Messung 9, Plan § 26) ───────────────────────
+#
+# Viele Aliase im Speicher sind Unterbegriffe: „σ-Komplex" bei „elektrophile Substitution".
+# Ein Eintrag je Knoten; die Aliase, unter denen die Stunde ihn nennt, stehen dabei.
+
+
+async def _substitution(async_engine, *aliase):
+    sub = await _begriff(async_engine, "elektrophile Substitution")
+    async with _sitzungen(async_engine)() as db:
+        db.add_all(NodeAlias(node_id=sub.id, alias=a) for a in aliase)
+        await db.commit()
+    return sub
+
+
+@pytest.mark.asyncio
+async def test_alias_bleibt_als_name_sichtbar(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    sub = await _substitution(async_engine, "σ-Komplex", "Arenium-Ion", "π-Komplex")
+    aus = await _schreibe_begriffe(
+        async_engine, stunde,
+        {"typ": "concept", "titel": "σ‑Komplex"},            # Schreibweise des Modells …
+        {"typ": "concept", "titel": "Arenium-Ion"},
+        {"typ": "concept", "titel": PRAEFIX + "elektrophile Substitution"},
+    )
+    titel = PRAEFIX + "elektrophile Substitution"
+    # … gespeichert wird die des Speichers; ein Eintrag, der Titel selbst ist kein Alias.
+    assert aus["eingetragen"] == [{"titel": titel, "aliase": ["σ-Komplex", "Arenium-Ion"]}], aus
+    refs = await _refs(test_client, auth_headers, stunde)
+    assert [(r["node_id"], r["titel"], r["aliase"]) for r in refs] == [
+        (str(sub.id), titel, ["σ-Komplex", "Arenium-Ion"])]
+
+
+@pytest.mark.asyncio
+async def test_unter_dem_titel_ohne_aliase(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    await _substitution(async_engine, "σ-Komplex")
+    aus = await _schreibe_begriffe(async_engine, stunde,
+                                   {"typ": "concept", "titel": PRAEFIX + "elektrophile Substitution"})
+    assert aus["eingetragen"] == [{"titel": PRAEFIX + "elektrophile Substitution"}], aus
+    assert "aliase" not in (await _refs(test_client, auth_headers, stunde))[0]
+
+
+@pytest.mark.asyncio
+async def test_aliase_bleiben_beim_neuschreiben(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Das Modell schickt `refs` als ganze Liste und lässt `aliase` leicht weg. Einen Alias,
+    den es dem Knoten nur zuschreibt, gibt es nicht — er fällt heraus."""
+    stunde = await _stunde(test_client, auth_headers)
+    sub = await _substitution(async_engine, "σ-Komplex", "π-Komplex")
+    await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": "σ-Komplex"})
+    aus = await _schreibe_begriffe(
+        async_engine, stunde,
+        {"typ": "concept", "node_id": str(sub.id), "titel": PRAEFIX + "elektrophile Substitution",
+         "aliase": ["Wheland-Komplex"]},
+        {"typ": "concept", "titel": "π-Komplex"},
+    )
+    assert aus["eingetragen"] == [{"titel": PRAEFIX + "elektrophile Substitution",
+                                   "aliase": ["σ-Komplex", "π-Komplex"]}], aus
+
+
+@pytest.mark.asyncio
+async def test_aliase_in_der_auswahl_und_im_planer(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """`begriffe` zeigt eingetragene mit ihren Aliasen; der Planer speichert sie mit."""
+    stunde = await _stunde(test_client, auth_headers)
+    await _substitution(async_engine, "σ-Komplex")
+    await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": "σ-Komplex"})
+    begriffe, _ = await _begriffe(async_engine, stunde)
+    assert begriffe["eintraege"][0] == {"titel": PRAEFIX + "elektrophile Substitution",
+                                        "eingetragen": True, "aliase": ["σ-Komplex"]}
+    refs = await _refs(test_client, auth_headers, stunde)
+    resp = await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers,
+                                   json={"refs": refs, "stundenziel": "anders"})
+    assert resp.status_code == 200, resp.text
+    assert (await _refs(test_client, auth_headers, stunde))[0]["aliase"] == ["σ-Komplex"]
+
+
 @pytest.mark.asyncio
 async def test_fehlender_begriff_wird_gemeldet(test_client, auth_headers, faecher, async_engine, aufraeumen):
     """Fehlt einer, wird der Rest gespeichert — Phasen und vorhandene Begriffe."""

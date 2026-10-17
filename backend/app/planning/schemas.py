@@ -250,14 +250,20 @@ class LessonRefItem(BaseModel):
     # Nur bei Begriffen: welche Bausteinart — die Leiste zeigt danach das Symbol (Fachbegriff
     # oder Stoffsteckbrief). Ältere Einträge haben es nicht; dann gilt das Standardsymbol.
     content_type: Optional[str] = None
+    # Nur bei Begriffen: die Aliase des Knotens, unter denen die Stunde ihn nennt — „σ-Komplex"
+    # und „Arenium-Ion" bei „elektrophile Substitution" (Messung 9: Viele Aliase im Speicher
+    # sind Unterbegriffe). Ein Eintrag je Knoten; die Leiste zeigt sie hinter dem Titel.
+    aliase: list[str] = Field(default_factory=list)
 
     @model_serializer(mode="wrap")
     def _ohne_leeren_typ(self, handler):
         # Ohne Typ kein Schlüssel: Kompetenzen tragen ihn nie, und ein `"content_type": null`
-        # an jedem gespeicherten Eintrag wäre nur Rauschen.
+        # an jedem gespeicherten Eintrag wäre nur Rauschen. Ebenso leere `aliase`.
         daten = handler(self)
         if daten.get("content_type") is None:
             daten.pop("content_type", None)
+        if not daten.get("aliase"):
+            daten.pop("aliase", None)
         return daten
 
 

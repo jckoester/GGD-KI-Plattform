@@ -3,14 +3,14 @@
   import PKSelector from '$lib/components/PKSelector.svelte'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import BegriffSelector from './BegriffSelector.svelte'
-  import { aufteilen, mitBegriff, ohneBegriff } from '$lib/begriffe_der_stunde.js'
+  import { aliaseText, aufteilen, begriffAnzeige, mitBegriff, ohneBegriff } from '$lib/begriffe_der_stunde.js'
 
   /**
    * Kompetenzen und Fachbegriffe der Stunde — beide in `refs`, getrennt angezeigt und
    * bearbeitet (Begriffe seit 0.17).
    *
    * Props:
-   * - refs: array of {node_id, typ, code, titel, partiell, content_type?}
+   * - refs: array of {node_id, typ, code, titel, partiell, content_type?, aliase?}
    * - subjectId: for selectors
    * - readonly: boolean
    * - onChange(newRefs)
@@ -111,9 +111,10 @@
     <div class="flex flex-wrap gap-1.5 items-center">
       <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Begriffe:</span>
       {#each getrennt.begriffe as ref (ref.node_id)}
-        <span class="{chipBase} {chipColor(ref.typ)}" title={ref.titel ?? ''}>
+        <span class="{chipBase} {chipColor(ref.typ)}" title={begriffAnzeige(ref)}>
           <NodeTypeIcon category="concept" contentType={ref.content_type ?? 'begriff'} size={12} />
           {ref.titel ?? ref.node_id}
+          {#if aliaseText(ref)}<span class="font-normal opacity-80">· {aliaseText(ref)}</span>{/if}
         </span>
       {/each}
     </div>

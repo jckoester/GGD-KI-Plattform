@@ -17,6 +17,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nach Zustimmung ein — über ihren Titel oder einen Alias, im Fach und seinen Bezugsfächern. Fehlt
   ein Begriff im Wissensspeicher, wird er nicht eingetragen; der Assistent sagt das und verweist
   auf die Fachschaft (Prompt `config/prompts/stundenentwurf_assistent.md`).
+- **Begriffe unter ihren Aliasen:** Nennt eine Stunde einen Begriff unter einem Alias
+  („σ-Komplex" bei „elektrophile Substitution"), bleibt der Name sichtbar: in der Leiste hinter
+  dem Titel, im Export und im Umfang einer Klassenarbeit. `update_lesson_phases` meldet dem
+  Assistenten, was eingetragen ist (`eingetragen`).
 - **Fachbegriffe in der Kompetenzleiste:** Die Leiste der Entwurfsansicht heißt „Kompetenzen und
   Fachbegriffe" und zeigt Begriffe getrennt von den Kompetenzen, mit Symbol für Fachbegriff oder
   Stoffsteckbrief. Beim Bearbeiten lassen sich Begriffe des Fachs und seiner Bezugsfächer suchen,

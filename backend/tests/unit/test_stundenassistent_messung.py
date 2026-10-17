@@ -275,16 +275,20 @@ def _mit_refs(refs):
     return stand
 
 
-def _begriffs_lauf(fall_begriffe, *, vorher, nachher, antwort, schreibt=True, phasen=GUT):
-    """Zwei Züge; im zweiten wird geschrieben (Phasen und `refs`)."""
+def _begriffs_lauf(fall_begriffe, *, vorher, nachher, antwort, schreibt=True, phasen=GUT,
+                   danach="Gespeichert.", zaehlen=False):
+    """Zwei Züge; im zweiten wird geschrieben (Phasen und `refs`). Mit ``zaehlen`` statt der
+    Kriterien die Zählung aus `begriffs_zaehlung`."""
     ausgang = _mit_refs(vorher)
     zug1 = _zug(["get_lesson_detail"], antwort=antwort)
     zug1["stand"] = copy.deepcopy(ausgang)
-    zug2 = _zug(["update_lesson_phases"] if schreibt else [], antwort="Gespeichert.")
+    zug2 = _zug(["update_lesson_phases"] if schreibt else [], antwort=danach)
     zug2["stand"] = _mit_refs(nachher)
     if schreibt:
         zug2["stand"]["entwuerfe"][STUNDE]["metadata"]["phasen"] = phasen
     fall = {"id": "b", "stunde": {}, "zuege": ["…", "Ja"], "zustimmung_ab": 2, "begriffe": fall_begriffe}
+    if zaehlen:
+        return messung.begriffs_zaehlung(fall, ausgang, [zug1, zug2], stunde=STUNDE, info=INFO)
     return messung.bewerte(fall, ausgang, [zug1, zug2], stunde=STUNDE, begriffe=INFO)
 
 
@@ -365,6 +369,102 @@ def test_ohne_begriffs_angaben_keine_begriffs_kriterien():
     """Die 0.15-Fälle ohne `begriffe` und ohne vorbelegte Kompetenzen bewerten wie bisher."""
     k = _begriffs_lauf({}, vorher=[], nachher=[], antwort="Soll ich das übernehmen?")
     assert not {n for n in k if "begriff" in n or n.startswith(("refs_", "kompetenzen_erhalten", "fehlen"))}
+
+
+# ── Begriffe zählen (Plan § 26, vor M10) ─────────────────────────────────────
+#
+# Die Absätze in den Formen aus M7–M9, gekürzt.
+
+@pytest.mark.parametrize("antwort, erwartet", [
+    # M7: eine Kommazeile mit Phase in Klammern, Fettdruck und geschütztem Bindestrich
+    ("Begriffe dieser Stunde**  \nBenzol (Einstieg), **elektrophile Substitution** (Erarbeitung), "
+     "**Sigma\u2011Komplex** (Erarbeitung).\n\nSoll ich das übernehmen?",
+     (["Benzol", "elektrophile Substitution", "Sigma\u2011Komplex"], [])),
+    # M7: eine Liste, zwei Namen mit Schrägstrich, danach ein Trenner
+    ("Begriffe dieser Stunde (neu eingeführt in dieser Erarbeitung)\n\n- **Elektrophil** (Erarbeitung)  \n"
+     "- **Arenium\u2011Ion / Sigma\u2011Komplex** (Erarbeitung)  \n\n---\n\nPasst die Ausarbeitung so?",
+     (["Elektrophil", "Arenium\u2011Ion", "Sigma\u2011Komplex"], [])),
+    # M8: je Phase eine Zeile, „Gesamt" nach einer Leerzeile — nur sie zählt
+    ("Begriffe dieser Stunde  \n\n- **Einstieg:** Benzol (eingeführt)  \n"
+     "- **Problematisierung:** Bromwasser-Probe (angesprochen)  \n- **Erarbeitung (zweite):** — (nur Wiederholung)\n\n"
+     "**Gesamt:** Benzol · nur angesprochen: Bromwasser-Probe  \n\n*Hinweis: …*",
+     (["Benzol"], ["Bromwasser-Probe"])),
+    # M9: „bekannt" und „wiederholt" in den Phasenzeilen, „Gesamt" ohne sie
+    ("Begriffe dieser Stunde**\n- Einstieg: Benzol (bekannt), Bindungsverhältnisse (bekannt)\n"
+     "- Erarbeitung (1): elektrophile Substitution (eingeführt), σ-Komplex (eingeführt)\n"
+     "- Sicherung (1): Reaktionsmechanismus (wiederholt)\n- Gesamt: elektrophile Substitution, σ-Komplex\n\n"
+     "Möchtest du diesen Vorschlag so übernehmen?",
+     (["elektrophile Substitution", "σ-Komplex"], [])),
+    # Phasenzeilen ohne „Gesamt": Wiederholtes und leere Phasen fallen weg
+    ("Begriffe dieser Stunde\n- Einstieg: — (Wiederholung bekannter Begriffe: Benzol, Bindungsverhältnisse)\n"
+     "- Erarbeitung: Elektrophil (eingeführt), π-Komplex (angesprochen)\n- Sicherung: Aromaten (bekannt)",
+     (["Elektrophil"], ["π-Komplex"])),
+    # M10: Gedankenstrich statt Doppelpunkt nach der Phase, leere Phasen mit „—"
+    ("Begriffe dieser Stunde  \n\n- **Einstieg** – —  \n"
+     "- **Erarbeitung** – π\u2011Komplex (eingeführt), Elektrophil (eingeführt)  \n- **Sicherung** – —  \n\n"
+     "*Hinweis*: Alle genannten Begriffe sind verzeichnet.",
+     (["π\u2011Komplex", "Elektrophil"], [])),
+    # M7, Fall 3: unsichtbare Zeichen hinter dem Begriff
+    ("Begriffe dieser Stunde**  \nChromatografie (Erarbeitung)   \u202f\u200b \n\n*Hinweis*: Die Dauer bleibt.",
+     (["Chromatografie"], [])),
+    (BEGRIFFE_ANTWORT, (["elektrophile Substitution", "Elektrophil"], [])),
+    ("Erarbeitung: … Soll ich das übernehmen?", None),
+])
+def test_begriffsabsatz_lesen(antwort, erwartet):
+    assert messung.begriffsabsatz(antwort) == erwartet
+
+
+ZAEHL_ANTWORT = ("Begriffe dieser Stunde\n- Erarbeitung: σ\u2011Komplex (eingeführt), Elektrophil (eingeführt), "
+                 "Deprotonierung (eingeführt), Katalysator (angesprochen)")
+
+
+def test_zaehlung_trennt_speicher_und_modell():
+    """σ-Komplex ist ein Alias von „elektrophile Substitution" — ein Knoten, eingetragen.
+    Deprotonierung gibt es nicht; Katalysator gibt es, aber das Modell hat ihn verloren."""
+    z = _begriffs_lauf({"absatz": True, "geschrieben": True}, vorher=[IK], zaehlen=True,
+                       nachher=[IK, _b("b-sub") | {"aliase": ["σ-Komplex"]}, _b("b-el")], antwort=ZAEHL_ANTWORT)
+    assert (z["eingefuehrt"], z["angesprochen"]) == (["σ\u2011Komplex", "Elektrophil", "Deprotonierung"], ["Katalysator"])
+    assert (z["knoten"], z["eingetragen"], z["aliase"]) == (3, 2, 1)
+    assert z["fehlt_im_speicher"] == ["Deprotonierung"]
+    assert z["vorhanden_nicht_eingetragen"] == ["Katalysator"]
+    assert z["eingetragen_nicht_genannt"] == []
+    assert messung.zaehlung_kurz(z) == ("genannt 3+1 → 3 Knoten → 2 eingetragen (1 Aliase) · fehlt: Deprotonierung"
+                                        " · verloren: Katalysator")
+
+
+def test_zaehlung_nur_mit_absatz_im_fall():
+    assert _begriffs_lauf({"geschrieben": True}, vorher=[], nachher=[], antwort=ZAEHL_ANTWORT, zaehlen=True) is None
+
+
+_ZAEHL_FALL = {"absatz": True, "geschrieben": True, "deckt_ab": ["elektrophile Substitution", "Elektrophil"],
+               "nicht_eingefuehrt": ["Katalysator"]}
+_ZAEHL_GUT = "Begriffe dieser Stunde: σ-Komplex (Erarbeitung), Elektrophil (Erarbeitung), Deprotonierung (Erarbeitung)"
+_ZAEHL_DANACH = "Eingetragen. „Deprotonierung“ fehlt im Wissensspeicher — die Fachschaft kann ihn anlegen."
+
+
+def test_zaehl_kriterien_bestehen():
+    k = _begriffs_lauf(_ZAEHL_FALL, vorher=[IK], nachher=[IK, _b("b-sub"), _b("b-el")],
+                       antwort=_ZAEHL_GUT, danach=_ZAEHL_DANACH)
+    assert {n: k[n] for n in ("deckt_ab", "wiederholtes_nicht_eingefuehrt", "nichts_verloren",
+                              "fehlende_genannt")} == dict.fromkeys(
+        ("deckt_ab", "wiederholtes_nicht_eingefuehrt", "nichts_verloren", "fehlende_genannt"), True)
+
+
+@pytest.mark.parametrize("antwort, nachher, danach, kriterium", [
+    # Elektrophil nicht genannt — der Alias allein deckt nur die Substitution ab
+    ("Begriffe dieser Stunde: σ-Komplex (Erarbeitung)", [IK, _b("b-sub")], "Eingetragen.", "deckt_ab"),
+    # Wiederholtes als eingeführt
+    (_ZAEHL_GUT + ", Katalysator (Einstieg)", [IK, _b("b-sub"), _b("b-el"), _b("b-kat")], _ZAEHL_DANACH,
+     "wiederholtes_nicht_eingefuehrt"),
+    # Elektrophil genannt, aber nicht eingetragen
+    (_ZAEHL_GUT, [IK, _b("b-sub")], _ZAEHL_DANACH, "nichts_verloren"),
+    # Deprotonierung fehlt — und die Antwort verschweigt es
+    (_ZAEHL_GUT, [IK, _b("b-sub"), _b("b-el")], "Eingetragen: elektrophile Substitution, Elektrophil.",
+     "fehlende_genannt"),
+])
+def test_zaehl_kriterien_fehlgriffe(antwort, nachher, danach, kriterium):
+    k = _begriffs_lauf(_ZAEHL_FALL, vorher=[IK], nachher=nachher, antwort=antwort, danach=danach)
+    assert k[kriterium] is False, k
 
 
 def test_verlauf_zeigt_refs_auch_ohne_phasenaenderung():

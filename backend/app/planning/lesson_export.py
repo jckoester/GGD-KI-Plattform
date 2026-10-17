@@ -105,6 +105,14 @@ def _slugify(s: str) -> str:
 _YAML_HEIKEL = re.compile(r"[,:\[\]{}#&*!|>'\"%@`]|^\s|\s$|^-")
 
 
+def begriff_mit_aliasen(ref: dict) -> str:
+    """Ein Begriff der Stunde, wie er im Export steht: „elektrophile Substitution
+    (σ-Komplex, Arenium-Ion)" — mit den Aliasen, unter denen die Stunde ihn nennt."""
+    titel = str(ref.get("titel") or "")
+    aliase = [str(a) for a in ref.get("aliase") or [] if a]
+    return f"{titel} ({', '.join(aliase)})" if aliase else titel
+
+
 def _yaml_eintrag(text: str) -> str:
     """Ein Eintrag einer Flow-Liste im Frontmatter — in Anführungszeichen, wo YAML ihn sonst
     zerlegte. „Säure, Base" wären ohne sie zwei Einträge; ein Titel mit Doppelpunkt brächte
@@ -208,7 +216,7 @@ def export_markdown(data: LessonExport) -> str:
         ]
         lines.append(f"kompetenzen: [{', '.join(kompetenzen)}]")
     if data.fachbegriffe:
-        fachbegriffe = [_yaml_eintrag(r.get("titel") or "") for r in data.fachbegriffe]
+        fachbegriffe = [_yaml_eintrag(begriff_mit_aliasen(r)) for r in data.fachbegriffe]
         lines.append(f"fachbegriffe: [{', '.join(fachbegriffe)}]")
     lines += ["---", ""]
 
@@ -273,9 +281,9 @@ async def export_pdf(data: LessonExport) -> bytes:
         }
         for r in data.kompetenzen
     ]
-    # Begriffe mit ihrem Titel, durch denselben Prärenderer (Formeln in Titeln).
+    # Begriffe mit Titel und Aliasen, durch denselben Prärenderer (Formeln in Titeln).
     begriffe_html = [
-        await render_markdown_inline_for_pdf(str(r.get("titel") or "")) for r in data.fachbegriffe
+        await render_markdown_inline_for_pdf(begriff_mit_aliasen(r)) for r in data.fachbegriffe
     ]
 
     env = Environment(

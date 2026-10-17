@@ -114,13 +114,17 @@ class TestStundenentwurf:
         assert "`begriffe`" in text
         abschnitt = text.split("## Fachbegriffe der Stunde", 1)[1].split("\n## ", 1)[0]
         assert "Begriffe dieser Stunde" in abschnitt
-        # Jans Bewertung von M4–M6: Begriffe unvollständig. Keine Bremse mehr, alle Phasen.
+        # Jans Bewertung von M4–M6: Begriffe unvollständig. Keine Bremse mehr, alle Phasen
+        # (seit Fables Fassung vom 17.10.2026: „Phase für Phase … auch die Phasen, die du nicht
+        # änderst", „Lieber einer zu viel").
         assert "selten mehr als zwei" not in abschnitt
-        assert "alle Phasen durch" in abschnitt
+        assert "Phase für Phase" in abschnitt
+        assert "auch die Phasen, die du nicht änderst" in abschnitt
         # Messung 5: Das Nachschlagen jedes Begriffs kostete die Runden zum Schreiben; seit A1
-        # prüft `update_lesson_phases` selbst und meldet, was fehlt.
-        assert "`search_context_nodes`" not in abschnitt
-        assert "schlag ihn nicht nach" in abschnitt
+        # prüft `update_lesson_phases` selbst und meldet, was fehlt. Seit Fables zweiter Fassung
+        # steht die Suche im Abschnitt nur noch als Verbot („kein `search_context_nodes`").
+        assert abschnitt.count("`search_context_nodes`") == abschnitt.count("kein `search_context_nodes`")
+        assert "`update_lesson_phases` prüft" in abschnitt
         assert "Fachschaft" in abschnitt and "fehlen" in abschnitt
         refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
         assert "concept" in refs_regel
@@ -130,8 +134,13 @@ class TestStundenentwurf:
         schritt3 = text.split("**Schritt 3", 1)[1].split("**Schritt 4", 1)[0]
         assert "Begriffe dieser Stunde" in schritt3
         # Messung 4: Beim Kürzen hängte das Modell den Absatz an — der Strich sagt jetzt, wann nicht.
-        assert "Nicht beim Kürzen" in schritt3
+        assert "Nicht beim bloßen Kürzen" in schritt3
         assert "`nicht_eingetragen`" in abschnitt
         # Messung 2: Die Zustimmung galt dem Modell nur für die Phasen.
         schritt5 = text.split("**Schritt 5", 1)[1].split("\n## ", 1)[0]
         assert "gilt die Zustimmung auch für sie" in schritt5
+        # Messung 9 (Zählung genannt/eingetragen): Viele Aliase im Speicher sind Unterbegriffe.
+        # Das Modell übernimmt sie als Schreibweise, und es prüft gegen `eingetragen`, statt
+        # „σ-Komplex eingetragen" zu melden, wo die Leiste „elektrophile Substitution" zeigt.
+        assert "unter `aliase`" in abschnitt
+        assert "unter `eingetragen` bestätigt" in schritt5

@@ -267,6 +267,28 @@ async def test_exam_scope_fuehrt_begriffe_als_begriffe(db_session, seed_sc_group
 
 
 @pytest.mark.asyncio
+async def test_exam_scope_sammelt_die_aliase(db_session, seed_sc_group):
+    """Nennen zwei Stunden denselben Begriff unter verschiedenen Aliasen, stehen beide da."""
+    ue = _ue("Aromaten")
+    B = str(uuid4())
+    eins = _stunde_mit_refs("Mechanismus", refs=[
+        {"node_id": B, "typ": "concept", "titel": "elektrophile Substitution", "aliase": ["σ-Komplex"]}])
+    zwei = _stunde_mit_refs("Vertiefung", refs=[
+        {"node_id": B, "typ": "concept", "titel": "elektrophile Substitution",
+         "aliase": ["Arenium-Ion", "σ-Komplex"]}])
+    db_session.add_all([ue, eins, zwei])
+    db_session.add_all([
+        _slot(date(2026, 3, 10), ue_id=ue.id, stunde_id=eins.id, nachbereitet=True),
+        _slot(date(2026, 3, 12), ue_id=ue.id, stunde_id=zwei.id, nachbereitet=True),
+        _slot(date(2026, 3, 20), kategorie="pruefung", ue_id=ue.id),
+    ])
+    await db_session.flush()
+
+    scope = await get_exam_scope(db_session, GROUP_ID, today=date(2026, 3, 15))
+    assert [(r.node_id, r.aliase) for r in scope.refs] == [(B, ["σ-Komplex", "Arenium-Ion"])]
+
+
+@pytest.mark.asyncio
 async def test_exam_scope_slot_historie_fallback(db_session, seed_sc_group):
     ue = _ue("UE-Historie")
     db_session.add(ue)

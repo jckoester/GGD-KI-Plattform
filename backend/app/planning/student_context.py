@@ -158,6 +158,9 @@ class ExamScopeRef:
     # „ik", „pk" oder „concept" (Fachbegriff, seit 0.17) — damit ein Lernplan Begriffe als
     # Begriffe nennen kann, nicht als Kompetenzen.
     typ: str | None = None
+    # Bei Begriffen die Aliase, unter denen die Stunden sie genannt haben („σ-Komplex" bei
+    # „elektrophile Substitution") — gesammelt über alle Stunden des Umfangs.
+    aliase: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -267,9 +270,12 @@ async def get_exam_scope(
             offen = {str(x) for x in (stunde.metadata_.get("refs_offen") or [])}
             for r in stunde.metadata_.get("refs") or []:
                 nid = str(r.get("node_id")) if r.get("node_id") else None
-                if nid and nid not in offen and nid not in refs:
+                if not nid or nid in offen:
+                    continue
+                if nid not in refs:
                     refs[nid] = ExamScopeRef(node_id=nid, titel=r.get("titel"), code=r.get("code"),
                                              typ=r.get("typ"))
+                refs[nid].aliase = list(dict.fromkeys([*refs[nid].aliase, *(r.get("aliase") or [])]))
 
     return ExamScope(
         exam_date=exam.date, unit_titles=unit_titles, topics=topics, refs=list(refs.values())

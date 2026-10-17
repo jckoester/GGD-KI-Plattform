@@ -62,6 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.auth.dependencies import get_jwt_service
 from app.config import settings
 from app.context.embedding import vor_einer_messung
+from app.context.lookup import normalisiere_titel
 
 # `scripts/` ist kein Paket (CLAUDE.md, „scripts/-Paketkonflikt") — über den Pfad laden.
 _spec = importlib.util.spec_from_file_location("chat_probe", Path(__file__).with_name("chat_probe.py"))
@@ -316,18 +317,19 @@ def refs_vorbelegen(conn, stunde: str, refs: list[dict]) -> None:
 def begriffe_info(conn, stunde: str) -> dict:
     """Was die Begriffs-Kriterien über die Knoten wissen müssen — ohne Datenbank in `bewerte`.
 
-    ``fach``: Fach der Stunde; ``erlaubt``: Fach und Bezugsfächer; ``knoten``: jeder aktive
-    Fachbegriff und Stoffsteckbrief mit Titel, Aliasen und Fach.
+    ``fach``: Fach der Stunde; ``erlaubt``: Fach und Bezugsfächer; ``knoten``: jeder
+    Fachbegriff und Stoffsteckbrief mit Titel, Aliasen, Fach und ob er aktiv ist.
     """
     fach, bezug = _alle(conn, "SELECT s.id, s.bezugsfaecher FROM context_nodes n JOIN subjects s "
                               "ON s.id = n.subject_id WHERE n.id::text = %s", stunde)[0]
     erlaubt = {fach} | {i for (i,) in _alle(conn, "SELECT id FROM subjects WHERE slug = ANY(%s)", list(bezug or []))}
     knoten = {}
-    for kennung, titel, fach_id, aliase in _alle(conn, """
-            SELECT n.id::text, n.title, n.subject_id, coalesce(array_agg(a.alias) FILTER (WHERE a.alias IS NOT NULL), '{}')
+    for kennung, titel, fach_id, aktiv, aliase in _alle(conn, """
+            SELECT n.id::text, n.title, n.subject_id, n.status = 'active',
+                   coalesce(array_agg(a.alias) FILTER (WHERE a.alias IS NOT NULL), '{}')
             FROM context_nodes n LEFT JOIN node_aliases a ON a.node_id = n.id
-            WHERE n.content_type IN ('begriff', 'stoffsteckbrief') GROUP BY 1, 2, 3"""):
-        knoten[kennung] = {"titel": titel, "aliase": list(aliase), "subject_id": fach_id}
+            WHERE n.content_type IN ('begriff', 'stoffsteckbrief') GROUP BY 1, 2, 3, 4"""):
+        knoten[kennung] = {"titel": titel, "aliase": list(aliase), "subject_id": fach_id, "aktiv": aktiv}
     return {"fach": fach, "erlaubt": erlaubt, "knoten": knoten}
 
 
@@ -488,6 +490,146 @@ def _refs(entwurf) -> list[dict]:
     return list((entwurf or {}).get("metadata", {}).get("refs") or [])
 
 
+# ── Begriffe zählen: genannt → im Speicher → eingetragen (Plan § 26) ─────────
+#
+# Fables Vorschlag nach Messung 9: Erst die Zählung je Lauf trennt den Wissensspeicher vom
+# Modell. „3 · 3 · 3 eingetragen" sah nach genauer Auswahl aus; genannt waren 6 · 7 · 6, die
+# Aliase im Speicher bündelten sie auf drei Knoten.
+
+# Wie `_BINDESTRICHE` im Werkzeug (`app/planning/assistant_tools.py`).
+_BINDESTRICHE = str.maketrans({"‐": "-", "‑": "-", "­": None})
+_UNSICHTBAR = re.compile(r"[*_`​  ]+")
+# Was in einem Absatz kein Begriff ist: leere Phasen, „bekannt" und „wiederholt" markierte.
+_LEER = re.compile(r"^[—–\-]*$")
+_NICHT_NEU = re.compile(r"\((?:[^)]*\b(?:bekannt|wiederholt|wiederholung)\b[^)]*)\)", re.IGNORECASE)
+
+
+def _begriff_bereinigen(roh: str) -> str:
+    t = _UNSICHTBAR.sub(" ", roh)
+    t = re.sub(r"\([^)]*\)", "", t)                  # „(Erarbeitung)", „(eingeführt)"
+    return " ".join(t.split()).strip(" .:;?!-–—")
+
+
+def begriffsabsatz(antwort: str) -> tuple[list[str], list[str]] | None:
+    """Die Begriffe aus dem Absatz „Begriffe dieser Stunde" → (eingeführt, angesprochen).
+
+    Drei Formen kamen in M7–M9 vor: eine Kommazeile („A (Erarbeitung), B (Einstieg)."), eine
+    Liste je Begriff und — seit Fables Fassung — eine Zeile je Phase mit „Gesamt". Steht
+    „Gesamt" da, zählt nur sie; „· nur angesprochen:" trennt dort die beiden Gruppen. Sonst
+    zählt jede Zeile, ohne Phasennamen, ohne als bekannt oder wiederholt markierte Begriffe.
+    None: kein Absatz.
+    """
+    treffer = _BEGRIFFSABSATZ.search(antwort or "")
+    if not treffer:
+        return None
+    zeilen: list[str] = []
+    rest = antwort[treffer.end():].split("\n")
+    kopf = re.sub(r"^[\s*:]*(?:\([^)]*\))?[\s*:]*", "", rest[0])
+    if kopf.strip():
+        zeilen.append(kopf)
+    for nr, zeile in enumerate(rest[1:], 1):
+        if not zeile.strip():
+            # Eine Leerzeile beendet den Absatz — außer vor der Zeile „Gesamt" (M8, Lauf 1).
+            folgt = next((z for z in rest[nr + 1:] if z.strip()), "")
+            if zeilen and not re.search(r"\bgesamt\b", folgt, re.IGNORECASE):
+                break
+            continue
+        zeilen.append(zeile)
+
+    def liste(text: str) -> list[str]:
+        # Eine Kommazeile endet mit dem Satz: „…, Elektrophil (Erarbeitung). Soll ich …?"
+        text = re.split(r"(?<=[\w)])[.?!]\s+(?=[A-ZÄÖÜ])", text)[0]
+        namen = []
+        for teil in re.split(r",(?![^()]*\))|\s/\s", text):
+            if _NICHT_NEU.search(teil):
+                continue
+            name = _begriff_bereinigen(teil)
+            if name and not _LEER.match(name) and len(name) <= 60:
+                namen.append(name)
+        return namen
+
+    eingefuehrt: list[str] = []
+    angesprochen: list[str] = []
+    gesamt = next((z for z in zeilen if re.search(r"\bgesamt\b", z, re.IGNORECASE)), None)
+    if gesamt:
+        inhalt = re.split(r"gesamt\W*", gesamt, maxsplit=1, flags=re.IGNORECASE)[1]
+        for teil in inhalt.split("·"):
+            if re.match(r"\s*nur angesprochen", teil, re.IGNORECASE):
+                angesprochen += liste(re.sub(r"^\s*nur angesprochen\s*:?", "", teil, flags=re.IGNORECASE))
+            else:
+                eingefuehrt += liste(teil)
+    else:
+        for zeile in zeilen:
+            zeile = re.sub(r"^\s*(?:[-*•]|\d+\.)\s*", "", zeile)
+            # „Erarbeitung (1): A (eingeführt), B (angesprochen)" — der Phasenname gehört nicht dazu.
+            # M10: auch mit Gedankenstrich statt Doppelpunkt („**Erarbeitung** – A, B").
+            zeile = re.sub(r"^\W*[\w ()0-9.]{1,40}?[*\s]*(?::|\s[–—-]\s)[*\s]*", "", zeile, count=1)
+            for teil in re.split(r",(?![^()]*\))", zeile):
+                ziel = angesprochen if re.search(r"\(angesprochen\)", teil, re.IGNORECASE) else eingefuehrt
+                ziel += liste(teil)
+    return list(dict.fromkeys(eingefuehrt)), [n for n in dict.fromkeys(angesprochen) if n not in eingefuehrt]
+
+
+def _knoten_zum_namen(name: str, info: dict) -> str | None:
+    """Wie `_begriff_zum_titel` im Werkzeug: Titel oder Alias, aktiv, im Fach oder einem
+    Bezugsfach; gibt es ihn in beiden, das eigene Fach."""
+    schluessel = normalisiere_titel(name.translate(_BINDESTRICHE))
+    treffer = [k for k, n in (info.get("knoten") or {}).items()
+               if n.get("aktiv", True) and n.get("subject_id") in info.get("erlaubt", set())
+               and schluessel in {normalisiere_titel(t) for t in [n["titel"], *n.get("aliase", [])]}]
+    if len(treffer) > 1:
+        eigene = [k for k in treffer if info["knoten"][k].get("subject_id") == info.get("fach")]
+        treffer = eigene if len(eigene) == 1 else treffer
+    return treffer[0] if len(treffer) == 1 else None
+
+
+def begriffs_zaehlung(fall: dict, ausgang: dict, zuege: list[dict], *, stunde, info) -> dict | None:
+    """Je Lauf: was das Modell nennt, was davon im Speicher steht und was eingetragen ist.
+
+    Nur für Fälle mit Absatz (``begriffe.absatz``). ``vorhanden_nicht_eingetragen``: genannt,
+    im Speicher, aber nach dem Lauf nicht in `refs` — das Modell hat es verloren.
+    ``fehlt_im_speicher``: genannt, aber weder Titel noch Alias eines Begriffs im Fach.
+    """
+    if not (fall.get("begriffe") or {}).get("absatz") or not zuege or not info:
+        return None
+    absatz = begriffsabsatz(zuege[0]["antwort"])
+    eingefuehrt, angesprochen = absatz or ([], [])
+    genannt = eingefuehrt + angesprochen
+    zuordnung = {n: _knoten_zum_namen(n, info) for n in genannt}
+    vorher = {str(r.get("node_id")) for r in _refs(ausgang["entwuerfe"].get(stunde)) if r.get("typ") == "concept"}
+    nachher = [r for r in _refs(zuege[-1]["stand"]["entwuerfe"].get(stunde)) if r.get("typ") == "concept"]
+    da = {str(r.get("node_id")) for r in nachher}
+    knoten = {k for k in zuordnung.values() if k}
+    neu = [r for r in nachher if str(r.get("node_id")) not in vorher]
+    return {
+        "absatz": absatz is not None,
+        "eingefuehrt": eingefuehrt,
+        "angesprochen": angesprochen,
+        "knoten": len(knoten),
+        "genannte_knoten": sorted(knoten),
+        "eingetragen": len(neu),
+        "aliase": sum(len(r.get("aliase") or []) for r in neu),
+        "fehlt_im_speicher": [n for n, k in zuordnung.items() if k is None],
+        "vorhanden_nicht_eingetragen": [n for n, k in zuordnung.items() if k and k not in da],
+        "eingetragen_nicht_genannt": [r.get("titel") for r in neu if str(r.get("node_id")) not in knoten],
+    }
+
+
+def zaehlung_kurz(z: dict | None) -> str:
+    """„genannt 6+1 → 3 Knoten → 3 eingetragen (2 Aliase) · fehlt: Startlinie" — eine Zeile."""
+    if not z:
+        return ""
+    if not z["absatz"]:
+        return f"kein Absatz → {z['eingetragen']} eingetragen"
+    teile = [f"genannt {len(z['eingefuehrt'])}+{len(z['angesprochen'])} → {z['knoten']} Knoten → "
+             f"{z['eingetragen']} eingetragen" + (f" ({z['aliase']} Aliase)" if z["aliase"] else "")]
+    for feld, name in (("fehlt_im_speicher", "fehlt"), ("vorhanden_nicht_eingetragen", "verloren"),
+                       ("eingetragen_nicht_genannt", "ungenannt")):
+        if z[feld]:
+            teile.append(f"{name}: {', '.join(z[feld])}")
+    return " · ".join(teile)
+
+
 def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde, info) -> dict[str, bool]:
     """Die Kriterien zu Begriffen der Stunde (Plan „Fachbegriffe der Stunde", Schritt 5).
 
@@ -501,7 +643,15 @@ def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde,
     - ``nur``: Titel, die eingetragen werden sollen — genau diese, kein anderer.
     - ``fehlt``: ein Begriff, den es nicht gibt — die Antwort sagt, dass er fehlt.
     - ``unveraendert``: `refs` nach dem Schreiben gleich denen davor.
+    - ``deckt_ab`` (seit M10): Titel, die die genannten Begriffe abdecken müssen — direkt oder
+      über einen Alias.
+    - ``nicht_eingefuehrt`` (seit M10): Titel, die nicht als eingeführt genannt sein dürfen —
+      die Stunde wiederholt sie.
     Dazu immer, wenn vorher Kompetenzen eingetragen waren und geschrieben wurde: Sie sind noch da.
+    Mit ``absatz`` und ``geschrieben`` (seit M10, aus :func:`begriffs_zaehlung`):
+    ``nichts_verloren`` — jeder genannte Begriff, den es gibt, steht danach in `refs`;
+    ``fehlende_genannt`` — jeden genannten, den es nicht gibt, nennt die Antwort nach der
+    Zustimmung als fehlend.
     """
     b = fall.get("begriffe") or {}
     k: dict[str, bool] = {}
@@ -511,10 +661,25 @@ def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde,
     if "fehlt" in b:
         text = "\n".join(z["antwort"] for z in zuege)
         k["fehlen_gesagt"] = _genannt([b["fehlt"]], text) and bool(_FEHLT.search(text))
+    zaehlung = begriffs_zaehlung(fall, ausgang, zuege, stunde=stunde, info=info)
+    if zaehlung and b.get("deckt_ab"):
+        gedeckt = set(zaehlung["genannte_knoten"])
+        k["deckt_ab"] = all(_knoten_zum_namen(t, info) in gedeckt for t in b["deckt_ab"])
+    if zaehlung and b.get("nicht_eingefuehrt"):
+        verboten = {normalisiere_titel(t) for t in b["nicht_eingefuehrt"]}
+        verboten_knoten = {_knoten_zum_namen(t, info) for t in b["nicht_eingefuehrt"]} - {None}
+        k["wiederholtes_nicht_eingefuehrt"] = not any(
+            normalisiere_titel(n.translate(_BINDESTRICHE)) in verboten or _knoten_zum_namen(n, info) in verboten_knoten
+            for n in zaehlung["eingefuehrt"])
 
     ab = fall.get("zustimmung_ab")
     if not (ab and stunde):
         return k
+    if zaehlung and b.get("geschrieben"):
+        k["nichts_verloren"] = not zaehlung["vorhanden_nicht_eingetragen"]
+        danach = "\n".join(z["antwort"] for z in zuege[ab - 1:])
+        fehlt = zaehlung["fehlt_im_speicher"]
+        k["fehlende_genannt"] = all(_genannt([n], danach) for n in fehlt) and (not fehlt or bool(_FEHLT.search(danach)))
     vorher = _refs(ausgang["entwuerfe"].get(stunde))
     nachher = _refs(zuege[-1]["stand"]["entwuerfe"].get(stunde))
     kompetenzen_vorher = {r.get("node_id") for r in vorher if r.get("typ") != "concept"}
@@ -575,7 +740,10 @@ def _refs_kurz(refs) -> str:
     """`refs` in einer Zeile: Kompetenzen mit Nummer, Begriffe mit Titel und „(B)"."""
     if not refs:
         return "—"
-    return ", ".join(f"{r.get('titel')} (B)" if r.get("typ") == "concept" else (r.get("code") or r.get("titel") or "?")
+    def begriff(r):
+        aliase = f" [{', '.join(r['aliase'])}]" if r.get("aliase") else ""
+        return f"{r.get('titel')}{aliase} (B)"
+    return ", ".join(begriff(r) if r.get("typ") == "concept" else (r.get("code") or r.get("titel") or "?")
                      for r in refs)
 
 
@@ -661,6 +829,8 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
         if l.get("refs_nachher") != l.get("refs_vorher"):
             zeilen += [f"**Kompetenzen und Begriffe:** {_refs_kurz(l.get('refs_vorher'))} → "
                        f"{_refs_kurz(l.get('refs_nachher'))}", ""]
+        if l.get("zaehlung"):
+            zeilen += [f"**Begriffe gezählt:** {zaehlung_kurz(l['zaehlung'])}", ""]
         if l.get("erwartung"):
             zeilen += _bewertungsblock(l["erwartung"])
     return "\n".join(zeilen) + "\n"
@@ -769,12 +939,21 @@ def main() -> None:
                         begriffe=begriffe_info(conn, bezug) if bezug and "begriffe" in fall else None,
                     )
                     bestanden = all(kriterien.values())
+                    zaehlung = begriffs_zaehlung(
+                        fall, lauf_ausgang, zuege, stunde=bezug,
+                        info=begriffe_info(conn, bezug) if bezug and "begriffe" in fall else None)
                     werkzeuge = " | ".join(" → ".join(_werkzeuge(z)) or "—" for z in zuege)
                     fehlend = ", ".join(n for n, ok in kriterien.items() if not ok)
                     print(f"{fall['id']:<30} Lauf {nr}  {'✓' if bestanden else '✗'}  "
                           f"[{werkzeuge}]{'  fehlt: ' + fehlend if fehlend else ''}", flush=True)
+                    if zaehlung:
+                        print(f"{'':<30} Begriffe: {zaehlung_kurz(zaehlung)}", flush=True)
                     ergebnisse.append({
                         "fall": fall["id"], "lauf": nr, "bestanden": bestanden, "kriterien": kriterien,
+                        "zaehlung": zaehlung,
+                        # Zum Nachbewerten ohne neuen Lauf (seit M10).
+                        "refs_vorher": _refs(lauf_ausgang["entwuerfe"].get(bezug)) if bezug else None,
+                        "refs_nachher": _refs(zuege[-1]["stand"]["entwuerfe"].get(bezug)) if bezug else None,
                         "modell": zuege[0].get("modell"), "erwartung": fall.get("erwartung"),
                         "kompetenznummern": kompetenznummern("\n".join(z["antwort"] for z in zuege))
                         if "kompetenzen" in fall else None,
@@ -794,6 +973,7 @@ def main() -> None:
                         "ziel_vorher": (vorher or {}).get("metadata", {}).get("stundenziel"),
                         "ziel_nachher": (nachher or {}).get("metadata", {}).get("stundenziel"),
                         "refs_vorher": _refs(vorher), "refs_nachher": _refs(nachher),
+                        "zaehlung": zaehlung,
                         "zuege": [{"frage": z["frage"], "werkzeuge": _werkzeuge(z), "antwort": z["antwort"],
                                    "zeit": z["zeit"], "fehler": z.get("fehler")} for z in zuege],
                         "erwartung": fall.get("erwartung"),
@@ -816,6 +996,21 @@ def main() -> None:
         gut = sum(e["bestanden"] for e in eigene)
         offen = sorted({n for e in eigene for n, ok in e["kriterien"].items() if not ok})
         print(f"{fall['id']:<30} {gut}/{len(eigene)}        {', '.join(offen) or '—'}")
+    gezaehlt = [e for e in ergebnisse if e.get("zaehlung")]
+    if gezaehlt:
+        print("\nBegriffe je Lauf            genannt (eingef.+angespr.) · Knoten · eingetragen · fehlt im Speicher · verloren")
+        for fall in faelle:
+            eigene = [e["zaehlung"] for e in gezaehlt if e["fall"] == fall["id"]]
+            if not eigene:
+                continue
+            spalten = [
+                " · ".join(f"{len(z['eingefuehrt'])}+{len(z['angesprochen'])}" if z["absatz"] else "–" for z in eigene),
+                " · ".join(str(z["knoten"]) for z in eigene),
+                " · ".join(str(z["eingetragen"]) for z in eigene),
+                " · ".join(str(len(z["fehlt_im_speicher"])) for z in eigene),
+                " · ".join(str(len(z["vorhanden_nicht_eingetragen"])) for z in eigene),
+            ]
+            print(f"{fall['id']:<27} " + "  |  ".join(spalten))
     if args.json:
         args.json.write_text(json.dumps(ergebnisse, ensure_ascii=False, indent=2), encoding="utf-8")
 
