@@ -114,6 +114,9 @@ class TestStundenentwurf:
         assert "`begriffe`" in text
         abschnitt = text.split("## Fachbegriffe der Stunde", 1)[1].split("\n## ", 1)[0]
         assert "Begriffe dieser Stunde" in abschnitt
+        # Jans Bewertung von M4–M6: Begriffe unvollständig. Keine Bremse mehr, alle Phasen.
+        assert "selten mehr als zwei" not in abschnitt
+        assert "alle Phasen durch" in abschnitt
         # Messung 5: Das Nachschlagen jedes Begriffs kostete die Runden zum Schreiben; seit A1
         # prüft `update_lesson_phases` selbst und meldet, was fehlt.
         assert "`search_context_nodes`" not in abschnitt

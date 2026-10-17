@@ -955,11 +955,13 @@ _BESCHREIBUNG_MAX = 300
 #: übersprang es den Prompt-Abschnitt „Fachbegriffe der Stunde" in 6 von 6 Läufen; in
 #: Messung 2 schickte es nach „Ja, übernehmen" die genannten Begriffe nicht mit — die
 #: Zustimmung galt ihm nur für die Phasen (§ 18, C); in Messung 4 hängte es den Absatz auch
-#: beim Kürzen an (§ 20, F).
+#: beim Kürzen an (§ 20, F). „Alle … aus allen Phasen": Jan bewertete M4–M6 als unvollständig,
+#: meist stand nur ein Begriff da (§ 23).
 BEGRIFFE_ANLEITUNG = (
     "Arbeitest du Phasen aus oder legst du neue an — nicht beim Kürzen, Streichen oder bei "
     "Fragen zur Stunde —, schließt dein Vorschlag mit einem eigenen Absatz „Begriffe dieser "
-    "Stunde: …“ — nur Begriffe, die die Stunde neu einführt, je mit der Phase. Die Zustimmung "
+    "Stunde: …“ — alle Begriffe, die die Stunde neu einführt, aus allen Phasen, nicht nur der "
+    "ausgearbeiteten, je mit der Phase. Die Zustimmung "
     "zum Vorschlag gilt auch für diese Begriffe: Schreib sie im selben update_lesson_phases-"
     "Aufruf als refs mit typ 'concept' und titel mit."
 )

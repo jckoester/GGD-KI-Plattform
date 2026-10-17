@@ -385,6 +385,7 @@ async def test_begriffe_ohne_kennungen_mit_anleitung(test_client, auth_headers, 
     assert all("node_id" not in e for e in begriffe["eintraege"])
     assert "Begriffe dieser Stunde" in begriffe["anleitung"]
     assert "nicht beim Kürzen" in begriffe["anleitung"]
+    assert "aus allen Phasen" in begriffe["anleitung"]
 
 
 @pytest.mark.asyncio

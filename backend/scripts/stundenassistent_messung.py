@@ -620,9 +620,14 @@ def notizen(markdown: str) -> list[tuple[str, str]]:
     gefunden = []
     for abschnitt in re.split(r"\n(?=## )", markdown):
         kopf = re.match(r"## (\S+ · Lauf \d+)", abschnitt)
-        if not kopf or "Notiz:" not in abschnitt:
+        if not kopf or "**Bewertung:**" not in abschnitt:
             continue
-        text = abschnitt.split("Notiz:", 1)[1].split("\n---", 1)[0].strip()
+        # Die Notiz steht unter der Bewertung — nicht beim ersten „Notiz:" im Abschnitt: Das
+        # kann im Text des Assistenten stehen (Messung 4 zu 0.17, eine Tabelle mit „Notiz:").
+        unten = abschnitt.rsplit("**Bewertung:**", 1)[1]
+        if "Notiz:" not in unten:
+            continue
+        text = unten.split("Notiz:", 1)[1].split("\n---", 1)[0].strip()
         if text:
             gefunden.append((kopf.group(1), " ".join(text.split())))
     return gefunden

@@ -238,6 +238,17 @@ def test_notizen_unter_der_bewertung():
     assert messung.notizen(text) == []
 
 
+def test_notiz_im_text_des_assistenten_zaehlt_nicht():
+    """Messung 4 zu 0.17: Eine Antwort enthielt selbst „**Notiz:**" — das Werkzeug las von dort
+    bis zum Ende des Laufs und gab den halben Verlauf als Notiz aus."""
+    text = _verlauf(erwartung="E.")
+    lauf = text.split("**Bewertung:**", 1)
+    mit_notiz_im_text = lauf[0] + "> | Schritt | **Notiz:** Pipette spülen |\n\n**Bewertung:**" + lauf[1]
+    assert messung.notizen(mit_notiz_im_text) == []
+    ausgefuellt = mit_notiz_im_text.replace("Notiz: \n", "Notiz: wichtige Begriffe fehlen\n")
+    assert messung.notizen(ausgefuellt) == [("x · Lauf 1", "wichtige Begriffe fehlen")]
+
+
 # ── Begriffe der Stunde (0.17, Plan „Fachbegriffe der Stunde", Schritt 5) ────
 #
 # Je Kriterium ein richtiger Lauf und ein Fehlgriff. Fach 6 (Chemie) liest Biologie (7) mit;
