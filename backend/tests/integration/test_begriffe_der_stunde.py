@@ -381,6 +381,35 @@ async def test_aliase_bleiben_beim_neuschreiben(test_client, auth_headers, faech
 
 
 @pytest.mark.asyncio
+async def test_mehrzahl_trifft_die_einzahl(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """M9–M11: „Blattfarbstoffe" fiel durch, der Alias heißt „Blattfarbstoff". Gespeichert wird
+    der Alias in seiner Schreibweise; die Mehrzahl des Titels ist kein Alias."""
+    stunde = await _stunde(test_client, auth_headers)
+    chl = await _begriff(async_engine, "Chlorophyll", fach=BEZUG)
+    kat = await _begriff(async_engine, "Katalysator")
+    async with _sitzungen(async_engine)() as db:
+        db.add(NodeAlias(node_id=chl.id, alias="Blattfarbstoff"))
+        await db.commit()
+    aus = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": "Blattfarbstoffe"},
+                                   {"typ": "concept", "titel": PRAEFIX + "Katalysatoren"})
+    assert "nicht_eingetragen" not in aus, aus
+    assert aus["eingetragen"] == [{"titel": PRAEFIX + "Chlorophyll", "aliase": ["Blattfarbstoff"]},
+                                  {"titel": PRAEFIX + "Katalysator"}]
+    assert [r["node_id"] for r in await _refs(test_client, auth_headers, stunde)] == [str(chl.id), str(kat.id)]
+
+
+@pytest.mark.asyncio
+async def test_mehrzahl_nur_bei_einem_treffer(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """„Phasen" passt auf „Phas" und auf „Phase" — dann lieber nicht eintragen als raten."""
+    stunde = await _stunde(test_client, auth_headers)
+    await _begriff(async_engine, "Phase")
+    await _begriff(async_engine, "Phas")
+    aus = await _schreibe_begriffe(async_engine, stunde, {"typ": "concept", "titel": PRAEFIX + "Phasen"})
+    assert [n["titel"] for n in aus["nicht_eingetragen"]] == [PRAEFIX + "Phasen"], aus
+    assert await _refs(test_client, auth_headers, stunde) == []
+
+
+@pytest.mark.asyncio
 async def test_aliase_in_der_auswahl_und_im_planer(test_client, auth_headers, faecher, async_engine, aufraeumen):
     """`begriffe` zeigt eingetragene mit ihren Aliasen; der Planer speichert sie mit."""
     stunde = await _stunde(test_client, auth_headers)

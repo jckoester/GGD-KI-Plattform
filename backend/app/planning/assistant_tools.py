@@ -1242,10 +1242,13 @@ async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
     Gesucht wird im Fach der Stunde und seinen Bezugsfächern, normalisiert wie die
     Namenssuche (`normalisiere_titel`, derselbe Ausdruck wie ihr Index). Gibt es den Namen
     in beiden, gilt das eigene Fach; gibt es ihn in mehreren Fassungen, entscheidet `fassung`.
+
+    Trifft der Name nichts, gilt eine Einzahlform (`einzahlformen`: „Blattfarbstoffe" →
+    Alias „Blattfarbstoff") — aber nur, wenn sie genau einen Begriff trifft.
     """
     from app.context.aliase import ALIAS_NORMALISIERT
     from app.context.filters import TITEL_NORMALISIERT
-    from app.context.lookup import normalisiere_titel
+    from app.context.lookup import einzahlformen, normalisiere_titel
     from app.context.service import bezugsfaecher_von
     from app.context.visibility import read_scope_clause
     from app.db.models import NodeAlias
@@ -1253,27 +1256,36 @@ async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
     if stunde.subject_id is None:
         return None, f"„{titel}“: Die Stunde hat kein Fach."
     faecher = (stunde.subject_id, *await bezugsfaecher_von(ctx.db, stunde.subject_id))
+
+    async def suche(schluessel: list[str]) -> list[ContextNode]:
+        treffer = list((await ctx.db.execute(
+            sa.select(ContextNode).where(
+                ContextNode.content_type.in_(BEGRIFF_TYPEN),
+                ContextNode.status == "active",
+                read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+                ContextNode.subject_id.in_(faecher),
+                sa.or_(
+                    TITEL_NORMALISIERT.in_(schluessel),
+                    ContextNode.id.in_(sa.select(NodeAlias.node_id).where(ALIAS_NORMALISIERT.in_(schluessel))),
+                ),
+            ).order_by(ContextNode.id)
+        )).scalars())
+        if fassung:
+            gewuenscht = fassung.translate(_BINDESTRICHE).strip().casefold()
+            treffer = [t for t in treffer
+                       if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
+        if len(treffer) > 1:
+            eigene = [t for t in treffer if t.subject_id == stunde.subject_id]
+            if len(eigene) == 1:
+                treffer = eigene
+        return treffer
+
     schluessel = normalisiere_titel(titel.translate(_BINDESTRICHE))
-    treffer = list((await ctx.db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.content_type.in_(BEGRIFF_TYPEN),
-            ContextNode.status == "active",
-            read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
-            ContextNode.subject_id.in_(faecher),
-            sa.or_(
-                TITEL_NORMALISIERT == schluessel,
-                ContextNode.id.in_(sa.select(NodeAlias.node_id).where(ALIAS_NORMALISIERT == schluessel)),
-            ),
-        ).order_by(ContextNode.id)
-    )).scalars())
-    if fassung:
-        gewuenscht = fassung.translate(_BINDESTRICHE).strip().casefold()
-        treffer = [t for t in treffer
-                   if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
-    if len(treffer) > 1:
-        eigene = [t for t in treffer if t.subject_id == stunde.subject_id]
-        if len(eigene) == 1:
-            treffer = eigene
+    treffer = await suche([schluessel])
+    if not treffer and (formen := einzahlformen(schluessel)):
+        einzahl = await suche(formen)
+        if len(einzahl) == 1:
+            return einzahl[0], None
     if len(treffer) == 1:
         return treffer[0], None
     if not treffer:
@@ -1287,10 +1299,11 @@ async def _aliase_des_begriffs(ctx: ToolContext, knoten: ContextNode, namen: lis
     """Welche der Namen Aliase dieses Begriffs sind — in der Schreibweise des Speichers.
 
     Der Titel selbst zählt nicht, ebenso wenig ein Name, der zu keinem Alias passt: Das
-    Modell kann keinen Alias erfinden, der dann in der Leiste stünde.
+    Modell kann keinen Alias erfinden, der dann in der Leiste stünde. Wie beim Nachschlagen
+    gilt im Zweifel die Einzahl („Blattfarbstoffe" → „Blattfarbstoff").
     """
     from app.context.aliase import ALIAS_NORMALISIERT
-    from app.context.lookup import normalisiere_titel
+    from app.context.lookup import einzahlformen, normalisiere_titel
     from app.db.models import NodeAlias
 
     titel = normalisiere_titel(knoten.title or "")
@@ -1298,11 +1311,21 @@ async def _aliase_des_begriffs(ctx: ToolContext, knoten: ContextNode, namen: lis
                if s and s != titel]
     if not gesucht:
         return []
+    alle = list(dict.fromkeys(f for s in gesucht for f in (s, *einzahlformen(s))))
     gefunden = dict((await ctx.db.execute(
         sa.select(ALIAS_NORMALISIERT, NodeAlias.alias)
-        .where(NodeAlias.node_id == knoten.id, ALIAS_NORMALISIERT.in_(gesucht))
+        .where(NodeAlias.node_id == knoten.id, ALIAS_NORMALISIERT.in_(alle))
     )).all())
-    return list(dict.fromkeys(gefunden[s] for s in gesucht if s in gefunden))
+    aliase = []
+    for s in gesucht:
+        if s in gefunden:
+            aliase.append(gefunden[s])
+            continue
+        formen = einzahlformen(s)
+        if titel in formen:                  # „Chromatografien" — der Titel in der Mehrzahl
+            continue
+        aliase += [gefunden[f] for f in formen if f in gefunden][:1]
+    return list(dict.fromkeys(aliase))
 
 
 async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
@@ -1568,7 +1591,8 @@ register_tool(ChatTool(
                 "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
                 "einzeln nachschlagen. (4) refs sind Kompetenzen und Begriffe — Begriffe mit "
                 "typ 'concept' und ihrem titel aus begriffe oder einem Treffer (Titel oder "
-                "Alias), ohne node_id; "
+                "Alias), ohne node_id — jeder genannte Name ein eigener Eintrag, auch mehrere "
+                "Aliase desselben Begriffs; das Werkzeug fasst sie zusammen; "
                 "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Hat der zugestimmte "
                 "Vorschlag „Begriffe dieser Stunde“ genannt, gehören sie in diesen Aufruf. "
                 "Gibt suggested_refs "
@@ -1656,7 +1680,7 @@ register_tool(ChatTool(
                             "die Lehrkraft zugestimmt hat). Immer die ganze Liste: bestehende "
                             "aus get_lesson_detail behalten, neue Kompetenzen so übernehmen, wie "
                             "sie im Kapitel oder im Treffer stehen, neue Begriffe mit typ "
-                            "'concept' und titel."
+                            "'concept' und titel — jeder genannte Name ein eigener Eintrag."
                         ),
                     },
                 },

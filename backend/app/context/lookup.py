@@ -92,6 +92,27 @@ def normalisiere_titel(titel: str) -> str:
     return " ".join(ohne_gliederungsnummer(titel).lower().split())
 
 
+# Pluralendungen, die ohne Umlaut auskommen: „Blattfarbstoffe", „Katalysatoren", „Säuren".
+_MEHRZAHL = ("en", "er", "e", "n", "s")
+
+
+def einzahlformen(schluessel: str) -> list[str]:
+    """Mögliche Einzahlformen eines normalisierten Namens — der Rückfall, wenn der Name selbst
+    nichts trifft: „blattfarbstoffe" → „blattfarbstoff" (Messung 9–11, fünfmal).
+
+    Nur das letzte Wort, nur Endungen ohne Umlautwechsel, mindestens drei Zeichen Rest. Was
+    davon gilt, entscheidet der Aufrufer — beim Eintragen eines Begriffs nur ein eindeutiger
+    Treffer (`_begriff_zum_titel`).
+    """
+    formen = []
+    for endung in _MEHRZAHL:
+        if schluessel.endswith(endung) and len(schluessel) - len(endung) >= 3:
+            form = schluessel[: -len(endung)]
+            if form not in formen and not form.endswith(" "):
+                formen.append(form)
+    return formen
+
+
 def titel_normalisiert_sql(spalte: str) -> str:
     """Dieselbe Normalisierung wie :func:`normalisiere_titel`, als SQL-Ausdruck.
 

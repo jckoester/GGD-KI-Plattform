@@ -62,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.auth.dependencies import get_jwt_service
 from app.config import settings
 from app.context.embedding import vor_einer_messung
-from app.context.lookup import normalisiere_titel
+from app.context.lookup import einzahlformen, normalisiere_titel
 
 # `scripts/` ist kein Paket (CLAUDE.md, „scripts/-Paketkonflikt") — über den Pfad laden.
 _spec = importlib.util.spec_from_file_location("chat_probe", Path(__file__).with_name("chat_probe.py"))
@@ -572,14 +572,19 @@ def begriffsabsatz(antwort: str) -> tuple[list[str], list[str]] | None:
 
 def _knoten_zum_namen(name: str, info: dict) -> str | None:
     """Wie `_begriff_zum_titel` im Werkzeug: Titel oder Alias, aktiv, im Fach oder einem
-    Bezugsfach; gibt es ihn in beiden, das eigene Fach."""
+    Bezugsfach; gibt es ihn in beiden, das eigene Fach. Trifft der Name nichts, eine
+    Einzahlform — nur bei genau einem Treffer."""
+    def suche(schluessel: set[str]) -> list[str]:
+        treffer = [k for k, n in (info.get("knoten") or {}).items()
+                   if n.get("aktiv", True) and n.get("subject_id") in info.get("erlaubt", set())
+                   and schluessel & {normalisiere_titel(t) for t in [n["titel"], *n.get("aliase", [])]}]
+        if len(treffer) > 1:
+            eigene = [k for k in treffer if info["knoten"][k].get("subject_id") == info.get("fach")]
+            treffer = eigene if len(eigene) == 1 else treffer
+        return treffer
+
     schluessel = normalisiere_titel(name.translate(_BINDESTRICHE))
-    treffer = [k for k, n in (info.get("knoten") or {}).items()
-               if n.get("aktiv", True) and n.get("subject_id") in info.get("erlaubt", set())
-               and schluessel in {normalisiere_titel(t) for t in [n["titel"], *n.get("aliase", [])]}]
-    if len(treffer) > 1:
-        eigene = [k for k in treffer if info["knoten"][k].get("subject_id") == info.get("fach")]
-        treffer = eigene if len(eigene) == 1 else treffer
+    treffer = suche({schluessel}) or suche(set(einzahlformen(schluessel)))
     return treffer[0] if len(treffer) == 1 else None
 
 

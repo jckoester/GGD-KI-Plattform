@@ -20,7 +20,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Begriffe unter ihren Aliasen:** Nennt eine Stunde einen Begriff unter einem Alias
   („σ-Komplex" bei „elektrophile Substitution"), bleibt der Name sichtbar: in der Leiste hinter
   dem Titel, im Export und im Umfang einer Klassenarbeit. `update_lesson_phases` meldet dem
-  Assistenten, was eingetragen ist (`eingetragen`).
+  Assistenten, was eingetragen ist (`eingetragen`). Trifft ein Name nichts, gilt seine Einzahl,
+  wenn sie genau einen Begriff trifft („Blattfarbstoffe" → „Blattfarbstoff").
 - **Fachbegriffe in der Kompetenzleiste:** Die Leiste der Entwurfsansicht heißt „Kompetenzen und
   Fachbegriffe" und zeigt Begriffe getrennt von den Kompetenzen, mit Symbol für Fachbegriff oder
   Stoffsteckbrief. Beim Bearbeiten lassen sich Begriffe des Fachs und seiner Bezugsfächer suchen,

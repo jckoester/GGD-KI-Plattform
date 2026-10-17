@@ -432,6 +432,13 @@ def test_zaehlung_trennt_speicher_und_modell():
                                         " · verloren: Katalysator")
 
 
+def test_zaehlung_kennt_die_mehrzahl():
+    """Wie das Werkzeug: „Katalysatoren" ist Katalysator, nicht „fehlt im Speicher"."""
+    z = _begriffs_lauf({"absatz": True, "geschrieben": True}, vorher=[], zaehlen=True, nachher=[_b("b-kat")],
+                       antwort="Begriffe dieser Stunde: Katalysatoren (Erarbeitung)")
+    assert (z["knoten"], z["fehlt_im_speicher"]) == (1, [])
+
+
 def test_zaehlung_nur_mit_absatz_im_fall():
     assert _begriffs_lauf({"geschrieben": True}, vorher=[], nachher=[], antwort=ZAEHL_ANTWORT, zaehlen=True) is None
 

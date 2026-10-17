@@ -144,3 +144,5 @@ class TestStundenentwurf:
         # „σ-Komplex eingetragen" zu melden, wo die Leiste „elektrophile Substitution" zeigt.
         assert "unter `aliase`" in abschnitt
         assert "unter `eingetragen` bestätigt" in schritt5
+        # Messung 11: `chat-komplex` schickte nur die Oberbegriffe, die genannten Aliase fehlten.
+        assert "jeden genannten Namen als eigenen Eintrag" in schritt5

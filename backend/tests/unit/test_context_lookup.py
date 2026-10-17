@@ -8,7 +8,7 @@ das Nachschlagen dort, verschlechtert es genau den Fall, um den es geht.
 
 import pytest
 
-from app.context.lookup import nachschlage_begriff, normalisiere_titel, reduziere
+from app.context.lookup import einzahlformen, nachschlage_begriff, normalisiere_titel, reduziere
 
 
 class TestNachschlagenErkannt:
@@ -93,3 +93,19 @@ class TestIndexUndAbfrageBleibenGleich:
         ).read_text(encoding="utf-8")
         assert "from app.context.lookup import titel_normalisiert_sql" in quelle
         assert "titel_normalisiert_sql('title')" in quelle
+
+
+# ── Einzahlformen (0.17, Plan „Fachbegriffe der Stunde" § 27) ────────────────
+
+
+@pytest.mark.parametrize("name, formen", [
+    ("blattfarbstoffe", ["blattfarbstoff"]),
+    ("katalysatoren", ["katalysator", "katalysatore"]),
+    ("säuren", ["säur", "säure"]),
+    ("elektronenpfeile", ["elektronenpfeil"]),
+    ("chromatografie", ["chromatografi"]),
+    ("ion", []),                      # „io" wäre kürzer als drei Zeichen
+    ("mobile phasen", ["mobile phas", "mobile phase"]),
+])
+def test_einzahlformen(name, formen):
+    assert einzahlformen(name) == formen
