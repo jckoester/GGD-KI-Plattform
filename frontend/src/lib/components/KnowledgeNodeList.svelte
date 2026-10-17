@@ -1,4 +1,5 @@
 <script>
+    import { untrack } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -81,7 +82,7 @@
     let selectedContentType = $state("");
     let selectedStatus = $state("active");
     let onlyEntryNodes = $state(false);
-    let selectedGrade = $state(initialGrade);
+    let selectedGrade = $state(untrack(() => initialGrade));
 
     // Sortierung
 

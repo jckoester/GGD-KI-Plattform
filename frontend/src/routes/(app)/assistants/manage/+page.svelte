@@ -632,7 +632,7 @@
 
 <!-- Import-Dialog (Modal) -->
 {#if importOpen}
-    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeImport} />
+    <div role="presentation" class="fixed inset-0 bg-black/50 z-40" onclick={closeImport}></div>
     <div
         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
     >
@@ -655,6 +655,8 @@
         {/if}
 
         <div
+            role="region"
+            aria-label="Datei hier ablegen"
             class="border-2 border-dashed border-light-ui-3 dark:border-dark-ui-3 rounded-xl p-8 text-center
                    mb-4 transition-colors
                    {importFile
@@ -717,12 +719,12 @@
         {/if}
 
         <div class="space-y-2 mb-4">
-            <label
+            <label for="verwaltung-modell-ueberschreiben"
                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
             >
                 Modell überschreiben (optional)
             </label>
-            <select
+            <select id="verwaltung-modell-ueberschreiben"
                 bind:value={importModelOverride}
                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                        bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
@@ -764,7 +766,7 @@
 
 <!-- Lösch-Bestätigung (Modal) -->
 {#if deleteTarget}
-    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeDelete} />
+    <div role="presentation" class="fixed inset-0 bg-black/50 z-40" onclick={closeDelete}></div>
     <div
         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
     >
@@ -820,7 +822,7 @@
 
 <!-- Ablehnen-Bestätigung (Modal) -->
 {#if rejectTarget}
-    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeReject} />
+    <div role="presentation" class="fixed inset-0 bg-black/50 z-40" onclick={closeReject}></div>
     <div
         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
     >

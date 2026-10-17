@@ -64,12 +64,17 @@
 </script>
 
 {#if open}
+  <!-- Klick daneben schließt (Maus); per Tastatur Escape oder die Knöpfe. -->
   <div
+    role="presentation"
     class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
     onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
   >
     <div
       class="bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-xl shadow-2xl w-full max-w-md p-6"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
       onkeydown={onKeydown}
     >
       <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">

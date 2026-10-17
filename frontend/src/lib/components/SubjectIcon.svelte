@@ -37,5 +37,5 @@
 </script>
 
 {#if Component}
-    <svelte:component this={Component} {size} {color} class={className} />
+    <Component {size} {color} class={className} />
 {/if}

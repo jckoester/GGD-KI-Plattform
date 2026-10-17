@@ -507,12 +507,12 @@
         >
             <!-- Titel -->
             <div>
-                <label
+                <label for="bearb-titel"
                     class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                 >
                     Titel *
                 </label>
-                <input
+                <input id="bearb-titel"
                     type="text"
                     bind:value={title}
                     disabled={!canEdit}
@@ -531,12 +531,12 @@
 
             <!-- Kategorie -->
             <div>
-                <label
+                <label for="bearb-kategorie"
                     class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                 >
                     Kategorie *
                 </label>
-                <select
+                <select id="bearb-kategorie"
                     bind:value={category}
                     onchange={() => {
                         contentType = "";
@@ -561,12 +561,12 @@
             <!-- Typ -->
             {#if category}
                 <div>
-                    <label
+                    <label for="bearb-typ"
                         class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                     >
                         Typ *
                     </label>
-                    <select
+                    <select id="bearb-typ"
                         bind:value={contentType}
                         disabled={!canEdit}
                         class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -589,7 +589,7 @@
             <!-- Inhalt -->
             {#if contentType}
                 <div>
-                    <label
+                    <label for="bearb-inhalt"
                         class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                     >
                         Inhalt
@@ -597,7 +597,7 @@
                     <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1">
                         Markdown wird unterstützt
                     </p>
-                    <textarea
+                    <textarea id="bearb-inhalt"
                         bind:value={content}
                         rows="6"
                         disabled={!canEdit}
@@ -622,12 +622,12 @@
                     </h3>
                     <div class="space-y-3">
                         <div>
-                            <label
+                            <label for="bearb-funktionsname"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Funktionsname
                             </label>
-                            <input
+                            <input id="bearb-funktionsname"
                                 type="text"
                                 bind:value={signatur.name}
                                 disabled={!canEdit}
@@ -638,12 +638,12 @@
                             />
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-sprache"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Sprache
                             </label>
-                            <select
+                            <select id="bearb-sprache"
                                 bind:value={signatur.sprache}
                                 disabled={!canEdit}
                                 class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -656,11 +656,11 @@
                             </select>
                         </div>
                         <div>
-                            <label
+                            <span
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Parameter
-                            </label>
+                            </span>
                             {#if signatur.parameter.length === 0}
                                 <p
                                     class="text-xs text-light-tx-3 dark:text-dark-tx-3 italic mb-2"
@@ -739,12 +739,12 @@
                             {/if}
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-rueckgabetyp"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Rückgabetyp
                             </label>
-                            <input
+                            <input id="bearb-rueckgabetyp"
                                 type="text"
                                 bind:value={signatur.rueckgabe.typ}
                                 disabled={!canEdit}
@@ -755,12 +755,12 @@
                             />
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-rueckgabebeschreibung"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Rückgabebeschreibung
                             </label>
-                            <input
+                            <input id="bearb-rueckgabebeschreibung"
                                 type="text"
                                 bind:value={signatur.rueckgabe.beschreibung}
                                 disabled={!canEdit}
@@ -786,12 +786,12 @@
                     </h3>
                     <div class="space-y-3">
                         <div>
-                            <label
+                            <label for="bearb-beschreibung"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Beschreibung
                             </label>
-                            <textarea
+                            <textarea id="bearb-beschreibung"
                                 bind:value={schaltzeichen.beschreibung}
                                 rows="2"
                                 disabled={!canEdit}
@@ -802,12 +802,12 @@
                             ></textarea>
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-norm"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Norm
                             </label>
-                            <input
+                            <input id="bearb-norm"
                                 type="text"
                                 bind:value={schaltzeichen.norm}
                                 disabled={!canEdit}
@@ -818,12 +818,12 @@
                             />
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-kennung"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 Kennung
                             </label>
-                            <input
+                            <input id="bearb-kennung"
                                 type="text"
                                 bind:value={schaltzeichen.kennung}
                                 disabled={!canEdit}
@@ -834,12 +834,12 @@
                             />
                         </div>
                         <div>
-                            <label
+                            <label for="bearb-svg"
                                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 SVG (optional)
                             </label>
-                            <textarea
+                            <textarea id="bearb-svg"
                                 bind:value={schaltzeichen.svg}
                                 rows="4"
                                 disabled={!canEdit}
@@ -863,12 +863,12 @@
             <!-- Generisches JSON-Feld für andere Typen -->
             {#if category && contentType && !["funktion", "bauteil", "methode", "sozialform"].includes(contentType)}
                 <div>
-                    <label
+                    <label for="bearb-metadaten"
                         class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                     >
                         Metadaten (JSON)
                     </label>
-                    <textarea
+                    <textarea id="bearb-metadaten"
                         bind:value={metadata}
                         rows="4"
                         disabled={!canEdit}
@@ -892,12 +892,12 @@
                 <div class="mt-4 space-y-4">
                     <!-- Lese-Scope -->
                     <div>
-                        <label
+                        <label for="bearb-lese-sichtbarkeit"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                         >
                             Lese-Sichtbarkeit
                         </label>
-                        <select
+                        <select id="bearb-lese-sichtbarkeit"
                             bind:value={readScope}
                                 onchange={readScopeGewechselt}
                             disabled={!canEdit}
@@ -915,14 +915,14 @@
                     <!-- Gruppen-Auswahl für read_scope -->
                     {#if ["subject", "group"].includes(readScope)}
                         <div>
-                            <label
+                            <label for="bearb-read-gruppe"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                             >
                                 {readScope === "group"
                                     ? "Gruppe"
                                     : "Fachgruppe"}
                             </label>
-                            <select
+                            <select id="bearb-read-gruppe"
                                 bind:value={readScopeGroupId}
                                 disabled={!canEdit}
                                 class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -942,12 +942,12 @@
 
                     <!-- Schreib-Scope -->
                     <div>
-                        <label
+                        <label for="bearb-schreib-sichtbarkeit"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                         >
                             Schreib-Sichtbarkeit
                         </label>
-                        <select
+                        <select id="bearb-schreib-sichtbarkeit"
                             bind:value={writeScope}
                                 onchange={writeScopeGewechselt}
                             disabled={!canEdit}
@@ -964,14 +964,14 @@
                     <!-- Gruppen-Auswahl für write_scope -->
                     {#if ["subject", "group"].includes(writeScope)}
                         <div>
-                            <label
+                            <label for="bearb-write-gruppe"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                             >
                                 {writeScope === "group"
                                     ? "Gruppe"
                                     : "Fachgruppe"}
                             </label>
-                            <select
+                            <select id="bearb-write-gruppe"
                                 bind:value={writeScopeGroupId}
                                 disabled={!canEdit}
                                 class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -991,13 +991,13 @@
 
                     <!-- Ablaufdatum -->
                     <div>
-                        <label
+                        <label for="bearb-ablaufdatum"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                         >
                             Ablaufdatum
                         </label>
                         <div class="flex gap-2 items-center">
-                            <input
+                            <input id="bearb-ablaufdatum"
                                 type="date"
                                 bind:value={validUntil}
                                 disabled={!canEdit}
@@ -1022,12 +1022,12 @@
 
                     <!-- Schuljahr -->
                     <div>
-                        <label
+                        <label for="bearb-schuljahr"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                         >
                             Schuljahr
                         </label>
-                        <input
+                        <input id="bearb-schuljahr"
                             type="text"
                             bind:value={schuljahr}
                             disabled={!canEdit}
@@ -1042,13 +1042,13 @@
                     {#if category === "knowledge"}
                         <!-- Fachzuordnung -->
                         <div class="space-y-1">
-                            <label
+                            <label for="bearb-fach"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                             >
                                 Fach
                             </label>
                             {#if canEdit}
-                                <select
+                                <select id="bearb-fach"
                                     bind:value={subjectId}
                                     class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                            bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -1075,14 +1075,14 @@
 
                         <!-- Jahrgangsstufen -->
                         <div class="space-y-1">
-                            <label
+                            <label for="bearb-jahrgangsstufe"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
                             >
                                 Jahrgangsstufe
                             </label>
                             {#if canEdit}
                                 <div class="flex items-center gap-2">
-                                    <input
+                                    <input id="bearb-jahrgangsstufe"
                                         type="number"
                                         min="1"
                                         max="13"

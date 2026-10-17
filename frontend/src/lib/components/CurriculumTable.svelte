@@ -384,10 +384,11 @@
 
 <!-- Kontextmenü -->
 {#if showContextMenu}
-    <div class="fixed inset-0 z-50 bg-black/10" onclick={hideMenu} />
+    <div role="presentation" class="fixed inset-0 z-50 bg-black/10" onclick={hideMenu}></div>
     <div
         class="fixed z-50 bg-white dark:bg-dark-bg-2 rounded-lg shadow-lg border border-light-ui-3 dark:border-dark-ui-3 py-2 min-w-[160px]"
         style="left: {showContextMenu.x}px; top: {showContextMenu.y}px;"
+        role="presentation"
         onclick={(e) => e.stopPropagation()}
     >
         <button
@@ -426,7 +427,8 @@
     >
         <div
             class="bg-white dark:bg-dark-bg-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-6 max-w-md w-full"
-            onclick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
         >
             <h3
                 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-3"
@@ -457,7 +459,8 @@
     </div>
 {/if}
 
-<div class="overflow-x-auto" onclick={hideMenu}>
+<!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
+<div class="overflow-x-auto" role="presentation" onclick={hideMenu}>
     <table class="w-full text-left border-collapse text-sm">
         <thead>
             <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
@@ -601,7 +604,7 @@
                                     }}
                                     class="w-full text-sm text-light-tx-2 dark:text-dark-tx-2 bg-transparent border-none focus:outline-none resize-none"
                                     rows="2"
-                                />
+></textarea>
                             {:else}
                                 {kap.metadata.einleitung}
                             {/if}
@@ -871,7 +874,7 @@
                                         class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2"
                                         rows="8"
                                         placeholder="Konkretisierungstext"
-                                    />
+></textarea>
                                 {:else}
                                     {#if eintrag.konkretisierung}
                                         <div
@@ -1150,16 +1153,14 @@
     /* Input-Styling im Edit-Mode */
     input[type="text"],
     input[type="number"],
-    textarea,
-    select {
+    textarea {
         outline: none;
         transition: border-color 0.15s ease;
     }
 
     input[type="text"]:focus,
     input[type="number"]:focus,
-    textarea:focus,
-    select:focus {
+    textarea:focus {
         border-color: #3b82f6;
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }

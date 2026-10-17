@@ -256,6 +256,7 @@
 
 {#if open}
   <div
+    role="presentation"
     class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
     onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
   >
@@ -264,6 +265,7 @@
         <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx">Wochenmuster bearbeiten</h2>
         <button
           onclick={onClose}
+          aria-label="Schließen"
           class="p-1.5 rounded hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 text-light-tx-2 dark:text-dark-tx-2 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -432,6 +434,7 @@
 
                 <button
                   onclick={() => removeRow(i)}
+                  aria-label="Zeile entfernen"
                   class="p-1 rounded hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"

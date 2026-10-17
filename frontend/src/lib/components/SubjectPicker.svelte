@@ -64,6 +64,7 @@
 <div
   bind:this={container}
   class="absolute bottom-full left-0 right-0 mb-2 z-50"
+  role="presentation"
   onclick={(e) => e.stopPropagation()}
 >
   <div class="w-full max-w-4xl mx-auto bg-light-bg-2 dark:bg-dark-bg-2

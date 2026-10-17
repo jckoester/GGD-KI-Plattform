@@ -123,12 +123,17 @@
 
 {#if open}
   <!-- Backdrop -->
+  <!-- Klick daneben schließt (Maus); per Tastatur Escape oder die Knöpfe. -->
   <div
+    role="presentation"
     class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
     onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
   >
     <div
       class="bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-xl shadow-2xl w-full max-w-md p-6"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
       onkeydown={onKeydown}
     >
       <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-4">
@@ -136,8 +141,8 @@
       </h2>
 
       <div class="mb-4">
-        <label class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">Titel</label>
-        <input
+        <label for="ue-titel" class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">Titel</label>
+        <input id="ue-titel"
           type="text"
           bind:value={titel}
           placeholder="z.B. Quadratische Funktionen"
@@ -147,7 +152,7 @@
       </div>
 
       <div class="mb-4">
-        <label class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2">Farbe</label>
+        <span class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2">Farbe</span>
         <div class="flex gap-2 flex-wrap">
           {#each UE_PALETTE as [light], i}
             <button
@@ -163,7 +168,7 @@
 
       <!-- Curriculum-Kapitel (optional) -->
       <div class="mb-5">
-        <label class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+        <label for="ue-curriculum-kapitel" class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
           Curriculum-Kapitel <span class="font-normal">(optional)</span>
         </label>
         {#if loadingChapters}
@@ -171,7 +176,7 @@
         {:else if chaptersError}
           <ErrorBanner message={chaptersError} />
         {:else}
-          <select
+          <select id="ue-curriculum-kapitel"
             bind:value={selectedKapitelId}
             onchange={onKapitelChange}
             class="w-full px-3 py-2 text-sm bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg

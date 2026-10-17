@@ -1,4 +1,5 @@
 <script>
+    import { untrack } from "svelte";
     /**
      * Sammlungs-Editor (UI-Notiz A2) — eigene Seite, kein Modal.
      *
@@ -37,10 +38,12 @@
     const schema = $derived(feldSchema(typ));
     const text = $derived(contentFeld(typ));
     const label = $derived(CONTENT_TYPE_LABELS[typ] ?? typ);
-    const [defRead, defWrite] = SCOPE_DEFAULTS[typ] ?? ["school", "private"];
+    // Der Editor wird je Knoten bzw. Typ neu aufgebaut (`{#key}` in den Routen) — Startwerte
+    // aus `typ` und `node` einmal zu übernehmen, ist hier richtig, nicht vergessen.
+    const [defRead, defWrite] = untrack(() => SCOPE_DEFAULTS[typ] ?? ["school", "private"]);
 
-    let title = $state(node?.title ?? "");
-    let content = $state(node?.content ?? "");
+    let title = $state(untrack(() => node?.title ?? ""));
+    let content = $state(untrack(() => node?.content ?? ""));
     // Gewählt wird die **Fachschaft**, nicht das Fach: Sie trägt `write_scope_group_id`,
     // das die Datenbank bei `write_scope = subject` verlangt. Das Fach ergibt sich daraus.
     let fachschaftId = $state("");
@@ -53,18 +56,18 @@
     const gewaehlteFachschaft = $derived(
         $myFachschaften.find((g) => String(g.id) === fachschaftId) ?? null,
     );
-    let felder = $state(
+    let felder = $state(untrack(() =>
         Object.fromEntries(
             Object.keys(feldSchema(typ)).map((name) => [
                 name,
                 (node?.metadata ?? {})[name] ?? (feldSchema(typ)[name].typ === "liste" ? [] : ""),
             ]),
         ),
-    );
+    ));
     let listenEingabe = $state({});
     // Aliase sind seit Migration 0057 kein Metadatenfeld mehr, sondern eine
     // Eigenschaft jedes Knotens — deshalb neben `felder`, nicht darin.
-    let aliase = $state([...(node?.aliase ?? [])]);
+    let aliase = $state(untrack(() => [...(node?.aliase ?? [])]));
 
     /**
      * Metadaten, die aus dem Import stammen und hier **nicht** im Formular stehen

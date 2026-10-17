@@ -212,10 +212,10 @@
   <form onsubmit={e => { e.preventDefault(); save() }} class="space-y-6">
     <!-- Titel -->
     <div>
-      <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+      <label for="neu-titel" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
         Titel *
       </label>
-      <input
+      <input id="neu-titel"
         type="text"
         bind:value={title}
         class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -230,10 +230,10 @@
 
     <!-- Kategorie -->
     <div>
-      <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+      <label for="neu-kategorie" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
         Kategorie *
       </label>
-      <select
+      <select id="neu-kategorie"
         bind:value={category}
         onchange={() => { contentType = '' }}
         class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -252,10 +252,10 @@
     <!-- Typ -->
     {#if category}
       <div>
-        <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        <label for="neu-typ" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
           Typ *
         </label>
-        <select
+        <select id="neu-typ"
           bind:value={contentType}
           class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                  bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -274,13 +274,13 @@
     <!-- Inhalt -->
     {#if contentType}
       <div>
-        <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        <label for="neu-inhalt" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
           Inhalt
         </label>
         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1">
           Markdown wird unterstützt
         </p>
-        <textarea
+        <textarea id="neu-inhalt"
           bind:value={content}
           rows="6"
           class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -299,10 +299,10 @@
         </h3>
         <div class="space-y-3">
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-funktionsname" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Funktionsname
             </label>
-            <input
+            <input id="neu-funktionsname"
               type="text"
               bind:value={signatur.name}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -311,10 +311,10 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-sprache" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Sprache
             </label>
-            <select
+            <select id="neu-sprache"
               bind:value={signatur.sprache}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -325,9 +325,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <span class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Parameter
-            </label>
+            </span>
             {#if signatur.parameter.length === 0}
               <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 italic mb-2">
                 Keine Parameter definiert
@@ -378,10 +378,10 @@
             </button>
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-rueckgabetyp" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Rückgabetyp
             </label>
-            <input
+            <input id="neu-rueckgabetyp"
               type="text"
               bind:value={signatur.rueckgabe.typ}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -390,10 +390,10 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-rueckgabebeschreibung" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Rückgabebeschreibung
             </label>
-            <input
+            <input id="neu-rueckgabebeschreibung"
               type="text"
               bind:value={signatur.rueckgabe.beschreibung}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -413,10 +413,10 @@
         </h3>
         <div class="space-y-3">
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-beschreibung" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Beschreibung
             </label>
-            <textarea
+            <textarea id="neu-beschreibung"
               bind:value={schaltzeichen.beschreibung}
               rows="2"
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -425,10 +425,10 @@
             ></textarea>
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-norm" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Norm
             </label>
-            <input
+            <input id="neu-norm"
               type="text"
               bind:value={schaltzeichen.norm}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -437,10 +437,10 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-kennung" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               Kennung
             </label>
-            <input
+            <input id="neu-kennung"
               type="text"
               bind:value={schaltzeichen.kennung}
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -449,10 +449,10 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+            <label for="neu-svg" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
               SVG (optional)
             </label>
-            <textarea
+            <textarea id="neu-svg"
               bind:value={schaltzeichen.svg}
               rows="4"
               class="w-full px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -468,10 +468,10 @@
     <!-- Generisches JSON-Feld für andere Typen -->
     {#if category && contentType && !['funktion', 'bauteil'].includes(contentType)}
       <div>
-        <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        <label for="neu-metadaten" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
           Metadaten (JSON)
         </label>
-        <textarea
+        <textarea id="neu-metadaten"
           bind:value={metadata}
           rows="4"
           class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -490,10 +490,10 @@
       <div class="mt-4 space-y-4">
         <!-- Lese-Scope -->
         <div>
-          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+          <label for="neu-lese-sichtbarkeit" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
             Lese-Sichtbarkeit
           </label>
-          <select
+          <select id="neu-lese-sichtbarkeit"
             bind:value={readScope}
             onchange={readScopeGewechselt}
             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -509,10 +509,10 @@
         <!-- Gruppen-Auswahl für read_scope -->
         {#if ['subject', 'group'].includes(readScope)}
           <div>
-            <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+            <label for="neu-read-gruppe" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
               {readScope === 'group' ? 'Gruppe' : 'Fachgruppe'}
             </label>
-            <select
+            <select id="neu-read-gruppe"
               bind:value={readScopeGroupId}
               class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -527,10 +527,10 @@
 
         <!-- Schreib-Scope -->
         <div>
-          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+          <label for="neu-schreib-sichtbarkeit" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
             Schreib-Sichtbarkeit
           </label>
-          <select
+          <select id="neu-schreib-sichtbarkeit"
             bind:value={writeScope}
             onchange={writeScopeGewechselt}
             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -545,10 +545,10 @@
         <!-- Gruppen-Auswahl für write_scope -->
         {#if ['subject', 'group'].includes(writeScope)}
           <div>
-            <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+            <label for="neu-write-gruppe" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
               {writeScope === 'group' ? 'Gruppe' : 'Fachgruppe'}
             </label>
-            <select
+            <select id="neu-write-gruppe"
               bind:value={writeScopeGroupId}
               class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -563,11 +563,11 @@
 
         <!-- Ablaufdatum -->
         <div>
-          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+          <label for="neu-ablaufdatum" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
             Ablaufdatum
           </label>
           <div class="flex gap-2 items-center">
-            <input
+            <input id="neu-ablaufdatum"
               type="date"
               bind:value={validUntil}
               class="px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -597,10 +597,10 @@
 
         <!-- Schuljahr -->
         <div>
-          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+          <label for="neu-schuljahr" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
             Schuljahr
           </label>
-          <input
+          <input id="neu-schuljahr"
             type="text"
             bind:value={schuljahr}
             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -613,10 +613,10 @@
         {#if category === 'knowledge'}
           <!-- Fachzuordnung -->
           <div class="space-y-1">
-            <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+            <label for="neu-fach" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
               Fach
             </label>
-            <select
+            <select id="neu-fach"
               bind:value={subjectId}
               class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
@@ -630,11 +630,11 @@
 
           <!-- Jahrgangsstufen -->
           <div class="space-y-1">
-            <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+            <label for="neu-jahrgangsstufe" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
               Jahrgangsstufe
             </label>
             <div class="flex items-center gap-2">
-              <input
+              <input id="neu-jahrgangsstufe"
                 type="number" min="1" max="13"
                 bind:value={minGrade}
                 placeholder="von"

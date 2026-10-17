@@ -1,6 +1,6 @@
 <script>
     import { goto, beforeNavigate } from "$app/navigation";
-    import { tick } from "svelte";
+    import { tick, untrack } from "svelte";
     import { page } from "$app/stores";
     import { getFachplanBySubject, getContextNodes } from "$lib/api.js";
     import { sortOperatorsByTitle, formatAfb } from "$lib/operators.js";
@@ -23,7 +23,7 @@
     // Ausgewähltes Band (Objekt mit min_grade/max_grade/niveau/label)
     let selectedBand = $state(null);
     // Ausgewählte BP-Version (null = aktuellste nehmen)
-    let selectedVersion = $state(initialBpVersion);
+    let selectedVersion = $state(untrack(() => initialBpVersion));
 
     // Ansicht: 'ik' = Inhaltsbezogene Kompetenzen, 'pk' = Prozessbezogene Kompetenzen,
     // 'operatoren' = Operatoren-Anhang (handlungsleitende Verben, nach AFB gruppiert)

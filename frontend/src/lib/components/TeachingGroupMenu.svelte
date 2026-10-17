@@ -21,7 +21,8 @@
 
 </script>
 
-<div class="relative" onclick={(e) => e.stopPropagation()}>
+<!-- Die Knöpfe stoppen das Hochblubbern selbst; die Hüllen brauchen keinen Klick-Handler. -->
+<div class="relative">
   <button
     onclick={toggle}
     disabled={loading}
@@ -36,7 +37,6 @@
     <div
       class="absolute right-0 top-full mt-1 z-50 w-48 bg-light-bg dark:bg-dark-bg rounded-lg shadow-lg
                   border border-light-ui-2 dark:border-dark-ui-2"
-      onclick={(e) => e.stopPropagation()}
     >
       <button
         onclick={(e) => { e.stopPropagation(); handleDelete() }}

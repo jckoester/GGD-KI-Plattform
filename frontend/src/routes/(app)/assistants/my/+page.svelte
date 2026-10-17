@@ -309,10 +309,10 @@
 
   <!-- Filter -->
   <div class="mb-4">
-    <label class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+    <label for="meine-status" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
       Status
     </label>
-    <select
+    <select id="meine-status"
       bind:value={statusFilter}
       onchange={load}
       class="w-full max-w-xs px-3 py-2 rounded-md border border-light-ui-3 dark:border-dark-ui-3
@@ -493,13 +493,15 @@
   <!-- Löschen-Bestätigungsmodal -->
   {#if deleteTarget !== null}
     <div
+      role="presentation"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onclick={() => (deleteTarget = null)}
+      onclick={(e) => { if (e.target === e.currentTarget) deleteTarget = null }}
       onkeydown={(e) => e.key === "Escape" && (deleteTarget = null)}
     >
       <div
         class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-xl p-6 max-w-sm w-full"
-        onclick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">
           Assistent löschen?
@@ -547,13 +549,15 @@
   <!-- Einreichen-Bestätigungsmodal -->
   {#if submitTarget !== null}
     <div
+      role="presentation"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onclick={() => (submitTarget = null)}
+      onclick={(e) => { if (e.target === e.currentTarget) submitTarget = null }}
       onkeydown={(e) => e.key === "Escape" && (submitTarget = null)}
     >
       <div
         class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-xl p-6 max-w-sm w-full"
-        onclick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">
           Zur Prüfung einreichen?
@@ -597,7 +601,7 @@
 
 <!-- Import-Dialog -->
 {#if importOpen}
-  <div class="fixed inset-0 bg-black/50 z-40" onclick={closeImport}></div>
+  <div role="presentation" class="fixed inset-0 bg-black/50 z-40" onclick={closeImport}></div>
   <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96
               bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6">
     <div class="flex items-center justify-between mb-4">
@@ -616,6 +620,8 @@
     {/if}
 
     <div
+            role="region"
+            aria-label="Datei hier ablegen"
       class="border-2 border-dashed rounded-xl p-8 text-center mb-4 transition-colors
              {importFile
                ? 'border-light-gr dark:border-dark-gr bg-light-gr/10 dark:bg-dark-gr/10'
@@ -667,10 +673,10 @@
 
     {#if availableModels.length > 0}
       <div class="mb-4">
-        <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        <label for="meine-modell-ueberschreiben" class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
           Modell überschreiben (optional)
         </label>
-        <select
+        <select id="meine-modell-ueberschreiben"
           bind:value={importModelOverride}
           class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                  bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx

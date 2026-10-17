@@ -1,4 +1,5 @@
 <script>
+    import { untrack } from "svelte";
     /**
      * Kanten anlegen (UI-Notiz A8) — ein Formular, kein Graph-Editor.
      *
@@ -22,7 +23,7 @@
     let { node, onclose, onverknuepft } = $props();
 
     const moeglich = $derived(relationen(node.content_type));
-    let relation = $state(relationen(node.content_type)[0]?.relation ?? "");
+    let relation = $state(untrack(() => relationen(node.content_type)[0]?.relation ?? ""));
     const gewaehlt = $derived(moeglich.find((r) => r.relation === relation) ?? null);
 
     let frage = $state("");

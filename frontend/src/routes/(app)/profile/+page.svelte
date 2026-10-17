@@ -347,12 +347,12 @@
             {#if quittung === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
-                <label
+                <label for="profil-kosten-im-chat-anzeigen"
                     class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
                 >
                     Kosten im Chat anzeigen
                 </label>
-                <select
+                <select id="profil-kosten-im-chat-anzeigen"
                     onchange={(e) =>
                         updatePreference("cost_granularity", e.target.value)}
                     value={preferences?.cost_granularity ?? "none"}
@@ -446,12 +446,12 @@
             </h2>
             <div class="space-y-4">
                 <div>
-                    <label
+                    <label for="profil-anzahl-zuletzt-angezeigter-cha"
                         class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
                     >
                         Anzahl zuletzt angezeigter Chats
                     </label>
-                    <select
+                    <select id="profil-anzahl-zuletzt-angezeigter-cha"
                         value={preferences?.sidebar_recent_chats_limit ?? 10}
                         onchange={updateSidebarLimit}
                         class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
@@ -475,12 +475,12 @@
             {#if quittung === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
-                <label
+                <label for="profil-angezeigte-treffer-im-vorschla"
                     class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
                 >
                     Angezeigte Treffer im Vorschlagsfenster
                 </label>
-                <select
+                <select id="profil-angezeigte-treffer-im-vorschla"
                     value={preferences?.context_search_limit ?? 8}
                     onchange={updateContextSearchLimit}
                     class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3

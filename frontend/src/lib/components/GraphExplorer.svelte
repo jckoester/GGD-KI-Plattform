@@ -1,4 +1,5 @@
 <script>
+    import { untrack } from 'svelte'
   import { goto } from '$app/navigation'
   import { getNeighborhood } from '$lib/api.js'
   import { CATEGORY_LABELS } from '$lib/taxonomy.js'
@@ -9,7 +10,7 @@
     initialDepth = 2, // 1 oder 2
   } = $props()
 
-  let depth = $state(initialDepth)
+  let depth = $state(untrack(() => initialDepth))
   let loading = $state(false)
   let error = $state(null)
   let hoveredId = $state(null)   // für Tooltip
@@ -171,6 +172,7 @@
       <svg
         bind:this={svgEl}
         class="w-full h-full"
+        role="presentation"
         onclick={(e) => { if (e.target === svgEl) hoveredId = null }}
       >
         <!-- Kanten (zuerst, damit Knoten darüber liegen) -->
@@ -199,6 +201,12 @@
               onmouseenter={() => { hoveredId = node.id }}
               onmouseleave={() => { hoveredId = null }}
               onclick={() => goto(`/knowledge/${node.id}`)}
+              role="link"
+              tabindex="0"
+              aria-label={node.title}
+              onkeydown={(e) => { if (e.key === 'Enter') goto(`/knowledge/${node.id}`) }}
+              onfocus={() => { hoveredId = node.id }}
+              onblur={() => { hoveredId = null }}
             >
               <circle
                 r={r}

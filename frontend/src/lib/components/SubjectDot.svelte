@@ -6,7 +6,7 @@
      */
     let { color = null, size = 'sm' } = $props()
 
-    const sizeClass = size === 'md' ? 'w-3 h-3' : 'w-2 h-2'
+    const sizeClass = $derived(size === 'md' ? 'w-3 h-3' : 'w-2 h-2')
 </script>
 
 <span

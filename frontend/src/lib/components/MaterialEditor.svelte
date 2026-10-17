@@ -137,7 +137,7 @@
             class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2 resize-none
                    focus:outline-none focus:border-primary dark:focus:border-primary-dark"
-        />
+></textarea>
 
         <!-- Autocomplete-Dropdown -->
         {#if dropdownOpen && dropdownItems.length > 0}

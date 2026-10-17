@@ -145,16 +145,16 @@
                            bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
                            font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"
                     placeholder="Geben Sie den Inhalt im Markdown-Format ein..."
-                />
+></textarea>
             </div>
 
             <!-- Preview -->
             <div>
-                <label
+                <span
                     class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-2"
                 >
                     Vorschau
-                </label>
+                </span>
                 <div
                     class="p-3 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
                             bg-light-ui dark:bg-dark-ui min-h-[400px]"

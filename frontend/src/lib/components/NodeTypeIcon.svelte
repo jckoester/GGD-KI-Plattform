@@ -32,4 +32,4 @@
     );
 </script>
 
-<svelte:component this={IconComponent} {size} class="{colorClass} shrink-0" />
+<IconComponent {size} class="{colorClass} shrink-0" />
