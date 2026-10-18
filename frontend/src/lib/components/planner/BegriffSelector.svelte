@@ -13,14 +13,16 @@
    * sagt die Liste, wer ihn anlegt.
    *
    * begriffe: die Einträge mit `typ: 'concept'` aus `refs`
-   * onAdd(eintrag), onRemove(nodeId): Die Leiste setzt `refs` daraus zusammen.
+   * onAdd(eintrag), onRemove(nodeId), onRemoveAlias(nodeId, alias): Die Leiste setzt `refs`
+   * daraus zusammen. Ein Alias lässt sich einzeln entfernen (0.18) — viele Aliase im Speicher
+   * sind Unterbegriffe und passen nicht zu jeder Stunde.
    */
   import { getContextNodes } from '$lib/api.js'
   import { subjectMap } from '$lib/stores/subjects.js'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
-  import { aliaseText, begriffAusTreffer, bezugsfach, ordneTreffer, suchparameter } from '$lib/begriffe_der_stunde.js'
+  import { begriffAusTreffer, bezugsfach, ordneTreffer, suchparameter } from '$lib/begriffe_der_stunde.js'
 
-  let { begriffe = [], subjectId = null, onAdd, onRemove } = $props()
+  let { begriffe = [], subjectId = null, onAdd, onRemove, onRemoveAlias } = $props()
 
   let draft = $state('')
   let dropdownOpen = $state(false)
@@ -63,7 +65,7 @@
   }
 
   function pick(node) {
-    onAdd(begriffAusTreffer(node))
+    onAdd(begriffAusTreffer(node, draft))
     draft = ''
     closeDropdown()
   }
@@ -96,12 +98,22 @@
                      bg-light-pu/20 text-light-pu dark:bg-dark-pu/20 dark:text-dark-pu">
           <NodeTypeIcon category="concept" contentType={b.content_type ?? 'begriff'} size={12} />
           {b.titel ?? b.node_id}
-          {#if aliaseText(b)}<span class="font-normal opacity-80">· {aliaseText(b)}</span>{/if}
+          {#each b.aliase ?? [] as alias (alias)}
+            <span class="font-normal opacity-80 inline-flex items-center">
+              · {alias}
+              <button
+                onclick={() => onRemoveAlias(b.node_id, alias)}
+                class="opacity-70 hover:opacity-100 ml-0.5"
+                aria-label={`Alias „${alias}“ entfernen`}
+                title="Nur diesen Namen entfernen"
+              >✕</button>
+            </span>
+          {/each}
           <button
             onclick={() => onRemove(b.node_id)}
             class="opacity-70 hover:opacity-100 ml-0.5"
             aria-label={`„${b.titel ?? b.node_id}“ entfernen`}
-            title="Entfernen"
+            title="Begriff entfernen"
           >✕</button>
         </span>
       {/each}

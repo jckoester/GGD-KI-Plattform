@@ -821,3 +821,40 @@ async def test_knotenliste_mit_bezugsfaechern(test_client, auth_headers, faecher
     # Bezugsfächer sind gerichtet: Das Bezugsfach liest das Fach nicht mit.
     assert await titel(subject_id=BEZUG, mit_bezugsfaechern="true") == ["Bezug"]
 
+
+
+# ── Aliase in der Leiste (0.18, Schritt 3) ───────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_patch_nimmt_nur_aliase_des_knotens(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    """Bis 0.18 speicherte `PATCH /planning/lessons` jedes Alias, das der Client schickte."""
+    stunde = await _stunde(test_client, auth_headers)
+    sub = await _substitution(async_engine, "σ-Komplex", "Arenium-Ion")
+    resp = await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={"refs": [
+        {"node_id": str(sub.id), "typ": "concept", "titel": PRAEFIX + "elektrophile Substitution",
+         "aliase": ["arenium-ION", "Erfunden", "σ-Komplex", "Arenium-Ion"]},
+        {"node_id": str(sub.id), "typ": "ik", "code": "3.4.5(4)", "aliase": ["gehört nicht hierher"]},
+    ]})
+    assert resp.status_code == 200, resp.text
+    refs = await _refs(test_client, auth_headers, stunde)
+    # Schreibweise des Speichers, Reihenfolge des Clients, ohne Doppel, Erfundenes weg;
+    # Kompetenzen tragen keine Aliase.
+    assert refs[0]["aliase"] == ["Arenium-Ion", "σ-Komplex"]
+    assert "aliase" not in refs[1]
+
+
+@pytest.mark.asyncio
+async def test_alias_einzeln_entfernen(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde = await _stunde(test_client, auth_headers)
+    sub = await _substitution(async_engine, "σ-Komplex", "Arenium-Ion")
+    eintrag = {"node_id": str(sub.id), "typ": "concept", "titel": PRAEFIX + "elektrophile Substitution"}
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers,
+                            json={"refs": [eintrag | {"aliase": ["σ-Komplex", "Arenium-Ion"]}]})
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers,
+                            json={"refs": [eintrag | {"aliase": ["Arenium-Ion"]}]})
+    assert (await _refs(test_client, auth_headers, stunde))[0]["aliase"] == ["Arenium-Ion"]
+    # Das letzte Alias weg: Der Begriff bleibt, der Schlüssel fällt weg.
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={"refs": [eintrag]})
+    refs = await _refs(test_client, auth_headers, stunde)
+    assert refs[0]["node_id"] == str(sub.id) and "aliase" not in refs[0]

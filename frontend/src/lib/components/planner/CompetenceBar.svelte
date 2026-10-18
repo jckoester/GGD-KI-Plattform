@@ -3,7 +3,7 @@
   import PKSelector from '$lib/components/PKSelector.svelte'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import BegriffSelector from './BegriffSelector.svelte'
-  import { aliaseText, aufteilen, begriffAnzeige, mitBegriff, ohneBegriff } from '$lib/begriffe_der_stunde.js'
+  import { aliaseText, aufteilen, begriffAnzeige, mitBegriff, ohneAlias, ohneBegriff } from '$lib/begriffe_der_stunde.js'
 
   /**
    * Kompetenzen und Fachbegriffe der Stunde — beide in `refs`, getrennt angezeigt und
@@ -154,6 +154,7 @@
           {subjectId}
           onAdd={(eintrag) => onChange(mitBegriff(refs, eintrag))}
           onRemove={(nodeId) => onChange(ohneBegriff(refs, nodeId))}
+          onRemoveAlias={(nodeId, alias) => onChange(ohneAlias(refs, nodeId, alias))}
         />
       </div>
       <div class="flex justify-end">

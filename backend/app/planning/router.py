@@ -57,6 +57,7 @@ from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
+from app.planning.begriffe import nur_aliase_des_knotens
 from app.planning.schemas import (
     AbWochenRead,
     BalanceRead,
@@ -1331,7 +1332,8 @@ async def patch_lesson(
             meta.get("phasen"),
         ))
     if payload.refs is not None:
-        meta["refs"] = [r.model_dump(mode="json") for r in payload.refs]
+        refs = await nur_aliase_des_knotens(db, payload.refs)
+        meta["refs"] = [r.model_dump(mode="json") for r in refs]
     if payload.refs_dismissed is not None:
         meta["refs_dismissed"] = [str(rid) for rid in payload.refs_dismissed]
 

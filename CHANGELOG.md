@@ -11,11 +11,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Phasentabelle, wie im PDF.
 - **Methoden „Unterrichtsgespräch“ (LSG, UG) und „Lehrervortrag“ (LVo)** im Vokabular; Sozialformen
   auch als EA, PA, GA. „Unterrichtsgespräch“ und „Lehrgespräch“ sind keine Aliase von Plenum mehr.
+- **Aliase der Begriffe in der Leiste einzeln entfernen.** Wird ein Begriff über die Suche nach
+  einem Alias hinzugefügt, bleibt dieser Name dabei stehen.
 - **`seed_methodik.py --aliase-ergaenzen`:** ergänzt fehlende Aliase des Seeds, ohne die der Schule
   zu ersetzen.
 
 ### Behoben
 
+- **Stundenentwurf speichern:** Aliase an Begriffen werden nur noch übernommen, wenn der Knoten sie
+  hat, in dessen Schreibweise.
 - **PDF-Export eines Stundenentwurfs:** Das Prio-Kürzel (K/Ü/V) war in jeder zweiten Zeile
   unsichtbar.
 - **DOCX-Export eines Stundenentwurfs:** Die Spalten der Phasentabelle waren gleich breit, die

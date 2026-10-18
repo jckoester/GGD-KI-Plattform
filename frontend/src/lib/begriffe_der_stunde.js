@@ -42,15 +42,33 @@ export function begriffAnzeige(ref) {
   return aliase ? `${titel} · ${aliase}` : titel
 }
 
-/** Der Eintrag in `refs` für einen Treffer aus `GET /context/nodes`. */
-export function begriffAusTreffer(node) {
-  return {
+/**
+ * Das Alias, über das ein Treffer gefunden wurde — `null`, wenn der Titel passt.
+ *
+ * Dieselbe Regel wie der Server (`filters.py`: Titel oder Alias enthält das Gesuchte,
+ * ohne Groß-/Kleinschreibung). Wer „σ-Kom" tippt und „elektrophile Substitution" wählt,
+ * meint den σ-Komplex — der Name soll in der Leiste stehen bleiben (0.18).
+ */
+export function getroffenesAlias(node, q) {
+  const gesucht = (q ?? '').trim().toLocaleLowerCase('de')
+  if (!gesucht || (node?.title ?? '').toLocaleLowerCase('de').includes(gesucht)) return null
+  return (node?.aliase ?? []).find((a) => a.toLocaleLowerCase('de').includes(gesucht)) ?? null
+}
+
+/**
+ * Der Eintrag in `refs` für einen Treffer aus `GET /context/nodes` — mit dem Alias, über
+ * das er gefunden wurde, falls nicht über den Titel.
+ */
+export function begriffAusTreffer(node, q = '') {
+  const eintrag = {
     node_id: node.id,
     typ: 'concept',
     titel: node.title,
     partiell: false,
     content_type: node.content_type,
   }
+  const alias = getroffenesAlias(node, q)
+  return alias ? { ...eintrag, aliase: [alias] } : eintrag
 }
 
 /** Einen Begriff dazu — nur, wenn er noch nicht drinsteht. Kompetenzen bleiben. */
@@ -62,6 +80,20 @@ export function mitBegriff(refs, eintrag) {
 /** Einen Begriff weg. Kompetenzen bleiben, auch eine mit derselben Kennung nicht. */
 export function ohneBegriff(refs, nodeId) {
   return (refs ?? []).filter((r) => !(istBegriff(r) && r.node_id === nodeId))
+}
+
+/**
+ * Ein einzelnes Alias eines Begriffs weg; der Begriff bleibt, auch ohne Aliase (0.18).
+ * Viele Aliase im Speicher sind Unterbegriffe — nicht jeder passt zu jeder Stunde.
+ */
+export function ohneAlias(refs, nodeId, alias) {
+  return (refs ?? []).map((r) => {
+    if (!istBegriff(r) || r.node_id !== nodeId) return r
+    const aliase = (r.aliase ?? []).filter((a) => a !== alias)
+    if (aliase.length) return { ...r, aliase }
+    const { aliase: _, ...ohne } = r
+    return ohne
+  })
 }
 
 /** Die Parameter der Suche: Begriffe des Fachs und seiner Bezugsfächer, aktive. */

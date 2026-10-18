@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url"
 import { getContextNodes } from "./api.js"
 import {
     BEGRIFF_TYPEN, SUCHGRENZE, aliaseText, aufteilen, begriffAnzeige, begriffAusTreffer,
-    bezugsfach, mitBegriff, ohneBegriff, ordneTreffer, suchparameter,
+    bezugsfach, getroffenesAlias, mitBegriff, ohneAlias, ohneBegriff, ordneTreffer, suchparameter,
 } from "./begriffe_der_stunde.js"
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -68,6 +68,47 @@ describe("Begriffe und Kompetenzen getrennt", () => {
     it("der Eintrag aus einem Treffer trägt Typ, Titel und Bausteinart", () => {
         expect(begriffAusTreffer({ id: "b-1", title: "Benzol", content_type: "stoffsteckbrief", subject_id: 3 }))
             .toEqual(BENZOL)
+    })
+})
+
+describe("Aliase einzeln (0.18, Schritt 3)", () => {
+    const SE = { node_id: "b-2", typ: "concept", titel: "elektrophile Substitution",
+                 aliase: ["σ-Komplex", "Arenium-Ion"] }
+    const TREFFER = { id: "b-2", title: "elektrophile Substitution", content_type: "begriff",
+                      aliase: ["σ-Komplex", "Arenium-Ion"] }
+
+    it("entfernt ein Alias, der Begriff und die anderen bleiben", () => {
+        expect(ohneAlias([IK, SE], "b-2", "σ-Komplex")).toEqual([IK, { ...SE, aliase: ["Arenium-Ion"] }])
+    })
+
+    it("ohne letztes Alias bleibt der Begriff — ohne Schlüssel", () => {
+        const nur = { ...SE, aliase: ["Arenium-Ion"] }
+        const [ergebnis] = ohneAlias([nur], "b-2", "Arenium-Ion")
+        expect(ergebnis).toEqual({ node_id: "b-2", typ: "concept", titel: "elektrophile Substitution" })
+    })
+
+    it("rührt Kompetenzen und andere Begriffe nicht an", () => {
+        expect(ohneAlias([IK, BENZOL, SE], "b-1", "σ-Komplex")).toEqual([IK, BENZOL, SE])
+    })
+
+    it("erkennt das Alias, über das die Suche traf — nicht, wenn der Titel passt", () => {
+        expect(getroffenesAlias(TREFFER, "σ-kom")).toBe("σ-Komplex")
+        expect(getroffenesAlias(TREFFER, "ARENIUM")).toBe("Arenium-Ion")
+        expect(getroffenesAlias(TREFFER, "Substitution")).toBeNull()
+        expect(getroffenesAlias(TREFFER, "")).toBeNull()
+    })
+
+    it("der Eintrag aus einem Alias-Treffer trägt das Alias mit", () => {
+        expect(begriffAusTreffer(TREFFER, "σ-Kom").aliase).toEqual(["σ-Komplex"])
+        expect(begriffAusTreffer(TREFFER, "elektrophil")).not.toHaveProperty("aliase")
+    })
+
+    it("die Auswahl bietet ein × je Alias und gibt das Gesuchte weiter", () => {
+        const auswahl = quelle("lib/components/planner/BegriffSelector.svelte")
+        const leiste = quelle("lib/components/planner/CompetenceBar.svelte")
+        expect(auswahl).toContain("onRemoveAlias(b.node_id, alias)")
+        expect(auswahl).toContain("begriffAusTreffer(node, draft)")
+        expect(leiste).toContain("onChange(ohneAlias(refs, nodeId, alias))")
     })
 })
 
