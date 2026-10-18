@@ -27,9 +27,12 @@
   td { border: 0.5pt solid #ccc; padding: 2mm 2.5mm; vertical-align: top; }
   tr:nth-child(even) td { background: #f7f9fc; }
   .prio-cell { text-align: center; color: #fff; font-weight: bold; vertical-align: middle; }
-  .prio-kern       { background: #4a7fb5; }
-  .prio-uebung     { background: #5ba37a; }
-  .prio-vertiefung { background: #b07fb8; }
+  /* Zwei Klassen statt einer: `tr:nth-child(even) td` (eine Pseudoklasse, zwei Elemente) ist
+     spezifischer als `.prio-kern` allein und überschrieb bis 0.18 in jeder zweiten Zeile den
+     Hintergrund — das weiße Kürzel stand auf #f7f9fc und war unsichtbar. */
+  .prio-cell.prio-kern       { background: #4a7fb5; }
+  .prio-cell.prio-uebung     { background: #5ba37a; }
+  .prio-cell.prio-vertiefung { background: #b07fb8; }
   .phase-name { font-weight: bold; }
   .phase-desc { color: #444; font-size: 8.5pt; }
   .sozialform { font-weight: bold; }

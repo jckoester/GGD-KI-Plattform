@@ -105,6 +105,14 @@ def _slugify(s: str) -> str:
 _YAML_HEIKEL = re.compile(r"[,:\[\]{}#&*!|>'\"%@`]|^\s|\s$|^-")
 
 
+def kompetenz_kurz(ref: dict) -> str:
+    """Eine Kompetenz, wie sie im Export steht: die Nummer, sonst der Titel, „[…]" bei partiell.
+
+    `or` statt Vorgabewert: Ein gespeicherter Eintrag trägt `"code": null`, und
+    `get("code", …)` lieferte dann `None` — im Frontmatter stand „None"."""
+    return f"{ref.get('code') or ref.get('titel') or ''}{'[…]' if ref.get('partiell') else ''}"
+
+
 def begriff_mit_aliasen(ref: dict) -> str:
     """Ein Begriff der Stunde, wie er im Export steht: „elektrophile Substitution
     (σ-Komplex, Arenium-Ion)" — mit den Aliasen, unter denen die Stunde ihn nennt."""
@@ -208,12 +216,7 @@ def export_markdown(data: LessonExport) -> str:
         f"verfuegbar_min: {data.verfuegbare_min}",
     ]
     if data.kompetenzen:
-        # `or` statt Vorgabewert: Ein gespeicherter Eintrag trägt `"code": null`, und
-        # `get("code", …)` lieferte dann `None` — im Frontmatter stand „None".
-        kompetenzen = [
-            _yaml_eintrag(f"{r.get('code') or r.get('titel') or ''}{'[…]' if r.get('partiell') else ''}")
-            for r in data.kompetenzen
-        ]
+        kompetenzen = [_yaml_eintrag(kompetenz_kurz(r)) for r in data.kompetenzen]
         lines.append(f"kompetenzen: [{', '.join(kompetenzen)}]")
     if data.fachbegriffe:
         fachbegriffe = [_yaml_eintrag(begriff_mit_aliasen(r)) for r in data.fachbegriffe]
@@ -401,6 +404,20 @@ def export_docx(data: LessonExport) -> bytes:
                     mc.add_paragraph(phase.methode)
 
             row[4].text = "\n".join(m for m in phase.material if m)
+
+    # Kompetenzen und Begriffe unter der Tabelle, wie im PDF (`lesson.html`). Bis 0.18 fehlten
+    # beide im DOCX. Formeln in Titeln bleiben TeX-Quelle — python-docx kann kein OMML.
+    for label, eintraege in (
+        ("Kompetenzen", [kompetenz_kurz(r) for r in data.kompetenzen]),
+        ("Fachbegriffe", [begriff_mit_aliasen(r) for r in data.fachbegriffe]),
+    ):
+        if eintraege:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(6)
+            p.add_run(f"{label}: ").bold = True
+            p.add_run(", ".join(eintraege))
+            for run in p.runs:
+                run.font.size = Pt(9)
 
     buf = io.BytesIO()
     doc.save(buf)

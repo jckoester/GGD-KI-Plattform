@@ -259,6 +259,58 @@ def test_export_docx_empty_phasen():
     assert result[:2] == b"PK"
 
 
+def _docx_bloecke(export) -> list[str]:
+    """Der Körper des DOCX in Reihenfolge: Absatztexte, Tabellen als „<tabelle>"."""
+    import io
+
+    from docx import Document
+
+    from app.planning.lesson_export import export_docx
+
+    koerper = Document(io.BytesIO(export_docx(export))).element.body
+    return ["<tabelle>" if el.tag.endswith("}tbl") else "".join(t.text or "" for t in el.iter() if t.tag.endswith("}t"))
+            for el in koerper if el.tag.endswith(("}p", "}tbl"))]
+
+
+def test_docx_kompetenzen_und_begriffe_unter_der_tabelle():
+    """Bis 0.18 fehlten beide im DOCX; MD und PDF führten sie. Lage wie im PDF: unter der Tabelle."""
+    pytest.importorskip("docx")
+    se = {"typ": "concept", "code": None, "titel": "elektrophile Substitution", "partiell": False,
+          "aliase": ["σ-Komplex", "Arenium-Ion"]}
+    bloecke = _docx_bloecke(_make_export(refs=_make_export().refs + [se]))
+    tabelle = bloecke.index("<tabelle>")
+    assert bloecke.index("Kompetenzen: 3.1.2, K1[…]") > tabelle
+    assert bloecke.index("Fachbegriffe: elektrophile Substitution (σ-Komplex, Arenium-Ion)") > tabelle
+
+
+def test_docx_ohne_refs_keine_absaetze():
+    pytest.importorskip("docx")
+    bloecke = _docx_bloecke(_make_export(refs=[]))
+    assert not any(b.startswith(("Kompetenzen:", "Fachbegriffe:")) for b in bloecke)
+
+
+def test_docx_nur_begriffe():
+    pytest.importorskip("docx")
+    bloecke = _docx_bloecke(_make_export(refs=_BEGRIFFE))
+    assert "Fachbegriffe: Benzol, Mesomerie" in bloecke
+    assert not any(b.startswith("Kompetenzen:") for b in bloecke)
+
+
+def test_pdf_prio_farbe_schlaegt_zeilenstreifen():
+    """`tr:nth-child(even) td` ist spezifischer als eine einzelne Klasse — bis 0.18 stand das
+    weiße Prio-Kürzel in jeder zweiten Zeile auf hellem Grund. Die Prio-Regeln brauchen
+    mindestens zwei Klassen."""
+    import re
+    from pathlib import Path
+
+    css = (Path(__file__).parents[2] / "app/planning/templates/lesson.html").read_text(encoding="utf-8")
+    assert re.search(r"tr:nth-child\(even\)\s+td\s*\{", css), "Zeilenstreifen weg? Dann Test anpassen."
+    for prio in ("kern", "uebung", "vertiefung"):
+        regeln = re.findall(rf"^\s*([^{{}}\n]*\.prio-{prio}\b[^{{}}\n]*)\{{", css, re.M)
+        assert regeln, prio
+        assert all(sel.count(".") >= 2 for sel in regeln), regeln
+
+
 # ── PDF smoke ─────────────────────────────────────────────────────────────────
 
 

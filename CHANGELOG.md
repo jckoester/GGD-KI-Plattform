@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **DOCX-Export eines Stundenentwurfs mit Kompetenzen und Fachbegriffen:** beide stehen unter der
+  Phasentabelle, wie im PDF.
+
+### Behoben
+
+- **PDF-Export eines Stundenentwurfs:** Das Prio-Kürzel (K/Ü/V) war in jeder zweiten Zeile
+  unsichtbar.
+
 ## [0.17.0] – 2026-10-17
 
 Der Stundenassistent nennt die Fachbegriffe einer Stunde und trägt sie nach Zustimmung ein; die
