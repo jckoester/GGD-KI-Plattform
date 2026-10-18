@@ -57,7 +57,7 @@ from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
-from app.planning.begriffe import nur_aliase_des_knotens
+from app.planning.begriffe import begriffe_vorschlagen, nur_aliase_des_knotens, vorschlag_zur_anzeige
 from app.planning.schemas import (
     AbWochenRead,
     BalanceRead,
@@ -1277,7 +1277,40 @@ async def get_lesson(
         grade=resolved_curricula.grade,
         darf_bearbeiten=darf_bearbeiten,
         updated_at=lesson.updated_at,
+        begriffe_vorschlag=vorschlag_zur_anzeige(lesson.title, meta),
+        begriffe_vorschlagen=bool(settings.begriffe_model) and lesson.subject_id is not None and darf_bearbeiten,
     )
+
+
+# ── POST /planning/lessons/{node_id}/begriffe-vorschlagen (0.18) ─────────────
+
+
+@router.post("/lessons/{node_id}/begriffe-vorschlagen", response_model=dict)
+async def begriffe_vorschlagen_endpunkt(
+    node_id: UUID,
+    erzwingen: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Begriffe der Stunde aus ihren Phasentexten vorschlagen (Knopf in der Leiste).
+
+    Ist der abgelegte Vorschlag noch aktuell, läuft ohne `erzwingen` kein neuer Aufruf.
+    `fehler` (`budget`, `zeit`, `kein_modell`, `kein_fach`, `antwort`, `abgelehnt` …) sagt,
+    warum es keinen neuen gibt — der bisherige bleibt dann stehen.
+    """
+    lesson = await db.get(ContextNode, node_id)
+    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+    if lesson.write_scope_group_id is None:
+        raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
+    await require_group_teacher(lesson.write_scope_group_id, user, db)
+
+    ergebnis = await begriffe_vorschlagen(db, node_id, user, erzwingen=erzwingen)
+    lesson = await db.get(ContextNode, node_id, populate_existing=True)
+    return {
+        "vorschlag": vorschlag_zur_anzeige(lesson.title, lesson.metadata_ or {}),
+        "fehler": ergebnis.get("fehler"),
+    }
 
 
 # ── PATCH /planning/lessons/{node_id} ────────────────────────────────────────

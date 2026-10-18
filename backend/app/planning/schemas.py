@@ -320,6 +320,11 @@ class LessonRead(BaseModel):
     darf_bearbeiten: bool = True
     # Änderungssignal für Clients außerhalb des Browsers (Unterrichtsplanungs-Sync).
     updated_at: datetime
+    # Begriffe aus den Phasentexten (0.18): der abgelegte Vorschlag samt `aktuell` — ohne, was
+    # inzwischen eingetragen oder verworfen ist —, oder None (`begriffe.vorschlag_zur_anzeige`).
+    begriffe_vorschlag: Optional[dict] = None
+    # Ob „Begriffe vorschlagen" geht: Modell konfiguriert, Stunde mit Fach, bearbeitbar.
+    begriffe_vorschlagen: bool = False
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────

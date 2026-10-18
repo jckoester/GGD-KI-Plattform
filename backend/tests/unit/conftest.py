@@ -28,3 +28,13 @@ def _bildarten_ohne_lokale_datei(monkeypatch):
     image_models.invalidate_image_models_cache()
     yield
     image_models.invalidate_image_models_cache()
+
+
+@pytest.fixture(autouse=True)
+def _ohne_begriffsvorschlag(monkeypatch):
+    """Unit-Tests laufen ohne `BEGRIFFE_MODEL` (0.18) — steht es in der lokalen `.env`, löste
+    jedes `update_lesson_phases` sonst einen echten Modellaufruf im Hintergrund aus. Tests,
+    die den Vorschlag brauchen, setzen das Modell selbst."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "begriffe_model", "")

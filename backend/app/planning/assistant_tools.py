@@ -24,6 +24,9 @@ from app.context.stunden import als_stundenzahl
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.planning import stunde_finden
 from app.db.models import ContextEdge, ContextNode, Group, LessonSlot, SlotPlanSnapshot, Subject
+from app.planning.begriffe import (
+    HINWEIS_FRUEHER, aliase_des_begriffs, begriff_zum_titel, begriffe_vorschlagen, fruehere_begriffe,
+)
 from app.planning.curriculum_resolver import group_grade, resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
@@ -1094,7 +1097,7 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
     slot = slot_result.scalar_one_or_none()
 
     zusammenhang = await _zusammenhang(ctx, node)
-    return {
+    ergebnis = {
         "id": str(node.id),
         "titel": node.title,
         "stundenziel": meta.get("stundenziel", ""),
@@ -1109,6 +1112,12 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
         "vokabular": await _vokabular(ctx, node.subject_id),
         "begriffe": await _begriffe(ctx, node, meta, zusammenhang),
     }
+    # Begriffe früherer Stunden der Gruppe (0.18, Plan F1) — mit dem Satz, dass das kein
+    # Lernstand ist: Was vor der Plattform eingeführt wurde, steht hier nie.
+    if frueher := await fruehere_begriffe(ctx.db, node):
+        ergebnis["begriffe_frueherer_stunden"] = {
+            "titel": [f["titel"] for f in frueher], "hinweis": HINWEIS_FRUEHER}
+    return ergebnis
 
 
 register_tool(ChatTool(
@@ -1131,7 +1140,9 @@ register_tool(ChatTool(
                 "begriffe: die zur Stunde passenden Fachbegriffe des Fachs und seiner "
                 "Bezugsfächer (titel, aliase, fassung, fach nur beim Bezugsfach; eingetragen = "
                 "steht schon in refs) samt anleitung — Begriffe der Stunde werden als refs mit "
-                "typ 'concept' und ihrem titel eingetragen."
+                "typ 'concept' und ihrem titel eingetragen. Und begriffe_frueherer_stunden: was "
+                "in früheren Stunden der Gruppe eingetragen ist — eine Planungshilfe, kein "
+                "Lernstand."
             ),
             "parameters": {
                 "type": "object",
@@ -1227,105 +1238,20 @@ _REF_TYPEN = {"ik": ("ik_kompetenz",), "pk": ("pk_kompetenz",), "concept": BEGRI
 _REF_TYP_ZU = {art: typ for typ, arten in _REF_TYPEN.items() for art in arten}
 
 
-#: Bindestriche, die das Modell statt „-" schreibt. `gpt-oss-120b` setzt durchweg den
-#: geschützten Bindestrich U+2011 („Arenium‑Ion") — in Messung 3 scheiterten daran alle
-#: Begriffe zweier Läufe, obwohl sie als Alias bestanden. Nur auf der Seite des Modells
-#: ersetzt: Die Normalisierung der Datenbankseite ist die des Index (`titel_normalisiert_sql`)
-#: und muss es bleiben. Das weiche Trennzeichen U+00AD fällt weg.
-_BINDESTRICHE = str.maketrans({"\u2010": "-", "\u2011": "-", "\u00ad": None})
+# Der Abgleich Name → Knoten liegt seit 0.18 in `app/planning/begriffe.py` — die Leiste und
+# der Vorschlag aus den Phasentexten brauchen ihn auch. Hier nur die Anbindung an den Kontext
+# des Werkzeugs.
 
 
 async def _begriff_zum_titel(ctx: ToolContext, titel: str, fassung: str | None,
                             stunde: ContextNode) -> tuple[ContextNode | None, str | None]:
-    """Ein Begriff der Stunde über seinen Titel oder Alias. → (Knoten, Grund, warum keiner)
-
-    Gesucht wird im Fach der Stunde und seinen Bezugsfächern, normalisiert wie die
-    Namenssuche (`normalisiere_titel`, derselbe Ausdruck wie ihr Index). Gibt es den Namen
-    in beiden, gilt das eigene Fach; gibt es ihn in mehreren Fassungen, entscheidet `fassung`.
-
-    Trifft der Name nichts, gilt eine Einzahlform (`einzahlformen`: „Blattfarbstoffe" →
-    Alias „Blattfarbstoff") — aber nur, wenn sie genau einen Begriff trifft.
-    """
-    from app.context.aliase import ALIAS_NORMALISIERT
-    from app.context.filters import TITEL_NORMALISIERT
-    from app.context.lookup import einzahlformen, normalisiere_titel
-    from app.context.service import bezugsfaecher_von
-    from app.context.visibility import read_scope_clause
-    from app.db.models import NodeAlias
-
-    if stunde.subject_id is None:
-        return None, f"„{titel}“: Die Stunde hat kein Fach."
-    faecher = (stunde.subject_id, *await bezugsfaecher_von(ctx.db, stunde.subject_id))
-
-    async def suche(schluessel: list[str]) -> list[ContextNode]:
-        treffer = list((await ctx.db.execute(
-            sa.select(ContextNode).where(
-                ContextNode.content_type.in_(BEGRIFF_TYPEN),
-                ContextNode.status == "active",
-                read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
-                ContextNode.subject_id.in_(faecher),
-                sa.or_(
-                    TITEL_NORMALISIERT.in_(schluessel),
-                    ContextNode.id.in_(sa.select(NodeAlias.node_id).where(ALIAS_NORMALISIERT.in_(schluessel))),
-                ),
-            ).order_by(ContextNode.id)
-        )).scalars())
-        if fassung:
-            gewuenscht = fassung.translate(_BINDESTRICHE).strip().casefold()
-            treffer = [t for t in treffer
-                       if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
-        if len(treffer) > 1:
-            eigene = [t for t in treffer if t.subject_id == stunde.subject_id]
-            if len(eigene) == 1:
-                treffer = eigene
-        return treffer
-
-    schluessel = normalisiere_titel(titel.translate(_BINDESTRICHE))
-    treffer = await suche([schluessel])
-    if not treffer and (formen := einzahlformen(schluessel)):
-        einzahl = await suche(formen)
-        if len(einzahl) == 1:
-            return einzahl[0], None
-    if len(treffer) == 1:
-        return treffer[0], None
-    if not treffer:
-        return None, (f"„{titel}“ gibt es im Wissensspeicher des Fachs nicht — nicht eingetragen. "
-                      "Die Fachschaft kann den Begriff anlegen.")
-    fassungen = ", ".join(sorted({str((t.metadata_ or {}).get("fassung") or "ohne Fassung") for t in treffer}))
-    return None, f"„{titel}“ gibt es mehrfach ({fassungen}) — mit fassung angeben, welcher gemeint ist."
+    """Siehe :func:`app.planning.begriffe.begriff_zum_titel`."""
+    return await begriff_zum_titel(ctx.db, ctx.user, titel, fassung, stunde)
 
 
 async def _aliase_des_begriffs(ctx: ToolContext, knoten: ContextNode, namen: list[str]) -> list[str]:
-    """Welche der Namen Aliase dieses Begriffs sind — in der Schreibweise des Speichers.
-
-    Der Titel selbst zählt nicht, ebenso wenig ein Name, der zu keinem Alias passt: Das
-    Modell kann keinen Alias erfinden, der dann in der Leiste stünde. Wie beim Nachschlagen
-    gilt im Zweifel die Einzahl („Blattfarbstoffe" → „Blattfarbstoff").
-    """
-    from app.context.aliase import ALIAS_NORMALISIERT
-    from app.context.lookup import einzahlformen, normalisiere_titel
-    from app.db.models import NodeAlias
-
-    titel = normalisiere_titel(knoten.title or "")
-    gesucht = [s for s in (normalisiere_titel(str(n).translate(_BINDESTRICHE)) for n in namen if n)
-               if s and s != titel]
-    if not gesucht:
-        return []
-    alle = list(dict.fromkeys(f for s in gesucht for f in (s, *einzahlformen(s))))
-    gefunden = dict((await ctx.db.execute(
-        sa.select(ALIAS_NORMALISIERT, NodeAlias.alias)
-        .where(NodeAlias.node_id == knoten.id, ALIAS_NORMALISIERT.in_(alle))
-    )).all())
-    aliase = []
-    for s in gesucht:
-        if s in gefunden:
-            aliase.append(gefunden[s])
-            continue
-        formen = einzahlformen(s)
-        if titel in formen:                  # „Chromatografien" — der Titel in der Mehrzahl
-            continue
-        aliase += [gefunden[f] for f in formen if f in gefunden][:1]
-    return list(dict.fromkeys(aliase))
+    """Siehe :func:`app.planning.begriffe.aliase_des_begriffs`."""
+    return await aliase_des_begriffs(ctx.db, knoten, namen)
 
 
 async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
@@ -1449,6 +1375,25 @@ async def _refs_pruefen(ctx: ToolContext, refs, stunde: ContextNode,
     return geprueft, None, nicht_eingetragen
 
 
+def _begriffe_im_hintergrund(node: ContextNode, nutzer) -> None:
+    """Nach dem Schreiben die Begriffe aus den Phasentexten vorschlagen (0.18, Plan F2 b) —
+    im Hintergrund, die Antwort im Chat wartet nicht darauf. Hat sich der Entwurfstext nicht
+    geändert, läuft kein Aufruf (Prüfsumme in `begriffe_vorschlagen`)."""
+    from app.config import settings
+    from app.core.hintergrund import im_hintergrund
+    from app.db.session import AsyncSessionLocal
+
+    if not settings.begriffe_model or node.subject_id is None:
+        return
+    stunde_id = node.id
+
+    async def _vorschlagen():
+        async with AsyncSessionLocal() as db:
+            await begriffe_vorschlagen(db, stunde_id, nutzer)
+
+    im_hintergrund(_vorschlagen, was=f"Begriffsvorschlag {stunde_id}")
+
+
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node_str = _stunden_kennung(args, ctx)
     phasen = args.get("phasen")
@@ -1512,6 +1457,7 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     await db.commit()
     if veraltet:
         await enqueue_embedding_job(node.id, db)
+    _begriffe_im_hintergrund(node, ctx.user)
 
     # Kompetenz-Sog: nur aus verknüpften Material-Knoten. Methode/Sozialform sind
     # kontrolliertes Vokabular ohne eigene Kompetenzen.

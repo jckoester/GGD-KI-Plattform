@@ -858,3 +858,159 @@ async def test_alias_einzeln_entfernen(test_client, auth_headers, faecher, async
     await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={"refs": [eintrag]})
     refs = await _refs(test_client, auth_headers, stunde)
     assert refs[0]["node_id"] == str(sub.id) and "aliase" not in refs[0]
+
+
+# ── Begriffe aus den Phasentexten (0.18, Schritt 5) ──────────────────────────
+#
+# Der Modellaufruf ist nachgebildet (`einzelaufruf`); geprüft wird, was der Dienst daraus
+# macht: Abgleich, Trennung in neu · früher · ohne Knoten, Ablage ohne Änderungsstempel.
+
+
+def _antwort(*namen):
+    import json as _json
+    from app.litellm.einzelaufruf import Antwort
+    return Antwort(inhalt=_json.dumps({"begriffe": [
+        {"name": n, "phase": "Erarbeitung", "art": "eingeführt"} for n in namen]}), kosten_usd=0.0002)
+
+
+def _modell(antwort):
+    """Modell gesetzt, Schlüssel vorhanden, Aufruf nachgebildet, keine Kandidaten (kein Vektor)."""
+    from contextlib import ExitStack
+    stapel = ExitStack()
+    stapel.enter_context(patch.object(settings, "begriffe_model", "system-begriffe"))
+    stapel.enter_context(patch("app.litellm.einzelaufruf.schluessel_fuer", AsyncMock(return_value="sk-test")))
+    aufruf = stapel.enter_context(patch("app.litellm.einzelaufruf.einzelaufruf",
+                                        AsyncMock(return_value=antwort)))
+    stapel.enter_context(patch("app.context.search.vektor_oder_none", AsyncMock(return_value=None)))
+    return stapel, aufruf
+
+
+async def _zwei_stunden(test_client, auth_headers, async_engine):
+    """Vorstunde (5.10.) mit „Benzol" eingetragen, die Stunde selbst am 12.10."""
+    benzol = await _begriff(async_engine, "Benzol", art="stoffsteckbrief")
+    sub = await _substitution(async_engine, "σ-Komplex")
+    vor = await _stunde(test_client, auth_headers, titel="Vorstunde", slot_id=await _termin(async_engine, 5))
+    await test_client.patch(f"/planning/lessons/{vor}", headers=auth_headers, json={"refs": [
+        {"node_id": str(benzol.id), "typ": "concept", "titel": benzol.title}]})
+    stunde = await _stunde(test_client, auth_headers, slot_id=await _termin(async_engine, 12))
+    return stunde, benzol, sub
+
+
+async def _vorschlagen(async_engine, stunde, **kw):
+    from app.planning.begriffe import begriffe_vorschlagen
+    async with _sitzungen(async_engine)() as db:
+        return await begriffe_vorschlagen(db, UUID(stunde), SimpleNamespace(sub=TEACHER1_PSEUDO, roles=["teacher"]), **kw)
+
+
+@pytest.mark.asyncio
+async def test_vorschlag_trennt_neu_frueher_ohne_knoten(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde, benzol, sub = await _zwei_stunden(test_client, auth_headers, async_engine)
+    vorher = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["updated_at"]
+
+    stapel, aufruf = _modell(_antwort(PRAEFIX + "Benzol", "σ‑Komplex", "Hückel-Regel"))
+    with stapel:
+        ergebnis = await _vorschlagen(async_engine, stunde)
+
+    v = ergebnis["vorschlag"]
+    assert [(e["node_id"], e["aliase"]) for e in v["eintraege"]] == [(str(sub.id), ["σ-Komplex"])]
+    # Früher eingetragen: getrennt, mit Datum — nicht verworfen (F1).
+    assert v["frueher"] == [{"node_id": str(benzol.id), "titel": benzol.title, "datum": "2026-10-05"}]
+    assert [o["name"] for o in v["ohne_knoten"]] == ["Hückel-Regel"]
+    # Das Modell hat die früheren Begriffe gesehen.
+    nachricht = aufruf.await_args.args[3][1]["content"]
+    assert f"Begriffe früherer Stunden dieser Gruppe: {benzol.title}" in nachricht
+    assert "Fach: A1 Fach" in nachricht and "Stunde: „Aromaten“" in nachricht
+    # Abgelegt, ohne den Änderungsstempel zu bewegen (sonst 409 beim nächsten Speichern).
+    nachher = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()
+    assert nachher["updated_at"] == vorher
+    assert nachher["begriffe_vorschlag"]["aktuell"] is True
+    assert "kein" in nachher["begriffe_vorschlag"]["hinweis_frueher"].casefold()
+
+
+@pytest.mark.asyncio
+async def test_gleiche_pruefsumme_kein_neuer_aufruf(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde, _, _ = await _zwei_stunden(test_client, auth_headers, async_engine)
+    stapel, aufruf = _modell(_antwort("σ-Komplex"))
+    with stapel:
+        await _vorschlagen(async_engine, stunde)
+        await _vorschlagen(async_engine, stunde)
+        assert aufruf.await_count == 1
+        await _vorschlagen(async_engine, stunde, erzwingen=True)
+        assert aufruf.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_anzeige_ohne_eingetragene_und_verworfene_und_veraltet(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    stunde, _, sub = await _zwei_stunden(test_client, auth_headers, async_engine)
+    andere = await _begriff(async_engine, "Elektrophil")
+    stapel, _ = _modell(_antwort("σ-Komplex", PRAEFIX + "Elektrophil"))
+    with stapel:
+        resp = await test_client.post(f"/planning/lessons/{stunde}/begriffe-vorschlagen", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert {e["node_id"] for e in resp.json()["vorschlag"]["eintraege"]} == {str(sub.id), str(andere.id)}
+
+    # Einer eingetragen, einer verworfen → beide nicht mehr im Vorschlag.
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers, json={
+        "refs": [{"node_id": str(sub.id), "typ": "concept"}], "refs_dismissed": [str(andere.id)]})
+    v = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["begriffe_vorschlag"]
+    assert v["eintraege"] == [] and v["aktuell"] is True
+    # Der Entwurf ändert sich → der Vorschlag ist veraltet.
+    await test_client.patch(f"/planning/lessons/{stunde}", headers=auth_headers,
+                            json={"phasen": [{"name": "Einstieg", "dauer_min": 15}]})
+    v = (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()["begriffe_vorschlag"]
+    assert v["aktuell"] is False
+
+
+@pytest.mark.asyncio
+async def test_endpunkt_meldet_budget_und_fehlendes_modell(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    from app.litellm.einzelaufruf import Antwort
+    stunde = await _stunde(test_client, auth_headers)
+    stapel, _ = _modell(Antwort(fehler="budget"))
+    with stapel:
+        resp = await test_client.post(f"/planning/lessons/{stunde}/begriffe-vorschlagen", headers=auth_headers)
+        assert resp.json() == {"vorschlag": None, "fehler": "budget"}
+        assert (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()[
+            "begriffe_vorschlagen"] is True
+    # Ohne Modell (conftest): kein Aufruf, der Knopf ist aus.
+    resp = await test_client.post(f"/planning/lessons/{stunde}/begriffe-vorschlagen", headers=auth_headers)
+    assert resp.json()["fehler"] == "kein_modell"
+    assert (await test_client.get(f"/planning/lessons/{stunde}", headers=auth_headers)).json()[
+        "begriffe_vorschlagen"] is False
+
+
+@pytest.mark.asyncio
+async def test_endpunkt_nur_fuer_lehrkraefte_der_gruppe(
+    test_client, auth_headers, auth_headers_teacher2, faecher, async_engine, aufraeumen,
+):
+    stunde = await _stunde(test_client, auth_headers)
+    resp = await test_client.post(f"/planning/lessons/{stunde}/begriffe-vorschlagen", headers=auth_headers_teacher2)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_schreiben_startet_den_vorschlag_im_hintergrund(
+    test_client, auth_headers, faecher, async_engine, aufraeumen,
+):
+    from app.core.hintergrund import warte_auf_abschluss
+    stunde = await _stunde(test_client, auth_headers)
+    with patch.object(settings, "begriffe_model", "system-begriffe"), \
+         patch("app.planning.assistant_tools.begriffe_vorschlagen", AsyncMock()) as vorschlagen:
+        aus = await _rufe(async_engine, _handle_update_lesson_phases, {
+            "node_id": stunde, "phasen": [{"name": "Einstieg", "dauer_min": 10}]})
+        assert aus["ok"] is True
+        await warte_auf_abschluss()
+    vorschlagen.assert_awaited_once()
+    assert vorschlagen.await_args.args[1] == UUID(stunde)
+
+
+@pytest.mark.asyncio
+async def test_detail_nennt_fruehere_begriffe_mit_hinweis(test_client, auth_headers, faecher, async_engine, aufraeumen):
+    stunde, benzol, _ = await _zwei_stunden(test_client, auth_headers, async_engine)
+    with patch("app.context.search.vektor_oder_none", AsyncMock(return_value=None)):
+        aus = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde})
+    frueher = aus["begriffe_frueherer_stunden"]
+    assert frueher["titel"] == [benzol.title] and "Lernstand" in frueher["hinweis"]

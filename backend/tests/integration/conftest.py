@@ -27,6 +27,9 @@ load_dotenv()
 # Der Batch-Service backfill_embeddings bleibt unberührt (Tests mocken dort gezielt).
 from app.config import settings as _settings
 _settings.embeddings_enabled = False
+# Ebenso die Begriffsvorschläge (0.18): Nach jedem `update_lesson_phases` liefe sonst ein
+# echter Modellaufruf im Hintergrund. Tests, die ihn brauchen, setzen das Modell selbst.
+_settings.begriffe_model = ""
 
 # OID des PostgreSQL-Typs `uuid`. psycopg2 liefert solche Spalten standardmäßig als
 # `str`; erst ein registrierter Typadapter macht `uuid.UUID` daraus.
