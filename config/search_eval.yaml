@@ -341,6 +341,19 @@ faelle:
       Zweiter Fall mit derselben räumlichen Anordnung wie Kugellager — die beiden
       dürfen sich nicht verwechseln lassen.
 
+  # Drei Gesprächs- und Vortragsformen (0.18): Sie liegen im Vektor nah beieinander und
+  # müssen sich trotzdem trennen. Die Fragen sind nach den Ablaufsätzen formuliert —
+  # Wächter für die Abgrenzung, keine unabhängige Messung. Stand 18.10.2026: alle Rang 1.
+  - frage: Die Lehrkraft erklärt vorne den Zusammenhang, die Klasse hört zu und schreibt mit
+    knoten: Lehrervortrag
+
+  - frage: Die Klasse bespricht gemeinsam die Ergebnisse, die Lehrkraft moderiert und sammelt die Beiträge
+    knoten: Unterrichtsgespräch
+    notiz: Gegenstück zum fragend-entwickelnden Gespräch — die Beiträge der Lernenden bestimmen den Weg.
+
+  - frage: Die Lehrkraft führt mit Fragen Schritt für Schritt auf die Lösung hin
+    knoten: Fragend-entwickelndes Gespräch
+
   # ── Stoffsteckbriefe (Paket 9, ab 26.09.2026) ────────────────────────────────
   #
   # ⚠️ **Noch ohne Bestand.** Die Knoten entstehen erst mit dem Pilot-Import (AP7);

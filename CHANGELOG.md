@@ -9,11 +9,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **DOCX-Export eines Stundenentwurfs mit Kompetenzen und Fachbegriffen:** beide stehen unter der
   Phasentabelle, wie im PDF.
+- **Methoden „Unterrichtsgespräch“ (LSG, UG) und „Lehrervortrag“ (LVo)** im Vokabular; Sozialformen
+  auch als EA, PA, GA. „Unterrichtsgespräch“ und „Lehrgespräch“ sind keine Aliase von Plenum mehr.
+- **`seed_methodik.py --aliase-ergaenzen`:** ergänzt fehlende Aliase des Seeds, ohne die der Schule
+  zu ersetzen.
 
 ### Behoben
 
 - **PDF-Export eines Stundenentwurfs:** Das Prio-Kürzel (K/Ü/V) war in jeder zweiten Zeile
   unsichtbar.
+- **DOCX-Export eines Stundenentwurfs:** Die Spalten der Phasentabelle waren gleich breit, die
+  Phasenspalte trennte Wörter. Sie sind jetzt gewichtet wie im PDF, die Seite ist A4 statt
+  US-Letter.
+
+### Nach dem Update
+
+- `python scripts/seed_methodik.py --aliase-ergaenzen`, danach
+  `python scripts/embedding_backfill.py --content-type methode`.
 
 ## [0.17.0] – 2026-10-17
 

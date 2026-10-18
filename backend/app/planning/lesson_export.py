@@ -310,6 +310,12 @@ async def export_pdf(data: LessonExport) -> bytes:
     return weasyprint.HTML(string=html_str, base_url=str(_TEMPLATES_DIR)).write_pdf()
 
 
+#: Spaltenanteile der Phasentabelle im DOCX in Prozent — Zeit, Prio, Phase, Sozialform/Methode,
+#: Material. Angelehnt an `templates/lesson.html` (PDF: 12/6/34/23/25), die Prio-Spalte aber 8 statt
+#: 6: Word zieht beidseits Zellränder ab, und bei 6 % brach der Kopf „Prio" um.
+_SPALTEN_ANTEILE = (12, 8, 34, 23, 23)
+
+
 def export_docx(data: LessonExport) -> bytes:
     try:
         from docx import Document
@@ -336,8 +342,11 @@ def export_docx(data: LessonExport) -> bytes:
 
     doc = Document()
 
-    # Seitenränder
+    # A4 wie das PDF — die Vorlage von python-docx ist US-Letter.
     for section in doc.sections:
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
+        # Seitenränder
         section.top_margin = Cm(2)
         section.bottom_margin = Cm(2)
         section.left_margin = Cm(2.5)
@@ -404,6 +413,18 @@ def export_docx(data: LessonExport) -> bytes:
                     mc.add_paragraph(phase.methode)
 
             row[4].text = "\n".join(m for m in phase.material if m)
+
+        # Spaltenbreiten wie im PDF (`lesson.html`). Ohne sie teilt Word die Breite gleichmäßig:
+        # Die Prio-Spalte war so breit wie die Phasenspalte, die dadurch Wörter trennte.
+        # Gesetzt an Spalte (`gridCol`, liest LibreOffice) und Zelle (`tcW`, liest Word).
+        section = doc.sections[0]
+        nutzbar = section.page_width - section.left_margin - section.right_margin
+        table.autofit = False
+        for i, anteil in enumerate(_SPALTEN_ANTEILE):
+            breite = int(nutzbar * anteil / 100)
+            table.columns[i].width = breite
+            for cell in table.columns[i].cells:
+                cell.width = breite
 
     # Kompetenzen und Begriffe unter der Tabelle, wie im PDF (`lesson.html`). Bis 0.18 fehlten
     # beide im DOCX. Formeln in Titeln bleiben TeX-Quelle — python-docx kann kein OMML.

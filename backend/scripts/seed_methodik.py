@@ -9,12 +9,18 @@ gehören keiner Fachschaft und sind die Ausnahme davon (ADR-019, Zielbild K3).
     python scripts/seed_methodik.py
     python scripts/seed_methodik.py --dry-run
     python scripts/seed_methodik.py --ueberschreiben
+    python scripts/seed_methodik.py --aliase-ergaenzen
 
 **Der Seed füllt Lücken, er überschreibt nichts.** Nach dem ersten Lauf gehören die
 Knoten der Schule: `write_scope = school` heißt, jede Lehrkraft darf sie über die
 Sammlung bearbeiten. Ein zweiter Lauf, der Text und Aliase zurücksetzt, nähme diese
 Arbeit weg — lautlos, denn niemand führt Buch darüber. Wer das ausdrücklich will, nimmt
 `--ueberschreiben`.
+
+**`--aliase-ergaenzen`** liegt dazwischen (0.18): Es fügt Aliase des Seeds hinzu, die einem
+Knoten fehlen, und behält die der Schule. Entfernt wird nur, was in `ALIASE_ENTFERNT` steht —
+Aliase, die der Seed früher selbst ausgeliefert hat und die falsch waren. Der Probelauf zeigt
+beides.
 
 Anders die **Scopes**: Sie sind kein Redaktionsergebnis, sondern das Zielbild aus
 ADR-019, und werden bei jedem Lauf nachgezogen.
@@ -135,7 +141,11 @@ class Baustein:
 SOZIALFORMEN: list[Baustein] = [
     Baustein(
         "Plenum",
-        ("Frontalunterricht", "Unterrichtsgespräch", "Lehrgespräch"),
+        # „Unterrichtsgespräch" und „Lehrgespräch" standen hier bis 0.18 — Gesprächsformen
+        # sind Methoden, keine Sozialform (`ALIASE_ENTFERNT`). Als Alias ließen sie den
+        # Assistenten das Gespräch als Sozialform eintragen. „Frontalunterricht" bleibt: alles,
+        # bei dem die Lehrkraft vorne steht (Jan, 18.10.2026).
+        ("Frontalunterricht",),
         content=(
             "Die ganze Klasse arbeitet gemeinsam an einer Sache, geführt von der "
             "Lehrkraft. Alle hören dasselbe und sprechen nacheinander. Typisch für Einstieg, Sicherung und gemeinsame Auswertung: Ergebnisse werden vorgestellt, verglichen, ggf. diskutiert und festgehalten."
@@ -143,21 +153,21 @@ SOZIALFORMEN: list[Baustein] = [
     ),
     Baustein(
         "Einzelarbeit",
-        ("Stillarbeit",),
+        ("Stillarbeit", "EA"),
         content=(
             "Jede und jeder arbeitet für sich, still und im eigenen Tempo. Sinnvoll vor allem zur Erarbeitung von Texten, Übungen und anderen Aufgaben, bei denen die eigenständige Denkleistung des Einzelnen im Vordergrund steht."
         ),
     ),
     Baustein(
         "Partnerarbeit",
-        (),
+        ("PA",),
         content=(
             "Zwei bearbeiten eine Aufgabe gemeinsam. Weil man dem Gegenüber erklären muss, was man meint, treten Lücken hervor, die in der Einzelarbeit unbemerkt bleiben. Zugleich kommt jede Person oft zu Wort — mehr als in jeder größeren Runde. Gut geeignet für die Erarbeitung von Texten, Übungen und komplexeren Aufgaben, Problemlöseaufgaben und Aufgaben, die kooperatives Vorgehen erfordern."
         ),
     ),
     Baustein(
         "Gruppenarbeit",
-        ("Teamarbeit",),
+        ("Teamarbeit", "GA"),
         content=(
             "Drei bis fünf Lernende bearbeiten zusammen eine Aufgabe und stellen ihr Ergebnis anschließend vor. Ideal für Aufgaben, die kooperativ gelöst werden müssen, Projektarbeiten oder Aufgaben, die arbeitsteilig gelöst werden können. Eine klare Absprache über die Rollen und Verantwortlichkeiten sowie die Zusammenführung der Ergebnisse ist wichtig."
         ),
@@ -287,6 +297,29 @@ METHODEN: list[Baustein] = [
         ),
     ),
     Baustein(
+        "Unterrichtsgespräch",
+        # Die Kürzel stehen so in den Stundenentwürfen (0.15, Vorab: fünf Entwürfe).
+        ("LSG", "Lehrer-Schüler-Gespräch", "UG"),
+        content=(
+            "Die Klasse spricht gemeinsam über eine Frage, einen Befund oder ein Ergebnis. Die Lehrkraft moderiert: Sie nimmt Beiträge auf, fragt nach, bündelt und hält fest. Wohin das Gespräch geht, bestimmen die Beiträge der Lernenden mit — anders als beim fragend-entwickelnden Gespräch, bei dem die Lehrkraft den Weg vorgibt. Typisch zum Sammeln von Vorwissen, zum Auswerten von Arbeitsergebnissen und zur Sicherung."
+        ),
+        ablauf=(
+            "Die Klasse bespricht gemeinsam eine Frage oder ein Ergebnis; die Lehrkraft moderiert, "
+            "nimmt die Beiträge der Lernenden auf und bündelt sie."
+        ),
+    ),
+    Baustein(
+        "Lehrervortrag",
+        ("LVo", "Lehrkraftvortrag"),
+        content=(
+            "Die Lehrkraft stellt einen Sachverhalt zusammenhängend dar, mündlich und oft gestützt durch Tafel, Folie oder einen vorgeführten Versuch. Die Klasse hört zu und schreibt mit. Geeignet, um Neues knapp einzuführen, einen Zusammenhang zu ordnen oder einen Versuch vorzuführen. Am besten kurz — wenige Minuten — und mit einer anschließenden Aufgabe für die Lernenden."
+        ),
+        ablauf=(
+            "Die Lehrkraft stellt einen Sachverhalt zusammenhängend dar, und die Klasse hört zu "
+            "und schreibt mit."
+        ),
+    ),
+    Baustein(
         "Lerntempoduett",
         (),
         content=(
@@ -348,6 +381,12 @@ BESTAND: list[tuple[str, list[Baustein]]] = [
     ("methode", METHODEN),
 ]
 
+#: Aliase, die der Seed früher selbst ausgeliefert hat und die falsch waren. Nur
+#: `--aliase-ergaenzen` (und `--ueberschreiben`) entfernt sie; der Probelauf zeigt es an.
+ALIASE_ENTFERNT: dict[tuple[str, str], tuple[str, ...]] = {
+    ("sozialform", "Plenum"): ("Unterrichtsgespräch", "Lehrgespräch"),  # 0.18: Gesprächsformen
+}
+
 
 @dataclass
 class Aenderung:
@@ -373,6 +412,7 @@ def plane_aenderung(
     content_type: str,
     *,
     ueberschreiben: bool = False,
+    aliase_ergaenzen: bool = False,
 ) -> Aenderung:
     """Vergleicht Ist und Soll und beschreibt den Unterschied.
 
@@ -411,7 +451,21 @@ def plane_aenderung(
     # ── Aliase ────────────────────────────────────────────────────────────────
     ist_aliase = list(ist.get("aliase") or [])
     soll_aliase = list(baustein.aliase)
-    if soll_aliase != ist_aliase:
+    if aliase_ergaenzen and ist_aliase and not ueberschreiben:
+        # Die der Schule behalten, die des Seeds dazu, die ausdrücklich falschen weg.
+        weg = {a.casefold() for a in ALIASE_ENTFERNT.get((content_type, baustein.titel), ())}
+        bleibt = [a for a in ist_aliase if a.casefold() not in weg]
+        schon = {a.casefold() for a in bleibt}
+        dazu = [a for a in soll_aliase if a.casefold() not in schon and a.casefold() not in weg]
+        if bleibt + dazu != ist_aliase:
+            aenderung.aliase = bleibt + dazu
+            if dazu:
+                aenderung.geaendert.append(f"Aliase ergänzt: {', '.join(dazu)}")
+            if len(bleibt) < len(ist_aliase):
+                entfernt = [a for a in ist_aliase if a.casefold() in weg]
+                aenderung.geaendert.append(f"Aliase entfernt: {', '.join(entfernt)}")
+            aenderung.embedding_verwerfen = True
+    elif soll_aliase != ist_aliase:
         if ist_aliase and not ueberschreiben:
             aenderung.behalten.append("Aliase")
         else:
@@ -490,6 +544,7 @@ async def _upsert(
     bilanz: Bilanz,
     *,
     ueberschreiben: bool,
+    aliase_ergaenzen: bool = False,
 ) -> None:
     vorhanden = (
         await db.execute(
@@ -505,7 +560,9 @@ async def _upsert(
         if vorhanden
         else {}
     )
-    aenderung = plane_aenderung(ist, baustein, content_type, ueberschreiben=ueberschreiben)
+    aenderung = plane_aenderung(
+        ist, baustein, content_type, ueberschreiben=ueberschreiben, aliase_ergaenzen=aliase_ergaenzen
+    )
 
     if aenderung.behalten:
         bilanz.behalten.append(
@@ -548,7 +605,9 @@ async def _upsert(
     logger.info("  %-12s %-35s %s", content_type, baustein.titel, ", ".join(aenderung.geaendert))
 
 
-async def seed(*, dry_run: bool = False, ueberschreiben: bool = False) -> Bilanz:
+async def seed(
+    *, dry_run: bool = False, ueberschreiben: bool = False, aliase_ergaenzen: bool = False
+) -> Bilanz:
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -557,7 +616,8 @@ async def seed(*, dry_run: bool = False, ueberschreiben: bool = False) -> Bilanz
         for content_type, eintraege in BESTAND:
             for baustein in eintraege:
                 await _upsert(
-                    db, content_type, baustein, bilanz, ueberschreiben=ueberschreiben
+                    db, content_type, baustein, bilanz,
+                    ueberschreiben=ueberschreiben, aliase_ergaenzen=aliase_ergaenzen,
                 )
         if dry_run:
             await db.rollback()
@@ -577,7 +637,10 @@ def _berichte(bilanz: Bilanz, *, dry_run: bool) -> None:
         bilanz.unveraendert,
     )
     for zeile in bilanz.behalten:
-        logger.info("Nicht überschrieben — %s (mit --ueberschreiben erzwingen).", zeile)
+        logger.info(
+            "Nicht überschrieben — %s (Aliase mit --aliase-ergaenzen ergänzen, alles mit "
+            "--ueberschreiben ersetzen).", zeile
+        )
     if bilanz.ohne_text:
         logger.warning(
             "%d Einträge ohne Kurzbeschreibung, als unvollständig markiert und ohne "
@@ -606,9 +669,16 @@ def main() -> None:
         action="store_true",
         help="Auch Text und Aliase ersetzen, die in der Schule geändert wurden",
     )
+    parser.add_argument(
+        "--aliase-ergaenzen",
+        action="store_true",
+        help="Fehlende Aliase des Seeds hinzufügen, die der Schule behalten",
+    )
     args = parser.parse_args()
 
-    bilanz = asyncio.run(seed(dry_run=args.dry_run, ueberschreiben=args.ueberschreiben))
+    bilanz = asyncio.run(seed(
+        dry_run=args.dry_run, ueberschreiben=args.ueberschreiben, aliase_ergaenzen=args.aliase_ergaenzen
+    ))
     _berichte(bilanz, dry_run=args.dry_run)
 
 

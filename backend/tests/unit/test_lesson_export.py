@@ -296,6 +296,38 @@ def test_docx_nur_begriffe():
     assert not any(b.startswith("Kompetenzen:") for b in bloecke)
 
 
+def test_docx_ist_a4():
+    """Die Vorlage von python-docx ist US-Letter; das PDF ist A4."""
+    pytest.importorskip("docx")
+    import io
+
+    from docx import Document
+
+    from app.planning.lesson_export import export_docx
+
+    section = Document(io.BytesIO(export_docx(_make_export()))).sections[0]
+    assert round(section.page_width.cm, 1) == 21.0
+    assert round(section.page_height.cm, 1) == 29.7
+
+
+def test_docx_spaltenbreiten_wie_im_pdf():
+    """Bis 0.18 waren alle fünf Spalten gleich breit; die Phasenspalte trennte Wörter."""
+    pytest.importorskip("docx")
+    import io
+
+    from docx import Document
+
+    from app.planning.lesson_export import _SPALTEN_ANTEILE, export_docx
+
+    doc = Document(io.BytesIO(export_docx(_make_export())))
+    tabelle = doc.tables[0]
+    gesamt = sum(c.width for c in tabelle.columns)
+    for spalte, anteil in zip(tabelle.columns, _SPALTEN_ANTEILE):
+        assert abs(spalte.width / gesamt * 100 - anteil) < 0.5
+        assert all(zelle.width == spalte.width for zelle in spalte.cells)
+    assert tabelle.columns[2].width > 3 * tabelle.columns[1].width  # Phase ≫ Prio
+
+
 def test_pdf_prio_farbe_schlaegt_zeilenstreifen():
     """`tr:nth-child(even) td` ist spezifischer als eine einzelne Klasse — bis 0.18 stand das
     weiße Prio-Kürzel in jeder zweiten Zeile auf hellem Grund. Die Prio-Regeln brauchen

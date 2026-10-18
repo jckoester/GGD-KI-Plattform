@@ -156,6 +156,65 @@ class TestSchulbearbeitungBleibt:
         assert a.aliase == ["Platzdeckchen"]
 
 
+class TestAliaseErgaenzen:
+    """`--aliase-ergaenzen` (0.18): fehlende Aliase des Seeds dazu, die der Schule behalten,
+    nur die ausdrücklich falschen (`ALIASE_ENTFERNT`) weg."""
+
+    def test_ergaenzt_und_behaelt(self, seed):
+        baustein = seed.Baustein("Einzelarbeit", ("Stillarbeit", "EA"), content="Seed")
+        a = seed.plane_aenderung(_ist(aliase=["Stillarbeit", "Eigene"]), baustein, "sozialform",
+                                 aliase_ergaenzen=True)
+
+        assert a.aliase == ["Stillarbeit", "Eigene", "EA"]
+        assert "Aliase ergänzt: EA" in a.geaendert
+
+    def test_ohne_schalter_bleibt_alles(self, seed):
+        baustein = seed.Baustein("Einzelarbeit", ("Stillarbeit", "EA"), content="Seed")
+        a = seed.plane_aenderung(_ist(aliase=["Stillarbeit"]), baustein, "sozialform")
+
+        assert a.aliase is None
+        assert "Aliase" in a.behalten
+
+    def test_gross_klein_kein_doppel(self, seed):
+        baustein = seed.Baustein("Einzelarbeit", ("Stillarbeit", "EA"), content="Seed")
+        a = seed.plane_aenderung(_ist(aliase=["Stillarbeit", "ea"]), baustein, "sozialform",
+                                 aliase_ergaenzen=True)
+
+        assert a.aliase is None
+
+    def test_entfernt_nur_was_ausdruecklich_falsch_ist(self, seed):
+        plenum = next(b for b in seed.SOZIALFORMEN if b.titel == "Plenum")
+        ist = _ist(aliase=["Frontalunterricht", "Unterrichtsgespräch", "Lehrgespräch", "Eigene"])
+        a = seed.plane_aenderung(ist, plenum, "sozialform", aliase_ergaenzen=True)
+
+        assert a.aliase == ["Frontalunterricht", "Eigene"]
+        assert "Aliase entfernt: Unterrichtsgespräch, Lehrgespräch" in a.geaendert
+
+    def test_entfernt_nicht_an_anderen_knoten(self, seed):
+        baustein = seed.Baustein("Einzelarbeit", ("Stillarbeit",), content="Seed")
+        a = seed.plane_aenderung(_ist(aliase=["Stillarbeit", "Unterrichtsgespräch"]), baustein,
+                                 "sozialform", aliase_ergaenzen=True)
+
+        assert a.aliase is None
+
+    def test_zweiter_lauf_aendert_nichts(self, seed):
+        plenum = next(b for b in seed.SOZIALFORMEN if b.titel == "Plenum")
+        ist = _ist(content=plenum.text, aliase=["Unterrichtsgespräch", "Eigene"], embedding_vorhanden=False)
+        erster = seed.plane_aenderung(ist, plenum, "sozialform", aliase_ergaenzen=True)
+        zweiter = seed.plane_aenderung(_anwenden(ist, erster), plenum, "sozialform", aliase_ergaenzen=True)
+
+        assert zweiter.aliase is None
+        assert not zweiter.wirkt
+
+    def test_kein_alias_einer_sozialform_ist_eine_methode(self, seed):
+        """Wächter: „Unterrichtsgespräch" stand bis 0.18 als Alias an Plenum — der Assistent
+        trug das Gespräch deshalb als Sozialform ein."""
+        methoden = {t.casefold() for b in seed.METHODEN for t in (b.titel, *b.aliase)}
+        for sozialform in seed.SOZIALFORMEN:
+            for alias in sozialform.aliase:
+                assert alias.casefold() not in methoden, f"{sozialform.titel}: {alias}"
+
+
 class TestAblaufsatz:
     """Der Satz, aus dem der Vektor entsteht — getrennt von der Kurzbeschreibung.
 
