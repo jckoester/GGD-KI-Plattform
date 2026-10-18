@@ -15,6 +15,7 @@ def _settings(**over):
     base = dict(
         chat_default_model="chat-standard",
         title_model="system-titel",
+        begriffe_model="",
         embedding_model="embedding-standard",
         image_default_model="bild-standard",
         model_picker_hidden_prefixes=["system-", "embedding-", "bild-"],
@@ -222,6 +223,28 @@ def test_optional_title_model_may_be_empty():
     findings = check_config(_healthy(), _settings(title_model=""), bildarten=_BILDARTEN)
 
     assert not [m for m in _levels(findings, ERROR) if "TITLE_MODEL" in m]
+
+
+def test_begriffe_model_leer_ist_kein_fehler():
+    """Leeres BEGRIFFE_MODEL heißt: keine Begriffsvorschläge (0.18)."""
+    findings = check_config(_healthy(), _settings(begriffe_model=""), bildarten=_BILDARTEN)
+
+    assert not [m for m in _levels(findings, ERROR) if "BEGRIFFE_MODEL" in m]
+
+
+def test_begriffe_model_unbekannt_ist_ein_fehler():
+    findings = check_config(_healthy(), _settings(begriffe_model="system-begriffe"), bildarten=_BILDARTEN)
+
+    assert any("BEGRIFFE_MODEL='system-begriffe'" in m for m in _levels(findings, ERROR))
+
+
+def test_begriffe_model_im_modellwaehler_ist_eine_warnung():
+    entries = _healthy() + [_entry("mistral-small", supports_function_calling=False,
+                                   input_cost_per_token=1e-8, output_cost_per_token=2e-8)]
+
+    findings = check_config(entries, _settings(begriffe_model="mistral-small"), bildarten=_BILDARTEN)
+
+    assert any("BEGRIFFE_MODEL" in m and "Modellwähler" in m for m in _levels(findings, WARNING))
 
 
 # ── Modalitäten ──────────────────────────────────────────────────────────────

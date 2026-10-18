@@ -30,6 +30,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - `python scripts/seed_methodik.py --aliase-ergaenzen`, danach
   `python scripts/embedding_backfill.py --content-type methode`.
+- In der LiteLLM-Config den Alias `system-begriffe` eintragen (Vorlage:
+  `infra/litellm_config.ionos.example.yaml`), in `.env` `BEGRIFFE_MODEL=system-begriffe` setzen und
+  das Modell unter `/settings/models` für die Lehrkräfte freischalten.
 
 ## [0.17.0] – 2026-10-17
 

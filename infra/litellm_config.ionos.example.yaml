@@ -218,6 +218,21 @@ model_list:
       input_cost_per_token: 1.5e-07        # 0,15 €/M
       output_cost_per_token: 6.5e-07        # 0,65 €/M
 
+  # Begriffsvorschläge aus den Phasentexten eines Stundenentwurfs (BEGRIFFE_MODEL, 0.18).
+  # Mistral Small 24B: im Vorlauf zu 0.18 die einzige getestete Variante, die die bekannten
+  # Fälle bestand (mit 5 Kandidaten) — ohne Denkphase, ~0,02 ct je Aufruf. Ein eigener
+  # Alias, obwohl dasselbe Modell wie `chat-schnell`: So lässt sich beides getrennt wechseln.
+  # ⚠️ Muss in der Allowlist der Lehrkräfte stehen (Aufruf über deren Virtual Key).
+  - model_name: system-begriffe
+    litellm_params:
+      model: openai/mistralai/Mistral-Small-24B-Instruct
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: false        # liefert nur JSON
+      input_cost_per_token: 1.0e-07        # 0,10 €/M
+      output_cost_per_token: 3.0e-07        # 0,30 €/M
+
   # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es bei
   # IONOS nicht gibt). Angebunden unten unter `litellm_settings.guardrails`.
   # Mistral Small 24B statt des noch günstigeren Qwen3.5-9B: Der Klassifikator muss die

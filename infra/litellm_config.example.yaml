@@ -60,6 +60,13 @@ model_list:
       model: gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
+  # Begriffsvorschläge aus den Phasentexten eines Stundenentwurfs (BEGRIFFE_MODEL, 0.18).
+  # ⚠️ Muss in der Allowlist der Lehrkräfte stehen (Aufruf über deren Virtual Key).
+  - model_name: system-begriffe
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
   # Klassifikator des Jugendschutz-Guardrails (siehe unten). Läuft bei JEDER Antwort.
   - model_name: system-moderation
     litellm_params:

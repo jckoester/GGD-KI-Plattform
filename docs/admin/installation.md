@@ -122,6 +122,7 @@ LiteLLM-Config, nicht die Modell-IDs des Anbieters:
 OPENAI_API_KEY=…            # bzw. IONOS_API_KEY / MISTRAL_API_KEY / ANTHROPIC_API_KEY
 CHAT_DEFAULT_MODEL=chat-standard
 TITLE_MODEL=system-titel
+BEGRIFFE_MODEL=system-begriffe
 EMBEDDING_MODEL=embedding-standard
 EMBEDDING_DIMENSIONS=1536   # muss zur Vektorbreite des gewählten Modells passen
 ```
@@ -351,6 +352,10 @@ Wert dort mindestens so hoch setzen wie `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`, si
    > dass irgendwo ein Fehler erscheint. Dass `MODEL_PICKER_HIDDEN_PREFIXES` es aus dem
    > Chat-Dropdown ausblendet, ändert daran nichts: Der Filter ist rein kosmetisch, in
    > dieser Matrix bleibt das Modell sichtbar.
+
+   > **Das Begriffsmodell (`BEGRIFFE_MODEL`) gehört in die Gruppe der Lehrkräfte.** Aus
+   > demselben Grund wie das Titelmodell: Der Vorschlag läuft über den Virtual Key der
+   > Lehrkraft. Fehlt die Freigabe, bleibt die Vorschlagszeile im Stundenentwurf leer.
 
 4. **Texte hinterlegen:** Unter `/settings/texts` Impressum, Datenschutzerklärung
    und Nutzungsregeln eingeben (rechtlich erforderlich).

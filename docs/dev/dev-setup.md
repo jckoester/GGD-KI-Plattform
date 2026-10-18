@@ -87,6 +87,7 @@ LITELLM_DATABASE_URL=postgresql://postgres:devpassword@localhost:5432/litellm
 # Namen aus der LiteLLM-Config, NICHT Anbieter-Modell-IDs.
 CHAT_DEFAULT_MODEL=chat-standard
 TITLE_MODEL=system-titel
+BEGRIFFE_MODEL=system-begriffe
 FRONTEND_ORIGIN=http://localhost:5173
 ENVIRONMENT=development
 AUTH_CONFIG_PATH=config/auth.yaml

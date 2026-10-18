@@ -153,6 +153,9 @@ def check_config(
     configured = [
         ("CHAT_DEFAULT_MODEL", settings.chat_default_model, True),
         ("TITLE_MODEL", settings.title_model, False),
+        # `getattr`: optional und erst seit 0.18 — Aufrufer mit eigenem, verkürztem
+        # Settings-Objekt (Tests, Werkzeuge) kennen es nicht.
+        ("BEGRIFFE_MODEL", getattr(settings, "begriffe_model", ""), False),
         ("EMBEDDING_MODEL", settings.embedding_model, True),
     ]
     for var, name, required in configured:
@@ -276,14 +279,16 @@ def check_config(
     if hidden:
         findings.append(Finding(INFO, f"Ausgeblendet: {', '.join(hidden)}"))
 
-    if settings.title_model and settings.title_model in pickable:
-        findings.append(Finding(
-            WARNING,
-            f"TITLE_MODEL='{settings.title_model}' erscheint im Modellwähler. Es ist nicht "
-            f"zur manuellen Auswahl gedacht — mit einem Präfix aus "
-            f"MODEL_PICKER_HIDDEN_PREFIXES benennen (z. B. 'system-titel'). "
-            f"Achtung: freigeschaltet bleiben muss es trotzdem.",
-        ))
+    for var, name, beispiel in (("TITLE_MODEL", settings.title_model, "system-titel"),
+                                ("BEGRIFFE_MODEL", getattr(settings, "begriffe_model", ""), "system-begriffe")):
+        if name and name in pickable:
+            findings.append(Finding(
+                WARNING,
+                f"{var}='{name}' erscheint im Modellwähler. Es ist nicht "
+                f"zur manuellen Auswahl gedacht — mit einem Präfix aus "
+                f"MODEL_PICKER_HIDDEN_PREFIXES benennen (z. B. '{beispiel}'). "
+                f"Achtung: freigeschaltet bleiben muss es trotzdem.",
+            ))
 
     # ── 6. Platzhalter aus der Vorlage übrig? ────────────────────────────────────────
     for name, entry in sorted(entries.items()):

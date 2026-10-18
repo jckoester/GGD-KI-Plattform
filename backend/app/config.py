@@ -138,6 +138,10 @@ class Settings(BaseSettings):
     chat_default_model: str = ""
     # Leer = keine automatische Titelgenerierung (der Chat-Flow prüft darauf).
     title_model: str = ""
+    # Modell für die Begriffsvorschläge aus den Phasentexten (0.18), Alias `system-begriffe`.
+    # Leer = keine Vorschläge. Der Aufruf läuft über den Virtual Key der Lehrkraft — das
+    # Modell muss in der Allowlist der Lehrkräfte stehen (nur dort; Schüler:innen rufen es nie).
+    begriffe_model: str = ""
     # Präfixe, deren Modelle NICHT im Chat-Modellwähler erscheinen: interne Modelle
     # (Titelgenerierung, Moderations-Klassifikator) und andere Modalitäten. Rein kosmetisch —
     # die Team-Allowlist bleibt unberührt, `system-titel` muss dort sogar stehen bleiben
