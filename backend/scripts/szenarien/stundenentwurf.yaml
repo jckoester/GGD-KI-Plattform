@@ -32,6 +32,7 @@ faelle:
       - "Arbeite die Phasen „Übungsaufgaben (einfach bis mittel)“ und „Vertiefte Übungen“ aus: Was genau sollen die Schüler:innen dort tun?"
       - "Ja, übernehmen."
     zustimmung_ab: 2
+    begriffe: {absatz: false, keine_ungefragten: true}   # 0.18: die Leiste schlägt vor
     erwartung: >-
       Beschreibt für beide Phasen konkret, was die Schüler:innen tun, passend zu „alle
       Rechenregeln für Potenzen" — einfach bis mittel bzw. vertieft unterscheidbar. Aufgaben nur
@@ -66,7 +67,7 @@ faelle:
       - "Ja, so übernehmen."
     zustimmung_ab: 2
     # 0.17: Beim Kürzen kein Absatz „Begriffe dieser Stunde" (Prompt, Plan F4).
-    begriffe: {absatz: false}
+    begriffe: {absatz: false, keine_ungefragten: true}
     erwartung: >-
       Kommt durch Kürzen und Streichen auf höchstens 70 Minuten — Vertiefung zuerst —, ohne neue
       Phasen. Je Änderung eine Zeile mit Grund, Beschreibungen unverändert, Zeitbilanz „… von 70".
@@ -78,6 +79,7 @@ faelle:
     kompetenzen:
       praefixe: ["3.4.", "2."]     # Chemie, Leistungsfach Kursstufe (BW 2016 V2)
       kapitel: true                # Einheit „Aromaten" mit Kapitel
+    begriffe: {absatz: false, keine_ungefragten: true}   # 0.18: die Leiste schlägt vor
     erwartung: >-
       Nimmt die Kompetenzen aus dem Kapitel der Einheit „Aromaten" (3.4.5) und wählt die, die
       zum Inhalt der Stunde passen — Bromierung von Benzol im Praktikum —, mit Nummer und

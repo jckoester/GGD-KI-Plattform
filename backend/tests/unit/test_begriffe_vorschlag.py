@@ -88,3 +88,20 @@ def test_anzeige_filtert_und_sagt_ob_aktuell():
 def test_hinweis_nennt_nichts_bekannt():
     """F1 (Jan, 18.10.2026): eine Planungshilfe, kein Lernstand — nirgends „bekannt"."""
     assert "bekannt" not in HINWEIS_FRUEHER.casefold() and "Lernstand" in HINWEIS_FRUEHER
+
+
+def test_werkzeugtexte_folgen_dem_prompt():
+    """Die Anleitung im Werkzeugergebnis steht nach dem Prompt und überstimmt ihn: In der ersten
+    Messung zu 0.18 Schritt 7 verlangte sie noch den Absatz „Begriffe dieser Stunde", und das
+    Modell schrieb ihn trotz neuem Prompt (Regression 1/3 und 0/3). Kein Werkzeugtext darf das
+    alte Verhalten verlangen."""
+    import json
+
+    from app.chat.tools import TOOL_REGISTRY
+    from app.planning import assistant_tools
+
+    assert "nicht von dir" in assistant_tools.BEGRIFFE_ANLEITUNG
+    for name in ("get_lesson_detail", "update_lesson_phases"):
+        text = json.dumps(TOOL_REGISTRY[name].definition, ensure_ascii=False)
+        assert "Begriffe dieser Stunde" not in text, name
+    assert "Begriffe dieser Stunde" not in assistant_tools.BEGRIFFE_ANLEITUNG

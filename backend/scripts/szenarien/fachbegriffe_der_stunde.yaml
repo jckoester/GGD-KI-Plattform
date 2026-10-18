@@ -46,8 +46,10 @@ messgruppen:
           beschreibung: "Ergebnis im Heft festhalten"
 
 faelle:
-  # Fall 1 — Phasen ausarbeiten: Der Assistent nennt die eingeführten Begriffe von sich aus
-  # und schreibt sie nach Zustimmung (Abnahme 2). Gruppe 33, 13.10. (ohne Einheit): Der Plan
+  # Fall 1 — Phasen ausarbeiten. Bis 0.17 nannte der Assistent die Begriffe von sich aus und
+  # schrieb sie nach Zustimmung. Seit 0.18 schlägt die Leiste sie vor: kein Absatz, nichts
+  # ungefragt eingetragen, und nach dem Schreiben liegt ein Vorschlag ab, der die erwarteten
+  # Begriffe deckt — soweit sie im geschriebenen Entwurf stehen. Gruppe 33, 13.10. (ohne Einheit): Der Plan
   # sah den 12.10. vor, der hat aber keine Erarbeitung (Praktikum).
   - id: begriffe-vorschlagen
     stunde: {gruppe: 33, datum: 2026-10-13}
@@ -58,16 +60,14 @@ faelle:
       - "Ja, übernehmen."
     zustimmung_ab: 2
     begriffe:
-      absatz: true
-      geschrieben: true
-      deckt_ab: [elektrophile Substitution, Elektrophil, Reaktionsmechanismus]
-      nicht_eingefuehrt: [Benzol, Aromaten]
+      absatz: false
+      keine_ungefragten: true
+      vorschlag: {deckt_ab: [elektrophile Substitution, Elektrophil, Reaktionsmechanismus]}
     erwartung: >-
-      Arbeitet die erste Erarbeitung konkret aus (Quellen, Arbeitsauftrag, Ergebnis) und nennt
-      am Ende „Begriffe dieser Stunde" mit Phase — Begriffe, die beim Mechanismus neu sind
-      (etwa elektrophile Substitution mit σ-Komplex, Elektrophil, Reaktionsmechanismus), nicht
-      Benzol oder Aromaten, die wiederholt werden. Nach „Ja" stehen genau diese als Begriffe in
-      der Leiste, die Kompetenz 3.4.5(4) bleibt.
+      Arbeitet die erste Erarbeitung konkret aus (Quellen, Arbeitsauftrag, Ergebnis), ohne
+      eigenen Begriffsabsatz und ohne Begriffe einzutragen. Nach „Ja" bleibt die Kompetenz
+      3.4.5(4); die Leiste schlägt die Begriffe des neuen Entwurfs vor (elektrophile
+      Substitution mit σ-Komplex, Elektrophil, Reaktionsmechanismus).
 
   # Fall 2 — ein Begriff fehlt im Wissensspeicher (F6, Abnahme 3). Die Lehrkraft nennt ihn
   # selbst: Der Entwurf vom 12.10. enthält keinen fehlenden Begriff. „Lewis-Säure" gibt es auf
@@ -85,7 +85,7 @@ faelle:
       Lewis-Schreibweise) an seine Stelle zu setzen. Nach „Ja" steht nur Katalysator in der
       Leiste. Phasen unverändert.
 
-  # Fall 3 — Begriffe aus Bezugsfächern (F2). Der Plan sah Physik vor; Physik-Begriffe gibt
+  # Fall 3 — Begriffe aus Bezugsfächern (F2). Seit 0.18 über den Vorschlag der Leiste. Der Plan sah Physik vor; Physik-Begriffe gibt
   # es nicht. Stattdessen NwT mit Biologie und Chemie.
   - id: begriffe-bezugsfach
     stunde: {gruppe: 98017, datum: 2026-10-21}
@@ -94,14 +94,13 @@ faelle:
       - "Ja, übernehmen."
     zustimmung_ab: 2
     begriffe:
-      absatz: true
-      geschrieben: true
-      aus_bezugsfach: true
-      deckt_ab: [Chromatografie, Chlorophyll]
+      absatz: false
+      keine_ungefragten: true
+      vorschlag: {deckt_ab: [Chromatografie, Chlorophyll], aus_bezugsfach: true}
     erwartung: >-
-      Arbeitet den Versuch aus (Extraktion, Laufmittel, Auftragen, Entwickeln, Beobachten)
-      und nennt als Begriffe der Stunde, was die Schüler:innen neu lernen — etwa Chromatografie,
-      Chlorophyll —, je mit Phase. Nach „Ja" stehen sie in der Leiste, mit ihrem Fach.
+      Arbeitet den Versuch aus (Extraktion, Laufmittel, Auftragen, Entwickeln, Beobachten),
+      ohne Begriffsabsatz. Nach „Ja" schlägt die Leiste vor, was die Schüler:innen neu lernen —
+      etwa Chromatografie, Chlorophyll —, darunter Begriffe aus einem Bezugsfach.
 
   # Fall 4 — Phasen ändern wirft keine Begriffe weg (Regression, Abnahme 2). Beim Kürzen kein
   # Begriffsabsatz (Prompt, F4).
@@ -119,3 +118,15 @@ faelle:
     erwartung: >-
       Kürzt genau diese Phase von 25 auf 20 Minuten, nennt die Zeitbilanz und sonst nichts.
       Kompetenz und Begriffe stehen danach unverändert in der Leiste.
+
+  # Fall 5 (0.18) — die Lehrkraft fragt nach Begriffen: Antwort Phase für Phase, nichts
+  # geschrieben (ohne Zustimmung jedes Schreiben zu früh).
+  - id: begriffe-fragen
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    zuege:
+      - "Welche Fachbegriffe führt diese Stunde ein?"
+    begriffe: {genannt: [elektrophile Substitution]}
+    erwartung: >-
+      Nennt Phase für Phase die Begriffe, die die Stunde einführt oder anspricht — elektrophile
+      Substitution, Reaktionsmechanismus, σ-Komplex —, nicht Benzol als neu. Schreibt nichts
+      und nennt keine Kennungen.

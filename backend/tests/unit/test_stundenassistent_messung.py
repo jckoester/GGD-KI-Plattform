@@ -481,3 +481,80 @@ def test_verlauf_zeigt_refs_auch_ohne_phasenaenderung():
                                        "assistent_name": "A", "prompt": "p"}, [lauf])
     assert "**Kompetenzen und Begriffe:** — → Katalysator (B)" in md
 
+
+
+# ── 0.18: Die Leiste schlägt vor (Plan „Begriffe aus den Phasentexten", Schritt 7) ──
+#
+# Der Assistent trägt nichts ungefragt ein; nach dem Schreiben liegt ein Vorschlag ab, der
+# deckt, was im geschriebenen Entwurf steht. Je Kriterium richtig und Fehlgriff.
+
+PHASEN_SUB = [{"id": "a", "name": "Erarbeitung", "dauer_min": 20,
+               "beschreibung": "Mechanismus der elektrophilen Substitution über den σ-Komplex"}]
+
+
+def _vorschlags_lauf(fall_begriffe, *, nachher_refs, vorschlag, phasen=PHASEN_SUB):
+    ausgang = _mit_refs([IK])
+    zug1 = _zug(["get_lesson_detail"], antwort="Vorschlag … Soll ich das übernehmen?")
+    zug1["stand"] = copy.deepcopy(ausgang)
+    zug2 = _zug(["update_lesson_phases"], antwort="Gespeichert.")
+    zug2["stand"] = _mit_refs(nachher_refs)
+    zug2["stand"]["entwuerfe"][STUNDE]["metadata"]["phasen"] = phasen
+    zug2["vorschlag"] = vorschlag
+    fall = {"id": "v", "stunde": {}, "zuege": ["…", "Ja"], "zustimmung_ab": 2, "begriffe": fall_begriffe}
+    return messung.bewerte(fall, ausgang, [zug1, zug2], stunde=STUNDE, begriffe=INFO)
+
+
+VORSCHLAG_GUT = {"eintraege": [{"node_id": "b-sub"}, {"node_id": "b-chl"}], "frueher": []}
+
+
+def test_vorschlag_besteht():
+    k = _vorschlags_lauf({"absatz": False, "keine_ungefragten": True,
+                          "vorschlag": {"deckt_ab": ["elektrophile Substitution", "Elektrophil"], "aus_bezugsfach": True}},
+                         nachher_refs=[IK], vorschlag=VORSCHLAG_GUT)
+    assert all(k.values()), k
+    assert {"kein_begriffsabsatz", "keine_ungefragten_begriffe", "vorschlag_abgelegt",
+            "vorschlag_deckt_ab", "vorschlag_aus_bezugsfach"} <= set(k)
+
+
+def test_elektrophil_steht_nicht_im_entwurf_und_zaehlt_nicht():
+    """„elektrophilen Substitution" nennt die Substitution, nicht das Elektrophil (Regel des Vorlaufs)."""
+    assert messung.im_entwurf(["elektrophile Substitution", "Elektrophil"],
+                              "Stunde: „T“\n- Erarbeitung — der elektrophilen Substitution", INFO) == [
+        "elektrophile Substitution"]
+    assert messung.im_entwurf(["Elektrophil"], "- Erarbeitung — Elektrophil‑Bildung", INFO) == ["Elektrophil"]
+
+
+@pytest.mark.parametrize("nachher_refs, vorschlag, kriterium", [
+    ([IK, _b("b-sub")], VORSCHLAG_GUT, "keine_ungefragten_begriffe"),         # ungefragt eingetragen
+    ([IK], None, "vorschlag_abgelegt"),                                        # kein Vorschlag
+    ([IK], {"eintraege": [{"node_id": "b-chl"}], "frueher": []}, "vorschlag_deckt_ab"),   # Substitution fehlt
+    ([IK], {"eintraege": [{"node_id": "b-sub"}], "frueher": []}, "vorschlag_aus_bezugsfach"),  # nur eigenes Fach
+])
+def test_vorschlags_fehlgriffe_werden_erkannt(nachher_refs, vorschlag, kriterium):
+    k = _vorschlags_lauf({"keine_ungefragten": True,
+                          "vorschlag": {"deckt_ab": ["elektrophile Substitution"], "aus_bezugsfach": True}},
+                         nachher_refs=nachher_refs, vorschlag=vorschlag)
+    assert k[kriterium] is False, k
+
+
+def test_frueher_deckt_auch():
+    k = _vorschlags_lauf({"vorschlag": {"deckt_ab": ["elektrophile Substitution"]}}, nachher_refs=[IK],
+                         vorschlag={"eintraege": [], "frueher": [{"node_id": "b-sub"}]})
+    assert k["vorschlag_deckt_ab"] is True
+
+
+def test_begriffe_genannt():
+    fall = {"id": "f", "stunde": {}, "zuege": ["Welche Begriffe?"], "begriffe": {"genannt": ["elektrophile Substitution"]}}
+    gut = messung.bewerte(fall, AUSGANG, [_zug(["get_lesson_detail"], antwort="Erarbeitung: der elektrophilen Substitution")],
+                          stunde=STUNDE, begriffe=INFO)
+    schlecht = messung.bewerte(fall, AUSGANG, [_zug(["get_lesson_detail"], antwort="Erarbeitung: Benzol")],
+                               stunde=STUNDE, begriffe=INFO)
+    assert gut["begriffe_genannt"] is True and schlecht["begriffe_genannt"] is False
+
+
+def test_kennungen_gezaehlt():
+    assert messung.kennungen_genannt([
+        {"antwort": "Unterrichtsgespräch (Node‑ID `6485052c-8321-45b4-83ba-b820cb1d6b27`)"},
+        {"antwort": "keine neuen (`suggested_refs` leer)"},
+        {"antwort": "Gespeichert."},
+    ]) == 2

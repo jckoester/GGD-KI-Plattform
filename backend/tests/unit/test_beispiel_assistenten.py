@@ -107,42 +107,34 @@ class TestStundenentwurf:
         assert "**Sicherung:**" in abschnitt
 
     def test_fachbegriffe_der_stunde(self):
-        """0.17 (A1): `begriffe` kommt mit dem Entwurf; der Assistent nennt die eingeführten
-        Begriffe in einem eigenen Absatz (Plan F4), nur aus Werkzeugergebnissen, und trägt einen
-        fehlenden nicht ein (F6). Begriffe stehen als `typ` „concept“ in `refs`."""
+        """0.17 (A1): `begriffe` kommt mit dem Entwurf, Begriffe stehen als `typ` „concept“ in
+        `refs`, ein fehlender wird nicht eingetragen (F6). Seit 0.18 schlägt die Leiste die
+        Begriffe vor (eigener Aufruf aus den Phasentexten); der Assistent nennt sie nur noch, wenn
+        die Lehrkraft fragt oder sie selbst nennt — der Pflichtabsatz „Begriffe dieser Stunde“
+        ist weg (Plan „Begriffe aus den Phasentexten", Schritt 7)."""
         text = _prompt(_eintrag("Stundenentwurf"))
         assert "`begriffe`" in text
         abschnitt = text.split("## Fachbegriffe der Stunde", 1)[1].split("\n## ", 1)[0]
-        assert "Begriffe dieser Stunde" in abschnitt
-        # Jans Bewertung von M4–M6: Begriffe unvollständig. Keine Bremse mehr, alle Phasen
-        # (seit Fables Fassung vom 17.10.2026: „Phase für Phase … auch die Phasen, die du nicht
-        # änderst", „Lieber einer zu viel").
-        assert "selten mehr als zwei" not in abschnitt
+        assert "nicht von dir aus" in abschnitt and "Leiste" in abschnitt
+        assert "Begriffe dieser Stunde" not in text
+        # F1 (Jan, 18.10.2026): frühere Begriffe sind eine Planungshilfe, kein Lernstand.
+        assert "`begriffe_frueherer_stunden`" in text and "kein Lernstand" in text
+        # Fragt die Lehrkraft: Phase für Phase, auch unveränderte Phasen (0.17, Fables Fassung).
         assert "Phase für Phase" in abschnitt
-        assert "auch die Phasen, die du nicht änderst" in abschnitt
-        # Messung 5: Das Nachschlagen jedes Begriffs kostete die Runden zum Schreiben; seit A1
-        # prüft `update_lesson_phases` selbst und meldet, was fehlt. Seit Fables zweiter Fassung
-        # steht die Suche im Abschnitt nur noch als Verbot („kein `search_context_nodes`").
+        assert "auch für die Phasen, die du nicht änderst" in abschnitt
+        # Messung 5 (0.17): Nachschlagen kostete die Runden — die Suche nur noch als Verbot.
         assert abschnitt.count("`search_context_nodes`") == abschnitt.count("kein `search_context_nodes`")
         assert "`update_lesson_phases` prüft" in abschnitt
         assert "Fachschaft" in abschnitt and "fehlen" in abschnitt
-        refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
-        assert "concept" in refs_regel
-        # Messung 1 (16.10.2026): Begriffe über den Titel, ohne Kennung; die Regel zum Absatz
-        # auch dort, wo der Vorschlag entsteht — den Abschnitt allein übersprang das Modell 6/6.
-        assert "`titel`" in refs_regel
-        schritt3 = text.split("**Schritt 3", 1)[1].split("**Schritt 4", 1)[0]
-        assert "Begriffe dieser Stunde" in schritt3
-        # Messung 4: Beim Kürzen hängte das Modell den Absatz an — der Strich sagt jetzt, wann nicht.
-        assert "Nicht beim bloßen Kürzen" in schritt3
         assert "`nicht_eingetragen`" in abschnitt
-        # Messung 2: Die Zustimmung galt dem Modell nur für die Phasen.
+        assert "unter `aliase`" in abschnitt
+        refs_regel = next(z for z in text.splitlines() if z.startswith("- `refs` schreibst du"))
+        assert "concept" in refs_regel and "`titel`" in refs_regel
+        schritt3 = text.split("**Schritt 3", 1)[1].split("**Schritt 4", 1)[0]
+        assert "nicht von dir aus" in schritt3
+        # Messung 2 (0.17): Die Zustimmung galt dem Modell nur für die Phasen.
         schritt5 = text.split("**Schritt 5", 1)[1].split("\n## ", 1)[0]
         assert "gilt die Zustimmung auch für sie" in schritt5
-        # Messung 9 (Zählung genannt/eingetragen): Viele Aliase im Speicher sind Unterbegriffe.
-        # Das Modell übernimmt sie als Schreibweise, und es prüft gegen `eingetragen`, statt
-        # „σ-Komplex eingetragen" zu melden, wo die Leiste „elektrophile Substitution" zeigt.
-        assert "unter `aliase`" in abschnitt
+        # Messung 9 und 11 (0.17): gegen `eingetragen` prüfen, jeden Namen einzeln schicken.
         assert "unter `eingetragen` bestätigt" in schritt5
-        # Messung 11: `chat-komplex` schickte nur die Oberbegriffe, die genannten Aliase fehlten.
         assert "jeden genannten Namen als eigenen Eintrag" in schritt5

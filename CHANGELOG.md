@@ -20,6 +20,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`BEGRIFFE_MODEL`), Endpunkt `POST /planning/lessons/{id}/begriffe-vorschlagen`. Begriffe, die in
   früheren Stunden der Gruppe eingetragen sind, stehen getrennt. Der Stundenassistent bekommt sie
   ebenfalls zu sehen (`begriffe_frueherer_stunden`), als Planungshilfe, nicht als Lernstand.
+- **Der Stundenassistent nennt Begriffe nur noch auf Frage:** Den Absatz „Begriffe dieser Stunde"
+  nach jedem Ausarbeiten gibt es nicht mehr — die Leiste schlägt die Begriffe vor. Fragt die
+  Lehrkraft danach oder nennt sie selbst welche, trägt er sie wie bisher nach Zustimmung ein.
 - **`seed_methodik.py --aliase-ergaenzen`:** ergänzt fehlende Aliase des Seeds, ohne die der Schule
   zu ersetzen.
 
@@ -40,6 +43,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - In der LiteLLM-Config den Alias `system-begriffe` eintragen (Vorlage:
   `infra/litellm_config.ionos.example.yaml`), in `.env` `BEGRIFFE_MODEL=system-begriffe` setzen und
   das Modell unter `/settings/models` für die Lehrkräfte freischalten.
+- Den Prompt des schulweiten Stundenassistenten im Editor durch
+  `config/prompts/stundenentwurf_assistent.md` ersetzen.
 
 ## [0.17.0] – 2026-10-17
 

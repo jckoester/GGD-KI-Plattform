@@ -63,6 +63,7 @@ from app.auth.dependencies import get_jwt_service
 from app.config import settings
 from app.context.embedding import vor_einer_messung
 from app.context.lookup import einzahlformen, normalisiere_titel
+from app.planning.begriffe import SCHLUESSEL as VORSCHLAG, entwurfstext, pruefsumme
 
 # `scripts/` ist kein Paket (CLAUDE.md, „scripts/-Paketkonflikt") — über den Pfad laden.
 _spec = importlib.util.spec_from_file_location("chat_probe", Path(__file__).with_name("chat_probe.py"))
@@ -126,8 +127,11 @@ def stundenassistent(conn) -> int:
 
 def stand(conn, gruppen: list[int]) -> dict:
     """Was ein Lauf verändern kann: Entwürfe, die Zuordnung der Termine, Kanten der Entwürfe."""
+    # Der Begriffsvorschlag (0.18) ist abgeleitet, keine Änderung der Stunde: Er entsteht nach
+    # jedem Schreiben im Hintergrund und kann nach dem Zurücksetzen noch eintreffen. Im Stand
+    # verfälschte er „nicht ohne Zustimmung" — deshalb bleibt er draußen.
     entwuerfe = {
-        i: {"titel": t, "metadata": m or {}}
+        i: {"titel": t, "metadata": {k: v for k, v in (m or {}).items() if k != VORSCHLAG}}
         for i, t, m in _alle(conn, "SELECT id::text, title, metadata FROM context_nodes "
                                    "WHERE content_type = 'unterrichtsstunde' "
                                    "AND write_scope_group_id = ANY(%s)", gruppen)
@@ -352,7 +356,65 @@ def lauf(client, conn, fall: dict, assistent: int, gruppen: list[int]) -> tuple[
         zug["bezug"] = _eins(conn, "SELECT stunde_node_id::text FROM conversations WHERE id = %s", konversation)
         zug["zeit"] = datetime.now().strftime("%H:%M:%S")
         zuege.append(zug)
+    if stunde and zuege and (fall.get("begriffe") or {}).get("vorschlag"):
+        zuege[-1]["vorschlag"] = warte_auf_vorschlag(conn, stunde)
     return zuege, konversation
+
+
+def warte_auf_vorschlag(conn, stunde: str, frist: float = 60.0) -> dict | None:
+    """Der Begriffsvorschlag zur geschriebenen Fassung (0.18) — er entsteht im Hintergrund
+    nach `update_lesson_phases`. Gilt nur, wenn seine Prüfsumme zum jetzigen Entwurf passt;
+    ein älterer (aus einem früheren Lauf) zählt nicht."""
+    import time
+    ende = time.monotonic() + frist
+    while True:
+        titel, meta = _alle(conn, "SELECT title, metadata FROM context_nodes WHERE id::text = %s", stunde)[0]
+        vorschlag = (meta or {}).get(VORSCHLAG)
+        if vorschlag and vorschlag.get("pruefsumme") == pruefsumme(entwurfstext(titel, meta or {})):
+            return vorschlag
+        if time.monotonic() > ende:
+            return None
+        time.sleep(2)
+
+
+def _steht_im_text(form: str, text: str) -> list[tuple[int, int]]:
+    """Wo eine Form als eigenes Wort steht — die Regel des Vorlaufs (`Messungen-0.18/vorlauf`,
+    aus 0.17 § 29): Endungen je Wort, mehrteilige ohne Groß-/Kleinschreibung, einteilige mit;
+    ein Bindestrich trennt Wörter („Elektrophil‑Bildung" nennt das Elektrophil)."""
+    endung = r"(?:e|en|es|er|em|n|s)?"
+    muster = r"(?<!\w)" + r"\s+".join(re.escape(w) + endung for w in form.split()) + r"(?!\w)"
+    return [(t.start(), t.end()) for t in re.finditer(muster, text, re.IGNORECASE if " " in form else 0)]
+
+
+def im_entwurf(titel: list[str], text: str, info: dict) -> list[str]:
+    """Welche der erwarteten Titel im Entwurfstext stehen — über Titel oder Alias des Knotens,
+    nicht nur als Teil eines längeren erwarteten Begriffs."""
+    text = text.translate(_BINDESTRICHE)
+    knoten = (info or {}).get("knoten", {})
+
+    def formen(t):
+        k = _knoten_zum_namen(t, info)
+        n = knoten.get(k) or {"titel": t, "aliase": []}
+        return [n["titel"], *n.get("aliase", [])]
+
+    spannen = {t: [sp for f in formen(t) for sp in _steht_im_text(f, text)] for t in titel}
+    da = []
+    for t in titel:
+        andere = [sp for u in titel if u != t for sp in spannen[u]]
+        if [sp for sp in spannen[t] if not any(a[0] <= sp[0] and sp[1] <= a[1] and a != sp for a in andere)]:
+            da.append(t)
+    return da
+
+
+#: Kennungen und Werkzeugnamen in einer Antwort an die Lehrkraft (0.18, nur berichtet) — die
+#: Goldene Regel „Kennungen sind für die Werkzeuge" (Gegenprobe zu 0.18 Schritt 2).
+_KENNUNG = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-|\b(?:node_id|suggested_refs|update_lesson_phases|"
+                      r"get_lesson_detail|nicht_eingetragen|begriffe_frueherer_stunden|waehle_stunde|finde_stunde)\b")
+
+
+def kennungen_genannt(zuege: list[dict]) -> int:
+    """In wie vielen Antworten eines Laufs eine Kennung oder ein Werkzeugname steht."""
+    return sum(bool(_KENNUNG.search(z.get("antwort") or "")) for z in zuege)
 
 
 def _werkzeuge(zug) -> list[str]:
@@ -666,6 +728,32 @@ def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde,
     if "fehlt" in b:
         text = "\n".join(z["antwort"] for z in zuege)
         k["fehlen_gesagt"] = _genannt([b["fehlt"]], text) and bool(_FEHLT.search(text))
+    if b.get("genannt"):
+        text = "\n".join(z["antwort"] for z in zuege)
+        k["begriffe_genannt"] = all(_genannt([t], text) for t in b["genannt"])
+    # 0.18: Die Leiste schlägt vor — der Assistent trägt nichts ungefragt ein, und nach dem
+    # Schreiben liegt ein Vorschlag ab, der deckt, was im geschriebenen Entwurf steht.
+    if b.get("keine_ungefragten") and stunde:
+        vorher_b = {r.get("node_id") for r in _refs(ausgang["entwuerfe"].get(stunde)) if r.get("typ") == "concept"}
+        k["keine_ungefragten_begriffe"] = not any(
+            r.get("typ") == "concept" and r.get("node_id") not in vorher_b
+            for z in zuege for r in _refs(z["stand"]["entwuerfe"].get(stunde)))
+    if b.get("vorschlag") and stunde:
+        v = zuege[-1].get("vorschlag") if zuege else None
+        k["vorschlag_abgelegt"] = v is not None
+        if v is not None:
+            knoten = (info or {}).get("knoten", {})
+            vorgeschlagen = {e.get("node_id") for e in v.get("eintraege") or []} | {
+                f.get("node_id") for f in v.get("frueher") or []}
+            if b["vorschlag"].get("deckt_ab"):
+                nachher_e = zuege[-1]["stand"]["entwuerfe"].get(stunde) or {}
+                text = entwurfstext(nachher_e.get("titel") or "", nachher_e.get("metadata") or {})
+                k["vorschlag_deckt_ab"] = all(
+                    _knoten_zum_namen(t, info) in vorgeschlagen for t in im_entwurf(b["vorschlag"]["deckt_ab"], text, info))
+            if b["vorschlag"].get("aus_bezugsfach"):
+                k["vorschlag_aus_bezugsfach"] = any(
+                    knoten.get(e.get("node_id"), {}).get("subject_id") not in (None, (info or {}).get("fach"))
+                    for e in v.get("eintraege") or [])
     zaehlung = begriffs_zaehlung(fall, ausgang, zuege, stunde=stunde, info=info)
     if zaehlung and b.get("deckt_ab"):
         gedeckt = set(zaehlung["genannte_knoten"])
@@ -955,7 +1043,8 @@ def main() -> None:
                         print(f"{'':<30} Begriffe: {zaehlung_kurz(zaehlung)}", flush=True)
                     ergebnisse.append({
                         "fall": fall["id"], "lauf": nr, "bestanden": bestanden, "kriterien": kriterien,
-                        "zaehlung": zaehlung,
+                        "zaehlung": zaehlung, "kennungen": kennungen_genannt(zuege),
+                        "vorschlag": zuege[-1].get("vorschlag"),
                         # Zum Nachbewerten ohne neuen Lauf (seit M10).
                         "refs_vorher": _refs(lauf_ausgang["entwuerfe"].get(bezug)) if bezug else None,
                         "refs_nachher": _refs(zuege[-1]["stand"]["entwuerfe"].get(bezug)) if bezug else None,
@@ -1016,8 +1105,11 @@ def main() -> None:
                 " · ".join(str(len(z["vorhanden_nicht_eingetragen"])) for z in eigene),
             ]
             print(f"{fall['id']:<27} " + "  |  ".join(spalten))
+    mit_kennung = [e for e in ergebnisse if e.get("kennungen")]
+    print(f"\nKennungen oder Werkzeugnamen in Antworten (nur berichtet): {len(mit_kennung)}/{len(ergebnisse)} Läufe"
+          + (f" — {', '.join(sorted({e['fall'] for e in mit_kennung}))}" if mit_kennung else ""))
     if args.json:
-        args.json.write_text(json.dumps(ergebnisse, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.json.write_text(json.dumps(ergebnisse, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
 
 if __name__ == "__main__":

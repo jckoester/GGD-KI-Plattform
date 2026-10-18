@@ -960,13 +960,15 @@ _BESCHREIBUNG_MAX = 300
 #: Zustimmung galt ihm nur für die Phasen (§ 18, C); in Messung 4 hängte es den Absatz auch
 #: beim Kürzen an (§ 20, F). „Alle … aus allen Phasen": Jan bewertete M4–M6 als unvollständig,
 #: meist stand nur ein Begriff da (§ 23).
+# Seit 0.18 schlägt die Leiste die Begriffe vor (eigener Aufruf aus den Phasentexten). Bis dahin
+# verlangte diese Anleitung einen Absatz „Begriffe dieser Stunde" und das Mitschreiben — sie
+# steht im Werkzeugergebnis, also nach dem Prompt, und überstimmte ihn: In der ersten Messung
+# zu 0.18 Schritt 7 schrieb das Modell trotz neuem Prompt weiter Absatz und Begriffe.
 BEGRIFFE_ANLEITUNG = (
-    "Arbeitest du Phasen aus oder legst du neue an — nicht beim Kürzen, Streichen oder bei "
-    "Fragen zur Stunde —, schließt dein Vorschlag mit einem eigenen Absatz „Begriffe dieser "
-    "Stunde: …“ — alle Begriffe, die die Stunde neu einführt, aus allen Phasen, nicht nur der "
-    "ausgearbeiteten, je mit der Phase. Die Zustimmung "
-    "zum Vorschlag gilt auch für diese Begriffe: Schreib sie im selben update_lesson_phases-"
-    "Aufruf als refs mit typ 'concept' und titel mit."
+    "Die Begriffe der Stunde schlägt die Leiste über dem Entwurf vor — nenne sie nicht von dir "
+    "aus und trag keine ungefragt ein. Nur wenn die Lehrkraft nach Begriffen fragt oder selbst "
+    "welche nennt: Schreibweise wie hier (titel oder aliase), nach Zustimmung als refs mit typ "
+    "'concept' und titel."
 )
 
 
@@ -1139,8 +1141,8 @@ register_tool(ChatTool(
                 "aliase), aus dem sozialform und methode als Knoten eingetragen werden. Und "
                 "begriffe: die zur Stunde passenden Fachbegriffe des Fachs und seiner "
                 "Bezugsfächer (titel, aliase, fassung, fach nur beim Bezugsfach; eingetragen = "
-                "steht schon in refs) samt anleitung — Begriffe der Stunde werden als refs mit "
-                "typ 'concept' und ihrem titel eingetragen. Und begriffe_frueherer_stunden: was "
+                "steht schon in refs) samt anleitung — eine Hilfe für die Schreibweise; die Begriffe der "
+                "Stunde schlägt die Leiste vor. Und begriffe_frueherer_stunden: was "
                 "in früheren Stunden der Gruppe eingetragen ist — eine Planungshilfe, kein "
                 "Lernstand."
             ),
@@ -1539,8 +1541,9 @@ register_tool(ChatTool(
                 "typ 'concept' und ihrem titel aus begriffe oder einem Treffer (Titel oder "
                 "Alias), ohne node_id — jeder genannte Name ein eigener Eintrag, auch mehrere "
                 "Aliase desselben Begriffs; das Werkzeug fasst sie zusammen; "
-                "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Hat der zugestimmte "
-                "Vorschlag „Begriffe dieser Stunde“ genannt, gehören sie in diesen Aufruf. "
+                "refs nur setzen, wenn die Lehrkraft zugestimmt hat. Begriffe nur, wenn die "
+                "Lehrkraft nach ihnen gefragt oder sie selbst genannt hat — sonst schlägt die "
+                "Leiste sie vor. "
                 "Gibt suggested_refs "
                 "zurück: Kompetenzen und Begriffe aus verknüpften Material-Knoten, die noch nicht "
                 "in refs stehen — nur vorschlagen, nicht ungefragt übernehmen. Dazu "
