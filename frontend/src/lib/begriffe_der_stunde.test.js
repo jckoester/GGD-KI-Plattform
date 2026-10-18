@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url"
 import { getContextNodes } from "./api.js"
 import {
     BEGRIFF_TYPEN, SUCHGRENZE, aliaseText, aufteilen, begriffAnzeige, begriffAusTreffer,
-    bezugsfach, getroffenesAlias, mitBegriff, ohneAlias, ohneBegriff, ordneTreffer, suchparameter,
+    bezugsfach, getroffenesAlias, kurzdatum, mitBegriff, mitVerworfen, offeneVorschlaege, ohneAlias,
+    ohneBegriff, ordneTreffer, refAusVorschlag, suchparameter, vorschlagFehlerText,
 } from "./begriffe_der_stunde.js"
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -168,11 +169,13 @@ describe("Komponenten (Quelltext)", () => {
         expect(AUSWAHL).not.toContain("createContextNode")
     })
 
-    it("die toten Vorschlags-Chips sind weg", () => {
+    it("die toten Vorschlags-Chips aus 0.15 sind weg", () => {
+        // `refs_dismissed` ist seit 0.18 wieder in Gebrauch — für die Vorschläge aus den
+        // Phasentexten (Schritt 6), nicht für die alten Chips.
         const seite = quelle("routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte")
         const phasen = quelle("lib/components/planner/PhaseTable.svelte")
         expect(LEISTE).not.toMatch(/suggestions\s*=|#each suggestions|onDismissSuggestion/)
-        expect(seite).not.toMatch(/onSuggestCompetences|onDismissSuggestion|refs_dismissed/)
+        expect(seite).not.toMatch(/onSuggestCompetences|onDismissSuggestion/)
         expect(phasen).not.toContain("onSuggestCompetences")
     })
 })
@@ -195,3 +198,70 @@ describe("Entwurfsseite (Schritt 4)", () => {
         expect(kopf).toContain("{gruppe.name}")
     })
 })
+
+describe("Vorschläge aus den Phasentexten (0.18, Schritt 6)", () => {
+    const VORSCHLAG = {
+        aktuell: true,
+        eintraege: [
+            { node_id: "b-1", titel: "Benzol", content_type: "stoffsteckbrief", aliase: [], phase: "Einstieg", art: "eingeführt" },
+            { node_id: "b-2", titel: "elektrophile Substitution", content_type: "begriff", aliase: ["σ-Komplex"] },
+            { node_id: "b-3", titel: "Elektrophil", content_type: "begriff", aliase: [] },
+        ],
+        frueher: [{ node_id: "b-4", titel: "Aromaten", datum: "2026-10-05" }],
+        ohne_knoten: [{ name: "Hückel-Regel" }],
+        hinweis_frueher: "… kein Lernstand …",
+    }
+
+    it("offen ist, was weder eingetragen noch verworfen ist", () => {
+        const o = offeneVorschlaege(VORSCHLAG, [IK, BENZOL], ["b-3"])
+        expect(o.eintraege.map((e) => e.node_id)).toEqual(["b-2"])
+        expect(o.frueher.map((f) => f.node_id)).toEqual(["b-4"])
+        expect(o.ohne).toEqual([{ name: "Hückel-Regel" }])
+        expect(offeneVorschlaege(null, [], [])).toEqual({ eintraege: [], frueher: [], ohne: [] })
+    })
+
+    it("ein übernommener Vorschlag wird ein Begriff samt Aliasen", () => {
+        expect(refAusVorschlag(VORSCHLAG.eintraege[1])).toEqual({
+            node_id: "b-2", typ: "concept", titel: "elektrophile Substitution", partiell: false,
+            content_type: "begriff", aliase: ["σ-Komplex"],
+        })
+        expect(refAusVorschlag(VORSCHLAG.eintraege[0])).not.toHaveProperty("aliase")
+        // Ein früherer Begriff (ohne Bausteinart) bekommt das Standardsymbol.
+        expect(refAusVorschlag(VORSCHLAG.frueher[0]).content_type).toBe("begriff")
+    })
+
+    it("verwerfen ohne Doppel", () => {
+        expect(mitVerworfen(["a"], "b")).toEqual(["a", "b"])
+        expect(mitVerworfen(["a"], "a")).toEqual(["a"])
+        expect(mitVerworfen(undefined, "a")).toEqual(["a"])
+    })
+
+    it("Datum kurz, Fehler als Satz", () => {
+        expect(kurzdatum("2026-10-05")).toBe("5.10.")
+        expect(kurzdatum(undefined)).toBe("")
+        expect(vorschlagFehlerText("budget")).toMatch(/Budget/)
+        expect(vorschlagFehlerText("irgendwas")).toMatch(/nicht möglich/)
+        expect(vorschlagFehlerText(null)).toBeNull()
+    })
+
+    it("die Leiste bindet die Vorschläge ein, nie im Lesezustand", () => {
+        const leiste = quelle("lib/components/planner/CompetenceBar.svelte")
+        expect(leiste).toContain("{#if !readonly && (vorschlagMoeglich || vorschlag)}")
+        expect(leiste).toContain("onUebernehmen={(ref) => onChange(mitBegriff(refs, ref))}")
+    })
+
+    it("die Seite speichert Verworfenes, gibt den Lesezustand weiter und speichert vor dem Vorschlag", () => {
+        const seite = quelle("routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte")
+        expect(seite).toContain("refs_dismissed: verworfen")
+        expect(seite).toContain("readonly={nurLesen}")
+        expect(seite).toMatch(/await doSave\(\)\s*\n\s*vorschlagLaedt = true/)
+    })
+
+    it("die Vorschlagszeile zeigt den Hinweis zu früheren Stunden und klappt Namen ohne Eintrag ein", () => {
+        const zeile = quelle("lib/components/planner/BegriffVorschlag.svelte")
+        expect(zeile).toContain("vorschlag?.hinweis_frueher")
+        expect(zeile).toMatch(/<details[\s\S]*ohne Eintrag im Wissensspeicher/)
+        expect(zeile).not.toMatch(/bekannt/i)
+    })
+})
+

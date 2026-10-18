@@ -13,9 +13,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   auch als EA, PA, GA. „Unterrichtsgespräch“ und „Lehrgespräch“ sind keine Aliase von Plenum mehr.
 - **Aliase der Begriffe in der Leiste einzeln entfernen.** Wird ein Begriff über die Suche nach
   einem Alias hinzugefügt, bleibt dieser Name dabei stehen.
-- **Begriffe aus den Phasentexten (Backend):** Ein eigener kleiner Modellaufruf schlägt die
+- **Begriffe aus den Phasentexten:** Die Leiste „Kompetenzen und Fachbegriffe" schlägt die
   Fachbegriffe eines Stundenentwurfs vor — automatisch, nachdem der Stundenassistent Phasen
-  geschrieben hat, und über `POST /planning/lessons/{id}/begriffe-vorschlagen`. Begriffe, die in
+  geschrieben hat, und über den Knopf „Begriffe vorschlagen". ✓ trägt ein, ✕ verwirft; Namen ohne
+  Eintrag im Wissensspeicher stehen eingeklappt dabei. Ein eigener kleiner Modellaufruf
+  (`BEGRIFFE_MODEL`), Endpunkt `POST /planning/lessons/{id}/begriffe-vorschlagen`. Begriffe, die in
   früheren Stunden der Gruppe eingetragen sind, stehen getrennt. Der Stundenassistent bekommt sie
   ebenfalls zu sehen (`begriffe_frueherer_stunden`), als Planungshilfe, nicht als Lernstand.
 - **`seed_methodik.py --aliase-ergaenzen`:** ergänzt fehlende Aliase des Seeds, ohne die der Schule

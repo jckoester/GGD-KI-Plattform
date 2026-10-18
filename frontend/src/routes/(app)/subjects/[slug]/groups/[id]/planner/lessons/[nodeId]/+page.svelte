@@ -2,6 +2,7 @@
   import { dauerZusatz } from '$lib/phasendauer.js'
   import { neuerChatPfad } from '$lib/chatziel.js'
   import { passendeAssistenten } from '$lib/assistentenwahl.js'
+  import { mitVerworfen } from '$lib/begriffe_der_stunde.js'
   import { user } from '$lib/stores/user.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { goto } from '$app/navigation'
@@ -9,6 +10,7 @@
   import {
     getLesson,
     patchLesson,
+    begriffeVorschlagen,
     exportLesson,
     createReview,
     deleteReview,
@@ -54,6 +56,19 @@
   let stundenziel = $state('')
   let titel = $state('')
 
+  // Begriffe aus den Phasentexten (0.18): der abgelegte Vorschlag, die verworfenen Begriffe
+  // und der Entwurf, zu dem der Vorschlag gehört. Ändert sich der Entwurf danach, ist der
+  // Vorschlag veraltet — die Seite sieht das selbst, ohne neu zu laden.
+  let vorschlag = $state(null)
+  let verworfen = $state([])
+  let vorschlagStand = $state('')
+  let vorschlagLaedt = $state(false)
+  let vorschlagFehler = $state(null)
+  const entwurfStand = () => JSON.stringify([titel, stundenziel, phasen])
+  const vorschlagVeraltet = $derived(
+    !!vorschlag && (vorschlag.aktuell === false || entwurfStand() !== vorschlagStand),
+  )
+
   // Nachbereiten-Modus
   let reviewMode = $state(false)
   let reviewStatus = $state({})   // phase_id → 'erledigt'|'offen'|'gestrichen'
@@ -76,6 +91,9 @@
       refs = lesson.refs ?? []
       stundenziel = lesson.stundenziel ?? ''
       titel = lesson.titel
+      vorschlag = lesson.begriffe_vorschlag ?? null
+      verworfen = lesson.refs_dismissed ?? []
+      vorschlagStand = entwurfStand()
     } catch (e) {
       error = e.message
     } finally {
@@ -132,6 +150,7 @@
           material: p.material ?? [],
         })),
         refs,
+        refs_dismissed: verworfen,
       })
     } catch (e) {
       saveError = e.message
@@ -148,6 +167,31 @@
   function onRefsChange(newRefs) {
     refs = newRefs
     scheduleSave()
+  }
+
+  function onVerwerfen(nodeId) {
+    verworfen = mitVerworfen(verworfen, nodeId)
+    scheduleSave()
+  }
+
+  async function onVorschlagen(erzwingen) {
+    // Erst speichern: Der Server schlägt aus dem gespeicherten Entwurf vor.
+    clearTimeout(saveTimer)
+    await doSave()
+    vorschlagLaedt = true
+    vorschlagFehler = null
+    try {
+      const antwort = await begriffeVorschlagen(nodeId, erzwingen)
+      if (antwort.vorschlag) {
+        vorschlag = antwort.vorschlag
+        vorschlagStand = entwurfStand()
+      }
+      vorschlagFehler = antwort.fehler ?? null
+    } catch (e) {
+      vorschlagFehler = e.message
+    } finally {
+      vorschlagLaedt = false
+    }
   }
 
 
@@ -488,7 +532,16 @@
           {refs}
           subjectId={lesson.subject_id}
           grade={lesson.grade}
+          readonly={nurLesen}
           onChange={onRefsChange}
+          {vorschlag}
+          {verworfen}
+          veraltet={vorschlagVeraltet}
+          vorschlagMoeglich={lesson.begriffe_vorschlagen}
+          {vorschlagLaedt}
+          {vorschlagFehler}
+          {onVerwerfen}
+          {onVorschlagen}
         />
       </section>
 
@@ -593,7 +646,7 @@
             <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">Keine Kompetenzen oder Begriffe zugeordnet.</p>
           {:else}
             <div class="space-y-1.5">
-              {#each refs as ref}
+              {#each refs as ref (`${ref.typ}:${ref.node_id}`)}
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"

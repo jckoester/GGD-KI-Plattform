@@ -125,3 +125,55 @@ export function bezugsfach(node, subjectId, faecher) {
   if (node?.subject_id == null || node.subject_id === subjectId) return null
   return faecher?.[node.subject_id]?.name ?? null
 }
+
+// ── Vorschläge aus den Phasentexten (0.18, Schritt 6) ────────────────────────
+
+/**
+ * Was vom Vorschlag noch offen ist: ohne die Begriffe, die inzwischen eingetragen oder
+ * verworfen sind. Der Server filtert beim Laden genauso; hier zählt der Stand der Seite,
+ * damit ein ✓ oder ✕ sofort wirkt, ohne neu zu laden.
+ */
+export function offeneVorschlaege(vorschlag, refs, verworfen) {
+  if (!vorschlag) return { eintraege: [], frueher: [], ohne: [] }
+  const weg = new Set([...(refs ?? []).map((r) => r.node_id), ...(verworfen ?? [])])
+  return {
+    eintraege: (vorschlag.eintraege ?? []).filter((e) => !weg.has(e.node_id)),
+    frueher: (vorschlag.frueher ?? []).filter((f) => !weg.has(f.node_id)),
+    ohne: vorschlag.ohne_knoten ?? [],
+  }
+}
+
+/** Ein Vorschlag als Eintrag in `refs` — samt den Aliasen, unter denen die Stunde ihn nennt. */
+export function refAusVorschlag(eintrag) {
+  const ref = {
+    node_id: eintrag.node_id,
+    typ: 'concept',
+    titel: eintrag.titel,
+    partiell: false,
+    content_type: eintrag.content_type ?? 'begriff',
+  }
+  return eintrag.aliase?.length ? { ...ref, aliase: [...eintrag.aliase] } : ref
+}
+
+/** Einen Begriff verwerfen: in `refs_dismissed`, ohne Doppel. Er kommt nicht wieder. */
+export function mitVerworfen(verworfen, nodeId) {
+  return (verworfen ?? []).includes(nodeId) ? verworfen : [...(verworfen ?? []), nodeId]
+}
+
+/** „12.10." aus „2026-10-12". */
+export function kurzdatum(iso) {
+  const [, m, t] = (iso ?? '').split('-')
+  return t && m ? `${Number(t)}.${Number(m)}.` : ''
+}
+
+/** Was die Leiste sagt, wenn kein neuer Vorschlag kam (`fehler` aus dem Endpunkt). */
+export function vorschlagFehlerText(fehler) {
+  if (!fehler) return null
+  return {
+    budget: 'Dein Budget ist aufgebraucht — keine neuen Vorschläge.',
+    zeit: 'Keine Antwort in der Zeit. Bitte später noch einmal.',
+    kein_fach: 'Die Stunde hat kein Fach — Vorschläge gehen nur mit Fach.',
+    kein_modell: 'Begriffsvorschläge sind an dieser Schule nicht eingerichtet.',
+  }[fehler] ?? 'Ein Vorschlag war gerade nicht möglich.'
+}
+

@@ -3,6 +3,7 @@
   import PKSelector from '$lib/components/PKSelector.svelte'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import BegriffSelector from './BegriffSelector.svelte'
+  import BegriffVorschlag from './BegriffVorschlag.svelte'
   import { aliaseText, aufteilen, begriffAnzeige, mitBegriff, ohneAlias, ohneBegriff } from '$lib/begriffe_der_stunde.js'
 
   /**
@@ -14,6 +15,9 @@
    * - subjectId: for selectors
    * - readonly: boolean
    * - onChange(newRefs)
+   * - Vorschläge aus den Phasentexten (0.18, `BegriffVorschlag`): vorschlag, verworfen,
+   *   veraltet, vorschlagMoeglich, vorschlagLaedt, vorschlagFehler, onVerwerfen(nodeId),
+   *   onVorschlagen(erzwingen). Nur im Bearbeitungszustand, nie `readonly`.
    *
    * Die Vorschlags-Chips (`suggestions`) sind 0.17 entfallen: Die Seite füllte sie nie.
    * Vorschläge aus verknüpftem Material bekommt der Stundenassistent (`suggested_refs`).
@@ -24,6 +28,14 @@
     grade = null,
     readonly = false,
     onChange = () => {},
+    vorschlag = null,
+    verworfen = [],
+    veraltet = false,
+    vorschlagMoeglich = false,
+    vorschlagLaedt = false,
+    vorschlagFehler = null,
+    onVerwerfen = () => {},
+    onVorschlagen = () => {},
   } = $props()
 
   let editing = $state(false)
@@ -118,6 +130,21 @@
         </span>
       {/each}
     </div>
+  {/if}
+
+  <!-- Vorschläge aus den Phasentexten (0.18) -->
+  {#if !readonly && (vorschlagMoeglich || vorschlag)}
+    <BegriffVorschlag
+      {vorschlag}
+      {refs}
+      {verworfen}
+      {veraltet}
+      laedt={vorschlagLaedt}
+      fehler={vorschlagFehler}
+      onUebernehmen={(ref) => onChange(mitBegriff(refs, ref))}
+      {onVerwerfen}
+      {onVorschlagen}
+    />
   {/if}
 
   <!-- Editor -->

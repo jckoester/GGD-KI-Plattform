@@ -2333,6 +2333,20 @@ export async function patchLesson(nodeId, updates) {
     return res.json()
 }
 
+/**
+ * Begriffe der Stunde aus ihren Phasentexten vorschlagen (0.18). Dauert einige Sekunden.
+ * `erzwingen`: auch dann neu, wenn der Entwurf seit dem letzten Vorschlag gleich ist.
+ * → `{vorschlag, fehler}`; bei `fehler` bleibt der bisherige Vorschlag stehen.
+ */
+export async function begriffeVorschlagen(nodeId, erzwingen = false) {
+    const res = await fetch(`${BASE}/planning/lessons/${nodeId}/begriffe-vorschlagen?erzwingen=${erzwingen}`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Vorschlag fehlgeschlagen')
+    return res.json()
+}
+
 export async function exportLesson(nodeId, format = 'md') {
     const res = await fetch(`${BASE}/planning/lessons/${nodeId}/export?format=${format}`, {
         credentials: 'include',
