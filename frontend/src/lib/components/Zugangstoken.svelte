@@ -10,13 +10,13 @@
         createToken,
         getTokenScopes,
         getTokens,
+        neuAnmelden,
         revokeToken,
     } from "$lib/api.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
-    import StepUpDialog from "$lib/components/StepUpDialog.svelte";
-    import { holeFormular, merkeFormular, stepupFehlerAusUrl } from "$lib/stepup_rueckkehr.js";
+    import { holeFormular, merkeFormular } from "$lib/stepup_rueckkehr.js";
 
     let tokens = $state([]);
     let scopes = $state([]);
@@ -34,10 +34,8 @@
     let frisch = $state(null);
     let kopiert = $state(false);
 
-    let stepUpOffen = $state(false);
-
-    // Beim Erzeugen gelesen: Das Layout räumt den Code danach aus der Adresse.
-    const rueckkehrFehler = stepupFehlerAusUrl(window.location.search);
+    // Die Anmeldung ist älter als 15 Minuten: Anlegen nur nach „Kurz neu anmelden".
+    let frischNoetig = $state(false);
 
     async function laden_() {
         laden = true;
@@ -54,8 +52,8 @@
         }
     }
 
-    // Im Redirect-Modus verlässt der Browser die Seite für die erneute Anmeldung. Danach
-    // stehen die Eingaben wieder da, und war die Anmeldung erfolgreich, wird gleich angelegt.
+    // „Kurz neu anmelden" verlässt die Seite. Danach stehen die Eingaben wieder da, und
+    // angelegt wird gleich — die Sitzung ist jetzt frisch.
     onMount(async () => {
         const gemerkt = holeFormular(sessionStorage, "zugangstoken");
         await laden_();
@@ -64,15 +62,16 @@
         gewaehlt = new Set(gemerkt.scopes ?? []);
         if (gemerkt.gueltigBis) gueltigBis = gemerkt.gueltigBis;
         formularOffen = true;
-        if (!rueckkehrFehler) await anlegen();
+        await anlegen();
     });
 
-    function formularMerken() {
+    async function kurzNeuAnmelden() {
         merkeFormular(sessionStorage, "zugangstoken", {
             name,
             scopes: [...gewaehlt],
             gueltigBis,
         });
+        await neuAnmelden(window.location.pathname);
     }
 
     function umschalten(key) {
@@ -90,6 +89,7 @@
         if (!kannAnlegen) return;
         sendet = true;
         fehler = null;
+        frischNoetig = false;
         try {
             const antwort = await createToken({
                 name: name.trim(),
@@ -103,21 +103,16 @@
             gewaehlt = new Set();
             await laden_();
         } catch (e) {
-            if (e.stepUpRequired) {
-                // Nicht als Fehler zeigen: Das Backend verlangt nur eine frische
-                // Anmeldung, die Eingaben bleiben stehen und werden danach wiederholt.
-                stepUpOffen = true;
+            if (e.frischeAnmeldung) {
+                // Kein Fehler: Das Backend verlangt nur eine frische Anmeldung. Die
+                // Eingaben bleiben stehen und überstehen das Neuanmelden.
+                frischNoetig = true;
             } else {
                 fehler = e.message;
             }
         } finally {
             sendet = false;
         }
-    }
-
-    async function nachStepUp() {
-        stepUpOffen = false;
-        await anlegen();
     }
 
     async function kopieren() {
@@ -143,11 +138,17 @@
         return wert ? new Date(wert).toLocaleDateString("de-DE") : "—";
     }
 
+    // Das Ablaufdatum ist das Ende des gewählten Tages **in UTC** (`23:59:59Z`). In
+    // deutscher Ortszeit ist das schon der Folgetag — angezeigt wurde ein Tag zu viel.
+    function ablaufdatum(wert) {
+        return new Date(wert).toLocaleDateString("de-DE", { timeZone: "UTC" });
+    }
+
     function zustand(eintrag) {
         if (eintrag.revoked_at) return { text: "beendet", matt: true };
         if (new Date(eintrag.expires_at) <= new Date())
             return { text: "abgelaufen", matt: true };
-        return { text: `gültig bis ${datum(eintrag.expires_at)}`, matt: false };
+        return { text: `gültig bis ${ablaufdatum(eintrag.expires_at)}`, matt: false };
     }
 </script>
 
@@ -273,6 +274,19 @@
                 message={`Ein Token gilt höchstens ${maxTage} Tage. Wer es verliert, legt ein neues an — wiederherstellen lässt es sich nicht.`}
             />
 
+            {#if frischNoetig}
+                <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3 text-sm text-light-tx dark:text-dark-tx">
+                    <p class="mb-2">
+                        Zum Schutz Ihres Kontos lassen sich Token nur in den ersten 15 Minuten
+                        nach der Anmeldung anlegen. Ihre Eingaben bleiben erhalten.
+                    </p>
+                    <button
+                        class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-white"
+                        onclick={kurzNeuAnmelden}>Kurz neu anmelden</button
+                    >
+                </div>
+            {/if}
+
             <div class="flex gap-2">
                 <button
                     class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-white disabled:opacity-50"
@@ -295,14 +309,4 @@
             <Plus size={14} /> Neues Token
         </button>
     {/if}
-{/if}
-
-{#if stepUpOffen}
-    <StepUpDialog
-        action="create_token"
-        resourceId=""
-        vorWeiterleitung={formularMerken}
-        onSuccess={nachStepUp}
-        onCancel={() => (stepUpOffen = false)}
-    />
 {/if}

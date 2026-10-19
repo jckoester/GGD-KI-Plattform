@@ -15,24 +15,15 @@ from uuid import uuid4
 
 from jose import JWTError, jwt
 
-# Erlaubte Step-up-Aktionen (an den `action`-Claim gebunden). Neue sensible Aktion → hier
-# ergänzen und einen `require_fresh_stepup_for(...)`-Guard setzen.
-ALLOWED_STEPUP_ACTIONS = frozenset({"approve", "deny", "read", "export", "create_token"})
-
-# Aktionen ohne Ressource. Die vier Krisen-Aktionen beziehen sich je auf **einen** Antrag,
-# und das Token ist an dessen ID gebunden (Sicherheits-Audit #3). Das Anlegen eines
-# Zugangstokens hat kein solches Gegenüber — es gibt die Ressource erst danach.
+# Erlaubte Step-up-Aktionen (an den `action`-Claim gebunden), je an **einen** Krisen-Antrag
+# gebunden (`resource_id`, Sicherheits-Audit #3). Neue sensible Aktion → hier ergänzen und
+# einen `require_fresh_stepup_for(...)`-Guard setzen.
 #
-# Lieber diese Liste als ein erfundener Platzhalter: Ein `resource_id="neu"` sähe aus wie
-# eine Bindung, wäre aber keine, und niemand könnte später unterscheiden, welche
-# Bindungen echt sind.
-STEPUP_AKTIONEN_OHNE_RESSOURCE = frozenset({"create_token"})
-
-
-def ressource_erwartet(action: str) -> bool:
-    """Ob `action` eine `resource_id` braucht. Symmetrisch geprüft: Eine Aktion ohne
-    Ressource darf auch keine mitbekommen, sonst gäbe es zwei Lesarten desselben Tokens."""
-    return action not in STEPUP_AKTIONEN_OHNE_RESSOURCE
+# Das Anlegen eines Zugangstokens stand bis 0.19 auch hier, ressourcenlos. Seitdem verlangt
+# es nur eine frische Sitzung (`require_frische_sitzung`): Das Schulkonto liefert kein
+# `auth_time`, und der Weg über Abmelden beim Schulkonto war für Lehrkräfte zu umständlich
+# (Jan, 19.10.2026).
+ALLOWED_STEPUP_ACTIONS = frozenset({"approve", "deny", "read", "export"})
 
 # Gültigkeitsdauer des Step-up-Tokens (Zeitfenster für die sensible Aktion).
 STEPUP_TTL_SECONDS = 300  # 5 Minuten

@@ -153,7 +153,7 @@ So gehen Sie vor:
 2. Einen Namen vergeben, an dem Sie das Gerät wiedererkennen („MacBook Obsidian").
 3. Ankreuzen, was das Programm darf — Lesen und Ändern sind getrennt. Wählen Sie nur, was es wirklich braucht.
 4. Ein Ablaufdatum wählen (höchstens ein Jahr).
-5. Sich erneut anmelden. Das ist Absicht: Ein Token überlebt das Ausloggen, deshalb soll niemand an einem unbeaufsichtigten Bildschirm eines anlegen können.
+5. *Token anlegen*. Liegt Ihre Anmeldung länger als 15 Minuten zurück, erscheint stattdessen **„Kurz neu anmelden“**: Ein Klick meldet Sie ab und gleich wieder an — über das Schulkonto ohne Eingabe — und legt das Token danach an. Ihre Eingaben bleiben dabei erhalten. Das ist Absicht: Ein Token überlebt das Ausloggen, deshalb soll sich niemand mit einer geklauten, alten Anmeldung eines ausstellen können.
 
 **Der Tokentext wird genau einmal angezeigt.** Kopieren Sie ihn sofort in das Programm. Wiederherstellen lässt er sich nicht — wer ihn verliert, beendet das alte Token und legt ein neues an.
 

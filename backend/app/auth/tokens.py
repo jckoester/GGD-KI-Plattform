@@ -87,7 +87,10 @@ async def erzeuge(
     jetzt = datetime.now(timezone.utc)
     if gueltig_bis <= jetzt:
         raise TokenFehler("Das Ablaufdatum liegt in der Vergangenheit.")
-    if gueltig_bis > jetzt + MAX_GUELTIGKEIT:
+    # Nach Kalendertag, nicht auf die Sekunde: Der Endpunkt legt das gewählte Datum auf
+    # dessen Tagesende, und der Vorschlag im Formular ist „heute + 365 Tage". Auf die Sekunde
+    # verglichen lag er damit immer knapp über der Grenze und wurde abgelehnt (19.10.2026).
+    if gueltig_bis.date() > (jetzt + MAX_GUELTIGKEIT).date():
         raise TokenFehler("Ein Token gilt höchstens ein Jahr.")
 
     klartext = PRAEFIX + secrets.token_urlsafe(32)

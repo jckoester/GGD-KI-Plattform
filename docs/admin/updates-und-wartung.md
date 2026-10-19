@@ -558,8 +558,9 @@ Häufige Meldungen und ihre Bedeutung:
 
 ## Troubleshooting
 
-**„Die erneute Anmeldung ließ sich nicht bestätigen" — beim Token anlegen oder in der
-Krisen-Einsicht** *(seit 0.18.1)*
+**„Die erneute Anmeldung ließ sich nicht bestätigen" — in der Krisen-Einsicht** *(seit
+0.18.1; das Token-Anlegen braucht seit 0.19 nur eine Anmeldung, die höchstens 15 Minuten
+zurückliegt)*
 Vor besonders geschützten Aktionen meldet man sich beim Schulkonto noch einmal an. Die
 Plattform verlangt dabei eine **frische** Anmeldung: höchstens zwei Minuten alt, belegt durch
 den Zeitpunkt `auth_time`, den das Schulkonto mitschickt. Scheitert die Prüfung, steht im

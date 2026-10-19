@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Zugangstoken anlegen** braucht keine erneute Anmeldung beim Schulkonto mehr, sondern eine
+  Anmeldung an der Plattform, die höchstens 15 Minuten zurückliegt. Sonst bietet das Formular
+  „Kurz neu anmelden" an; die Eingaben bleiben erhalten, das Token wird danach angelegt.
+- **Zugangstoken mit dem vorgeschlagenen Ablaufdatum** (heute in einem Jahr) wurden abgelehnt.
+- **Ablaufdatum eines Zugangstokens** wurde einen Tag zu spät angezeigt.
+- **Anmeldung** kann auf die Ausgangsseite zurückführen (`return_to`).
+
 ## [0.18.2] – 2026-10-19
 
 ### Behoben

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   holeFormular,
+  lokalesZiel,
   merkeFormular,
   ohneStepupFehler,
   stepupFehlerAusUrl,
@@ -43,6 +44,16 @@ describe("Adresse", () => {
     expect(stepupFehlerAusUrl("?x=1")).toBeNull();
     expect(ohneStepupFehler("/review", "?x=1&stepup_fehler=abgebrochen")).toBe("/review?x=1");
     expect(ohneStepupFehler("/profile", "?stepup_fehler=abgebrochen")).toBe("/profile");
+  });
+});
+
+describe("lokalesZiel", () => {
+  it("lässt nur Pfade der Plattform durch", () => {
+    expect(lokalesZiel("/profile")).toBe("/profile");
+    expect(lokalesZiel("/profile?x=1")).toBe("/profile?x=1");
+    for (const fremd of ["https://evil.example", "//evil.example", "/\\evil.example", "profile", "", null, "/a\nb"]) {
+      expect(lokalesZiel(fremd)).toBeNull();
+    }
   });
 });
 

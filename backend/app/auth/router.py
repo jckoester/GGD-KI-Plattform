@@ -21,7 +21,6 @@ from app.auth.stepup import (
     is_stepup_state,
     issue_stepup_token,
     parse_stepup_state,
-    ressource_erwartet,
     sign_stepup_state,
 )
 from app.config import settings
@@ -50,15 +49,19 @@ _OAUTH_LOGIN_TTL = 600  # 10 Minuten für den Login-Round-Trip
 @router.get("/login-challenge")
 async def login_challenge(
     response: Response,
+    return_to: str = "",
     adapter: AuthAdapter = Depends(get_auth_adapter),
 ) -> LoginChallenge:
+    """`return_to`: wohin der Callback nach dem Login führt (sonst `/welcome`) — etwa zurück
+    zum Token-Formular nach „Kurz neu anmelden" (0.19). Nur lokale Pfade."""
     challenge = await adapter.get_login_challenge()
     # Nur der Redirect-Pfad (OAuth) liefert einen code_verifier → Browser-Bindung setzen.
     if challenge.code_verifier and challenge.state:
         secure = settings.environment != "development"
+        ziel = _safe_return_to(return_to) if return_to else ""
         response.set_cookie(
             _OAUTH_LOGIN_COOKIE,
-            f"{challenge.state}|{challenge.code_verifier}",
+            f"{challenge.state}|{challenge.code_verifier}|{ziel}",
             httponly=True, secure=secure, samesite="lax",
             max_age=_OAUTH_LOGIN_TTL, path="/",
         )
@@ -119,7 +122,9 @@ async def auth_callback(
     if not cookie or "|" not in cookie:
         logger.warning("OAuth-Callback ohne gültiges Login-Bindungs-Cookie")
         raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
-    cookie_state, code_verifier = cookie.split("|", 1)
+    # Drittes Feld (seit 0.19): Rücksprungziel; ältere Cookies haben es nicht.
+    cookie_state, code_verifier, *rest = cookie.split("|", 2)
+    ziel = _safe_return_to(rest[0]) if rest and rest[0] else "/welcome"
     if not secrets.compare_digest(cookie_state, state):
         logger.warning("OAuth-Callback: State stimmt nicht mit dem Browser-Cookie überein")
         raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
@@ -173,7 +178,7 @@ async def auth_callback(
         sso_groups=identity.sso_groups, sso_roles=identity.sso_roles,
     )
     secure = settings.environment != "development"
-    redirect = RedirectResponse(url="/welcome", status_code=303)
+    redirect = RedirectResponse(url=ziel, status_code=303)
     redirect.set_cookie(
         "session", token,
         httponly=True, secure=secure, samesite="lax",
@@ -186,8 +191,16 @@ async def auth_callback(
 # ===== Step-up-Re-Authentifizierung (Phase 12, Schritt 5) =====
 
 def _safe_return_to(return_to: str) -> str:
-    """Schützt vor Open-Redirect: nur lokale Pfade zulassen."""
-    if not return_to.startswith("/") or return_to.startswith("//"):
+    """Schützt vor Open-Redirect: nur lokale Pfade zulassen.
+
+    `/\\` zählt wie `//`: Browser lesen den Rückstrich als Schrägstrich, `/\\evil.example`
+    wäre also eine fremde Adresse. Steuerzeichen (Zeilenumbruch im Location-Kopf) auch nicht.
+    """
+    if (
+        not return_to.startswith("/")
+        or return_to[1:2] in ("/", "\\")
+        or any(ord(c) < 0x20 for c in return_to)
+    ):
         return "/welcome"
     return return_to
 
@@ -288,10 +301,8 @@ async def step_up_challenge(
     Aktion (Audit #3). direct: Frontend zeigt Passwort-Dialog (→ POST /step-up mit denselben
     Feldern). redirect: Aktion/Ressource reisen mitsigniert im State.
     """
-    if action not in ALLOWED_STEPUP_ACTIONS or bool(resource_id) != ressource_erwartet(action):
-        # Symmetrisch: Eine ressourcengebundene Aktion **braucht** eine ID, eine
-        # ressourcenlose darf keine tragen. Sonst gäbe es zwei Lesarten desselben
-        # Tokens, und die schwächere gewänne.
+    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+        # Jede Step-up-Aktion ist an einen Antrag gebunden (Audit #3).
         raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     if adapter.mode == "direct":
         return {"mode": "direct"}
@@ -321,10 +332,8 @@ async def step_up_direct(
     resource_id = body.get("resource_id") or ""
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing username or password")
-    if action not in ALLOWED_STEPUP_ACTIONS or bool(resource_id) != ressource_erwartet(action):
-        # Symmetrisch: Eine ressourcengebundene Aktion **braucht** eine ID, eine
-        # ressourcenlose darf keine tragen. Sonst gäbe es zwei Lesarten desselben
-        # Tokens, und die schwächere gewänne.
+    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+        # Jede Step-up-Aktion ist an einen Antrag gebunden (Audit #3).
         raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     identity = await adapter.authenticate_direct(username, password)
     if identity is None:

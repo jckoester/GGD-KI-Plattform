@@ -75,6 +75,13 @@ export async function logout() {
   });
 }
 
+// „Kurz neu anmelden" (0.19): abmelden und über die Anmeldeseite zurück nach `returnTo`.
+// Mit dem Schulkonto geht das ohne Eingabe — die Anmeldeseite leitet gleich weiter.
+export async function neuAnmelden(returnTo) {
+  await logout();
+  window.location.href = `/?return_to=${encodeURIComponent(returnTo)}`;
+}
+
 export async function getMe() {
   const res = await fetch(`${BASE}/auth/me`, {
     credentials: "include",
@@ -2745,8 +2752,8 @@ export async function getTokenScopes() {
   return res.json();
 }
 
-// Wie `_accessAction`: 401 + X-Stepup-Required wird zu `stepUpRequired`, damit die
-// Oberfläche den Re-Auth-Dialog öffnen und den Aufruf danach wiederholen kann.
+// 401 + X-Frische-Anmeldung wird zu `frischeAnmeldung` (seit 0.19): Die Sitzung ist älter
+// als 15 Minuten, die Oberfläche bietet „Kurz neu anmelden" an (`neuAnmelden`).
 export async function createToken({ name, scopes, gueltigBis }) {
   const res = await fetch(`${BASE}/tokens`, {
     method: "POST",
@@ -2755,13 +2762,12 @@ export async function createToken({ name, scopes, gueltigBis }) {
     body: JSON.stringify({ name, scopes, gueltig_bis: gueltigBis }),
   });
   if (!res.ok) {
-    if (res.status === 401 && res.headers.get("X-Stepup-Required")) {
-      const err = new ApiError(401, "Re-Authentifizierung erforderlich");
-      err.stepUpRequired = true;
-      throw err;
-    }
     const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.detail);
+    const err = new ApiError(res.status, data.detail);
+    if (res.status === 401 && res.headers.get("X-Frische-Anmeldung")) {
+      err.frischeAnmeldung = true;
+    }
+    throw err;
   }
   return res.json(); // { token, eintrag } — `token` ist nur hier zu haben
 }

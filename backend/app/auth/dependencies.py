@@ -1,3 +1,4 @@
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -11,7 +12,7 @@ from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
 from app.auth.scopes import pruefe_zugang
-from app.auth.stepup import decode_stepup_token, ressource_erwartet
+from app.auth.stepup import decode_stepup_token
 from app.auth.stepup_nonce import consume_stepup_jti
 from app.config import settings
 from app.db.session import get_db
@@ -166,30 +167,32 @@ def require_fresh_stepup_for(action: str) -> Callable:
     return _guard
 
 
-def require_fresh_stepup_ohne_ressource(action: str) -> Callable:
-    """Dieselbe Prüfung für Aktionen, die kein Gegenüber haben — etwa das **Anlegen**
-    eines Zugangstokens: Die Ressource entsteht erst dadurch.
+# Wie jung die Anmeldung sein muss, damit ein Zugangstoken entstehen darf.
+FRISCHE_SITZUNG_S = 15 * 60
 
-    Bewusst eine **zweite Fabrik** statt eines Schalters an der ersten: Der Unterschied
-    liegt in der Signatur, nicht im Verhalten. Eine Fabrik mit `ressourcengebunden=False`
-    müsste den Pfad-Parameter `request_id` je nach Argument deklarieren oder eben nicht —
-    FastAPI liest die Signatur aber einmalig beim Registrieren, und ein optionaler
-    `request_id` hieße: Wer ihn wegzulassen vergisst, bekommt still keine Bindung.
+_FRISCHE_ANMELDUNG_NOETIG = HTTPException(
+    status_code=401,
+    detail="Bitte kurz neu anmelden — die Anmeldung ist länger als 15 Minuten her.",
+    headers={"X-Frische-Anmeldung": "1"},
+)
 
-    Die Aktion muss in `STEPUP_AKTIONEN_OHNE_RESSOURCE` stehen. Sonst verlöre ein
-    ressourcengebundener Guard hier unbemerkt seine Bindung.
+
+def require_frische_sitzung(max_alter_s: int = FRISCHE_SITZUNG_S) -> Callable:
+    """Verlangt, dass die Sitzung jünger als `max_alter_s` ist (`iat` des Sitzungs-JWT).
+
+    Für das Anlegen eines Zugangstokens (0.19, Weg A). Schützt gegen ein **gestohlenes
+    Sitzungs-Cookie**: Wer nur das Cookie hat, hat keine Sitzung beim Schulkonto und kommt
+    zu keiner frischen Anmeldung. Gegen ein entsperrtes, angemeldetes Gerät schützt es
+    nicht — das ist bewusst so entschieden (Jan, 19.10.2026); die Krisen-Einsicht bleibt
+    beim echten Step-up.
+
+    Ein Token-Aufruf (`token_scopes`) erreicht das nie: `/tokens` steht nicht in der
+    Scope-Tabelle.
     """
-    if ressource_erwartet(action):
-        raise ValueError(
-            f"'{action}' ist ressourcengebunden — `require_fresh_stepup_for` verwenden "
-            f"oder die Aktion in STEPUP_AKTIONEN_OHNE_RESSOURCE aufnehmen."
-        )
 
-    async def _guard(
-        request: Request,
-        current_user: JwtPayload = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db),
-    ) -> JwtPayload:
-        return await _stepup_pruefen(request, action, "", current_user, db)
+    async def _guard(current_user: JwtPayload = Depends(get_current_user)) -> JwtPayload:
+        if time.time() - current_user.iat > max_alter_s:
+            raise _FRISCHE_ANMELDUNG_NOETIG
+        return current_user
 
     return _guard

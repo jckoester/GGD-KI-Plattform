@@ -564,6 +564,9 @@ class TestCallback:
         mock_redirect_adapter.exchange_code.assert_not_awaited()
 
 
+_ANTRAG = "00000000-0000-0000-0000-0000000000aa"
+
+
 class TestStepupCallback:
     """Rücksprung der erneuten Anmeldung (0.18.1): Ablehnungen landen lesbar auf der
     Ausgangsseite und mit Grund im Log — vorher JSON-401 an der Callback-URL, Log leer."""
@@ -599,7 +602,7 @@ class TestStepupCallback:
         from app.auth.stepup import sign_stepup_state
 
         sub = sub or pseudonymize("lehrer_1", _SCHOOL_SECRET)
-        return sign_stepup_state(_SCHOOL_SECRET, sub, return_to, "n0nce", "create_token", "")
+        return sign_stepup_state(_SCHOOL_SECRET, sub, return_to, "n0nce", "read", _ANTRAG)
 
     def _jetzt(self):
         return int(datetime.now(timezone.utc).timestamp())
@@ -620,7 +623,7 @@ class TestStepupCallback:
         assert r.headers["location"] == "/profile?stepup_fehler=nicht_frisch"
         assert "stepup=" not in r.headers.get("set-cookie", "")
         zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
-        assert "(nicht_frisch)" in zeile and "aktion=create_token" in zeile
+        assert "(nicht_frisch)" in zeile and "aktion=read" in zeile
         assert "alter_s=3600" in zeile or "alter_s=3601" in zeile
         assert "'claims': ['auth_time', 'sub']" in zeile
 
@@ -685,3 +688,75 @@ class TestStepupCallback:
         r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
         assert r.status_code == 303 and r.headers["location"] == "/"
         self.adapter.exchange_code_fresh.assert_not_awaited()
+
+
+class TestLoginRuecksprung:
+    """0.19: Der Login führt auf Wunsch zurück — „Kurz neu anmelden" am Token-Formular."""
+
+    @pytest.fixture
+    def app_(self, mock_redirect_adapter, mock_db):
+        from app.auth.base import LoginChallenge
+
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_redirect_adapter
+
+        async def get_mock_db():
+            yield mock_db
+
+        mock_redirect_adapter.get_login_challenge = AsyncMock(side_effect=lambda: LoginChallenge(
+            type="redirect", redirect_url="https://idp/auth", state="st", code_verifier="cv"))
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = get_mock_db
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+        return app
+
+    def test_challenge_legt_ziel_ins_bindungs_cookie(self, app_):
+        c = TestClient(app_)
+        c.get("/login-challenge?return_to=/profile")
+        assert c.cookies.get("oauth_login").strip('"') == "st|cv|/profile"
+
+    @pytest.mark.parametrize("fremd", ["https://evil.example", "//evil.example", "/\\evil.example"])
+    def test_fremdes_ziel_wird_zur_startseite(self, app_, fremd):
+        c = TestClient(app_)
+        c.get("/login-challenge", params={"return_to": fremd})
+        assert c.cookies.get("oauth_login").strip('"') == "st|cv|/welcome"
+
+    def _callback(self, app_, mock_redirect_adapter, test_identity, cookie):
+        mock_redirect_adapter.exchange_code = AsyncMock(return_value=test_identity)
+        with patch("app.auth.router.upsert_pseudonym_audit", AsyncMock(return_value=("student", 10))), \
+             patch("app.auth.router.ensure_litellm_user", AsyncMock()), \
+             patch("app.auth.router.ensure_litellm_team_membership", AsyncMock()), \
+             patch("app.auth.router.load_auth_config") as cfg, \
+             patch("app.auth.router.sync_groups", AsyncMock()):
+            cfg.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            c = TestClient(app_, raise_server_exceptions=False)
+            c.cookies.set("oauth_login", cookie)
+            return c.get("/callback?code=x&state=st", follow_redirects=False)
+
+    def test_callback_fuehrt_zum_ziel(self, app_, mock_redirect_adapter, test_identity):
+        r = self._callback(app_, mock_redirect_adapter, test_identity, "st|cv|/profile")
+        assert r.status_code == 303 and r.headers["location"] == "/profile"
+
+    def test_altes_cookie_ohne_ziel(self, app_, mock_redirect_adapter, test_identity):
+        r = self._callback(app_, mock_redirect_adapter, test_identity, "st|cv")
+        assert r.headers["location"] == "/welcome"
+
+    def test_untergeschobenes_ziel_im_cookie(self, app_, mock_redirect_adapter, test_identity):
+        r = self._callback(app_, mock_redirect_adapter, test_identity, "st|cv|//evil.example")
+        assert r.headers["location"] == "/welcome"
+
+
+@pytest.mark.parametrize("ziel,erwartet", [
+    ("/profile?x=1", "/profile?x=1"),
+    ("profile", "/welcome"),
+    ("//evil", "/welcome"),
+    ("/\\evil", "/welcome"),
+    ("/a\r\nSet-Cookie: x", "/welcome"),
+])
+def test_safe_return_to(ziel, erwartet):
+    from app.auth.router import _safe_return_to
+
+    assert _safe_return_to(ziel) == erwartet

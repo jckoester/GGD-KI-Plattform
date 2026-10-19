@@ -32,6 +32,15 @@ export function stepupFehlerText(code, jetzt = new Date()) {
   }
 }
 
+/** Ein Rücksprungziel aus der Adresse — nur lokale Pfade, sonst null (gegen Open-Redirect;
+ *  dieselbe Regel wie `_safe_return_to` im Backend). */
+export function lokalesZiel(wert) {
+  if (!wert || !wert.startsWith("/") || ["/", "\\"].includes(wert[1])) return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(wert)) return null;
+  return wert;
+}
+
 /** Fehlercode aus einem Query-String (`?…`), oder null. */
 export function stepupFehlerAusUrl(search) {
   return new URLSearchParams(search).get(STEPUP_FEHLER_PARAM);

@@ -11,9 +11,7 @@
 
   // action (approve|deny|read|export) + resourceId (request_id) binden das Step-up-Token
   // an genau diese Aktion/Ressource (Sicherheits-Audit #3).
-  // vorWeiterleitung: wird vor dem Verlassen der Seite aufgerufen (redirect) — etwa, um
-  // Formulareingaben im Sitzungsspeicher festzuhalten (`merkeFormular`).
-  let { onSuccess, onCancel, action, resourceId, vorWeiterleitung } = $props();
+  let { onSuccess, onCancel, action, resourceId } = $props();
 
   let mode = $state(null); // "direct" | "redirect"
   let redirectUrl = $state(null);
@@ -39,9 +37,7 @@
   });
 
   function goRedirect() {
-    if (!redirectUrl) return;
-    vorWeiterleitung?.();
-    window.location.href = redirectUrl;
+    if (redirectUrl) window.location.href = redirectUrl;
   }
 
   async function submitDirect() {

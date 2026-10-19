@@ -139,16 +139,25 @@ Schreibrecht enthält kein Leserecht; wer beides braucht, bekommt beide Scopes.
 Gedrosselt wird **je Token** (`token`-Eimer), nicht je Person: Eine durchdrehende
 Sync-Schleife soll ihre Besitzerin nicht aus dem Browser aussperren.
 
-### Step-up ohne Ressource
+### Token anlegen: frische Sitzung statt Step-up *(seit 0.19)*
 
-Die Krisen-Aktionen binden ihr Step-up-Token an eine `resource_id` (Audit #3). Das
-Anlegen eines Zugangstokens hat kein solches Gegenüber — die Ressource entsteht erst
-dadurch. Dafür gibt es `require_fresh_stepup_ohne_ressource(action)` und die Liste
-`STEPUP_AKTIONEN_OHNE_RESSOURCE`; die Fabrik weist eine ressourcengebundene Aktion ab,
-damit keine Bindung stillschweigend verlorengeht.
+`POST /tokens` hängt an `require_frische_sitzung()` (`auth/dependencies.py`): Das `iat` des
+Sitzungs-JWT darf höchstens `FRISCHE_SITZUNG_S` (15 min) zurückliegen, sonst 401 mit
+`X-Frische-Anmeldung: 1`. Das Sitzungs-JWT entsteht nur beim Login, `iat` ist also die
+Anmeldezeit. Die Oberfläche bietet dann „Kurz neu anmelden" (`neuAnmelden` in `api.js`):
+Formular merken (`merkeFormular`), abmelden, `/?return_to=<pfad>`. Die Anmeldeseite reicht
+`return_to` an `/auth/login-challenge` weiter; der Callback liest es aus dem dritten Feld des
+Bindungs-Cookies (`state|verifier|ziel`) und leitet dorthin. Im Redirect-Modus springt die
+Anmeldeseite ohne Knopf gleich weiter. Ziele laufen beidseits durch dieselbe Regel
+(`_safe_return_to` / `lokalesZiel`): nur lokale Pfade, kein `//`, kein `/\`, keine
+Steuerzeichen.
 
-Geprüft wird symmetrisch: Eine gebundene Aktion **braucht** eine ID, eine ressourcenlose
-darf keine tragen — sonst gäbe es zwei Lesarten desselben Tokens.
+Was das schützt und was nicht: Ein **gestohlenes Cookie** reicht nicht — ohne Sitzung beim
+Schulkonto kein neuer Login. Ein **entsperrtes, angemeldetes Gerät** schon — bewusst so
+entschieden (Jan, 19.10.2026), weil das Schulkonto keine frische Anmeldung nachweist
+(`auth_time` fehlt, `prompt=login` wird übergangen). Bis 0.18 lief das Anlegen über ein
+ressourcenloses Step-up (`create_token`); das ist entfernt, jede Step-up-Aktion ist jetzt an
+einen Krisen-Antrag gebunden.
 
 ### Step-up im Redirect-Modus: Rücksprung und Protokoll *(0.18.1)*
 
@@ -171,10 +180,10 @@ Vergleich soll zeigen, ob ein Abmelden beim Schulkonto mit anschließender Anmel
 neuen `sid` erkennbar ist.
 
 Im Frontend liest `StepUpFehler.svelte` (einmal im Layout) den Code und zeigt einen Satz
-dazu (`lib/stepup_rueckkehr.js`). Ein Formular, das nach der Anmeldung weitermachen soll,
-merkt sich seine Eingaben über den Hook `vorWeiterleitung` des `StepUpDialog`
-(`merkeFormular`) und holt sie beim nächsten Laden einmal zurück (`holeFormular`, 15
-Minuten gültig). `Zugangstoken.svelte` legt danach ohne weiteren Klick an.
+dazu (`lib/stepup_rueckkehr.js`). Ein Formular, das nach einer Anmeldung weitermachen soll,
+merkt sich seine Eingaben vor dem Verlassen der Seite (`merkeFormular`) und holt sie beim
+nächsten Laden einmal zurück (`holeFormular`, 15 Minuten gültig) — seit 0.19 genutzt von
+„Kurz neu anmelden" im `Zugangstoken.svelte`.
 
 ### Die eigenen Gruppen: `GET /planning/groups`
 

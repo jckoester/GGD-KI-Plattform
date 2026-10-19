@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import tokens as token_dienst
-from app.auth.dependencies import require_any_role, require_fresh_stepup_ohne_ressource
+from app.auth.dependencies import require_any_role, require_frische_sitzung
 from app.auth.jwt import JwtPayload
 from app.db.session import get_db
 
@@ -78,12 +78,13 @@ async def meine_token(
 async def token_anlegen(
     payload: TokenAnlegen,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(require_fresh_stepup_ohne_ressource("create_token")),
+    user: JwtPayload = Depends(require_frische_sitzung()),
 ):
     """Legt ein Token an und gibt den Klartext **einmalig** zurück.
 
-    Hinter frischer Re-Authentifizierung: Ein übernommenes Browser-Fenster soll sich
-    keinen Dauerzugang ausstellen können, der das Ausloggen überlebt.
+    Nur mit frischer Sitzung (höchstens 15 Minuten alt): Ein gestohlenes Sitzungs-Cookie
+    soll sich keinen Dauerzugang ausstellen können, der das Ausloggen überlebt. Ist die
+    Sitzung älter, kommt 401 mit `X-Frische-Anmeldung` — die Oberfläche meldet kurz neu an.
     """
     if not ({"teacher", "admin"} & set(user.roles)):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")

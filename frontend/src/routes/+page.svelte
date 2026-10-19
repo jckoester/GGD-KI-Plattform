@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { login, getMe } from "$lib/api.js";
+    import { lokalesZiel } from "$lib/stepup_rueckkehr.js";
     import { branding } from "$lib/branding.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
@@ -13,19 +14,31 @@
     let challenge = null; // null = lädt; sonst { type, redirect_url } vom Backend
     let loadError = false; // login-challenge nicht erreichbar (Backend/Proxy)
 
+    // Wohin nach dem Login (0.19, „Kurz neu anmelden"): nur lokale Pfade.
+    const ruecksprung = lokalesZiel(new URLSearchParams(window.location.search).get("return_to"));
+    const ziel = ruecksprung ?? "/welcome";
+
     onMount(async () => {
         try {
             await getMe();
-            goto("/welcome");
+            goto(ziel);
             return;
         } catch {
             /* nicht eingeloggt → Login anzeigen */
         }
 
         try {
-            const res = await fetch("/api/auth/login-challenge");
+            const anfrage = ruecksprung
+                ? `/api/auth/login-challenge?return_to=${encodeURIComponent(ruecksprung)}`
+                : "/api/auth/login-challenge";
+            const res = await fetch(anfrage);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             challenge = await res.json();
+            // Neu anmelden aus einer Aktion heraus: nicht erst den Knopf zeigen. Beim
+            // Schulkonto besteht die Sitzung noch, die Anmeldung läuft ohne Eingabe durch.
+            if (ruecksprung && challenge.type === "redirect") {
+                window.location.href = challenge.redirect_url;
+            }
         } catch {
             // Anmeldedienst nicht erreichbar → bewusst KEIN Test-Login-Formular zeigen
             // (das würde einen Backend-/Proxy-Ausfall maskieren), sondern Fehler.
@@ -38,7 +51,7 @@
         loading = true;
         try {
             await login(username, password);
-            goto("/welcome");
+            goto(ziel);
         } catch (e) {
             error = e.message;
         } finally {
