@@ -14,7 +14,7 @@
     let challenge = null; // null = lädt; sonst { type, redirect_url } vom Backend
     let loadError = false; // login-challenge nicht erreichbar (Backend/Proxy)
 
-    // Wohin nach dem Login (0.19, „Kurz neu anmelden"): nur lokale Pfade.
+    // Wohin nach dem Login (0.18.3, „Kurz neu anmelden"): nur lokale Pfade.
     const ruecksprung = lokalesZiel(new URLSearchParams(window.location.search).get("return_to"));
     const ziel = ruecksprung ?? "/welcome";
 

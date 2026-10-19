@@ -691,7 +691,7 @@ class TestStepupCallback:
 
 
 class TestLoginRuecksprung:
-    """0.19: Der Login führt auf Wunsch zurück — „Kurz neu anmelden" am Token-Formular."""
+    """0.18.3: Der Login führt auf Wunsch zurück — „Kurz neu anmelden" am Token-Formular."""
 
     @pytest.fixture
     def app_(self, mock_redirect_adapter, mock_db):

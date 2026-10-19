@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.18.3] – 2026-10-19
+
 ### Behoben
 
 - **Zugangstoken anlegen** braucht keine erneute Anmeldung beim Schulkonto mehr, sondern eine

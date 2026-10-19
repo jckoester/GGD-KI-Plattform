@@ -180,7 +180,7 @@ _FRISCHE_ANMELDUNG_NOETIG = HTTPException(
 def require_frische_sitzung(max_alter_s: int = FRISCHE_SITZUNG_S) -> Callable:
     """Verlangt, dass die Sitzung jünger als `max_alter_s` ist (`iat` des Sitzungs-JWT).
 
-    Für das Anlegen eines Zugangstokens (0.19, Weg A). Schützt gegen ein **gestohlenes
+    Für das Anlegen eines Zugangstokens (0.18.3, Weg A). Schützt gegen ein **gestohlenes
     Sitzungs-Cookie**: Wer nur das Cookie hat, hat keine Sitzung beim Schulkonto und kommt
     zu keiner frischen Anmeldung. Gegen ein entsperrtes, angemeldetes Gerät schützt es
     nicht — das ist bewusst so entschieden (Jan, 19.10.2026); die Krisen-Einsicht bleibt

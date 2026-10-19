@@ -53,7 +53,7 @@ async def login_challenge(
     adapter: AuthAdapter = Depends(get_auth_adapter),
 ) -> LoginChallenge:
     """`return_to`: wohin der Callback nach dem Login führt (sonst `/welcome`) — etwa zurück
-    zum Token-Formular nach „Kurz neu anmelden" (0.19). Nur lokale Pfade."""
+    zum Token-Formular nach „Kurz neu anmelden" (0.18.3). Nur lokale Pfade."""
     challenge = await adapter.get_login_challenge()
     # Nur der Redirect-Pfad (OAuth) liefert einen code_verifier → Browser-Bindung setzen.
     if challenge.code_verifier and challenge.state:
@@ -122,7 +122,7 @@ async def auth_callback(
     if not cookie or "|" not in cookie:
         logger.warning("OAuth-Callback ohne gültiges Login-Bindungs-Cookie")
         raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
-    # Drittes Feld (seit 0.19): Rücksprungziel; ältere Cookies haben es nicht.
+    # Drittes Feld (seit 0.18.3): Rücksprungziel; ältere Cookies haben es nicht.
     cookie_state, code_verifier, *rest = cookie.split("|", 2)
     ziel = _safe_return_to(rest[0]) if rest and rest[0] else "/welcome"
     if not secrets.compare_digest(cookie_state, state):

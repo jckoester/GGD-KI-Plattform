@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.18.2          # die auszurollende Version
+git checkout 0.18.3          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -12,7 +12,7 @@ docker compose up -d
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.2`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.3`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
@@ -20,7 +20,7 @@ docker compose up -d
 >
 > ```bash
 > docker compose exec backend curl -s localhost:8000/health
-> # {"status":"ok","version":"0.18.2"}
+> # {"status":"ok","version":"0.18.3"}
 > ```
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
@@ -559,7 +559,7 @@ Häufige Meldungen und ihre Bedeutung:
 ## Troubleshooting
 
 **„Die erneute Anmeldung ließ sich nicht bestätigen" — in der Krisen-Einsicht** *(seit
-0.18.1; das Token-Anlegen braucht seit 0.19 nur eine Anmeldung, die höchstens 15 Minuten
+0.18.1; das Token-Anlegen braucht seit 0.18.3 nur eine Anmeldung, die höchstens 15 Minuten
 zurückliegt)*
 Vor besonders geschützten Aktionen meldet man sich beim Schulkonto noch einmal an. Die
 Plattform verlangt dabei eine **frische** Anmeldung: höchstens zwei Minuten alt, belegt durch

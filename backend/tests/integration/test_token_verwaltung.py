@@ -2,7 +2,7 @@
 
 Zwei Zusagen stehen hier im Mittelpunkt:
 
-* **Anlegen verlangt eine frische Sitzung** (höchstens 15 Minuten, seit 0.19; vorher
+* **Anlegen verlangt eine frische Sitzung** (höchstens 15 Minuten, seit 0.18.3; vorher
   Step-up). Ein gestohlenes Sitzungs-Cookie soll sich keinen Dauerzugang ausstellen
   können, der das Ausloggen überlebt.
 * **Ein Token kann kein Token anlegen.** `/tokens` steht nicht in der Scope-Tabelle;
@@ -101,7 +101,7 @@ class TestAnlegen:
             assert (await _anlegen(test_client, auth_headers)).status_code == 201
 
     async def test_kein_stepup_mehr_noetig_und_keins_moeglich(self, test_client, auth_headers):
-        """Seit 0.19 gibt es für das Token-Anlegen keine Step-up-Aktion mehr."""
+        """Seit 0.18.3 gibt es für das Token-Anlegen keine Step-up-Aktion mehr."""
         resp = await test_client.get(
             "/auth/step-up?action=create_token&resource_id=", headers=auth_headers
         )

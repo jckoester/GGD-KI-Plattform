@@ -75,7 +75,7 @@ export async function logout() {
   });
 }
 
-// „Kurz neu anmelden" (0.19): abmelden und über die Anmeldeseite zurück nach `returnTo`.
+// „Kurz neu anmelden" (0.18.3): abmelden und über die Anmeldeseite zurück nach `returnTo`.
 // Mit dem Schulkonto geht das ohne Eingabe — die Anmeldeseite leitet gleich weiter.
 export async function neuAnmelden(returnTo) {
   await logout();
@@ -2752,7 +2752,7 @@ export async function getTokenScopes() {
   return res.json();
 }
 
-// 401 + X-Frische-Anmeldung wird zu `frischeAnmeldung` (seit 0.19): Die Sitzung ist älter
+// 401 + X-Frische-Anmeldung wird zu `frischeAnmeldung` (seit 0.18.3): Die Sitzung ist älter
 // als 15 Minuten, die Oberfläche bietet „Kurz neu anmelden" an (`neuAnmelden`).
 export async function createToken({ name, scopes, gueltigBis }) {
   const res = await fetch(`${BASE}/tokens`, {

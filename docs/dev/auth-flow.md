@@ -139,7 +139,7 @@ Schreibrecht enthält kein Leserecht; wer beides braucht, bekommt beide Scopes.
 Gedrosselt wird **je Token** (`token`-Eimer), nicht je Person: Eine durchdrehende
 Sync-Schleife soll ihre Besitzerin nicht aus dem Browser aussperren.
 
-### Token anlegen: frische Sitzung statt Step-up *(seit 0.19)*
+### Token anlegen: frische Sitzung statt Step-up *(seit 0.18.3)*
 
 `POST /tokens` hängt an `require_frische_sitzung()` (`auth/dependencies.py`): Das `iat` des
 Sitzungs-JWT darf höchstens `FRISCHE_SITZUNG_S` (15 min) zurückliegen, sonst 401 mit
@@ -155,7 +155,7 @@ Steuerzeichen.
 Was das schützt und was nicht: Ein **gestohlenes Cookie** reicht nicht — ohne Sitzung beim
 Schulkonto kein neuer Login. Ein **entsperrtes, angemeldetes Gerät** schon — bewusst so
 entschieden (Jan, 19.10.2026), weil das Schulkonto keine frische Anmeldung nachweist
-(`auth_time` fehlt, `prompt=login` wird übergangen). Bis 0.18 lief das Anlegen über ein
+(`auth_time` fehlt, `prompt=login` wird übergangen). Bis 0.18.2 lief das Anlegen über ein
 ressourcenloses Step-up (`create_token`); das ist entfernt, jede Step-up-Aktion ist jetzt an
 einen Krisen-Antrag gebunden.
 
@@ -182,7 +182,7 @@ neuen `sid` erkennbar ist.
 Im Frontend liest `StepUpFehler.svelte` (einmal im Layout) den Code und zeigt einen Satz
 dazu (`lib/stepup_rueckkehr.js`). Ein Formular, das nach einer Anmeldung weitermachen soll,
 merkt sich seine Eingaben vor dem Verlassen der Seite (`merkeFormular`) und holt sie beim
-nächsten Laden einmal zurück (`holeFormular`, 15 Minuten gültig) — seit 0.19 genutzt von
+nächsten Laden einmal zurück (`holeFormular`, 15 Minuten gültig) — seit 0.18.3 genutzt von
 „Kurz neu anmelden" im `Zugangstoken.svelte`.
 
 ### Die eigenen Gruppen: `GET /planning/groups`

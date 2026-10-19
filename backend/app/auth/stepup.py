@@ -19,7 +19,7 @@ from jose import JWTError, jwt
 # gebunden (`resource_id`, Sicherheits-Audit #3). Neue sensible Aktion → hier ergänzen und
 # einen `require_fresh_stepup_for(...)`-Guard setzen.
 #
-# Das Anlegen eines Zugangstokens stand bis 0.19 auch hier, ressourcenlos. Seitdem verlangt
+# Das Anlegen eines Zugangstokens stand bis 0.18.2 auch hier, ressourcenlos. Seitdem verlangt
 # es nur eine frische Sitzung (`require_frische_sitzung`): Das Schulkonto liefert kein
 # `auth_time`, und der Weg über Abmelden beim Schulkonto war für Lehrkräfte zu umständlich
 # (Jan, 19.10.2026).
