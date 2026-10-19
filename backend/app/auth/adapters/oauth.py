@@ -257,25 +257,35 @@ class OAuthAdapter(AuthAdapter):
             )
             userinfo_resp.raise_for_status()
 
-        identity = self._userinfo_to_identity(userinfo_resp.json())
+        userinfo = userinfo_resp.json()
+        identity = self._userinfo_to_identity(userinfo)
         id_token = token_json.get("id_token")
         auth_time = None
+        # Für das Log bei einer Ablehnung: nur Namen und Ja/Nein, nie Werte.
+        diagnose = {
+            "id_token": bool(id_token),
+            "signatur": "geprueft" if self._config.jwks_url else "ungeprueft",
+            "userinfo_auth_time": "auth_time" in userinfo,
+        }
         if id_token:
             if self._config.jwks_url:
                 # Strikte Prüfung: nur eine gültige Signatur liefert eine vertrauenswürdige
                 # auth_time. Schlägt die Prüfung fehl → None → Step-up wird als „nicht frisch"
                 # abgelehnt (fail-closed).
                 claims = await self._verify_id_token(id_token)
+                if claims is None:
+                    diagnose["signatur"] = "ungueltig"
             else:
                 logger.warning(
                     "OAuth-Step-up: jwks_url nicht konfiguriert — ID-Token-Signatur wird NICHT "
                     "geprüft (Audit #6). Für strikte Prüfung `oauth.jwks_url` in auth.yaml setzen."
                 )
                 claims = _unverified_jwt_claims(id_token)
+            diagnose["claims"] = sorted(claims or {})
             raw_at = (claims or {}).get("auth_time")
             if isinstance(raw_at, (int, float)):
                 auth_time = int(raw_at)
-        return FreshIdentity(identity=identity, auth_time=auth_time)
+        return FreshIdentity(identity=identity, auth_time=auth_time, diagnose=diagnose)
 
     async def _fetch_jwks(self) -> dict | None:
         try:

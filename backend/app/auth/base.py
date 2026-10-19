@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
@@ -51,10 +51,14 @@ class FreshIdentity:
 
     `auth_time` ist der Unix-Zeitpunkt der IdP-Authentifizierung aus dem ID-Token
     (None, wenn der Provider keinen liefert) — Grundlage der Frische-Prüfung.
+
+    `diagnose` sagt, woher `auth_time` kam oder warum es fehlt — nur Namen und Ja/Nein,
+    keine Token-Inhalte. Der Router schreibt es bei einer Ablehnung ins Log (0.18.1).
     """
 
     identity: NormalizedIdentity
     auth_time: int | None
+    diagnose: dict = field(default_factory=dict)
 
 
 class AuthAdapter(ABC):

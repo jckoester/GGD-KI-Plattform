@@ -562,3 +562,116 @@ class TestCallback:
         response = client.get("/callback?code=test&state=test_state")
         assert response.status_code == 401
         mock_redirect_adapter.exchange_code.assert_not_awaited()
+
+
+class TestStepupCallback:
+    """Rücksprung der erneuten Anmeldung (0.18.1): Ablehnungen landen lesbar auf der
+    Ausgangsseite und mit Grund im Log — vorher JSON-401 an der Callback-URL, Log leer."""
+
+    @pytest.fixture
+    def client(self, mock_redirect_adapter, jwt_service):
+        from app.auth.base import FreshIdentity
+
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_redirect_adapter
+
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = _no_revocation_db()
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+        self.adapter = mock_redirect_adapter
+        self.fresh = lambda auth_time, ext="lehrer_1", diagnose=None: FreshIdentity(
+            identity=NormalizedIdentity(external_id=ext, roles=["teacher"]),
+            auth_time=auth_time, diagnose=diagnose or {},
+        )
+        token, _ = jwt_service.issue(pseudonymize("lehrer_1", _SCHOOL_SECRET), ["teacher"], None)
+        c = TestClient(app, raise_server_exceptions=False)
+        c.cookies.set("session", token)
+        with patch("app.auth.router.settings") as s:
+            s.school_secret = _SCHOOL_SECRET
+            s.jwt_secret = _TEST_SECRET
+            s.environment = "development"
+            yield c
+
+    def _state(self, return_to="/profile", sub=None):
+        from app.auth.stepup import sign_stepup_state
+
+        sub = sub or pseudonymize("lehrer_1", _SCHOOL_SECRET)
+        return sign_stepup_state(_SCHOOL_SECRET, sub, return_to, "n0nce", "create_token", "")
+
+    def _jetzt(self):
+        return int(datetime.now(timezone.utc).timestamp())
+
+    def test_erfolg_setzt_cookie_und_springt_zurueck(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(self._jetzt() - 5))
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/profile"
+        assert "stepup=" in r.headers.get("set-cookie", "")
+
+    def test_alt_nennt_alter_und_diagnose(self, client, caplog):
+        diagnose = {"id_token": True, "signatur": "ungeprueft", "claims": ["auth_time", "sub"]}
+        self.adapter.exchange_code_fresh = AsyncMock(
+            return_value=self.fresh(self._jetzt() - 3600, diagnose=diagnose))
+        with caplog.at_level("WARNING", logger="app.auth.router"):
+            r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/profile?stepup_fehler=nicht_frisch"
+        assert "stepup=" not in r.headers.get("set-cookie", "")
+        zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
+        assert "(nicht_frisch)" in zeile and "aktion=create_token" in zeile
+        assert "alter_s=3600" in zeile or "alter_s=3601" in zeile
+        assert "'claims': ['auth_time', 'sub']" in zeile
+
+    def test_zukunft_als_negatives_alter(self, client, caplog):
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(self._jetzt() + 30))
+        with caplog.at_level("WARNING", logger="app.auth.router"):
+            r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"].endswith("stepup_fehler=nicht_frisch")
+        assert any("alter_s=-" in m for m in caplog.messages)
+
+    def test_ohne_auth_time(self, client, caplog):
+        self.adapter.exchange_code_fresh = AsyncMock(
+            return_value=self.fresh(None, diagnose={"id_token": False}))
+        with caplog.at_level("WARNING", logger="app.auth.router"):
+            client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
+        assert "auth_time fehlt" in zeile and "'id_token': False" in zeile
+
+    def test_anderes_konto(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock(
+            return_value=self.fresh(self._jetzt(), ext="jemand_anders"))
+        r = client.get(f"/callback?code=c&state={self._state('/review?x=1')}", follow_redirects=False)
+        assert r.headers["location"] == "/review?x=1&stepup_fehler=anderes_konto"
+
+    def test_code_tausch_scheitert(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock(side_effect=RuntimeError("boom"))
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"] == "/profile?stepup_fehler=fehlgeschlagen"
+
+    def test_abbruch_beim_provider(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock()
+        r = client.get(f"/callback?error=access_denied&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"] == "/profile?stepup_fehler=abgebrochen"
+        self.adapter.exchange_code_fresh.assert_not_awaited()
+
+    def test_gefaelschter_state_springt_nicht_ans_ziel(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock()
+        state = self._state("/profile")[:-2] + "xx"
+        r = client.get(f"/callback?code=c&state={state}", follow_redirects=False)
+        assert r.headers["location"] == "/welcome?stepup_fehler=fehlgeschlagen"
+        self.adapter.exchange_code_fresh.assert_not_awaited()
+
+    def test_fremder_state_springt_mit_fehler_zurueck(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock()
+        r = client.get(f"/callback?code=c&state={self._state(sub='fremd')}", follow_redirects=False)
+        assert r.headers["location"] == "/profile?stepup_fehler=fehlgeschlagen"
+        self.adapter.exchange_code_fresh.assert_not_awaited()
+
+    def test_ohne_sitzung_zur_anmeldung(self, client):
+        client.cookies.clear()
+        self.adapter.exchange_code_fresh = AsyncMock()
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/"
+        self.adapter.exchange_code_fresh.assert_not_awaited()

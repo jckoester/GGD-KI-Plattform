@@ -7,10 +7,13 @@
   import { onMount } from "svelte";
   import { ShieldCheck } from "lucide-svelte";
   import { getStepUpChallenge, stepUpDirect } from "$lib/api.js";
+  import { ohneStepupFehler } from "$lib/stepup_rueckkehr.js";
 
   // action (approve|deny|read|export) + resourceId (request_id) binden das Step-up-Token
   // an genau diese Aktion/Ressource (Sicherheits-Audit #3).
-  let { onSuccess, onCancel, action, resourceId } = $props();
+  // vorWeiterleitung: wird vor dem Verlassen der Seite aufgerufen (redirect) — etwa, um
+  // Formulareingaben im Sitzungsspeicher festzuhalten (`merkeFormular`).
+  let { onSuccess, onCancel, action, resourceId, vorWeiterleitung } = $props();
 
   let mode = $state(null); // "direct" | "redirect"
   let redirectUrl = $state(null);
@@ -23,7 +26,8 @@
 
   onMount(async () => {
     try {
-      const returnTo = window.location.pathname + window.location.search;
+      // Ein Fehlercode vom letzten Versuch soll nach dem nächsten nicht wieder erscheinen.
+      const returnTo = ohneStepupFehler(window.location.pathname, window.location.search);
       const data = await getStepUpChallenge(returnTo, action, resourceId);
       mode = data.mode;
       redirectUrl = data.redirect_url ?? null;
@@ -35,7 +39,9 @@
   });
 
   function goRedirect() {
-    if (redirectUrl) window.location.href = redirectUrl;
+    if (!redirectUrl) return;
+    vorWeiterleitung?.();
+    window.location.href = redirectUrl;
   }
 
   async function submitDirect() {

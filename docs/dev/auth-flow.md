@@ -150,6 +150,25 @@ damit keine Bindung stillschweigend verlorengeht.
 Geprüft wird symmetrisch: Eine gebundene Aktion **braucht** eine ID, eine ressourcenlose
 darf keine tragen — sonst gäbe es zwei Lesarten desselben Tokens.
 
+### Step-up im Redirect-Modus: Rücksprung und Protokoll *(0.18.1)*
+
+Der Callback (`_handle_stepup_callback`) lehnt nie mehr mit JSON ab, sondern springt über
+`_stepup_abgelehnt(grund, return_to, detail)` auf die Ausgangsseite zurück:
+`return_to?stepup_fehler=<grund>` mit `abgebrochen`, `fehlgeschlagen`, `nicht_frisch` oder
+`anderes_konto`. Ist der State nicht gültig signiert, ist auch `return_to` nicht
+vertrauenswürdig — dann `/welcome`. Ohne gültige Sitzung geht es auf die Anmeldeseite.
+
+Jede Ablehnung schreibt eine Logzeile `Step-up abgelehnt (<grund>)` mit Aktion,
+Pseudonym-Präfix, Alter von `auth_time` (negativ = Zukunft) und `FreshIdentity.diagnose`:
+ob ein ID-Token kam, wie die Signatur ausfiel, ob UserInfo ein `auth_time` trägt, und die
+**Namen** der Claims. Keine Werte.
+
+Im Frontend liest `StepUpFehler.svelte` (einmal im Layout) den Code und zeigt einen Satz
+dazu (`lib/stepup_rueckkehr.js`). Ein Formular, das nach der Anmeldung weitermachen soll,
+merkt sich seine Eingaben über den Hook `vorWeiterleitung` des `StepUpDialog`
+(`merkeFormular`) und holt sie beim nächsten Laden einmal zurück (`holeFormular`, 15
+Minuten gültig). `Zugangstoken.svelte` legt danach ohne weiteren Klick an.
+
 ### Die eigenen Gruppen: `GET /planning/groups`
 
 Die Unterrichtsgruppen, in denen der Nutzer **Lehrkraft** ist — genau die, für die

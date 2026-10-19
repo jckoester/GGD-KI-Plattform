@@ -285,6 +285,8 @@ class TestOAuthAdapter:
         with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
             fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
         assert fresh.auth_time == 1700000000
+        assert fresh.diagnose["signatur"] == "geprueft"
+        assert fresh.diagnose["claims"] == ["auth_time", "sub"]  # Namen, keine Werte
 
     @pytest.mark.asyncio
     async def test_exchange_code_fresh_rejects_bad_signature(self, oauth_adapter):
@@ -299,6 +301,7 @@ class TestOAuthAdapter:
         with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
             fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
         assert fresh.auth_time is None  # ungültige Signatur → keine vertrauenswürdige auth_time
+        assert fresh.diagnose["signatur"] == "ungueltig"
 
     @pytest.mark.asyncio
     async def test_exchange_code_success(self, oauth_adapter):
@@ -708,6 +711,9 @@ class TestOAuthStepup:
             fresh = await oauth_adapter.exchange_code_fresh("code", "su.state")
         assert fresh.auth_time is None
         assert fresh.identity.external_id == "testuser"
+        assert fresh.diagnose == {
+            "id_token": False, "signatur": "ungeprueft", "userinfo_auth_time": False,
+        }
 
 
 # --- AUTH_DEBUG_USERINFO-Warnung (Sicherheits-Audit #15) ---

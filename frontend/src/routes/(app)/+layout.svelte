@@ -16,6 +16,7 @@
     import FeedbackDialog from "$lib/components/FeedbackDialog.svelte";
     import { feedbackDialog, schliesseFeedback } from "$lib/stores/feedbackDialog.js";
     import AppHeader from "$lib/components/AppHeader.svelte";
+    import StepUpFehler from "$lib/components/StepUpFehler.svelte";
 
     let { children } = $props();
 
@@ -108,6 +109,7 @@
     <!-- Rechter Bereich: Header + Inhalt -->
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader {sidebarOpen} onToggle={toggleSidebar} />
+        <StepUpFehler />
         <main class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2">
             {@render children()}
         </main>

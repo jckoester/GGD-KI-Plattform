@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.18.1] – 2026-10-19
+
+### Behoben
+
+- **Erneute Anmeldung beim Schulkonto (Token anlegen, Krisen-Einsicht):** Scheitert sie, steht
+  statt einer JSON-Fehlermeldung ein Hinweis auf der Ausgangsseite. Beim Token anlegen bleiben die
+  Eingaben erhalten, und nach erfolgreicher Anmeldung wird das Token ohne weiteren Klick angelegt.
+- **Grund einer abgelehnten erneuten Anmeldung im Backend-Log** (`Step-up abgelehnt`), ohne
+  Token-Inhalte.
+
 ## [0.18.0] – 2026-10-18
 
 Die Leiste über dem Stundenentwurf schlägt die Fachbegriffe einer Stunde vor; der

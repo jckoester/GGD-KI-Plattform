@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.18.0          # die auszurollende Version
+git checkout 0.18.1          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -12,7 +12,7 @@ docker compose up -d
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.0`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.1`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
@@ -20,7 +20,7 @@ docker compose up -d
 >
 > ```bash
 > docker compose exec backend curl -s localhost:8000/health
-> # {"status":"ok","version":"0.18.0"}
+> # {"status":"ok","version":"0.18.1"}
 > ```
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
@@ -557,6 +557,30 @@ Häufige Meldungen und ihre Bedeutung:
 | `… Rückmeldung(en) sind seit über 365 Tagen offen` | Unerledigte Meldungen im Feedback-Kanal | Kein Fehler — unter `/feedback/manage` abschließen oder bewusst behalten ([Leitfaden](feedback.md)) |
 
 ## Troubleshooting
+
+**„Die erneute Anmeldung ließ sich nicht bestätigen" — beim Token anlegen oder in der
+Krisen-Einsicht** *(seit 0.18.1)*
+Vor besonders geschützten Aktionen meldet man sich beim Schulkonto noch einmal an. Die
+Plattform verlangt dabei eine **frische** Anmeldung: höchstens zwei Minuten alt, belegt durch
+den Zeitpunkt `auth_time`, den das Schulkonto mitschickt. Scheitert die Prüfung, steht im
+Backend-Log eine Zeile mit dem Grund — Lehrkräfte bekommen die Uhrzeit dazu angezeigt:
+
+```bash
+docker compose logs backend | grep "Step-up abgelehnt"
+# WARNING Step-up abgelehnt (nicht_frisch): aktion=create_token nutzer=3f9a1c2e… alter_s=5412 (erlaubt 0–120) diagnose={'id_token': True, 'signatur': 'ungeprueft', 'userinfo_auth_time': False, 'claims': ['aud', 'auth_time', 'exp', 'iat', 'iss', 'sub']}
+```
+
+| Im Log | heißt |
+|---|---|
+| `alter_s=` groß (Minuten, Stunden) | Das Schulkonto hat keine neue Anmeldung verlangt, sondern die bestehende Sitzung bestätigt |
+| `alter_s=` negativ | Der Zeitpunkt liegt in der Zukunft — die Uhr des Schulkontos geht vor (oder die des Servers nach) |
+| `auth_time fehlt`, `'id_token': False` | Das Schulkonto schickt kein ID-Token |
+| `auth_time fehlt`, `auth_time` nicht unter `claims` | Das ID-Token trägt keinen Anmeldezeitpunkt |
+| `'signatur': 'ungueltig'` | `oauth.jwks_url` ist gesetzt, die Signatur passt aber nicht zu den Schlüsseln |
+| `(anderes_konto)` | Angemeldet wurde mit einem anderen Konto |
+| `(abgebrochen)` / `(fehlgeschlagen)` | Abbruch beim Schulkonto / Code-Tausch oder Rücksprung gescheitert |
+
+Das Log enthält nur Namen und Ja/Nein, keine Token-Inhalte.
 
 **Das Backend startet nicht: „Die Knotentyp-Taxonomie passt nicht zum System (ADR-018)"**
 Der Start bricht ab, und das Log nennt jede Abweichung einzeln — welcher Typ, welche

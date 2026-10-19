@@ -16,6 +16,7 @@
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import StepUpDialog from "$lib/components/StepUpDialog.svelte";
+    import { holeFormular, merkeFormular, stepupFehlerAusUrl } from "$lib/stepup_rueckkehr.js";
 
     let tokens = $state([]);
     let scopes = $state([]);
@@ -35,6 +36,9 @@
 
     let stepUpOffen = $state(false);
 
+    // Beim Erzeugen gelesen: Das Layout räumt den Code danach aus der Adresse.
+    const rueckkehrFehler = stepupFehlerAusUrl(window.location.search);
+
     async function laden_() {
         laden = true;
         try {
@@ -50,7 +54,26 @@
         }
     }
 
-    onMount(laden_);
+    // Im Redirect-Modus verlässt der Browser die Seite für die erneute Anmeldung. Danach
+    // stehen die Eingaben wieder da, und war die Anmeldung erfolgreich, wird gleich angelegt.
+    onMount(async () => {
+        const gemerkt = holeFormular(sessionStorage, "zugangstoken");
+        await laden_();
+        if (!gemerkt) return;
+        name = gemerkt.name ?? "";
+        gewaehlt = new Set(gemerkt.scopes ?? []);
+        if (gemerkt.gueltigBis) gueltigBis = gemerkt.gueltigBis;
+        formularOffen = true;
+        if (!rueckkehrFehler) await anlegen();
+    });
+
+    function formularMerken() {
+        merkeFormular(sessionStorage, "zugangstoken", {
+            name,
+            scopes: [...gewaehlt],
+            gueltigBis,
+        });
+    }
 
     function umschalten(key) {
         const neu = new Set(gewaehlt);
@@ -278,6 +301,7 @@
     <StepUpDialog
         action="create_token"
         resourceId=""
+        vorWeiterleitung={formularMerken}
         onSuccess={nachStepUp}
         onCancel={() => (stepUpOffen = false)}
     />

@@ -15,6 +15,7 @@ from app.auth.jwt import JwtPayload, JwtService
 from app.auth.pseudonym import pseudonymize
 from app.auth.stepup import (
     ALLOWED_STEPUP_ACTIONS,
+    STEPUP_AUTH_TIME_MAX_AGE,
     STEPUP_TTL_SECONDS,
     auth_time_is_fresh,
     is_stepup_state,
@@ -80,6 +81,14 @@ async def auth_callback(
     # OAuth-Fehler-Redirect des Providers (z. B. ungültiger Scope, abgelehnte
     # Zustimmung): kommt mit ?error=...&error_description=... statt code/state.
     error = request.query_params.get("error")
+    if error is not None and is_stepup_state(state):
+        # Abbruch beim Schulkonto während der erneuten Anmeldung: zurück zur Seite, von der
+        # sie ausging, statt auf eine JSON-Fehlermeldung.
+        parsed = parse_stepup_state(settings.school_secret, state)
+        return _stepup_abgelehnt(
+            "abgebrochen", parsed[1] if parsed else "/welcome",
+            f"Provider meldet error={error!r}",
+        )
     if error is not None:
         logger.warning(
             "OAuth-Callback: Provider meldet error=%r description=%r (state vorhanden=%s)",
@@ -183,6 +192,19 @@ def _safe_return_to(return_to: str) -> str:
     return return_to
 
 
+def _stepup_abgelehnt(grund: str, return_to: str, detail: str) -> RedirectResponse:
+    """Lehnt eine erneute Anmeldung ab: Logzeile mit Grund, Rücksprung mit Fehlercode.
+
+    Die Seite, von der die Anmeldung ausging, liest `stepup_fehler` und zeigt einen Satz
+    dazu (`StepUpFehler.svelte`). Vor 0.18.1 landete die Lehrkraft auf einem rohen JSON-401,
+    und im Log stand nicht, warum.
+    """
+    logger.warning("Step-up abgelehnt (%s): %s", grund, detail)
+    ziel = _safe_return_to(return_to)
+    trenner = "&" if "?" in ziel else "?"
+    return RedirectResponse(url=f"{ziel}{trenner}stepup_fehler={grund}", status_code=303)
+
+
 async def _handle_stepup_callback(
     request: Request,
     db: AsyncSession,
@@ -192,36 +214,51 @@ async def _handle_stepup_callback(
     state: str,
 ) -> RedirectResponse:
     # Step-up frischt eine *laufende* Sitzung auf — Session muss gültig bestehen.
+    # Ohne sie bleibt nur die Anmeldeseite.
     session_token = request.cookies.get("session")
     if not session_token:
-        raise HTTPException(status_code=401, detail="Keine Sitzung")
+        logger.warning("Step-up abgelehnt (sitzung): kein Sitzungs-Cookie")
+        return RedirectResponse(url="/", status_code=303)
     try:
         current = jwt_service.verify(session_token)
     except JWTError:
-        raise HTTPException(status_code=401, detail="Ungültige Sitzung")
+        logger.warning("Step-up abgelehnt (sitzung): Sitzung ungültig")
+        return RedirectResponse(url="/", status_code=303)
     if await jwt_service.is_revoked(db, current):
-        raise HTTPException(status_code=401, detail="Sitzung revoziert")
+        logger.warning("Step-up abgelehnt (sitzung): Sitzung beendet")
+        return RedirectResponse(url="/", status_code=303)
 
     parsed = parse_stepup_state(settings.school_secret, state)
     if parsed is None:
-        raise HTTPException(status_code=400, detail="Ungültiger Step-up-State")
+        # Unsigniertes Ziel ist nicht vertrauenswürdig → Startseite.
+        return _stepup_abgelehnt("fehlgeschlagen", "/welcome", "State ungültig")
     state_sub, return_to, action, resource_id = parsed
+    wer = f"aktion={action} nutzer={current.sub[:8]}…"
     if state_sub != current.sub:
-        raise HTTPException(status_code=401, detail="Step-up gehört zu anderem Nutzer")
+        return _stepup_abgelehnt("fehlgeschlagen", return_to, f"{wer} State gehört zu anderem Nutzer")
     if action not in ALLOWED_STEPUP_ACTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
+        return _stepup_abgelehnt("fehlgeschlagen", return_to, f"{wer} Aktion unbekannt")
 
     try:
         fresh = await adapter.exchange_code_fresh(code, state)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Re-Authentifizierung fehlgeschlagen")
+    except Exception as exc:
+        return _stepup_abgelehnt(
+            "fehlgeschlagen", return_to, f"{wer} Code-Tausch scheitert ({type(exc).__name__})"
+        )
 
     # Frische-Sicherheitsnetz: honoriert der IdP prompt=login nicht, ist auth_time alt.
     now_ts = int(datetime.now(timezone.utc).timestamp())
     if not auth_time_is_fresh(fresh.auth_time, now_ts):
-        raise HTTPException(status_code=401, detail="Re-Authentifizierung nicht frisch genug")
+        if fresh.auth_time is None:
+            alter = "auth_time fehlt"
+        else:
+            # Negativ heißt: Zeitpunkt in der Zukunft — die Uhr des Providers geht vor.
+            alter = f"alter_s={now_ts - fresh.auth_time} (erlaubt 0–{STEPUP_AUTH_TIME_MAX_AGE})"
+        return _stepup_abgelehnt(
+            "nicht_frisch", return_to, f"{wer} {alter} diagnose={fresh.diagnose}"
+        )
     if pseudonymize(fresh.identity.external_id, settings.school_secret) != current.sub:
-        raise HTTPException(status_code=401, detail="Re-Authentifizierung als anderer Nutzer")
+        return _stepup_abgelehnt("anderes_konto", return_to, f"{wer} angemeldet als anderer Nutzer")
 
     token = issue_stepup_token(settings.jwt_secret, current.sub, action, resource_id)
     secure = settings.environment != "development"
