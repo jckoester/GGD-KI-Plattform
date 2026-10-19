@@ -17,6 +17,9 @@
 - id: "0.17-fachbegriffe"
   version: "0.17.0"
   datum: 2026-10-17
+  # Seit 0.18 schlägt die Leiste die Begriffe vor, nicht mehr der Assistent — der Text stimmt
+  # nicht mehr.
+  bis: 2026-10-17
   rollen: [teacher]
   eintrag: planner
   titel: "Fachbegriffe im Stundenentwurf"
@@ -27,3 +30,18 @@
     Stundenassistenten, übernehmen Sie den Abschnitt „Fachbegriffe der Stunde" aus dem
     schulweiten Prompt.
   link: /help/unterrichtsplanung
+
+- id: "0.18-begriffe-vorschlagen"
+  version: "0.18.0"
+  datum: 2026-10-18
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Begriffe schlägt jetzt die Leiste vor"
+  text: >-
+    Die Leiste „Kompetenzen und Fachbegriffe" schlägt die Fachbegriffe Ihrer Stunde vor — nach
+    jeder Änderung durch den Stundenassistenten und über „Begriffe vorschlagen". ✓ trägt ein,
+    ✕ verwirft. Einzelne Namen eines Begriffs lassen sich entfernen, und der DOCX-Export führt
+    Kompetenzen und Fachbegriffe auf. Haben Sie einen eigenen Stundenassistenten, legen Sie ihn
+    neu an — die Hilfe erklärt, wie.
+  link: /help/unterrichtsplanung
+

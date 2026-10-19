@@ -24,6 +24,8 @@ Der KI-Anbieter erhält **keine** Informationen, die auf Sie persönlich schlie�
 
 Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Plattform einen kleinen Hinweis zum aktuellen Unterricht, damit der Assistent passend helfen kann: Thema und Inhalte der letzten und vorletzten Stunde, das nächste Thema sowie Termin und Umfang der nächsten Klassenarbeit. Als Inhalte erscheinen die Kompetenzen (und Fachbegriffe) aus dem Stundenentwurf — nur solche, die alle in der Gruppe ohnehin lesen dürfen; ist eine Stunde noch nicht nachbereitet, steht dabei „laut Plan“.
 
+**Begriffsvorschläge im Stundenentwurf** *(seit 0.18)*: Schlägt die Leiste „Kompetenzen und Fachbegriffe" Begriffe vor, geht der Text des Entwurfs — Titel, Stundenziel und Phasen — an den KI-Anbieter, auf demselben Weg und mit demselben anonymen Code wie im Chat. Das geschieht auf Knopfdruck und automatisch, nachdem der Stundenassistent den Entwurf geändert hat; den Entwurf kennt der Assistent dann ohnehin.
+
 **Nicht** übermittelt werden interne Planungsfelder der Lehrkraft — etwa Kommentare, Reflexionen, der Pin-Status oder die einzelnen Phasen einer Stunde. Es werden nur Angaben weitergegeben, die ohnehin für die Gruppe bestimmt sind (Themen, Stundenziele, Kompetenzen und Fachbegriffe der Stunden, Klassenarbeits-Umfang). Material bleibt draußen — ein Arbeitsblatt mit Lösungen etwa.
 
 Dasselbe gilt für den **Wissensbereich**: Jahrespläne, Unterrichtseinheiten und Stundenentwürfe sind den **Lehrkräften ihrer Unterrichtsgruppe** vorbehalten. Schüler:innen derselben Gruppe finden sie weder über die Suche noch über einen Direktaufruf. *(Bis September 2026 war das anders — sie galten als gruppenweit lesbar, was auch die Schüler:innen einschloss. Seit 0.11 nicht mehr.)*

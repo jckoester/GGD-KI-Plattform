@@ -5,14 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.18.0] – 2026-10-18
+
+Die Leiste über dem Stundenentwurf schlägt die Fachbegriffe einer Stunde vor; der
+Stundenassistent nennt sie nur noch auf Frage. Dazu: Aliase einzeln entfernen, DOCX-Export mit
+Kompetenzen und Begriffen, Unterrichtsgespräch und Lehrervortrag im Methoden-Vokabular. Keine
+Migration — nach dem Update Modell freischalten, Vokabular einspielen und den Prompt des
+Stundenassistenten übernehmen (unten).
+
 ### Neu
 
-- **DOCX-Export eines Stundenentwurfs mit Kompetenzen und Fachbegriffen:** beide stehen unter der
-  Phasentabelle, wie im PDF.
-- **Methoden „Unterrichtsgespräch“ (LSG, UG) und „Lehrervortrag“ (LVo)** im Vokabular; Sozialformen
-  auch als EA, PA, GA. „Unterrichtsgespräch“ und „Lehrgespräch“ sind keine Aliase von Plenum mehr.
-- **Aliase der Begriffe in der Leiste einzeln entfernen.** Wird ein Begriff über die Suche nach
-  einem Alias hinzugefügt, bleibt dieser Name dabei stehen.
 - **Begriffe aus den Phasentexten:** Die Leiste „Kompetenzen und Fachbegriffe" schlägt die
   Fachbegriffe eines Stundenentwurfs vor — automatisch, nachdem der Stundenassistent Phasen
   geschrieben hat, und über den Knopf „Begriffe vorschlagen". ✓ trägt ein, ✕ verwirft; Namen ohne
@@ -23,6 +25,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Der Stundenassistent nennt Begriffe nur noch auf Frage:** Den Absatz „Begriffe dieser Stunde"
   nach jedem Ausarbeiten gibt es nicht mehr — die Leiste schlägt die Begriffe vor. Fragt die
   Lehrkraft danach oder nennt sie selbst welche, trägt er sie wie bisher nach Zustimmung ein.
+- **Aliase der Begriffe in der Leiste einzeln entfernen.** Wird ein Begriff über die Suche nach
+  einem Alias hinzugefügt, bleibt dieser Name dabei stehen.
+- **DOCX-Export eines Stundenentwurfs mit Kompetenzen und Fachbegriffen:** beide stehen unter der
+  Phasentabelle, wie im PDF.
+- **Methoden „Unterrichtsgespräch“ (LSG, UG) und „Lehrervortrag“ (LVo)** im Vokabular; Sozialformen
+  auch als EA, PA, GA. „Unterrichtsgespräch“ und „Lehrgespräch“ sind keine Aliase von Plenum mehr.
 - **`seed_methodik.py --aliase-ergaenzen`:** ergänzt fehlende Aliase des Seeds, ohne die der Schule
   zu ersetzen.
 

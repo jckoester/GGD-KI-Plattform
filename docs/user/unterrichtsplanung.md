@@ -157,7 +157,9 @@ liegen oder einen Überhang haben.
 - **Sozialform / Methode** (gestapelt: oben Sozialform, darunter Methode): Sie
   tippen frei oder wählen aus dem mitgelieferten Vokabular (z. B. *Partnerarbeit*,
   *Think-Pair-Share*). Tippen schlägt passende Begriffe vor — auch über Synonyme
-  (z. B. findet „Ich-Du-Wir" den Eintrag „Think-Pair-Share"). Ein aus dem Vokabular
+  (z. B. findet „Ich-Du-Wir" den Eintrag „Think-Pair-Share"; die üblichen Kürzel **EA, PA, GA**,
+  **LSG**/**UG** für das Unterrichtsgespräch und **LVo** für den Lehrervortrag gehören dazu).
+  Ein aus dem Vokabular
   gewählter Eintrag ist **anklickbar**: Er öffnet in einem neuen Tab die Beschreibung der
   Methode — wie sie abläuft und worauf es ankommt. Über **„+ … anlegen"**
   legen Sie einen eigenen, zunächst privaten Eintrag an, den Sie später Ihrer
@@ -186,15 +188,38 @@ Stoffsteckbriefe aus dem Wissensspeicher Ihres Fachs; ein Symbol zeigt, welches 
 Kompetenzen und Begriffe bearbeiten Sie getrennt: Wer Kompetenzen ändert, lässt die Begriffe
 stehen und umgekehrt.
 
-Hat der Stundenassistent einen Begriff unter einem anderen Namen genannt, steht dieser
-hinter dem Titel — etwa **„elektrophile Substitution · σ-Komplex, Arenium-Ion“**. Im
-Wissensspeicher sind das Aliase desselben Begriffs.
+Steht ein Begriff unter einem anderen Namen in der Stunde, steht dieser hinter dem Titel —
+etwa **„elektrophile Substitution · σ-Komplex, Arenium-Ion“**. Im Wissensspeicher sind das
+Aliase desselben Begriffs. Unter **„✎ bearbeiten“** hat jeder dieser Namen ein eigenes **✕**:
+So entfernen Sie einen einzelnen Namen, der zu Ihrer Stunde nicht passt, und der Begriff
+bleibt. Fügen Sie einen Begriff über die Suche hinzu und trifft sie ihn über einen solchen
+Namen (Sie tippen „σ-Kom“), bleibt dieser Name dabei.
+
+#### Vorgeschlagene Begriffe
+
+Die Leiste schlägt die Fachbegriffe Ihrer Stunde selbst vor — aus dem, was in den Phasen
+steht. Das geschieht **automatisch, nachdem der Stundenassistent den Entwurf geändert hat**,
+und auf Knopfdruck: **„Begriffe vorschlagen“**. Das dauert einige Sekunden.
+
+- Vorschläge stehen **gestrichelt** unter **„Vorgeschlagen:“**. **✓** trägt einen Begriff ein,
+  **✕** verwirft ihn — er wird Ihnen für diese Stunde nicht wieder vorgeschlagen.
+- **„In früheren Stunden eingetragen“** nennt Begriffe, die schon an einer früheren Stunde
+  dieser Gruppe stehen, mit Datum. Mit **✓** tragen Sie sie trotzdem ein, etwa als Wiederholung.
+  Diese Liste ist eine **Planungshilfe, kein Lernstand**: Was vor der Plattform oder ohne
+  Eintrag behandelt wurde — etwa Grundbegriffe aus früheren Klassen —, steht dort nie.
+- **„… Namen ohne Eintrag im Wissensspeicher“** (aufklappen) zeigt Begriffe, die die Stunde
+  nennt, die es im Wissensspeicher aber nicht gibt. Anlegen kann sie Ihre Fachschaft.
+- Ändern Sie den Entwurf danach, heißt der Knopf **„Entwurf geändert — neu vorschlagen“**.
+
+Die Vorschläge sind ein Angebot: Sie übersehen manchmal einen Begriff oder nennen einen, der
+nicht passt. Was Sie nicht abhaken, bleibt draußen. Der Vorschlag geht wie der Chat über einen
+eigenen kleinen Modellaufruf und zählt zu Ihrem Budget — Bruchteile eines Cents je Vorschlag.
 
 ### Export
 
 Den fertigen Entwurf exportieren Sie über die Export-Zeile im Kopf als **Markdown**
-(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**. Markdown und
-PDF führen Kompetenzen und Fachbegriffe getrennt auf; im DOCX fehlen beide noch.
+(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**. Alle drei
+führen Kompetenzen und Fachbegriffe getrennt auf.
 
 ### Mit dem Stundenassistenten planen
 
@@ -206,16 +231,11 @@ formuliert ein Stundenziel und schlägt Kompetenzen vor. **Geschrieben wird erst
 zustimmen.** Eine Phase ohne Dauer bleibt ohne, bis Sie Minuten wollen; bereits
 nachbereitete Phasen behalten ihren Stand.
 
-**Fachbegriffe:** Arbeitet der Assistent Phasen aus, schließt sein Vorschlag meist mit dem
-Absatz **„Begriffe dieser Stunde“** — Phase für Phase, was die Stunde neu einführt oder nur
-anspricht. Stimmen Sie dem Vorschlag zu, trägt er diese Begriffe in die Leiste ein. Danach
-sagt er, was eingetragen ist und welche Begriffe es im Wissensspeicher nicht gibt; die kann
-Ihre Fachschaft anlegen. Sie können ihn auch direkt bitten: „Trag Katalysator als Begriff
-ein.“
-
-Verlassen Sie sich nicht darauf, dass die Liste vollständig ist: Der Assistent übersieht
-manchmal einen Begriff oder lässt den Absatz weg. Prüfen Sie die Leiste und ergänzen Sie
-über **„✎ bearbeiten“**, was fehlt.
+**Fachbegriffe:** Die schlägt seit Version 0.18 die Leiste vor ([Vorgeschlagene
+Begriffe](#vorgeschlagene-begriffe)) — nach jeder Änderung durch den Assistenten neu. Der
+Assistent selbst nennt Begriffe nur, wenn Sie danach fragen („Welche Fachbegriffe führt die
+Stunde ein?“) oder selbst welche nennen: „Trag Katalysator als Begriff ein.“ Dann trägt er sie
+nach Ihrer Zustimmung ein und sagt, welche es im Wissensspeicher nicht gibt.
 
 Der Bezug bleibt am Chat: Öffnen Sie ihn später aus dem Verlauf, weiß der Assistent noch,
 um welche Stunde es geht. Weitere Wege zu ihm:
@@ -248,9 +268,10 @@ mit passendem Fach, dann Ihr eigener ohne Fach, dann der schulweite; die übrige
 der Auswahl hinter dem Pfeil. Spätere Änderungen am schulweiten Assistenten übernimmt Ihrer
 nicht — er gehört Ihnen.
 
-**Eigener Assistent aus der Zeit vor den Fachbegriffe-Vorschlägen (Version 0.17):** Er kennt den
-Abschnitt **„Fachbegriffe der Stunde“** noch nicht und schlägt deshalb keine Begriffe vor. So
-holen Sie ihn nach:
+**Eigener Assistent aus einer früheren Version (vor 0.18):** Sein Prompt regelt die
+Fachbegriffe noch auf dem alten Weg — vor 0.17 gar nicht, in 0.17 mit einem eigenen Absatz
+„Begriffe dieser Stunde“ nach jedem Ausarbeiten, den es seit 0.18 nicht mehr gibt. So bringen
+Sie ihn auf den heutigen Stand:
 
 1. Legen Sie wie oben einen **neuen** eigenen Stundenassistenten an. Er bekommt den heutigen
    Prompt des schulweiten Assistenten, samt Abschnitt.

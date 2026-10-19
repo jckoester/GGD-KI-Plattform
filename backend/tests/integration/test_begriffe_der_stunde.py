@@ -482,14 +482,15 @@ async def test_eigenes_fach_vor_bezugsfach(test_client, auth_headers, faecher, a
 
 @pytest.mark.asyncio
 async def test_begriffe_ohne_kennungen_mit_anleitung(test_client, auth_headers, faecher, async_engine, aufraeumen):
-    """`begriffe` trägt keine Kennungen mehr, aber die Anleitung zum Absatz."""
+    """`begriffe` trägt keine Kennungen, aber eine Anleitung. Seit 0.18 sagt sie, dass die Leiste
+    vorschlägt — bis dahin verlangte sie den Absatz „Begriffe dieser Stunde" und überstimmte damit
+    den neuen Prompt (Plan „Begriffe aus den Phasentexten", § 16)."""
     stunde = await _stunde(test_client, auth_headers)
     await _begriff(async_engine, "Mesomerie")
     begriffe, _ = await _begriffe(async_engine, stunde)
     assert all("node_id" not in e for e in begriffe["eintraege"])
-    assert "Begriffe dieser Stunde" in begriffe["anleitung"]
-    assert "nicht beim Kürzen" in begriffe["anleitung"]
-    assert "aus allen Phasen" in begriffe["anleitung"]
+    assert "Leiste" in begriffe["anleitung"] and "nicht von dir aus" in begriffe["anleitung"]
+    assert "Begriffe dieser Stunde" not in begriffe["anleitung"]
 
 
 @pytest.mark.asyncio

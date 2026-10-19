@@ -311,22 +311,27 @@ Prompt, dazu Modell, Temperatur und max. Tokens, in einen privaten Assistenten. 
 Sie also im Editor wie jeden anderen; eine Änderung gilt für Kopien, die danach entstehen —
 vorhandene folgen ihr nicht. Gibt es keinen schulweiten, bekommt die Lehrkraft eine Meldung.
 
-**Fachbegriffe der Stunde (seit 0.17).** Der Prompt hat einen Abschnitt „Fachbegriffe der
-Stunde“: Arbeitet der Assistent Phasen aus, nennt er die Begriffe, die die Stunde einführt
-oder anspricht, und trägt sie nach Zustimmung ein. Dafür liefert `get_lesson_detail` die
-Begriffe des Fachs, die dem Entwurf am nächsten sind; sie brauchen Vektoren, die der
-nächtliche Einbettungslauf nachzieht. Begriffe, die es im Wissensspeicher nicht gibt, trägt
-das Werkzeug nicht ein; der Assistent verweist dann auf die Fachschaft.
+**Fachbegriffe der Stunde (seit 0.17, umgestellt in 0.18).** Seit 0.18 schlägt die Leiste
+über dem Entwurf die Begriffe vor: Nach jedem Schreiben des Assistenten bestimmt ein eigener
+kleiner Modellaufruf sie aus den Phasentexten (`BEGRIFFE_MODEL`, Alias `system-begriffe`, nur
+für Lehrkräfte freizuschalten — siehe [Installation](installation.md)). Der Assistent nennt
+Begriffe nur noch, wenn die Lehrkraft fragt oder selbst welche nennt, und trägt sie dann nach
+Zustimmung ein. `get_lesson_detail` liefert dafür die Begriffe des Fachs, die dem Entwurf am
+nächsten sind (sie brauchen Vektoren, die der nächtliche Einbettungslauf nachzieht), und die
+Begriffe früherer Stunden der Gruppe — als Planungshilfe, nicht als Lernstand. Begriffe, die
+es im Wissensspeicher nicht gibt, trägt das Werkzeug nicht ein; der Assistent verweist dann auf
+die Fachschaft. Ohne `BEGRIFFE_MODEL` gibt es keine Vorschläge; der Assistent trägt Begriffe
+weiter auf Zuruf ein.
 
-⚠️ **Nach dem Update auf 0.17 den Prompt im Editor nachziehen.** Ein bestehender schulweiter
+⚠️ **Nach jedem Update mit Änderung am Prompt (zuletzt 0.18) den Prompt im Editor nachziehen.** Ein bestehender schulweiter
 Stundenassistent behält seinen alten Prompt. Übernehmen Sie den Inhalt von
 `config/prompts/stundenentwurf_assistent.md` in den System-Prompt. Eigene Stundenassistenten
 der Lehrkräfte folgen nicht; die Startseite weist Lehrkräfte darauf hin, und die Hilfe
 erklärt, wie sie nachziehen.
 
-Das Modell bleibt `chat-standard`. In den Messungen zu 0.17 nannte es die Begriffe meist,
-aber nicht immer vollständig; `chat-komplex` war genauer, kostet aber etwa das Dreifache je
-Unterhaltung.
+Das Modell des Assistenten bleibt `chat-standard`. Die Begriffsvorschläge laufen getrennt
+davon über Mistral Small (gemessen im Vorlauf zu 0.18: besser als Llama 3.3 70B, etwa 0,02 ct
+je Vorschlag).
 
 ### Verschiebe-Assistent einrichten
 
