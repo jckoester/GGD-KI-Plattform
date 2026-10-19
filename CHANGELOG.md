@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.18.2] – 2026-10-19
+
+### Behoben
+
+- **Diagnose der erneuten Anmeldung:** Login und abgelehnter Step-up schreiben die Merkmale der
+  Sitzung beim Schulkonto ins Log (Hash-Anfang der `sid`, `amr`, `acr`); der Step-up dazu das Alter
+  des ID-Tokens.
+
 ## [0.18.1] – 2026-10-19
 
 ### Behoben

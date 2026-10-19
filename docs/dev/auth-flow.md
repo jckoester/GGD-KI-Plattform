@@ -163,6 +163,13 @@ Pseudonym-Präfix, Alter von `auth_time` (negativ = Zukunft) und `FreshIdentity.
 ob ein ID-Token kam, wie die Signatur ausfiel, ob UserInfo ein `auth_time` trägt, und die
 **Namen** der Claims. Keine Werte.
 
+*Seit 0.18.2* zusätzlich `sitzung` — `sitzungsmerkmale()` aus `adapters/oauth.py`: die ersten
+12 Zeichen von sha256(`sid`), `amr`, `acr` — und das Alter von `iat`. Dieselben Merkmale stehen
+beim Login in der Zeile `OAuth-Login: …`. Hintergrund: Das Schulkonto liefert kein `auth_time`
+(Discovery ohne den Claim), und `prompt=login` wird bei bestehender Sitzung übergangen. Der
+Vergleich soll zeigen, ob ein Abmelden beim Schulkonto mit anschließender Anmeldung an einer
+neuen `sid` erkennbar ist.
+
 Im Frontend liest `StepUpFehler.svelte` (einmal im Layout) den Code und zeigt einen Satz
 dazu (`lib/stepup_rueckkehr.js`). Ein Formular, das nach der Anmeldung weitermachen soll,
 merkt sich seine Eingaben über den Hook `vorWeiterleitung` des `StepUpDialog`

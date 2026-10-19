@@ -62,6 +62,22 @@ def _as_str_list(value) -> list[str]:
     return out
 
 
+def sitzungsmerkmale(claims: dict) -> dict:
+    """Was eine Anmeldung beim Schulkonto kennzeichnet, fürs Log (0.18.2).
+
+    Das Schulkonto liefert kein `auth_time` (Befund 19.10.2026). Ob sich eine frische
+    Anmeldung an der Sitzungskennung `sid` oder an `amr`/`acr` erkennen lässt, zeigt der
+    Vergleich dieser Werte zwischen Login und Step-up. Von `sid` nur ein Hash-Anfang:
+    Er reicht zum Vergleichen und taugt nicht, um die Sitzung zu übernehmen.
+    """
+    sid = claims.get("sid")
+    return {
+        "sid": hashlib.sha256(str(sid).encode()).hexdigest()[:12] if sid else None,
+        "amr": claims.get("amr"),
+        "acr": claims.get("acr"),
+    }
+
+
 def _unverified_jwt_claims(token: str) -> dict:
     """Dekodiert die Claims eines JWT **ohne** Signaturprüfung.
 
@@ -282,6 +298,9 @@ class OAuthAdapter(AuthAdapter):
                 )
                 claims = _unverified_jwt_claims(id_token)
             diagnose["claims"] = sorted(claims or {})
+            diagnose["sitzung"] = sitzungsmerkmale(claims or {})
+            if isinstance((claims or {}).get("iat"), (int, float)):
+                diagnose["iat"] = int(claims["iat"])
             raw_at = (claims or {}).get("auth_time")
             if isinstance(raw_at, (int, float)):
                 auth_time = int(raw_at)
@@ -348,11 +367,12 @@ class OAuthAdapter(AuthAdapter):
         # Fehlt der Gruppen-Key komplett, ist meist der OAuth-Scope/-Clientrecht
         # in IServ das Problem, nicht das Matching.
         logger.info(
-            "OAuth-Login: userinfo-Claims=%s, groups=%d, sso_roles=%s → Rollen=%s",
+            "OAuth-Login: userinfo-Claims=%s, groups=%d, sso_roles=%s → Rollen=%s, sitzung=%s",
             sorted(userinfo.keys()),
             len(groups),
             sso_roles,
             roles,
+            sitzungsmerkmale(userinfo),
         )
         if self._debug_userinfo:
             # Komplette userinfo (enthält PII!) — zeigt den exakten Key/die Struktur

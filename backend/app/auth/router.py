@@ -251,6 +251,9 @@ async def _handle_stepup_callback(
     if not auth_time_is_fresh(fresh.auth_time, now_ts):
         if fresh.auth_time is None:
             alter = "auth_time fehlt"
+            iat = fresh.diagnose.pop("iat", None)
+            if iat is not None:
+                alter += f" iat_alter_s={now_ts - iat}"
         else:
             # Negativ heißt: Zeitpunkt in der Zukunft — die Uhr des Providers geht vor.
             alter = f"alter_s={now_ts - fresh.auth_time} (erlaubt 0–{STEPUP_AUTH_TIME_MAX_AGE})"

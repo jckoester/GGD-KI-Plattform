@@ -639,6 +639,16 @@ class TestStepupCallback:
         zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
         assert "auth_time fehlt" in zeile and "'id_token': False" in zeile
 
+    def test_ohne_auth_time_nennt_alter_von_iat(self, client, caplog):
+        """0.18.2: Das Schulkonto liefert kein auth_time — dann wenigstens, wie alt das Token ist."""
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(
+            None, diagnose={"id_token": True, "iat": self._jetzt() - 7, "sitzung": {"sid": "ab12"}}))
+        with caplog.at_level("WARNING", logger="app.auth.router"):
+            client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
+        assert "iat_alter_s=7" in zeile or "iat_alter_s=8" in zeile
+        assert "'sitzung': {'sid': 'ab12'}" in zeile
+
     def test_anderes_konto(self, client):
         self.adapter.exchange_code_fresh = AsyncMock(
             return_value=self.fresh(self._jetzt(), ext="jemand_anders"))

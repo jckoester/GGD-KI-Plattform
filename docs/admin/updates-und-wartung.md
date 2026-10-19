@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.18.1          # die auszurollende Version
+git checkout 0.18.2          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -12,7 +12,7 @@ docker compose up -d
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.1`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.2`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
@@ -20,7 +20,7 @@ docker compose up -d
 >
 > ```bash
 > docker compose exec backend curl -s localhost:8000/health
-> # {"status":"ok","version":"0.18.1"}
+> # {"status":"ok","version":"0.18.2"}
 > ```
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
@@ -577,6 +577,7 @@ docker compose logs backend | grep "Step-up abgelehnt"
 | `auth_time fehlt`, `'id_token': False` | Das Schulkonto schickt kein ID-Token |
 | `auth_time fehlt`, `auth_time` nicht unter `claims` | Das ID-Token trägt keinen Anmeldezeitpunkt |
 | `'signatur': 'ungueltig'` | `oauth.jwks_url` ist gesetzt, die Signatur passt aber nicht zu den Schlüsseln |
+| `auth_time fehlt iat_alter_s=…` *(seit 0.18.2)* | Wie oben; dazu, wie alt das ID-Token ist. `sitzung` nennt Hash-Anfang der `sid`, `amr`, `acr` — vergleichbar mit der Zeile `OAuth-Login: … sitzung=` beim Login |
 | `(anderes_konto)` | Angemeldet wurde mit einem anderen Konto |
 | `(abgebrochen)` / `(fehlgeschlagen)` | Abbruch beim Schulkonto / Code-Tausch oder Rücksprung gescheitert |
 

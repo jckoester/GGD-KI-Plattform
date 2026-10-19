@@ -730,3 +730,37 @@ def test_no_debug_userinfo_no_startup_warning(mock_settings, oauth_config_dict, 
     with caplog.at_level(logging.WARNING, logger="app.auth.adapters.oauth"):
         OAuthAdapter(raw=oauth_config_dict, settings=mock_settings, group_role_map={})
     assert not any("AUTH_DEBUG_USERINFO" in r.getMessage() for r in caplog.records)
+
+
+# --- Sitzungsmerkmale fürs Log (0.18.2): Ersatz für das fehlende auth_time finden ---
+
+def test_sitzungsmerkmale_hasht_sid_und_nennt_amr_acr():
+    from app.auth.adapters.oauth import sitzungsmerkmale
+
+    m = sitzungsmerkmale({"sid": "geheime-sitzung", "amr": ["pwd", "otp"], "acr": "2", "sub": "x"})
+    assert m["amr"] == ["pwd", "otp"] and m["acr"] == "2"
+    assert len(m["sid"]) == 12 and "geheime" not in m["sid"]
+    assert m["sid"] == sitzungsmerkmale({"sid": "geheime-sitzung"})["sid"]  # vergleichbar
+    assert sitzungsmerkmale({}) == {"sid": None, "amr": None, "acr": None}
+
+
+@pytest.mark.asyncio
+async def test_stepup_diagnose_traegt_sitzung_und_iat(oauth_adapter):
+    jwks, pem = _make_rsa_jwks()
+    id_token = _sign(pem, {"sub": "x", "iat": 1700000000, "sid": "s1", "amr": ["pwd"]})
+    oauth_adapter._config.jwks_url = "https://idp/jwks"
+    oauth_adapter._fetch_jwks = AsyncMock(return_value=jwks)
+    client = _make_mock_client(_mock_token_signed_id("at", id_token), _mock_userinfo("u", ["schueler"]))
+    with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
+        fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
+    assert fresh.auth_time is None
+    assert fresh.diagnose["iat"] == 1700000000
+    assert fresh.diagnose["sitzung"]["amr"] == ["pwd"] and fresh.diagnose["sitzung"]["sid"]
+
+
+def test_login_log_nennt_sitzung(oauth_adapter, caplog):
+    with caplog.at_level("INFO", logger="app.auth.adapters.oauth"):
+        oauth_adapter._userinfo_to_identity(
+            {"preferred_username": "u", "groups": ["schueler"], "sid": "s1", "amr": ["pwd"], "acr": "1"})
+    zeile = next(m for m in caplog.messages if "OAuth-Login" in m)
+    assert "'amr': ['pwd']" in zeile and "'acr': '1'" in zeile and "s1'" not in zeile
