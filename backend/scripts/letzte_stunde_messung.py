@@ -31,6 +31,11 @@ Stunden nachbereitet — über die echten Endpunkte. Schüler:in ist ein vorhand
 vorübergehender Mitgliedschaft; ihr Pseudonym wird nicht ausgegeben. Am Ende ist die Gruppe
 samt Konversationen gelöscht.
 
+**Seit 0.20 (Päckchen AC)** auch für `begriffe_im_schuelerchat.yaml`: ältere Stunden außerhalb des
+Zwei-Stunden-Fensters (`aeltere`), eine fremde Gruppe derselben Schüler:in (`fremde_gruppe`, Fall mit
+`gruppe: fremd`) und der Fachbezug ohne Gruppe (`weg: fach`). `xy` darf eine Liste sein; ein Fall
+gilt als „Knoten da", wenn **alle** Titel in den Bausteinen stehen.
+
 ⚠️ Nur für Entwicklungsinstanzen — eigene Sitzungs-Token, echte Modellaufrufe auf Kosten des
 Budgets der Schüler:in.
 """
@@ -139,16 +144,32 @@ def aufbauen(conn, lehrkraft: httpx.Client, daten: dict, lehrer: str, schueler: 
 
     gruppe = daten["gruppe"]
     entfall.abbauen(conn, gruppe)
+    if daten.get("fremde_gruppe"):
+        entfall.abbauen(conn, daten["fremde_gruppe"])
     gid, fach = gruppe["id"], gruppe["fach"]
     fach_id = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", fach)
     vergangen, kommend = termine(gruppe["wochentage"], heute, len(daten["stunden"]), len(daten["kommende"]))
     wechsel = load_school_year().halbjahreswechsel
+    aeltere = []
+    for alt in daten.get("aeltere") or []:
+        tag = heute - timedelta(weeks=alt["wochen_zurueck"])
+        while tag.weekday() not in gruppe["wochentage"]:
+            tag -= timedelta(days=1)
+        aeltere.append((tag, alt))
     with conn.cursor() as cur:
         cur.execute("INSERT INTO groups (id, name, slug, type, subject_id) VALUES (%s, %s, %s, 'teaching_group', %s)",
                     (gid, gruppe["name"], f"messung-letzte-{gid}", fach_id))
         cur.execute("INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) VALUES "
                     "(%s, %s, 'teacher', 'eigen'), (%s, %s, 'student', 'manuell')", (gid, lehrer, gid, schueler))
-        for tag in [*vergangen, *kommend]:
+        if daten.get("fremde_gruppe"):
+            fremd = daten["fremde_gruppe"]
+            cur.execute("INSERT INTO groups (id, name, slug, type, subject_id) VALUES (%s, %s, %s, 'teaching_group', "
+                        "(SELECT id FROM subjects WHERE slug = %s))",
+                        (fremd["id"], fremd["name"], f"messung-fremd-{fremd['id']}", fremd["fach"]))
+            cur.execute("INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) VALUES "
+                        "(%s, %s, 'teacher', 'eigen'), (%s, %s, 'student', 'manuell')",
+                        (fremd["id"], lehrer, fremd["id"], schueler))
+        for tag in [*(t for t, _ in aeltere), *vergangen, *kommend]:
             cur.execute("INSERT INTO lesson_slots (group_id, date, start_period, periods, halbjahr) "
                         "VALUES (%s, %s, 3, 1, %s)", (gid, tag, 1 if tag < wechsel else 2))
     slots = {d: s for s, d in _alle(conn, "SELECT id::text, date FROM lesson_slots WHERE group_id = %s", gid)}
@@ -160,25 +181,37 @@ def aufbauen(conn, lehrkraft: httpx.Client, daten: dict, lehrer: str, schueler: 
         return resp.json()
 
     ue = ok(lehrkraft.post(f"/planning/groups/{gid}/units", json={"titel": gruppe["einheit"], "farbe": 0}))["id"]
-    for tag, stunde in zip(vergangen, daten["stunden"]):
-        ok(lehrkraft.patch(f"/planning/slots/{slots[tag]}", json={"ue_node_id": ue, "thema": stunde["thema"]}))
+    alte_ues = {alt["einheit"]: ok(lehrkraft.post(f"/planning/groups/{gid}/units",
+                                                  json={"titel": alt["einheit"], "farbe": 1}))["id"]
+                for _, alt in aeltere}
+
+    def entwurf_anlegen(tag, stunde, einheit):
+        ok(lehrkraft.patch(f"/planning/slots/{slots[tag]}", json={"ue_node_id": einheit, "thema": stunde["thema"]}))
         entwurf = ok(lehrkraft.post(f"/planning/slots/{slots[tag]}/lesson"))["id"]
-        begriff_id, begriff_titel = knoten(conn, fach, begriff=stunde["begriff"])
         ik_id, ik_text = knoten(conn, fach, kompetenz=stunde["kompetenz"])
         refs = [{"node_id": ik_id, "typ": "ik", "code": stunde["kompetenz"], "titel": ik_text}]
         if mit_begriffen:
-            refs.append({"node_id": begriff_id, "typ": "concept", "titel": begriff_titel})
+            for name in stunde.get("begriffe") or [stunde["begriff"]]:
+                begriff_id, begriff_titel = knoten(conn, fach, begriff=name)
+                refs.append({"node_id": begriff_id, "typ": "concept", "titel": begriff_titel})
         ok(lehrkraft.patch(f"/planning/lessons/{entwurf}", json={
             "titel": stunde["thema"],
             "phasen": [{"name": "Erarbeitung", "dauer_min": 30}, {"name": "Sicherung", "dauer_min": 10}],
             "refs": refs,
         }))
+
+    for tag, alt in aeltere:
+        entwurf_anlegen(tag, alt, alte_ues[alt["einheit"]])
+        nachbereiten(lehrkraft, slots[tag])
+    for tag, stunde in zip(vergangen, daten["stunden"]):
+        entwurf_anlegen(tag, stunde, ue)
     for tag, thema in zip(kommend, daten["kommende"]):
         ok(lehrkraft.patch(f"/planning/slots/{slots[tag]}", json={"ue_node_id": ue, "thema": thema}))
     # Die älteren nachbereiten — die letzte bleibt offen, wie zwischen letzter und nächster Stunde.
     for tag in vergangen[:-1]:
         nachbereiten(lehrkraft, slots[tag])
-    return {"vergangen": [(d, slots[d]) for d in vergangen], "kommend": [(d, slots[d]) for d in kommend]}
+    return {"vergangen": [(d, slots[d]) for d in vergangen], "kommend": [(d, slots[d]) for d in kommend],
+            "aeltere": [(d, alt["thema"]) for d, alt in aeltere]}
 
 
 def nachbereiten(lehrkraft: httpx.Client, slot: str) -> None:
@@ -251,16 +284,20 @@ def bewerte(fall: dict, antwort: str, vorlagen: list[dict], stunden: list[dict],
 
     ``vorab_debug`` ist der Messkanal (0.16); ohne ihn bleiben ``xy_angeboten`` und
     ``xy_nachgeschlagen`` ``None`` — keine Aussage, nicht „nein"."""
-    xy = fall.get("xy")
-    xy_herkunft = sorted({b["herkunft"] for b in vorlagen if xy and b["art"] == "begriff" and b["titel"] == xy})
+    roh = fall.get("xy")
+    titel = roh if isinstance(roh, list) else [roh] if roh else []
+    xy = " + ".join(titel) or None
+    je = {t: sorted({b["herkunft"] for b in vorlagen if b["art"] == "begriff" and b["titel"] == t}) for t in titel}
     stamm = lambda s: s["begriff"][:13]  # „Elektronegativ…" trifft auch „elektronegativer"
-    angebot = [a for a in (vorab_debug or {}).get("angebot", []) if xy and a["titel"] == xy]
+    angebot = [a for a in (vorab_debug or {}).get("angebot", []) if a["titel"] in titel]
     nachgeschlagen = set((vorab_debug or {}).get("nachgeschlagen", []))
     mit_kanal = vorab_debug is not None and xy
     return {
         "xy": xy,
-        "xy_knoten": bool(xy_herkunft) if xy else None,
-        "xy_herkunft": xy_herkunft,
+        "xy_knoten": all(je.values()) if xy else None,
+        "xy_herkunft": [f"{t}: {'/'.join(h) or '—'}" for t, h in je.items()] if len(titel) > 1
+                       else (je[titel[0]] if titel else []),
+        "xy_je": je,
         "xy_angeboten": bool(angebot) if mit_kanal else None,
         "xy_nachgeschlagen": any(a["node_id"] in nachgeschlagen for a in angebot) if mit_kanal else None,
         "genannt": [s["begriff"] for s in stunden if stamm(s).lower() in (antwort or "").lower()],
@@ -317,6 +354,8 @@ def main() -> None:
     p.add_argument("--nur-aufbau", action="store_true", help="aufbauen, Plan und Block zeigen, abbauen")
     p.add_argument("--mit-begriffen", action="store_true",
                    help="Begriffe zusätzlich als refs (Vorschau auf Päckchen A1)")
+    p.add_argument("--mindestbudget", type=float, default=MINDESTBUDGET_USD,
+                   help="Restbudget (USD), das das Schüler:innen-Konto mindestens haben muss")
     p.add_argument("--nur", action="append", default=[], help="nur diesen Fall (mehrfach möglich)")
     p.add_argument("--ohne-nachbereitete", action="store_true",
                    help="nur die Fälle ohne Nachbereitung der letzten Stunde (keine Strich-Fälle)")
@@ -328,13 +367,16 @@ def main() -> None:
     heute = date.today()
     conn = entfall.verbindung()
     lehrer = entfall.lehrkraft_der_gruppe(conn, daten["lehrkraft_der_gruppe"])
-    schueler, stufe = schuelerin(conn)
+    schueler, stufe = schuelerin(conn, args.mindestbudget)
     jwt = get_jwt_service()
     lehrkraft = httpx.Client(base_url=args.basis, timeout=60.0,
                              headers={"Cookie": f"session={jwt.issue(pseudonym=lehrer, roles=['teacher'], grade=None)[0]}"})
     lernende = httpx.Client(base_url=args.basis, timeout=300.0,
                             headers={"Cookie": f"session={jwt.issue(pseudonym=schueler, roles=['student'], grade=stufe)[0]}"})
     gid = daten["gruppe"]["id"]
+    fremd_gid = (daten.get("fremde_gruppe") or {}).get("id")
+    fach_id = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", daten["gruppe"]["fach"])
+    ohne_gruppe: list[str] = []  # Konversationen aus `weg: fach` — `abbauen` erreicht sie nicht
     laeufe: list[dict] = []
     kopf = {"datei": args.datei.name, "beginn": datetime.now().strftime("%d.%m.%Y, %H:%M"), "modell": "?",
             "bloecke": {}, "mit_begriffen": args.mit_begriffen}
@@ -349,6 +391,9 @@ def main() -> None:
         kopf["termine"] = " · ".join(
             f"{d:%a %d.%m.} {s['thema']}{' (nachbereitet)' if i < len(vergangen) - 1 else ''}"
             for i, ((d, _), s) in enumerate(zip(vergangen, daten["stunden"])))
+        if termin["aeltere"]:
+            kopf["termine"] = " · ".join(f"{d:%a %d.%m.} {t} (nachbereitet)" for d, t in termin["aeltere"]) \
+                + " · … · " + kopf["termine"]
         if args.nur_aufbau:
             print(kopf["termine"])
             print(block(gid))
@@ -364,7 +409,13 @@ def main() -> None:
                 name = fall["id"] + suffix
                 for nr in range(1, args.laeufe + 1):
                     try:
-                        zug = chat_probe.frage_stellen(lernende, fall["frage"], assistent=None, gruppe=gid)
+                        if fall.get("weg") == "fach":
+                            zug = chat_probe.frage_stellen(lernende, fall["frage"], assistent=None, gruppe=None,
+                                                           fach=fach_id)
+                            ohne_gruppe.append(zug["konversation"])
+                        else:
+                            zug = chat_probe.frage_stellen(lernende, fall["frage"], assistent=None,
+                                                           gruppe=fremd_gid if fall.get("gruppe") == "fremd" else gid)
                     except (httpx.HTTPError, SystemExit) as fehler:
                         grund = f"{type(fehler).__name__}: {str(fehler)[:200]}"
                         print(f"{name:<4} Lauf {nr}  abgebrochen — {grund}", flush=True)
@@ -386,7 +437,12 @@ def main() -> None:
                     if args.verlauf:
                         args.verlauf.write_text(verlauf_als_markdown(kopf, laeufe), encoding="utf-8")
     finally:
+        with conn.cursor() as cur:
+            for k in ohne_gruppe:
+                cur.execute("DELETE FROM conversations WHERE id = %s", (k,))
         entfall.abbauen(conn, daten["gruppe"])
+        if daten.get("fremde_gruppe"):
+            entfall.abbauen(conn, daten["fremde_gruppe"])
         lehrkraft.close()
         lernende.close()
         conn.close()

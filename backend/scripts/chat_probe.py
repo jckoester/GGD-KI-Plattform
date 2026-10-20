@@ -39,7 +39,7 @@ from app.context.embedding import vor_einer_messung
 
 def frage_stellen(
     client: httpx.Client, frage: str, *, assistent: int | None, gruppe: int | None,
-    modell: str | None = None, stunde: str | None = None,
+    modell: str | None = None, stunde: str | None = None, fach: int | None = None,
     verlauf: list[dict] | None = None, konversation: str | None = None,
 ) -> dict:
     """Eine Frage senden und den Rohstrom auswerten.
@@ -63,6 +63,10 @@ def frage_stellen(
         rumpf["group_id"] = gruppe
     if stunde is not None and konversation is None:
         rumpf["stunde_node_id"] = stunde
+    # ``fach``: Fachbezug ohne Gruppe (0.20, Messung AC Fall f) — wie ein Chat, dessen Fach aus
+    # dem Assistenten kommt.
+    if fach is not None and gruppe is None and konversation is None:
+        rumpf["subject_id"] = fach
     if modell is not None:
         rumpf["model_id"] = modell
 

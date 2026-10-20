@@ -1,0 +1,86 @@
+# Messung „Eingeführte Begriffe der Gruppe im Schüler-Chat" (0.20, Päckchen AC, Plan § 5).
+#
+#   python scripts/letzte_stunde_messung.py --datei scripts/szenarien/begriffe_im_schuelerchat.yaml \
+#       --mit-begriffen --ohne-nachbereitete --nur a --nur d --nur e --nur e-fremd --nur f-a --nur f-d
+#
+# Aufbau wie `letzte_stunde.yaml`, dazu eine **ältere Stunde vor vier Wochen** in einer früheren
+# Einheit (Begriffe „Stoffe" und „Gemisch", nachbereitet — wie die Auto-Bestätigung es täte) mit
+# einer Kompetenz, deren Text die Stichwörter **nicht** enthält (Lehre aus der Nebenmessung
+# 0.17), und eine **fremde Gruppe** derselben Schüler:in im Fach Deutsch ohne diese Begriffe.
+#
+# Kriterium (Jan, 20.10.2026, vor dem ersten Lauf):
+# - F2 (a) wird gebaut, wenn heute in (d) oder (e, Chemie) in mindestens einem Lauf der Knoten zu
+#   XY in den Bausteinen fehlt und nach dem Bau in allen Läufen vorliegt.
+# - Gegenprobe: In (e-fremd) darf „Stoffe" nach dem Bau in keinem Lauf als sicherer Treffer
+#   (Herkunft `vorab`) erscheinen; Angebot bleibt erlaubt.
+# - F1 gilt als bestätigt, wenn (f-a)/(f-d) nach dem Bau wie (a)/(d) mit Gruppenbezug ausfallen.
+# - F4/F5: kein Kriterium, nur Befund.
+#
+# Vorab gemessen (20.10.2026, `chat-standard`-Embedding): Die Frage in (d) liegt für „Stoffe"
+# bei 0,457 und für „Gemisch" bei 0,465 — beide im Graubereich (0,45–0,50), heute nur Angebot.
+# (e) liegt bei 0,326: im Chemie-Chat schon heute sicher, im Deutsch-Chat nur Angebot (F8, 0.16).
+
+lehrkraft_der_gruppe: 33
+
+gruppe:
+  id: 98016
+  name: "Messung letzte Stunde 10x"
+  fach: chemie
+  wochentage: [0, 2, 4]        # Mo, Mi, Fr
+  einheit: Chemische Bindung
+
+fremde_gruppe:
+  id: 98017
+  name: "Messung fremde Gruppe 10x"
+  fach: deutsch
+
+# Ältere Stunden außerhalb des Zwei-Stunden-Fensters, je in eigener Einheit, nachbereitet.
+aeltere:
+  - wochen_zurueck: 4
+    einheit: Stoffe und ihre Eigenschaften
+    thema: Reinstoffe und Gemische
+    begriffe: [Stoffe, Gemisch]
+    kompetenz: "3.2.1.1(8)"
+
+stunden:
+  - thema: Ionenbindung und Ionengitter
+    begriff: Ionenbindung
+    kompetenz: "3.2.1.3(1)"
+  - thema: Metallbindung
+    begriff: Metallbindung
+    kompetenz: "3.2.1.3(2)"
+  - thema: Elektronegativität
+    begriff: Elektronegativität
+    kompetenz: "3.2.1.3(4)"
+
+kommende:
+  - Polare Elektronenpaarbindung und Dipol
+  - Wasserstoffbrücken
+
+faelle:
+  - id: a
+    frage: "Letzte Stunde haben wir etwas über Elektronegativität gelernt, das ich nicht ganz verstanden habe."
+    xy: Elektronegativität
+  - id: b
+    frage: "Ich habe die letzte Stunde nicht verstanden."
+  - id: c
+    frage: "Letzte Stunde haben wir etwas über Metallbindung gelernt, das ich nicht ganz verstanden habe."
+    xy: Metallbindung
+  - id: d
+    frage: "Vor ein paar Wochen hatten wir was zu Stoffen, wie war das mit Reinstoff und Gemisch?"
+    xy: [Gemisch, Stoffe]
+  - id: e
+    frage: "Was ist eigentlich ein Stoff?"
+    xy: Stoffe
+  - id: e-fremd
+    frage: "Was ist eigentlich ein Stoff?"
+    xy: Stoffe
+    gruppe: fremd
+  - id: f-a
+    frage: "Letzte Stunde haben wir etwas über Elektronegativität gelernt, das ich nicht ganz verstanden habe."
+    xy: Elektronegativität
+    weg: fach
+  - id: f-d
+    frage: "Vor ein paar Wochen hatten wir was zu Stoffen, wie war das mit Reinstoff und Gemisch?"
+    xy: [Gemisch, Stoffe]
+    weg: fach
