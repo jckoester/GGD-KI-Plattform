@@ -1889,6 +1889,33 @@ async def _eigene_unterrichtsgruppe(db: AsyncSession, group_id: int, pseudonym: 
     ).scalar_one_or_none()
 
 
+def _ist_lehrkraft(user: JwtPayload) -> bool:
+    """Lehrkraft oder Admin (Admin erweitert die Lehrkraft-Rolle, CLAUDE.md „Rollenmodell")."""
+    return "teacher" in (user.roles or [])
+
+
+async def _einzige_gruppe_im_fach(db: AsyncSession, subject_id: int, pseudonym: str) -> Group | None:
+    """Die Unterrichtsgruppe der Person in diesem Fach — nur, wenn es **genau eine** gibt.
+
+    Geht über die Mitgliedschaft wie `_eigene_unterrichtsgruppe`: Eine Gruppe, der die Person
+    nicht angehört, kann so nie an ihre Konversation kommen. Bei zweien bleibt es beim Fach —
+    stillschweigend die erste zu nehmen hieße raten (vgl. `schuelerWeiche`).
+    """
+    gruppen = (
+        await db.execute(
+            select(Group)
+            .join(GroupMembership, GroupMembership.group_id == Group.id)
+            .where(
+                Group.subject_id == subject_id,
+                Group.type == "teaching_group",
+                GroupMembership.pseudonym == pseudonym,
+            )
+            .limit(2)
+        )
+    ).scalars().all()
+    return gruppen[0] if len(gruppen) == 1 else None
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -1922,6 +1949,7 @@ async def chat(
 
     conversation_id = request.conversation_id
     is_new = conversation_id is None
+    gruppe_abgeleitet = False  # 0.20, F1 — unten beim Anlegen gesetzt
     conversation_is_test = request.is_test
     title_prompt: str | None = None
 
@@ -1985,6 +2013,14 @@ async def chat(
             # Fallback: aus Assistent ableiten
             subject_id = assistant.subject_id if assistant is not None else None
             group_id = None
+        # 0.20 (Päckchen AC, F1): Für Schüler:innen ist die Unterrichtsgruppe das Fach. Kommt ihr
+        # Chat nur mit einem Fach an (Fach-Assistent, Link mit `subject_id`) und hat sie darin
+        # genau eine Gruppe, hängt er an dieser — mit Block „Aktueller Unterricht" und den
+        # eingeführten Begriffen. Lehrkräfte nicht: Fach ohne Gruppe ist ihre Fach-Ebene.
+        if group_id is None and subject_id is not None and not _ist_lehrkraft(current_user):
+            grp = await _einzige_gruppe_im_fach(db, subject_id, current_user.sub)
+            if grp is not None:
+                group_id, gruppe_abgeleitet = grp.id, True
         conversation_group_id = group_id
 
         new_conv = Conversation(
@@ -2320,13 +2356,15 @@ async def chat(
 
         # Neue Unterhaltung aus der Entwurfsansicht: Der Kopf des Chats zeigt die Stunde
         # gleich, nicht erst nach dem Neuladen (0.19, Schritt 2).
-        if is_new and conversation_stunde_id is not None:
+        # Ebenso eine aus dem Fach abgeleitete Gruppe (0.20, F1).
+        if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet):
             _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
             _bezug = {
                 "group_id": conversation_group_id,
                 "subject_id": _gruppe.subject_id if _gruppe else None,
-                "stunde_node_id": str(conversation_stunde_id),
-                "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
+                "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
+                "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)
+                if conversation_stunde_id else None,
             }
             yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
 

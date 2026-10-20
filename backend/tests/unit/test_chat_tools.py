@@ -459,7 +459,8 @@ def test_der_chat_uebernimmt_einen_gewaehlten_bezug():
     # Beginn einer neuen Konversation aus der Entwurfsansicht, nicht erst nach `waehle_stunde`.
     quelle = inspect.getsource(router)
     assert quelle.count('"stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)') == 2
-    assert "if is_new and conversation_stunde_id is not None:" in quelle
+    # 0.20 (AC, F1): ebenso, wenn die Gruppe aus dem Fach abgeleitet wurde.
+    assert "if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet):" in quelle
 
 
 # ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────

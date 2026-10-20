@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Startet eine Schüler:in einen Chat nur mit Fach (etwa über einen Fach-Assistenten) und hat sie
+  in diesem Fach genau eine Unterrichtsgruppe, gehört der Chat zu dieser Gruppe — mit dem Stand
+  des Unterrichts wie bei einem Chat von der Gruppenseite. Für Lehrkräfte bleibt der Chat auf
+  der Fach-Ebene.
+
 ### Behoben
 
 - Der Lernstand bei Assistenten mit Wissensbereich enthält nur noch Inhalte, die die fragende
