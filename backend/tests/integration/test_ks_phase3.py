@@ -949,6 +949,7 @@ class TestEngagementRetrieval:
             anchor_ids=[anchor],
             pseudonym="test_user",
             db=db_session,
+            group_id=group_id,
         )
 
         assert len(results) == 1
@@ -990,6 +991,7 @@ class TestEngagementRetrieval:
             anchor_ids=[anchor],
             pseudonym="test_user",
             db=db_session,
+            group_id=group_id,
         )
 
         assert len(results) == 1

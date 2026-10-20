@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Der Lernstand bei Assistenten mit Wissensbereich enthält nur noch Inhalte, die die fragende
+  Person lesen darf, und nur aus der Unterrichtsgruppe des Chats.
+
 ## [0.19.0] – 2026-10-20
 
 Chat und Planung im Alltag: Antwort stoppen, letzte Nachricht bearbeiten, Link vom Chat zum

@@ -425,7 +425,9 @@ async def kontext_fuer_frage(
         #
         # Überlappt wird stattdessen ausdrücklich das, was überlappt werden darf: der
         # Netzaufruf. Er ist oben schon gestartet und längst fertig.
-        engagement_entries = await get_engagement_context(anchor_ids, pseudonym, db)
+        engagement_entries = await get_engagement_context(
+            anchor_ids, pseudonym, db, rollen=rollen, group_id=await _conversation_group(db, chat_id)
+        )
         # `ausschluss`: Was die Grundschicht schon vorgelegt hat, gehört nicht ein
         # zweites Mal in denselben Prompt — einmal als JSON-Eintrag, einmal als Absatz.
         thematisch_abschnitt = await thematisch(
@@ -478,6 +480,14 @@ async def stufe_der_person(
         return int(str(jwt_stufe).strip())
     except (TypeError, ValueError):
         return None
+
+
+async def _conversation_group(db: AsyncSession, chat_id: UUID | None) -> int | None:
+    """Unterrichtsgruppe der Konversation — sonst ``None``."""
+    if chat_id is None:
+        return None
+    conv = await db.get(Conversation, chat_id)
+    return conv.group_id if conv is not None and isinstance(conv.group_id, int) else None
 
 
 async def _conversation_grade(db: AsyncSession, chat_id: UUID | None) -> int | None:

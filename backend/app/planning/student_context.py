@@ -79,16 +79,10 @@ async def _resolve_nodes(db: AsyncSession, slots: list[LessonSlot]) -> dict[UUID
 
 def _fuer_alle_lesbar(node: ContextNode, group_id: int) -> bool:
     """Darf **jedes** Mitglied der Gruppe den Knoten lesen? Der Block ist für alle derselbe.
+    Die Regel steht in :func:`app.context.visibility.fuer_gruppe_lesbar` (0.20)."""
+    from app.context.visibility import fuer_gruppe_lesbar
 
-    Dieselben Scopes wie `context.visibility.read_scope_clause` für eine Schüler:in der
-    Gruppe — ohne Eigentum, das an einer Person hängt. `private` und `group_teachers` fallen
-    heraus (etwa ein privater Begriff der Lehrkraft), ebenso eine fremde Gruppe.
-    """
-    from app.context.visibility import OFFENE_SCOPES
-
-    return node.read_scope in OFFENE_SCOPES or (
-        node.read_scope == "group" and node.read_scope_group_id == group_id
-    )
+    return fuer_gruppe_lesbar(node.read_scope, node.read_scope_group_id, group_id)
 
 
 def _inhalt(node: ContextNode) -> str:

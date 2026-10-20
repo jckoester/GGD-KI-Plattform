@@ -1,11 +1,13 @@
 """Retrieval-Funktionen fuer den Kontextspeicher (KS-Phase-3)."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.visibility import read_scope_clause
 from app.db.models import ContextNode
 
 # Nur strukturell sinnvolle Einstiegspunkte als retrieval_scope zulässig. Weiterhin von
@@ -61,11 +63,22 @@ async def get_engagement_context(
     anchor_ids: list[UUID],
     pseudonym: str,
     db: AsyncSession,
+    *,
+    rollen: Sequence[str] = (),
+    group_id: int | None = None,
 ) -> list[EngagementEntry]:
     """Kombinierter Lernstand (eigene + Gruppen-Engagements), scoped auf Anker-Subgraphen.
 
     Folgt dem UNION-Pattern aus ADR-013 Paragraph Lernzustands-Tabelle.
     Gibt leere Liste zurueck wenn keine Anker oder keine Engagements.
+
+    **Gruppen-Engagements nur der Gruppe der Konversation** (``group_id``; 0.20, Päckchen AC,
+    F6). Bis dahin kamen die *aller* Gruppen der Person — im Chemie-Chat stand dann auch, was
+    ihre Deutschgruppe eingeführt hatte. Ohne Gruppenbezug gibt es keine.
+
+    **Nur lesbare Knoten** (``read_scope_clause`` für diese Person). Bis 0.20 prüfte der
+    Lernstand keine Leserechte — ein privater Knoten der Lehrkraft, als Material einer Phase
+    nachbereitet, ging als „eingeführt" in den Prompt der Schüler:in (Nebenbefund 09.10.2026).
     """
     if not anchor_ids:
         return []
@@ -96,6 +109,7 @@ async def get_engagement_context(
             FROM node_engagement ne
             JOIN group_memberships gm ON gm.group_id = ne.group_id
             WHERE gm.pseudonym = :pseudonym
+              AND ne.group_id = CAST(:group_id AS integer)
         ),
         aggregated AS (
             SELECT
@@ -127,9 +141,18 @@ async def get_engagement_context(
         {
             "anchor_ids": anchor_id_strs,
             "pseudonym": pseudonym,
+            "group_id": group_id,
         },
     )
     rows = result.mappings().all()
+    if rows:
+        lesbar = set((await db.execute(
+            sa.select(ContextNode.id).where(
+                ContextNode.id.in_([r["id"] for r in rows]),
+                read_scope_clause(pseudonym, rollen),
+            )
+        )).scalars())
+        rows = [r for r in rows if r["id"] in lesbar]
 
     entries: list[EngagementEntry] = []
     for row in rows:

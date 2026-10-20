@@ -378,10 +378,61 @@ async def test_lernstand_eingefuehrte_kompetenz_im_schuelerkontext(db_session, s
     ))
     await db_session.flush()
 
-    entries = await get_engagement_context([n_intro.id, n_offen.id], "stud-lern", db_session)
+    entries = await get_engagement_context(
+        [n_intro.id, n_offen.id], "stud-lern", db_session, group_id=GROUP_ID
+    )
     titles = {e.node.title for e in entries}
     assert "Zahlen runden K" in titles
     assert "Nicht eingeführt K" not in titles
+
+
+@pytest.mark.asyncio
+async def test_lernstand_nur_aus_der_gruppe_der_konversation(db_session, seed_sc_group, seed_test_group):
+    """0.20 (AC, F6): Was die **andere** Gruppe der Schüler:in eingeführt hat, gehört nicht in
+    diesen Chat — und ohne Gruppenbezug gibt es keinen Gruppen-Lernstand."""
+    from app.context.retrieval import get_engagement_context
+    from app.db.models import GroupMembership, NodeEngagement
+
+    db_session.add_all([
+        GroupMembership(group_id=GROUP_ID, pseudonym="stud-zwei", role_in_group="student"),
+        GroupMembership(group_id=1, pseudonym="stud-zwei", role_in_group="student"),
+    ])
+    hier, dort = _inhaltsknoten("Hier eingeführt"), _inhaltsknoten("Dort eingeführt")
+    db_session.add_all([hier, dort])
+    db_session.add_all([
+        NodeEngagement(group_id=GROUP_ID, node_id=hier.id, relation="introduced", source="lesson_plan", metadata_={}),
+        NodeEngagement(group_id=1, node_id=dort.id, relation="introduced", source="lesson_plan", metadata_={}),
+    ])
+    await db_session.flush()
+
+    anker = [hier.id, dort.id]
+    mit = {e.node.title for e in await get_engagement_context(anker, "stud-zwei", db_session, group_id=GROUP_ID)}
+    assert mit == {"Hier eingeführt"}
+    ohne = await get_engagement_context(anker, "stud-zwei", db_session)
+    assert ohne == []
+
+
+@pytest.mark.asyncio
+async def test_lernstand_nur_lesbare_knoten(db_session, seed_sc_group):
+    """0.20 (AC, F6): Ein privates Material der Lehrkraft, als Phase nachbereitet, steht als
+    `introduced` in der Tabelle — in den Lernstand der Schüler:in gehört es nicht."""
+    from app.context.retrieval import get_engagement_context
+    from app.db.models import GroupMembership, NodeEngagement
+
+    db_session.add(GroupMembership(group_id=GROUP_ID, pseudonym="stud-lesen", role_in_group="student"))
+    offen = _inhaltsknoten("Offener Begriff", art="begriff")
+    privat = _inhaltsknoten("Arbeitsblatt mit Lösungen", scope="private", art="methodenblatt")
+    privat.owner_pseudonym = "lehrkraft-x"
+    lehrkraft = _inhaltsknoten("Entwurf der Lehrkraft", scope="group_teachers", gruppe=GROUP_ID)
+    db_session.add_all([offen, privat, lehrkraft])
+    for n in (offen, privat, lehrkraft):
+        db_session.add(NodeEngagement(group_id=GROUP_ID, node_id=n.id, relation="introduced",
+                                      source="lesson_plan", metadata_={}))
+    await db_session.flush()
+
+    titel = {e.node.title for e in await get_engagement_context(
+        [offen.id, privat.id, lehrkraft.id], "stud-lesen", db_session, rollen=["student"], group_id=GROUP_ID)}
+    assert titel == {"Offener Begriff"}
 
 
 # ── 0.15: Inhalte der vergangenen Stunden ─────────────────────────────────────

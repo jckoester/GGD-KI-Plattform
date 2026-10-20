@@ -19,6 +19,12 @@ abschreiben ist der Fehler, den man erst bemerkt, wenn er wirkt.
 * ``global``, ``school``, ``subject`` für alle angemeldeten Nutzer:innen;
 * ``group`` nur für Mitglieder der freigegebenen Gruppe — Admins ausgenommen.
 * ``group_teachers`` nur für deren **Lehrkräfte** (Planungsknoten, Alembic 0074).
+
+**Zwei Fragen, zwei Funktionen.** ``read_scope_clause`` fragt: Darf *diese Person* lesen? Das
+gilt für alles, was nur sie zu sehen bekommt — Treffer, Werkzeugergebnisse, ihren Lernstand.
+``fuer_gruppe_lesbar`` fragt: Darf *jedes Mitglied* der Gruppe lesen? Das gilt für das, was aus
+der Gruppe kommt und für alle gleich ist — den Block „Aktueller Unterricht" und, seit 0.20,
+die eingeführten Begriffe der Gruppe (Päckchen AC, F6).
 """
 
 from collections.abc import Iterable
@@ -65,4 +71,22 @@ def read_scope_clause(pseudonym: str, rollen: Iterable[str] = ()):
             ContextNode.read_scope.in_(gruppenscopes),
             ContextNode.read_scope_group_id.in_(eigene_gruppen),
         ),
+    )
+
+
+def fuer_gruppe_lesbar(read_scope: str | None, read_scope_group_id: int | None, group_id: int) -> bool:
+    """Darf **jedes** Mitglied der Gruppe den Knoten lesen?
+
+    Dieselben Scopes wie ``read_scope_clause`` für eine Schüler:in der Gruppe — ohne Eigentum,
+    das an einer Person hängt. ``private`` und ``group_teachers`` fallen heraus (etwa ein
+    privater Begriff der Lehrkraft oder ihr Stundenentwurf), ebenso eine fremde Gruppe.
+    """
+    return read_scope in OFFENE_SCOPES or (read_scope == "group" and read_scope_group_id == group_id)
+
+
+def fuer_gruppe_lesbar_clause(group_id: int):
+    """``fuer_gruppe_lesbar`` als SQL-Bedingung — für Abfragen, die gleich filtern."""
+    return or_(
+        ContextNode.read_scope.in_(OFFENE_SCOPES),
+        and_(ContextNode.read_scope == "group", ContextNode.read_scope_group_id == group_id),
     )
