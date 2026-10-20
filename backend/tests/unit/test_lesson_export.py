@@ -504,3 +504,76 @@ async def test_pdf_zeitspalte_und_budget_ohne_dauer():
     # Dieselbe Regel wie im DOCX: nach der Skizze steht die Uhr.
     assert zellen == ["0–15′", "ab 15′", "–"]
     assert re.search(r"30′ geplant / 90′ verfügbar\s+· 1 Phase ohne Dauer", html)
+
+
+# ── Gestrichene Phasen (0.19, Schritt 1) ──────────────────────────────────────
+# Jan, 18.10.2026: Zeitspalte „–", die Uhr läuft ohne sie weiter, „offen" zählt mit.
+
+def _mit_gestrichener():
+    """Einstieg 15 · Erarbeitung 30 (gestrichen) · Sicherung 15."""
+    export = _make_export()
+    export.phasen[1].gestrichen = True
+    return export
+
+
+def test_zeitspalte_ueberspringt_gestrichene():
+    from app.planning.lesson_export import zeitspalte
+
+    # Die Sicherung beginnt, wo der Einstieg endet — bis 0.19 „45–60′".
+    assert zeitspalte(_mit_gestrichener().phasen) == ["0–15′", "–", "15–30′"]
+
+
+def test_zeitbudget_ohne_gestrichene():
+    from app.planning.lesson_export import zeitbudget
+
+    assert zeitbudget(_mit_gestrichener().phasen) == (30, 0)
+
+
+def test_gestrichene_ohne_dauer_zaehlt_nicht_als_fehlend():
+    from app.planning.lesson_export import zeitbudget
+
+    export = _mit_gestrichener()
+    export.phasen[1].dauer_min = None
+    assert zeitbudget(export.phasen) == (30, 0)
+
+
+def test_markdown_gestrichene_sichtbar_und_nicht_gezaehlt():
+    md = export_markdown(_mit_gestrichener())
+    assert "## ~~Erarbeitung~~ (30′ · Kern, gestrichen)" in md
+    assert "30′ geplant / 90′ verfügbar" in md
+
+
+def test_docx_gestrichene_durchgestrichen_ohne_zeit():
+    import io
+
+    from docx import Document
+
+    from app.planning.lesson_export import export_docx
+
+    doc = Document(io.BytesIO(export_docx(_mit_gestrichener())))
+    zeilen = doc.tables[0].rows[1:]
+    assert [z.cells[0].text for z in zeilen] == ["0–15′", "–", "15–30′"]
+    name = zeilen[1].cells[2].paragraphs[0]
+    assert name.text.startswith("Erarbeitung (gestrichen)")
+    assert all(lauf.font.strike for lauf in name.runs)
+    budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
+    assert "30′ / 90′ verfügbar" in budget
+
+
+@pytest.mark.asyncio
+async def test_pdf_gestrichene():
+    import re
+
+    html = await TestFormelnImStundenPdf()._pdf_html(_mit_gestrichener())
+    assert re.findall(r"<tr>\s*<td>([^<]*)</td>", html) == ["0–15′", "–", "15–30′"]
+    assert 'class="phase-name gestrichen"' in html
+    assert re.search(r"30′ geplant / 90′ verfügbar", html)
+
+
+def test_geplant_min_fuer_den_assistenten():
+    from app.planning.phasen import geplant_min
+
+    phasen = [{"dauer_min": 15}, {"dauer_min": 30, "status": "gestrichen"},
+              {"dauer_min": 10, "status": "offen"}, {"dauer_min": None}, "kaputt"]
+    assert geplant_min(phasen) == 25
+    assert geplant_min(None) == 0

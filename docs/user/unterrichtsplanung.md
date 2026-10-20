@@ -152,6 +152,12 @@ Jede Phase hat eine **Dauer**, eine **Priorität**, eine **Sozialform/Methode** 
 **Material**. Der Zeitbudget-Balken oben zeigt, ob Sie im verfügbaren Zeitrahmen
 liegen oder einen Überhang haben.
 
+**Gestrichene Phasen** — in der Nachbereitung oder vom Assistenten beim Umplanen
+gestrichen — bleiben grau und durchgestrichen in der Tabelle stehen, zählen aber nicht
+zur Unterrichtszeit: Die Zeitspalte zeigt „–", die folgenden Phasen rücken nach vorn, und
+der Zeitbudget-Balken lässt sie weg. Das gilt ebenso im PDF-, DOCX- und Markdown-Export.
+Eine *offene* Phase zählt dagegen mit.
+
 - **Priorität** (farbiges Pill): *Kern*, *Übung* oder *Vertiefung*. Sie steuert
   später, was bei Zeitnot zuerst gekürzt wird.
 - **Sozialform / Methode** (gestapelt: oben Sozialform, darunter Methode): Sie

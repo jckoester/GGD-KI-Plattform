@@ -94,3 +94,18 @@ def uebernimm_zusatzfelder(
         zusatz = {k: v for k, v in (alt or {}).items() if k not in schema}
         ergebnis.append({**eigene, **zusatz})
     return ergebnis
+
+
+def geplant_min(phasen: list[dict[str, Any]]) -> int:
+    """Geplante Minuten aus den gespeicherten Phasen — ohne gestrichene (0.19).
+
+    Gestrichen (Nachbereitung oder `strike_phase`) heißt: bleibt sichtbar, zählt nicht zur
+    Zeit. „Offen" zählt mit. Dieselbe Regel wie `zeitbudget` im Export und `startzeiten` im
+    Planer (`frontend/src/lib/phasendauer.js`). Für das Werkzeugergebnis des
+    Stundenassistenten: Er bekommt die Summe fertig, statt sie selbst zu rechnen.
+    """
+    return sum(
+        p.get("dauer_min") or 0
+        for p in phasen or []
+        if isinstance(p, dict) and p.get("status") != "gestrichen"
+    )

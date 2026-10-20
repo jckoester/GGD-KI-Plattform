@@ -7,7 +7,8 @@
   /**
    * Props:
    * - phase: {id, name, dauer_min, beschreibung, prio, sozialform, methode, material}
-   * - kumMin: cumulative minutes before this phase
+   * - kumMin: cumulative minutes before this phase (null → „–")
+   * - gestrichen: Phase zählt nicht zur Zeit — grau, Name durchgestrichen (0.19)
    * - canMoveUp / canMoveDown
    * - onChange(updatedPhase)
    * - onDelete()
@@ -18,6 +19,7 @@
   const {
     phase,
     kumMin = 0,
+    gestrichen = false,
     canMoveUp = false,
     canMoveDown = false,
     onChange,
@@ -42,7 +44,9 @@
   const prioColor = $derived(PRIO_COLORS[phase.prio] ?? PRIO_COLORS.kern)
 </script>
 
-<tr class="border-b border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 group">
+<tr class="border-b border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 group"
+    class:opacity-60={gestrichen}
+    title={gestrichen ? 'Gestrichen — zählt nicht zur Unterrichtszeit' : undefined}>
   <!-- Zeit -->
   <td class="px-2 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap w-20">
     {zeitspanne(kumMin, phase.dauer_min)}
@@ -90,7 +94,11 @@
       placeholder="Phasen-Name"
       class="w-full bg-transparent text-sm font-medium text-light-tx dark:text-dark-tx
              border-b border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
+      class:line-through={gestrichen}
     />
+    {#if gestrichen && !reviewMode}
+      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 italic">gestrichen</span>
+    {/if}
     {#if editDesc || phase.beschreibung}
       <textarea
         rows="2"

@@ -1015,3 +1015,26 @@ async def test_detail_nennt_fruehere_begriffe_mit_hinweis(test_client, auth_head
         aus = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde})
     frueher = aus["begriffe_frueherer_stunden"]
     assert frueher["titel"] == [benzol.title] and "Lernstand" in frueher["hinweis"]
+
+
+@pytest.mark.asyncio
+async def test_detail_nennt_geplante_minuten_ohne_gestrichene(
+    test_client, auth_headers, faecher, async_engine, aufraeumen
+):
+    """0.19, F8b: Das Modell bekommt die Summe fertig — eine gestrichene Phase zählt nicht."""
+    stunde = await _stunde(test_client, auth_headers, phasen=[
+        {"name": "Einstieg", "dauer_min": 10},
+        {"name": "Vertiefung", "dauer_min": 20},
+        {"name": "Sicherung", "dauer_min": 15},
+    ])
+    # Den Status setzen Nachbereitung und Operationen, nicht der Editor — hier direkt.
+    from sqlalchemy.orm.attributes import flag_modified
+    async with _sitzungen(async_engine)() as db:
+        knoten = await db.get(ContextNode, UUID(stunde))
+        knoten.metadata_["phasen"][1]["status"] = "gestrichen"
+        knoten.metadata_["phasen"][2]["status"] = "offen"
+        flag_modified(knoten, "metadata_")
+        await db.commit()
+    with patch("app.context.search.vektor_oder_none", AsyncMock(return_value=FRAGE)):
+        detail = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde})
+    assert detail["geplant_min"] == 25

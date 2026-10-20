@@ -34,6 +34,7 @@
   .prio-cell.prio-uebung     { background: #5ba37a; }
   .prio-cell.prio-vertiefung { background: #b07fb8; }
   .phase-name { font-weight: bold; }
+  .phase-name.gestrichen { text-decoration: line-through; color: #888; }
   .phase-desc { color: #444; font-size: 8.5pt; }
   .sozialform { font-weight: bold; }
   .methode { color: #444; }
@@ -85,7 +86,7 @@
         {% if phase.prio == "kern" %}K{% elif phase.prio == "uebung" %}Ü{% else %}V{% endif %}
       </td>
       <td>
-        <span class="phase-name">{{ phase.name }}</span>
+        <span class="phase-name{% if phase.gestrichen %} gestrichen{% endif %}">{{ phase.name }}</span>{% if phase.gestrichen %} <span class="phase-desc">(gestrichen)</span>{% endif %}
         {% if phase.beschreibung %}<br><span class="phase-desc">{{ beschreibungen[loop.index0] | safe }}</span>{% endif %}
       </td>
       <td>

@@ -30,7 +30,7 @@ from app.planning.begriffe import (
 from app.planning.curriculum_resolver import group_grade, resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
-from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
+from app.planning.phasen import geplant_min, sichere_phasen_kennungen, uebernimm_zusatzfelder
 from app.planning.permissions import zugang_zur_stunde
 from app.planning.reflow_service import build_reflow_context
 from app.planning.schemas import BEGRIFF_TYPEN
@@ -1105,6 +1105,8 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
         "stundenziel": meta.get("stundenziel", ""),
         "phasen": meta.get("phasen", []),
         "refs": meta.get("refs", []),
+        # Fertig gerechnet, ohne gestrichene Phasen (0.19, F8b) — das Modell zählte sie mit.
+        "geplant_min": geplant_min(meta.get("phasen", [])),
         "slot": {
             "date": slot.date.isoformat(),
             "periods": slot.periods,
@@ -1132,7 +1134,8 @@ register_tool(ChatTool(
             "name": "get_lesson_detail",
             "description": (
                 "Gibt den vollständigen Stundenentwurf zurück: Titel, Stundenziel, "
-                "Phasen-Array, Kompetenzen und Slot-Kontext. Dazu zusammenhang: Fach, "
+                "Phasen-Array, Kompetenzen und Slot-Kontext, dazu geplant_min: die Summe der "
+                "Phasendauern ohne gestrichene Phasen (status gestrichen zählt nicht zur Zeit). Dazu zusammenhang: Fach, "
                 "Gruppe, jahrgang (null = unbekannt), die Unterrichtseinheit und — wenn sie "
                 "auf ein Kapitel des Schulcurriculums verweist — dessen Curriculum, "
                 "Bildungsplan-Fassung und Lernsequenzen mit ihren Kompetenzen (in der Form "

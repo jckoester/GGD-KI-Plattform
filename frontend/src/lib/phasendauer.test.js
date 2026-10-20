@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { dauerAusEingabe, dauerZusatz, startzeiten, zeitspanne } from "./phasendauer.js"
+import { dauerAusEingabe, dauerZusatz, geplanteMinuten, istGestrichen, startzeiten, zeitspanne } from "./phasendauer.js"
 
 describe("phasendauer — Phasen ohne Dauer (0.13, P1)", () => {
     it("ein geleertes Feld speichert null, keine 1", () => {
@@ -35,5 +35,34 @@ describe("phasendauer — Phasen ohne Dauer (0.13, P1)", () => {
     it("ohne fehlende Dauer zählt die Uhr wie bisher", () => {
         expect(startzeiten([{ dauer_min: 10 }, { dauer_min: 15 }, { dauer_min: 5 }])).toEqual([0, 10, 25])
         expect(startzeiten([])).toEqual([])
+    })
+})
+
+describe("phasendauer — gestrichene Phasen (0.19)", () => {
+    const phasen = [
+        { id: "a", dauer_min: 15 },
+        { id: "b", dauer_min: 30, status: "gestrichen" },
+        { id: "c", dauer_min: 10, status: "offen" },
+        { id: "d", dauer_min: 5 },
+    ]
+
+    it("zeigt „–“ und die Uhr läuft ohne sie weiter", () => {
+        // Bis 0.19: [0, 15, 45, 55] — die gestrichene schob alles nach hinten.
+        expect(startzeiten(phasen)).toEqual([0, null, 15, 25])
+        expect(startzeiten(phasen).map((b, i) => zeitspanne(b, phasen[i].dauer_min)))
+            .toEqual(["0–15′", "–", "15–25′", "25–30′"])
+    })
+
+    it("zählt nicht zu den geplanten Minuten, „offen“ schon", () => {
+        expect(geplanteMinuten(phasen)).toBe(30)
+        expect(geplanteMinuten([])).toBe(0)
+    })
+
+    it("folgt in der Nachbereitung dem gewählten Status", () => {
+        const gewaehlt = { a: "gestrichen", b: "erledigt" }
+        const statusVon = (p) => gewaehlt[p.id] ?? p.status
+        expect(istGestrichen(phasen[0], statusVon)).toBe(true)
+        expect(geplanteMinuten(phasen, statusVon)).toBe(45)
+        expect(startzeiten(phasen, statusVon)).toEqual([null, 0, 30, 40])
     })
 })

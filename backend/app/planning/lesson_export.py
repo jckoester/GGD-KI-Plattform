@@ -25,9 +25,13 @@ def zeitbudget(phasen) -> tuple[int, int]:
 
     Fehlende Dauern zählen nicht als 0 stillschweigend mit: Die Zahl der Phasen ohne
     Dauer wird genannt, sonst sähe „35′ geplant" vollständig aus, obwohl zwei fehlen.
+
+    Gestrichene Phasen zählen gar nicht (0.19, Jan 18.10.2026) — weder ihre Minuten noch
+    als „ohne Dauer". „Offen" zählt mit: Sie war geplant, nur nicht fertig.
     """
-    gesetzt = [p.dauer_min for p in phasen if p.dauer_min is not None]
-    return sum(gesetzt), len(phasen) - len(gesetzt)
+    zaehlen = [p for p in phasen if not p.gestrichen]
+    gesetzt = [p.dauer_min for p in zaehlen if p.dauer_min is not None]
+    return sum(gesetzt), len(zaehlen) - len(gesetzt)
 
 
 def ohne_dauer_zusatz(anzahl: int) -> str:
@@ -47,6 +51,10 @@ def zeitspalte(phasen) -> list[str]:
     zeiten = []
     uhr = 0
     for phase in phasen:
+        if phase.gestrichen:
+            # Keine Zeit, und die Uhr läuft ohne sie weiter (Jan, 18.10.2026).
+            zeiten.append("–")
+            continue
         if uhr is None:
             zeiten.append("–")
         elif phase.dauer_min is None:
@@ -66,6 +74,8 @@ class ExportPhase:
     sozialform: str  # display string
     methode: str  # display string
     material: list[str]  # display strings
+    # Gestrichen (Nachbereitung oder `strike_phase`): bleibt sichtbar, zählt nicht zur Zeit.
+    gestrichen: bool = False
 
 
 @dataclass
@@ -185,6 +195,7 @@ async def build_lesson_export(db: AsyncSession, node_id: UUID) -> LessonExport:
             sozialform=_display_linked(p.get("sozialform") or {}),
             methode=_display_linked(p.get("methode") or {}),
             material=[_display_linked(m) for m in (p.get("material") or [])],
+            gestrichen=p.get("status") == "gestrichen",
         )
         for p in meta.get("phasen", [])
     ]
@@ -238,7 +249,10 @@ def export_markdown(data: LessonExport) -> str:
         prio = prio_labels.get(phase.prio, phase.prio)
         # Ohne Dauer nur die Prio — nie `0′`, nie `None′`.
         dauer = f"{phase.dauer_min}′ · " if phase.dauer_min is not None else ""
-        lines.append(f"## {phase.name} ({dauer}{prio})")
+        if phase.gestrichen:
+            lines.append(f"## ~~{phase.name}~~ ({dauer}{prio}, gestrichen)")
+        else:
+            lines.append(f"## {phase.name} ({dauer}{prio})")
         if phase.beschreibung:
             lines.append("")
             lines.append(phase.beschreibung)
@@ -402,7 +416,12 @@ def export_docx(data: LessonExport) -> bytes:
             run.bold = True
             run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
-            row[2].text = f"{phase.name}\n{phase.beschreibung}" if phase.beschreibung else phase.name
+            name = f"{phase.name} (gestrichen)" if phase.gestrichen else phase.name
+            row[2].text = f"{name}\n{phase.beschreibung}" if phase.beschreibung else name
+            if phase.gestrichen:
+                for absatz in row[2].paragraphs:
+                    for lauf in absatz.runs:
+                        lauf.font.strike = True
 
             # Sozialform (fett) über Methode stapeln.
             mc = row[3]

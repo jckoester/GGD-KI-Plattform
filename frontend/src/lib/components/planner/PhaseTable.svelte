@@ -1,5 +1,5 @@
 <script>
-    import { startzeiten } from "$lib/phasendauer.js";
+    import { geplanteMinuten, istGestrichen, startzeiten } from "$lib/phasendauer.js";
     import { PRIO_COLORS } from "$lib/planner.js";
     import PhaseRow from "./PhaseRow.svelte";
 
@@ -24,18 +24,26 @@
         onReviewStatusChange = null,
     } = $props();
 
-    const gesamtMin = $derived(
-        (phasen || []).reduce((s, p) => s + (p.dauer_min || 0), 0),
+    // Welcher Status gilt: in der Nachbereitung der gerade gewählte, sonst der gespeicherte.
+    // So zeigt der Balken schon beim Anklicken von „gestrichen", was übrig bleibt.
+    const statusVon = $derived(
+        reviewMode
+            ? (p) => reviewStatus[p?.id ?? ""] ?? p?.status
+            : (p) => p?.status,
     );
+
+    // Gestrichene Phasen zählen nicht (phasendauer.js, 0.19).
+    const gesamtMin = $derived(geplanteMinuten(phasen, statusVon));
     const ueberhang = $derived(gesamtMin - verfuegbareMin);
 
-    // Beginn je Phase — `null` nach einer Phase ohne Dauer (phasendauer.js)
-    const kumMinutes = $derived(startzeiten(phasen));
+    // Beginn je Phase — `null` nach einer Phase ohne Dauer und für gestrichene
+    const kumMinutes = $derived(startzeiten(phasen, statusVon));
 
     // Prio-Segmente für Zeitbudget-Balken
     const prioSegments = $derived(() => {
         const totals = { kern: 0, uebung: 0, vertiefung: 0 };
         for (const p of phasen || []) {
+            if (istGestrichen(p, statusVon)) continue;
             totals[p.prio || "kern"] =
                 (totals[p.prio || "kern"] || 0) + (p.dauer_min || 0);
         }
@@ -157,6 +165,7 @@
                         <PhaseRow
                             {phase}
                             kumMin={kumMinutes[i]}
+                            gestrichen={istGestrichen(phase, statusVon)}
                             canMoveUp={i > 0}
                             canMoveDown={i < phasen.length - 1}
                             onChange={(updated) => updatePhase(i, updated)}

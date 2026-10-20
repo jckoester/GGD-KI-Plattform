@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Gestrichene Phasen zählen nicht mehr zur Unterrichtszeit** — im Stundenentwurf, im Zeitbudget
+  und in den Exporten (PDF, DOCX, Markdown). Die Zeitspalte zeigt „–", die folgenden Phasen rücken
+  nach vorn. Gestrichene Phasen sind auch außerhalb der Nachbereitung als solche erkennbar.
+- **Stundenassistent:** bekommt die geplanten Minuten ohne gestrichene Phasen fertig gerechnet
+  (`geplant_min`).
+
 ## [0.18.4] – 2026-10-20
 
 ### Behoben
