@@ -5,8 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
-Mit Migrationen (0087, 0088) — **vor dem Update** prüfen, ob ein Stundenentwurf an mehreren Terminen
-hängt; die Migration bricht sonst mit einer Liste ab (unten).
+## [0.19.0] – 2026-10-20
+
+Chat und Planung im Alltag: Antwort stoppen, letzte Nachricht bearbeiten, Link vom Chat zum
+Stundenentwurf, Doppelstunden teilen, gestrichene Phasen ohne Zeit. Zwei Migrationen (0087, 0088)
+— vorher eine Abfrage laufen lassen (unten).
 
 ### Neu
 
@@ -24,6 +27,11 @@ hängt; die Migration bricht sonst mit einer Liste ab (unten).
   eine Stunde wählt oder anlegt. `GET /conversations/{id}/messages` und das Ereignis `bezug` tragen
   dafür `stunde`.
 
+### Geändert
+
+- **`PATCH /planning/slots/{id}`** hängt einen Stundenentwurf, der schon an einem anderen Termin
+  hängt, nicht mehr zusätzlich an (409 mit Ort). Ein Entwurf hängt an höchstens einem Termin.
+
 ### Behoben
 
 - **Gestrichene Phasen zählen nicht mehr zur Unterrichtszeit** — im Stundenentwurf, im Zeitbudget
@@ -36,16 +44,21 @@ hängt; die Migration bricht sonst mit einer Liste ab (unten).
 - **Neuaufbau aus dem Wochenmuster** prüft jede Stunde eines bestehenden Termins, nicht nur die
   erste — eine Doppelstunde aus dem Muster legte sich sonst über eine importierte Einzelstunde.
 
-### Nach dem Update
+### Vor dem Update
 
-```sql
-SELECT stunde_node_id, count(*) FROM lesson_slots
-WHERE stunde_node_id IS NOT NULL GROUP BY 1 HAVING count(*) > 1;
+```bash
+docker compose exec db psql -U postgres -d ggd_ki -c \
+  "SELECT stunde_node_id, count(*) FROM lesson_slots WHERE stunde_node_id IS NOT NULL GROUP BY 1 HAVING count(*) > 1;"
 ```
 
 Liefert das Zeilen, je Entwurf alle Termine bis auf einen lösen
-(`UPDATE lesson_slots SET stunde_node_id = NULL WHERE id = …`), dann `alembic upgrade head`.
-Seit 0087 hängt ein Entwurf an höchstens einem Termin (eindeutiger Index).
+(`UPDATE lesson_slots SET stunde_node_id = NULL WHERE id = …`). Sonst bricht Migration 0087 mit
+derselben Liste ab.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0087, 0088) — wie im regulären Update.
+- Backend **und** Frontend neu bauen; offene Browser-Tabs einmal neu laden.
 
 ## [0.18.4] – 2026-10-20
 

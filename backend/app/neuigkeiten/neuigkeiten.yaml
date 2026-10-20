@@ -45,3 +45,25 @@
     neu an — die Hilfe erklärt, wie.
   link: /help/unterrichtsplanung
 
+- id: "0.19-chat-stoppen-bearbeiten"
+  version: "0.19.0"
+  datum: 2026-10-20
+  rollen: [student, teacher]
+  titel: "Antwort stoppen, Nachricht bearbeiten"
+  text: >-
+    Während eine Antwort entsteht, wird aus dem Senden-Knopf ein Stopp-Knopf — was bis dahin kam,
+    bleibt stehen. Unter Ihrer letzten Nachricht steht „Bearbeiten": Der Text kommt zurück ins
+    Eingabefeld, und Senden ersetzt die alte Nachricht samt Antwort.
+  link: /help/chat
+
+- id: "0.19-planung-alltag"
+  version: "0.19.0"
+  datum: 2026-10-20
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Doppelstunden teilen, Link zum Entwurf"
+  text: >-
+    Eine Doppelstunde lässt sich in der Jahresübersicht über ⋯ in zwei Einzelstunden teilen —
+    etwa für eine Klassenarbeit — und wieder zusammenlegen. Ein Chat mit Bezugsstunde zeigt
+    oben einen Link zum Entwurf. Gestrichene Phasen zählen nicht mehr zur Unterrichtszeit.
+  link: /help/unterrichtsplanung
