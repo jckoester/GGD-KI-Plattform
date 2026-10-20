@@ -166,6 +166,23 @@ async def restore_snapshot(
         slot.pinned = slot_data.get("pinned", False)
         slot.anpassung_noetig = slot_data.get("anpassung_noetig", False)
 
+    # Termine, die es beim Snapshot noch nicht gab (etwa die zweite Hälfte einer geteilten
+    # Doppelstunde), bleiben unberührt — und könnten einen Entwurf tragen, den der Snapshot
+    # wieder an seinen alten Termin hängt. Ein Entwurf gehört an höchstens einen Termin
+    # (0087): Der Snapshot gewinnt, der neuere Termin wird gelöst.
+    zurueck = {d["stunde_node_id"] for d in payload.get("slots", []) if d.get("stunde_node_id")}
+    if zurueck:
+        await db.execute(
+            sa.update(LessonSlot)
+            .where(
+                LessonSlot.group_id == snapshot.group_id,
+                LessonSlot.stunde_node_id.in_([UUID(s) for s in zurueck]),
+                LessonSlot.id.not_in([UUID(d["slot_id"]) for d in payload.get("slots", [])]),
+            )
+            .values(stunde_node_id=None, updated_at=sa.func.now())
+            .execution_options(synchronize_session=False)
+        )
+
     stunden = payload.get("stunden")
     if stunden is None:
         # Snapshots vor 0.17 kennen nur die Phasen — der Rest der Stunde bleibt, wie er ist.

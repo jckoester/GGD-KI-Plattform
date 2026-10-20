@@ -38,6 +38,14 @@ Damit arbeiten Sie so:
   Unterricht hat, und erzeugen daraus die Slots eines Halbjahres — auf Wunsch gleich
   [bis zum Schuljahresende](#das-ganze-jahr-planen).
 - Über **Verlauf** machen Sie Änderungen rückgängig (jede Änderung wird gesichert).
+- **Doppelstunde teilen:** Im Menü **⋯** einer Doppelstunde steht *In zwei Einzelstunden
+  teilen* — etwa für eine Klassenarbeit in der ersten Stunde oder den Wechsel zur nächsten
+  Einheit. Danach sind es zwei Zeilen. Einheit, Kategorie und ein Ausfall gelten für beide;
+  Thema und Stundenentwurf bleiben an der ersten (ein Entwurf für 90 Minuten zeigt dann einen
+  Überhang). Der Neuaufbau aus dem Wochenmuster und der Stundenplan-Abgleich lassen die
+  Teilung stehen. Zurück geht es über *Wieder zur Doppelstunde zusammenlegen* an einer der
+  beiden Hälften — nicht über den Verlauf. Trägt die zweite Hälfte eigenen Inhalt, verschieben
+  Sie den vorher.
 
 > **Wenn Ihre Schule den Stundenplan angebunden hat**, können Sie das Wochenmuster
 > übernehmen statt eintippen, und Ausfall, Vertretung und Verlegungen kommen von selbst in

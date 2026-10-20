@@ -2115,6 +2115,32 @@ export async function updateSlot(slotId, updates) {
     return res.json()
 }
 
+// Doppelstunde in zwei Einzelstunden teilen (0.19). → { slots: [erste, zweite] }.
+// 409, wenn es keine Doppelstunde ist oder sich der Termin seit dem Lesen geändert hat.
+export async function teileSlot(slotId, expectedUpdatedAt = null) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/teilen`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Teilen fehlgeschlagen')
+    return res.json()
+}
+
+// Geteilte Doppelstunde wieder zusammenlegen — von jeder Hälfte aus (0.19). 409, solange
+// die zweite Hälfte eigenen Inhalt trägt; `detail` sagt, welche Stunde.
+export async function legeSlotZusammen(slotId, expectedUpdatedAt = null) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/zusammenlegen`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expected_updated_at: expectedUpdatedAt }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Zusammenlegen fehlgeschlagen')
+    return res.json()
+}
+
 export async function swapSlots(groupId, slotAId, slotBId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/swap`, {
         method: 'POST',

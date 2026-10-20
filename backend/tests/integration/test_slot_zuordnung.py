@@ -81,7 +81,15 @@ async def test_eigene_stunde_und_einheit_lassen_sich_setzen_und_loesen(
     ue = await _einheit(test_client, auth_headers, EIGENE)
     stunde = await _stunde(test_client, auth_headers, ue, slots[0]["id"])
 
-    # Dieselbe Stunde in einen zweiten Slot derselben Gruppe: erlaubt.
+    # Dieselbe Stunde in einen zweiten Slot derselben Gruppe: seit 0.19 nicht mehr — ein
+    # Entwurf hängt an höchstens einem Termin (Migration 0087). Bis dahin „erlaubt", und das
+    # Laden der Stunde brach danach mit `MultipleResultsFound` ab.
+    resp = await _patch(test_client, auth_headers, slots[1]["id"], ue_node_id=ue, stunde_node_id=stunde)
+    assert resp.status_code == 409, resp.text
+    assert "hängt schon am" in resp.json()["detail"]
+
+    # Am ersten lösen, dann am zweiten setzen: geht.
+    assert (await _patch(test_client, auth_headers, slots[0]["id"], stunde_node_id=None)).status_code == 200
     resp = await _patch(test_client, auth_headers, slots[1]["id"], ue_node_id=ue, stunde_node_id=stunde)
     assert resp.status_code == 200, resp.text
     assert resp.json()["stunde_node_id"] == stunde

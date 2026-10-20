@@ -5,8 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+Mit Migration (0087) — **vor dem Update** prüfen, ob ein Stundenentwurf an mehreren Terminen
+hängt; die Migration bricht sonst mit einer Liste ab (unten).
+
 ### Neu
 
+- **Doppelstunde in zwei Einzelstunden teilen** und wieder zusammenlegen (Menü ⋯ in der
+  Jahresübersicht; `POST /planning/slots/{id}/teilen`, `…/zusammenlegen`). Einheit, Kategorie und
+  Ausfall gelten für beide Hälften, Thema und Entwurf bleiben an der ersten. Neues Feld
+  `lesson_slots.geteilt`.
 - **Link vom Chat zum Stundenentwurf:** Hat ein Chat eine Bezugsstunde, steht sie oben neben dem
   Titel — mit Datum, als Link in den Entwurf. Auch nach dem Wiederöffnen und sobald der Assistent
   eine Stunde wählt oder anlegt. `GET /conversations/{id}/messages` und das Ereignis `bezug` tragen
@@ -19,6 +26,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nach vorn. Gestrichene Phasen sind auch außerhalb der Nachbereitung als solche erkennbar.
 - **Stundenassistent:** bekommt die geplanten Minuten ohne gestrichene Phasen fertig gerechnet
   (`geplant_min`).
+- **Neuaufbau aus dem Wochenmuster** prüft jede Stunde eines bestehenden Termins, nicht nur die
+  erste — eine Doppelstunde aus dem Muster legte sich sonst über eine importierte Einzelstunde.
+
+### Nach dem Update
+
+```sql
+SELECT stunde_node_id, count(*) FROM lesson_slots
+WHERE stunde_node_id IS NOT NULL GROUP BY 1 HAVING count(*) > 1;
+```
+
+Liefert das Zeilen, je Entwurf alle Termine bis auf einen lösen
+(`UPDATE lesson_slots SET stunde_node_id = NULL WHERE id = …`), dann `alembic upgrade head`.
+Seit 0087 hängt ein Entwurf an höchstens einem Termin (eindeutiger Index).
 
 ## [0.18.4] – 2026-10-20
 

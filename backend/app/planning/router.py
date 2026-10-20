@@ -31,7 +31,7 @@ from app.context.embedding import (
 )
 from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
-from app.planning import zuordnung
+from app.planning import teilen, zuordnung
 from app.db.models import (
     ContextEdge,
     ContextNode,
@@ -486,6 +486,21 @@ async def update_slot(
             if fehler:
                 raise HTTPException(status_code=422, detail=fehler)
 
+    # Ein Entwurf hängt an höchstens einem Termin (0.19, Migration 0087). Bis dahin ließ sich
+    # derselbe Entwurf an einen zweiten Termin hängen — und das Laden der Stunde brach dann
+    # mit `MultipleResultsFound` ab. Statt ihn still vom anderen Termin zu lösen: sagen, wo.
+    neuer_entwurf = update_data.get("stunde_node_id")
+    if neuer_entwurf is not None and neuer_entwurf != slot.stunde_node_id:
+        belegt = (await db.execute(
+            sa.select(LessonSlot).where(
+                LessonSlot.stunde_node_id == neuer_entwurf, LessonSlot.id != slot.id)
+        )).scalars().first()
+        if belegt is not None:
+            stunde = f", {belegt.start_period}. Stunde" if belegt.start_period else ""
+            raise HTTPException(status_code=409, detail=(
+                f"Dieser Stundenentwurf hängt schon am {belegt.date:%d.%m.%Y}{stunde}. "
+                "Lösen Sie ihn dort zuerst oder verschieben Sie die Stunde."))
+
     changes_assignment = bool(_SNAPSHOT_ASSIGNMENT_FIELDS & update_data.keys())
     if changes_assignment:
         await create_snapshot(
@@ -515,6 +530,65 @@ async def update_slot(
     await db.commit()
     await db.refresh(slot)
     return slot
+
+
+# ── Doppelstunde teilen / zusammenlegen (0.19) ───────────────────────────────
+
+
+class SlotVorbedingung(BaseModel):
+    expected_updated_at: Optional[datetime] = None
+
+
+class SlotsGeteilt(BaseModel):
+    slots: list[SlotRead]
+
+
+@router.post("/slots/{slot_id}/teilen", response_model=SlotsGeteilt)
+async def teile_slot(
+    slot_id: UUID,
+    payload: SlotVorbedingung = SlotVorbedingung(),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Teilt eine Doppelstunde in zwei Einzelstunden (`planning/teilen.py`).
+
+    Entwurf und Thema bleiben an der ersten Hälfte, Einheit, Kategorie und Herkunft an
+    beiden. → beide Hälften.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+    await require_group_teacher(slot.group_id, user, db)
+    vorbedingung.pruefe(slot.updated_at, payload.expected_updated_at, "Diese Stunde")
+    erste, zweite = await teilen.teile(db, slot)
+    await db.commit()
+    await db.refresh(erste)
+    await db.refresh(zweite)
+    logger.info("doppelstunde_geteilt pseudonym=%s slot=%s gruppe=%s", user.sub, slot_id, erste.group_id)
+    return SlotsGeteilt(slots=[erste, zweite])
+
+
+@router.post("/slots/{slot_id}/zusammenlegen", response_model=SlotRead)
+async def lege_slot_zusammen(
+    slot_id: UUID,
+    payload: SlotVorbedingung = SlotVorbedingung(),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Legt eine geteilte Doppelstunde wieder zusammen — von jeder ihrer Hälften aus.
+
+    409, solange die zweite Hälfte eigenen Inhalt trägt. → die Doppelstunde.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+    await require_group_teacher(slot.group_id, user, db)
+    vorbedingung.pruefe(slot.updated_at, payload.expected_updated_at, "Diese Stunde")
+    doppel = await teilen.lege_zusammen(db, slot)
+    await db.commit()
+    await db.refresh(doppel)
+    logger.info("doppelstunde_zusammengelegt pseudonym=%s slot=%s gruppe=%s", user.sub, doppel.id, doppel.group_id)
+    return doppel
 
 
 # ── Parkplatz: Planungsinhalt ohne Termin ────────────────────────────────────

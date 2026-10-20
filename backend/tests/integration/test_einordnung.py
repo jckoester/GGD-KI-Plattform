@@ -112,7 +112,9 @@ async def test_der_stundenassistent_sieht_die_einheit(test_client, auth_headers,
 async def test_einen_entwurf_an_einen_termin_mit_einheit_haengen(test_client, auth_headers, gruppe, async_engine):
     """Die andere Richtung: Der Termin hat die Einheit schon, der Entwurf kommt dazu."""
     h = auth_headers
-    _, stunde = await _termin_mit_entwurf(test_client, h, async_engine, 7)
+    alt, stunde = await _termin_mit_entwurf(test_client, h, async_engine, 7)
+    # Ein Entwurf hängt an höchstens einem Termin (0.19) — erst am alten lösen.
+    await test_client.patch(f"/planning/slots/{alt}", headers=h, json={"stunde_node_id": None})
     einheit = await _einheit(test_client, h, "Aromaten")
     ziel = uuid4()
     async with _sitzungen(async_engine)() as db:
@@ -182,8 +184,11 @@ async def test_snapshot_mit_gleicher_einheit_und_anderem_entwurf(test_client, au
     slot, stunde = await _termin_mit_entwurf(test_client, h, async_engine, 14)
     einheit = await _einheit(test_client, h, "Aromaten")
     await test_client.patch(f"/planning/slots/{slot}", headers=h, json={"ue_node_id": einheit})
-    _, andere = await _termin_mit_entwurf(test_client, h, async_engine, 15)
-    await test_client.patch(f"/planning/slots/{slot}", headers=h, json={"stunde_node_id": andere})
+    anderer_termin, andere = await _termin_mit_entwurf(test_client, h, async_engine, 15)
+    # Ein Entwurf hängt an höchstens einem Termin (0.19) — erst am anderen lösen.
+    await test_client.patch(f"/planning/slots/{anderer_termin}", headers=h, json={"stunde_node_id": None})
+    resp = await test_client.patch(f"/planning/slots/{slot}", headers=h, json={"stunde_node_id": andere})
+    assert resp.status_code == 200, resp.text
 
     async with _sitzungen(async_engine)() as db:
         snapshot = (await db.execute(

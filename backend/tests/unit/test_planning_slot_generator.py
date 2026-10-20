@@ -293,7 +293,7 @@ async def test_woechentlicher_fallback_meldet_nichts():
 # ── Vorläufige Termine und vorhandene Slots (AP1, 22.09.2026) ────────────────
 
 
-def _mk_slot(datum, start_period=1, source="import"):
+def _mk_slot(datum, start_period=1, source="import", periods=1, geteilt=False):
     """Ein vorhandener Slot, wie ihn der Generator vor dem Löschen vorfindet.
 
     `source` ist ausdrücklich gesetzt: Daran entscheidet der Generator, ob der Slot fällt
@@ -304,6 +304,10 @@ def _mk_slot(datum, start_period=1, source="import"):
     s.date = datum
     s.start_period = start_period
     s.source = source
+    # Seit 0.19 belegt ein Slot **alle** seine Stunden, und ein geteilter bleibt stehen —
+    # beides entscheidet mit, also ausdrücklich gesetzt (sonst MagicMock-Vergleiche).
+    s.periods = periods
+    s.geteilt = geteilt
     return s
 
 

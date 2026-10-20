@@ -12,6 +12,8 @@
     getPlanningOverhang,
     updateSlot,
     swapSlots,
+    teileSlot,
+    legeSlotZusammen,
     listSnapshots,
     restoreSnapshot,
     createLesson,
@@ -140,6 +142,29 @@
       }
     } catch (e) {
       slots[idx] = prev
+      patchError = e.message
+    }
+  }
+
+  // ── Doppelstunde teilen / zusammenlegen (0.19) ───────────────────────────────
+  // Nicht optimistisch: Beim Teilen entsteht eine neue Zeile, beim Zusammenlegen fällt
+  // eine weg — die Übersicht kommt danach frisch vom Server (samt Bilanz der Einheiten).
+  async function teilen(slot) {
+    patchError = null
+    try {
+      await teileSlot(slot.id, slot.updated_at)
+      await loadOverview()
+    } catch (e) {
+      patchError = e.message
+    }
+  }
+
+  async function zusammenlegen(slot) {
+    patchError = null
+    try {
+      await legeSlotZusammen(slot.id, slot.updated_at)
+      await loadOverview()
+    } catch (e) {
       patchError = e.message
     }
   }
@@ -614,6 +639,8 @@
       onAusfallZurueck={ausfallZurueck}
       onAusfallWeg={ausfallWegZeile}
       onReview={handleReview}
+      onTeilen={teilen}
+      onZusammenlegen={zusammenlegen}
     />
   </div>
 

@@ -82,9 +82,12 @@ def _raster(patterns, start, end, phasen, calendar, belegt) -> list[tuple]:
             for p in by_weekday.get(d.weekday(), []):
                 if not _findet_statt(p.rhythmus, phase):
                     continue
-                if (d, p.start_period) in belegt:
-                    # Ein verschonter Slot sitzt schon hier. Die Musterzeile entfällt —
-                    # zwei Slots auf derselben Stunde wären eine Dublette.
+                if any((d, p.start_period + k) in belegt for k in range(max(1, p.periods))):
+                    # Ein verschonter Slot sitzt schon auf einer ihrer Stunden. Die
+                    # Musterzeile entfällt — zwei Slots auf derselben Stunde wären eine
+                    # Dublette. Geprüft wird **jede** Stunde: Bis 0.19 nur die erste, und eine
+                    # Doppelstunde aus dem Muster legte sich über die zweite Hälfte einer
+                    # geteilten (oder eine importierte Einzelstunde in der 6.).
                     continue
                 termine.append((d, p.start_period, p.periods))
         d += timedelta(days=1)
@@ -193,9 +196,10 @@ async def generate_slots(
             .all()
         )
         # Nur Muster-Slots verschwinden; alles andere trägt eine Quellangabe oder eine
-        # Entscheidung von Hand und überlebt (AP1).
-        aus_muster = [s for s in vorhanden if s.source == "pattern"]
-        verschont = [s for s in vorhanden if s.source != "pattern"]
+        # Entscheidung von Hand und überlebt (AP1). Eine geteilte Doppelstunde ist eine
+        # solche Entscheidung, auch wenn ihre Herkunft das Muster ist (0.19).
+        aus_muster = [s for s in vorhanden if s.source == "pattern" and not s.geteilt]
+        verschont = [s for s in vorhanden if s.source != "pattern" or s.geteilt]
         umzuhaengen = [
             AlterSlot(
                 id=s.id,
@@ -211,7 +215,13 @@ async def generate_slots(
             for s in aus_muster
         ]
 
-    belegt = {(s.date, s.start_period) for s in verschont}
+    # Jede Stunde eines verschonten Termins, nicht nur seine erste (0.19).
+    belegt = {
+        (s.date, s.start_period + k)
+        for s in verschont
+        if s.start_period is not None
+        for k in range(max(1, s.periods))
+    }
 
     raster = _raster(patterns, start, end, phasen, calendar, belegt)
 

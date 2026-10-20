@@ -99,6 +99,7 @@ class SlotRead(BaseModel):
     pinned: bool
     anpassung_noetig: bool
     vorlaeufig: bool = False
+    geteilt: bool = False  # Hälfte einer geteilten Doppelstunde (0.19)
     note: Optional[str]
     nachbereitet_at: Optional[datetime]
     nachbereitet_auto: bool

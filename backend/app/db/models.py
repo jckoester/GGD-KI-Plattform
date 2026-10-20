@@ -1537,6 +1537,12 @@ class LessonSlot(Base):
     vorlaeufig: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+    # Hälfte einer geteilten Doppelstunde (Alembic 0087, 0.19). Unabhängig von `source`:
+    # Die Herkunft bleibt, damit der Abgleich Ausfälle weiter einträgt. Der Neuaufbau aus
+    # dem Wochenmuster verschont geteilte Termine wie importierte und von Hand gesetzte.
+    geteilt: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     # `lessonId` der Quelle — identifiziert die Unterrichts**reihe**, nicht diesen Slot.
     # Mehrere Slots teilen sie sich (belegt: 5 Perioden je lessonId). Zeilenidentität ist
     # und bleibt (group_id, date, start_period).
@@ -1576,6 +1582,15 @@ class LessonSlot(Base):
             "idx_lesson_slots_external",
             "group_id", "external_uid",
             postgresql_where=text("external_uid IS NOT NULL"),
+        ),
+        # Ein Entwurf hängt an höchstens einem Termin (0087) — `get_lesson` liest ihn mit
+        # `scalar_one_or_none`. Erst beim Commit geprüft: Verschieben und Tauschen setzen
+        # den Entwurf am Ziel, bevor sie ihn an der Quelle lösen.
+        UniqueConstraint(
+            "stunde_node_id",
+            name="uq_lesson_slots_stunde_node_id",
+            deferrable=True,
+            initially="DEFERRED",
         ),
     )
 

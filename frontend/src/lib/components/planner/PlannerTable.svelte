@@ -19,6 +19,8 @@
         onUnpark = () => {},
         onEditLesson = null,
         onReview = null,
+        onTeilen = null,
+        onZusammenlegen = null,
         onAusfallTag = null,
         onAusfallZurueck = null,
         onAusfallWeg = null,
@@ -197,6 +199,8 @@
                             onUnpark={(parkplatzId) => onUnpark(parkplatzId, row.slot.id)}
                             {onEditLesson}
                             {onReview}
+                            {onTeilen}
+                            {onZusammenlegen}
                             {onAusfallTag}
                             {onAusfallZurueck}
                             {onAusfallWeg}

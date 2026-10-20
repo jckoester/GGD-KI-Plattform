@@ -8,7 +8,9 @@
           // dort verwendet, wo es keinen Tageskontext gibt.
           onAusfallTag = null, onAusfallZurueck = null,
           // AP5: die drei Wege, wenn an dieser Zeile noch etwas offen ist.
-          onAusfallWeg = null } = $props()
+          onAusfallWeg = null,
+          // Doppelstunde teilen / wieder zusammenlegen (0.19) — optional wie oben.
+          onTeilen = null, onZusammenlegen = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -483,6 +485,23 @@
               class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
             >
               Stunden-Verknüpfung lösen
+            </button>
+          {/if}
+          {#if onTeilen && slot.periods === 2 && slot.start_period}
+            <button
+              onclick={() => { onTeilen(slot); menuOpen = false }}
+              title="Etwa für eine Klassenarbeit in einer Hälfte oder den Wechsel der Einheit. Entwurf und Thema bleiben an der ersten Stunde."
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              In zwei Einzelstunden teilen
+            </button>
+          {/if}
+          {#if onZusammenlegen && slot.geteilt}
+            <button
+              onclick={() => { onZusammenlegen(slot); menuOpen = false }}
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              Wieder zur Doppelstunde zusammenlegen
             </button>
           {/if}
           <button
