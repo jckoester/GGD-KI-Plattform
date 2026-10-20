@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.context.visibility import read_scope_clause
-from app.context.vorab_statistik import ANGEBOT, GRUPPE, SICHER
+from app.context.vorab_statistik import ANGEBOT, BLOCK, GRUPPE, SICHER
 from app.db.models import ContextNode, ExchangeRate, Subject, VorabStatistik as VS
 from app.db.session import get_db
 from app.litellm import systemkonto
@@ -356,6 +356,10 @@ class VorabKnoten(BaseModel):
     sicher_gruppe: int = 0
     angeboten: int
     nachgeschlagen: int
+    #: Titel in der Block-Zeile „bereits eingeführt" (0.20, `grund = 'block'`) und wie oft er
+    #: danach im Werkzeugergebnis stand — getrennt, damit die Quote des Angebots stimmt.
+    im_block: int = 0
+    im_block_nachgeschlagen: int = 0
 
 
 class VorabFach(BaseModel):
@@ -416,8 +420,12 @@ async def get_vorab_statistik(
             VS.node_id,
             sa.func.sum(sa.case((VS.stufe == SICHER, VS.vorgelegt), else_=0)).label("sicher"),
             sa.func.sum(sa.case((VS.grund == GRUPPE, VS.vorgelegt), else_=0)).label("sicher_gruppe"),
-            sa.func.sum(sa.case((VS.stufe == ANGEBOT, VS.vorgelegt), else_=0)).label("angeboten"),
-            sa.func.sum(VS.im_werkzeugergebnis).label("nachgeschlagen"),
+            sa.func.sum(sa.case((sa.and_(VS.stufe == ANGEBOT, VS.grund.is_(None)), VS.vorgelegt),
+                                else_=0)).label("angeboten"),
+            sa.func.sum(sa.case((VS.grund.is_(None), VS.im_werkzeugergebnis), else_=0)).label("nachgeschlagen"),
+            sa.func.sum(sa.case((VS.grund == BLOCK, VS.vorgelegt), else_=0)).label("im_block"),
+            sa.func.sum(sa.case((VS.grund == BLOCK, VS.im_werkzeugergebnis), else_=0))
+            .label("im_block_nachgeschlagen"),
         )
         .where(VS.node_id.is_not(None), *filter_)
         .group_by(VS.node_id)
@@ -430,6 +438,7 @@ async def get_vorab_statistik(
         sa.select(
             summen.c.node_id, sa.case((sichtbar, ContextNode.title), else_=None), Subject.name,
             summen.c.sicher, summen.c.angeboten, summen.c.nachgeschlagen, summen.c.sicher_gruppe,
+            summen.c.im_block, summen.c.im_block_nachgeschlagen,
         )
         .join(ContextNode, ContextNode.id == summen.c.node_id)
         .outerjoin(Subject, Subject.id == ContextNode.subject_id)
@@ -450,7 +459,8 @@ async def get_vorab_statistik(
                 for w in wochen],
         knoten=[VorabKnoten(node_id=str(k[0]), titel=k[1], fach=k[2], sicher=int(k[3] or 0),
                             angeboten=int(k[4] or 0), nachgeschlagen=int(k[5] or 0),
-                            sicher_gruppe=int(k[6] or 0))
+                            sicher_gruppe=int(k[6] or 0), im_block=int(k[7] or 0),
+                            im_block_nachgeschlagen=int(k[8] or 0))
                 for k in knoten],
         faecher=[VorabFach(id=f[0], name=f[1]) for f in faecher],
     )

@@ -168,3 +168,106 @@ async def test_kontext_der_konversation_nimmt_die_eingefuehrten_mit(db_session, 
     assert [(b.titel, b.grund) for b in k_mit.bausteine if b.titel == "Gemisch AC"] == [("Gemisch AC", "gruppe")]
     assert "Gemisch AC" not in [b.titel for b in k_ohne.bausteine]
     assert "Gemisch AC" in [a.titel for a in k_ohne.angebot]
+
+
+# ── Schritt 6: Block-Zeile „In dieser Gruppe bereits eingeführt" (F4 a) ─────────
+
+
+async def _block(db):
+    from app.planning.student_context import get_current_topic, render_topic_block
+
+    topic = await get_current_topic(db, GROUP_ID, TODAY)
+    return topic, render_topic_block(topic, "Chemie")
+
+
+@pytest.mark.asyncio
+async def test_block_zeile_laufende_einheit_ohne_die_zwei_stunden(db_session, seed_sc_group):
+    """Begriffe der Einheit der letzten Stunde; was an den zwei Stunden steht, nicht noch einmal;
+    eine frühere Einheit nicht; Herkunft getrennt."""
+    bindung, stoffe_ue = _ue("Chemische Bindung"), _ue("Stoffe")
+    ion, metall, en, stoff = (_knoten(t) for t in ("Ionenbindung", "Metallbindung", "Elektronegativität", "Stoffe"))
+    e_alt, e1, e2, e3 = _entwurf(stoff), _entwurf(ion), _entwurf(metall), _entwurf(en)
+    db_session.add_all([bindung, stoffe_ue, ion, metall, en, stoff, e_alt, e1, e2, e3])
+    s_alt = _slot(date(2026, 2, 16), stunde_id=e_alt.id, ue_id=stoffe_ue.id, nachbereitet=True)
+    s1 = _slot(date(2026, 3, 9), stunde_id=e1.id, ue_id=bindung.id, nachbereitet=True)
+    db_session.add_all([s_alt, s1, _slot(date(2026, 3, 11), stunde_id=e2.id, ue_id=bindung.id),
+                        _slot(date(2026, 3, 13), stunde_id=e3.id, ue_id=bindung.id)])
+    await db_session.flush()
+    db_session.add_all([_eingetragen(stoff, s_alt), _eingetragen(ion, s1)])
+    await db_session.flush()
+
+    topic, md = await _block(db_session)
+    assert topic.bereits.einheit == "Chemische Bindung"
+    assert [t for _, t in topic.bereits.eingefuehrt] == ["Ionenbindung"]
+    assert topic.bereits.laut_plan == []  # Metall- und Elektronegativität stehen an den zwei Stunden
+    assert '- In dieser Gruppe bereits eingeführt (UE „Chemische Bindung", nur Titel): Ionenbindung' in md
+    assert "Stoffe" not in md
+
+
+@pytest.mark.asyncio
+async def test_block_zeile_ohne_einheit_letzte_acht_stunden(db_session, seed_sc_group):
+    from app.planning.student_context import EINGEFUEHRT_STUNDEN
+
+    alt, neu = _knoten("Zu alt"), _knoten("Im Fenster")
+    e_alt, e_neu = _entwurf(alt), _entwurf(neu)
+    db_session.add_all([alt, neu, e_alt, e_neu])
+    db_session.add(_slot(date(2026, 1, 12), stunde_id=e_alt.id))
+    db_session.add(_slot(date(2026, 2, 2), stunde_id=e_neu.id))
+    # Danach EINGEFUEHRT_STUNDEN − 1 belegte Stunden mit Thema, ohne Entwurf.
+    for i in range(EINGEFUEHRT_STUNDEN - 1):
+        db_session.add(_slot(date(2026, 3, 1) + timedelta(days=i), thema=f"T{i}"))
+    await db_session.flush()
+
+    topic, md = await _block(db_session)
+    assert topic.bereits.einheit is None
+    assert [t for _, t in topic.bereits.laut_plan] == ["Im Fenster"]
+    assert f"(letzte {EINGEFUEHRT_STUNDEN} Stunden, nur Titel): laut Plan: Im Fenster" in md
+
+
+@pytest.mark.asyncio
+async def test_block_zeile_deckel(db_session, seed_sc_group):
+    from app.planning.student_context import EINGEFUEHRT_TITEL
+
+    ue = _ue("Viel")
+    viele = [_knoten(f"B{i:02d}") for i in range(EINGEFUEHRT_TITEL + 3)]
+    alt = _entwurf(*viele)
+    db_session.add_all([ue, *viele, alt,
+                        _slot(date(2026, 3, 2), stunde_id=alt.id, ue_id=ue.id),
+                        _slot(date(2026, 3, 11), thema="Übung", ue_id=ue.id),
+                        _slot(date(2026, 3, 13), thema="Übung 2", ue_id=ue.id)])
+    await db_session.flush()
+
+    topic, _ = await _block(db_session)
+    assert len(topic.bereits.node_ids) == EINGEFUEHRT_TITEL
+
+
+@pytest.mark.asyncio
+async def test_block_zeile_fehlt_ohne_begriffe(db_session, seed_sc_group):
+    db_session.add(_slot(date(2026, 3, 13), thema="Nur Thema"))
+    await db_session.flush()
+
+    topic, md = await _block(db_session)
+    assert topic.bereits is None and "bereits eingeführt" not in md
+
+
+@pytest.mark.asyncio
+async def test_block_titel_kommen_in_den_kontext_fuer_die_statistik(db_session, seed_sc_group):
+    from unittest.mock import AsyncMock, patch
+
+    from app.context.service import kontext_fuer_frage
+    from app.db.models import Conversation
+
+    ue, begriff = _ue("Einheit"), _knoten("Früher eingeführt")
+    alt = _entwurf(begriff)
+    konv = Conversation(pseudonym="stud-ac", model_used="m", group_id=GROUP_ID)
+    db_session.add_all([ue, begriff, alt, konv,
+                        _slot(date.today() - timedelta(days=20), stunde_id=alt.id, ue_id=ue.id),
+                        _slot(date.today() - timedelta(days=3), thema="Zuletzt", ue_id=ue.id),
+                        _slot(date.today() - timedelta(days=1), thema="Gestern", ue_id=ue.id)])
+    await db_session.flush()
+
+    with patch("app.context.service.vektor_oder_none", AsyncMock(return_value=None)):
+        k = await kontext_fuer_frage(assistant_id=None, pseudonym="stud-ac", query_text="egal",
+                                     chat_id=konv.id, db=db_session, rollen=["student"])
+    assert k.block_angebot == [str(begriff.id)]
+    assert "laut Plan: Früher eingeführt" in k.text

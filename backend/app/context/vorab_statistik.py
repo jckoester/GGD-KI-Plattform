@@ -33,6 +33,8 @@ SICHER = "sicher"
 ANGEBOT = "angebot"
 #: ``grund`` einer sicheren Knotenzeile: sicher, weil die Unterrichtsgruppe ihn hatte (0.20).
 GRUPPE = "gruppe"
+#: ``grund`` einer Angebotszeile: Titel in der Block-Zeile „bereits eingeführt" (0.20).
+BLOCK = "block"
 ZAEHLER = (
     "vorgelegt", "im_werkzeugergebnis", "nachrichten", "mit_sicher", "mit_angebot",
     "angebot_nachgeschlagen", "suchen_ohne_angebot", "angebot_ohne_sicher",
@@ -49,13 +51,15 @@ def woche_von(zeitpunkt: datetime) -> date:
 
 def zeilen(
     sicher: Iterable[str], angebot: Iterable[str], im_werkzeugergebnis: set[str], gesucht: bool,
-    *, aus_gruppe: Iterable[str] = (),
+    *, aus_gruppe: Iterable[str] = (), im_block: Iterable[str] = (),
 ) -> list[dict]:
     """Die Zeilen **einer** Antwort, ohne Woche, Fach und Modell: zuerst die Wochenzeile, dann
     die Knotenzeilen. Nicht genannte Zähler sind 0.
 
     ``aus_gruppe``: sichere Knoten, die es nur wurden, weil die Gruppe sie hatte (0.20) — ihre
-    Zeile trägt ``grund = 'gruppe'``, alle anderen keinen."""
+    Zeile trägt ``grund = 'gruppe'``, alle anderen keinen. ``im_block``: Titel aus der Block-Zeile
+    „bereits eingeführt" — Knotenzeilen ``stufe = 'angebot'``, ``grund = 'block'``. Die Wochenzeile
+    zählt sie nicht: Ihre Zähler beschreiben die Vorab-Suche."""
     aus_gruppe = set(aus_gruppe)
     sicher, angebot = list(dict.fromkeys(sicher)), list(dict.fromkeys(angebot))
     nachgeschlagen = any(k in im_werkzeugergebnis for k in angebot)
@@ -73,6 +77,8 @@ def zeilen(
                "vorgelegt": 1} for k in sicher]
     knoten += [{"node_id": k, "stufe": ANGEBOT, "grund": None, "vorgelegt": 1,
                 "im_werkzeugergebnis": int(k in im_werkzeugergebnis)} for k in angebot]
+    knoten += [{"node_id": k, "stufe": ANGEBOT, "grund": BLOCK, "vorgelegt": 1,
+                "im_werkzeugergebnis": int(k in im_werkzeugergebnis)} for k in dict.fromkeys(im_block)]
     return [{z: 0 for z in ZAEHLER} | zeile for zeile in (woche, *knoten)]
 
 
@@ -93,6 +99,7 @@ async def zaehlen(
             im_werkzeugergebnis={b.node_id for b in werkzeug_bausteine},
             gesucht=gesucht,
             aus_gruppe=[b.node_id for b in kontext.bausteine if b.herkunft == VORAB and b.grund == GRUPPE],
+            im_block=kontext.block_angebot,
         )
         # Nur Knoten, die es noch gibt — wie beim Speichern der Bausteine: Zwischen Suche und
         # Zählen vergehen Sekunden, und ein gelöschter Knoten ließe den Fremdschlüssel anschlagen.

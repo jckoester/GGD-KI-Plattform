@@ -446,13 +446,13 @@ async def kontext_fuer_frage(
     )
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
-    planning_block = await _planning_block(db, chat_id)
+    planning_block, im_block = await _planning_block(db, chat_id)
     if planning_block:
         text = f"{planning_block}\n\n{base}" if base else planning_block
     else:
         text = base
     return Kontext(text=text, bausteine=grund.bausteine, angebot=grund.angebot,
-                   subject_id=grund.subject_id)
+                   subject_id=grund.subject_id, block_angebot=im_block)
 
 
 async def stufe_der_person(
@@ -536,13 +536,14 @@ async def _group_label(db: AsyncSession, group_id: int) -> str:
     return name
 
 
-async def _planning_block(db: AsyncSession, chat_id: UUID | None) -> str | None:
-    """Markdown-Block aus den Planungsdaten der Conversation-Gruppe (UP-7)."""
+async def _planning_block(db: AsyncSession, chat_id: UUID | None) -> tuple[str | None, list[str]]:
+    """Markdown-Block aus den Planungsdaten der Conversation-Gruppe (UP-7) — und die Kennungen
+    der Begriffe, deren Titel die Zeile „bereits eingeführt" nennt (0.20, für die Statistik)."""
     if chat_id is None:
-        return None
+        return None, []
     conv = await db.get(Conversation, chat_id)
     if conv is None or not isinstance(conv.group_id, int):
-        return None
+        return None, []
 
     # Lokaler Import vermeidet eine Modul-Zyklus-Abhängigkeit context ↔ planning.
     from datetime import date as _date
@@ -557,8 +558,9 @@ async def _planning_block(db: AsyncSession, chat_id: UUID | None) -> str | None:
     topic = await get_current_topic(db, conv.group_id, today)
     exam = await get_exam_scope(db, conv.group_id, today=today)
     if topic is None and exam is None:
-        return None
-    return render_topic_block(topic, await _group_label(db, conv.group_id), exam)
+        return None, []
+    im_block = topic.bereits.node_ids if topic is not None and topic.bereits is not None else []
+    return render_topic_block(topic, await _group_label(db, conv.group_id), exam), im_block
 
 
 # -- KS-Phase-6 Curriculum Import Logic -----------------------------------------

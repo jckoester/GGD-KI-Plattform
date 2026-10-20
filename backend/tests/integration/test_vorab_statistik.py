@@ -150,6 +150,12 @@ async def bestand(async_engine):
             s.add(VorabStatistik(woche=woche, node_id=knoten, stufe=stufe, subject_id=fach.id,
                                  modell="chat-standard", vorgelegt=vorgelegt,
                                  im_werkzeugergebnis=nach))
+        # 0.20: Block-Titel und „sicher wegen der Gruppe" — eigene Zeilen, eigene Spalten.
+        for knoten, stufe, grund, vorgelegt, nach in ((stoff, "angebot", "block", 4, 2),
+                                                      (ion, "sicher", "gruppe", 1, 0)):
+            s.add(VorabStatistik(woche=WOCHE, node_id=knoten, stufe=stufe, grund=grund,
+                                 subject_id=fach.id, modell="chat-standard", vorgelegt=vorgelegt,
+                                 im_werkzeugergebnis=nach))
         await s.commit()
     yield {"fach": fach.id, "stoff": stoff, "ion": ion, "geheim": geheim}
     async with factory() as s:
@@ -201,8 +207,11 @@ class TestApi:
                 for k in eigene] == [
             ("Statistikprobe Stoffe", "Statistik-Chemie", 0, 5, 1),
             (None, None, 0, 1, 0),
-            ("Statistikprobe Ion", None, 2, 0, 0),
+            ("Statistikprobe Ion", None, 3, 0, 0),
         ]
+        # 0.20: Block-Titel verfälschen die Quote des Angebots nicht; Gruppe ist Teil von sicher.
+        assert [(k["sicher_gruppe"], k["im_block"], k["im_block_nachgeschlagen"]) for k in eigene] == [
+            (0, 4, 2), (0, 0, 0), (1, 0, 0)]
 
     async def test_zeitraum_schneidet_wochen_ab(self, test_client, auth_headers, bestand):
         """Gegenprobe zum Zeitraum: Nur die erste Woche — die zweite zählt nirgends mit."""

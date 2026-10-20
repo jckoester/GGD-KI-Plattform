@@ -95,7 +95,8 @@
         Der angebotene Eintrag stand im Suchergebnis derselben Antwort — nicht unbedingt, weil das
         Modell gezielt nach ihm gesucht hat. Titel, die oft angeboten und nie nachgeschlagen werden,
         sind Kandidaten für die Pflege der Suchbegriffe. <em>Davon Gruppe</em>: sicher nur, weil die
-        Unterrichtsgruppe den Begriff schon hatte — sonst wäre er nur angeboten worden. Vorschau-Chats
+        Unterrichtsgruppe den Begriff schon hatte — sonst wäre er nur angeboten worden. <em>Im Block</em>:
+        Titel in der Zeile „In dieser Gruppe bereits eingeführt“, getrennt gezählt. Vorschau-Chats
         aus dem Editor zählen nicht.
     </p>
 
@@ -282,7 +283,12 @@
                                                   title="sicher, weil die Unterrichtsgruppe den Begriff schon hatte"
                                             >(davon Gruppe {k.sicher_gruppe})</span>{/if}
                                     </td>
-                                    <td class="px-3 py-1.5 text-right tabular-nums">{k.angeboten}</td>
+                                    <td class="px-3 py-1.5 text-right tabular-nums">
+                                        {k.angeboten}{#if k.im_block}
+                                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                                  title="Titel in der Zeile „In dieser Gruppe bereits eingeführt“ des Blocks „Aktueller Unterricht“ — davon nachgeschlagen"
+                                            >(im Block {k.im_block}, nachgeschlagen {k.im_block_nachgeschlagen})</span>{/if}
+                                    </td>
                                     <td class="px-3 py-1.5 text-right tabular-nums">{k.nachgeschlagen}</td>
                                     <td class="px-3 py-1.5 text-right tabular-nums">
                                         {knotenanteil(k) === null ? "—" : `${Math.round(100 * knotenanteil(k))} %`}

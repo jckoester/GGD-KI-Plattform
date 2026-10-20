@@ -75,3 +75,10 @@ def test_sicher_wegen_der_gruppe_traegt_den_grund():
                aus_gruppe=["g"])
     assert [(r["node_id"], r["stufe"], r["grund"]) for r in z] == [
         (None, None, None), ("a", "sicher", None), ("g", "sicher", "gruppe"), ("b", "angebot", None)]
+
+
+def test_block_titel_als_angebot_mit_grund_block_ohne_wochenzaehler():
+    z = zeilen(sicher=[], angebot=[], im_werkzeugergebnis={"k"}, gesucht=False, im_block=["k", "k"])
+    assert [(r["node_id"], r["stufe"], r["grund"], r["im_werkzeugergebnis"]) for r in z] == [
+        (None, None, None, 0), ("k", "angebot", "block", 1)]
+    assert z[0]["mit_angebot"] == 0 and z[0]["angebot_nachgeschlagen"] == 0

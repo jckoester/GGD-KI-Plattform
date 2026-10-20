@@ -82,6 +82,9 @@ class Kontext:
     #: Fach, mit dem die Vorab-Suche gesucht hat (Unterrichtsgruppe, sonst Fachzuordnung) —
     #: für die Vorab-Statistik.
     subject_id: int | None = None
+    #: Begriffe, deren Titel die Block-Zeile „In dieser Gruppe bereits eingeführt" nennt (0.20)
+    #: — für die Vorab-Statistik (`grund = 'block'`).
+    block_angebot: list[str] = field(default_factory=list)
 
 
 def aus_treffern(treffer: Iterable, herkunft: str) -> list[Baustein]:

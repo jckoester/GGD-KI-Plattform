@@ -11,6 +11,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Frage passt, als Inhalt mit, wenn die Gruppe ihn schon im Unterricht hatte (nachbereitet oder
   laut Plan). Die Statistik der Vorab-Suche weist das je Eintrag als „davon Gruppe“ aus.
   Migration 0089.
+- Der Stand des Unterrichts im Chat mit Unterrichtsgruppe nennt zusätzlich die Fachbegriffe,
+  die die Gruppe in der laufenden Einheit schon hatte (ohne Einheit: in den letzten acht
+  Stunden) — nur die Titel, getrennt nach nachbereitet und laut Plan.
 
 ### Geändert
 

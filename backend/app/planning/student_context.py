@@ -29,6 +29,12 @@ VERGANGENE_STUNDEN = 2
 INHALTE_JE_STUNDE = 5
 #: Länge eines Inhalts im Block; Kompetenztitel tragen Nummer und ganzen Text.
 INHALT_ZEICHEN = 100
+#: Zeile „In dieser Gruppe bereits eingeführt" (0.20, Päckchen AC, F4 a): Ohne laufende Einheit
+#: zählen die Begriffe der letzten so vielen Stunden …
+EINGEFUEHRT_STUNDEN = 8
+#: … und es stehen höchstens so viele Titel da. Nur Titel — den Inhalt holt das Modell per
+#: Werkzeug, wie beim Angebot der Vorab-Suche (0.16).
+EINGEFUEHRT_TITEL = 12
 
 
 @dataclass
@@ -48,10 +54,27 @@ class TopicSlot:
 
 
 @dataclass
+class BereitsEingefuehrt:
+    """Die Zeile „In dieser Gruppe bereits eingeführt" (0.20, Päckchen AC, F4 a)."""
+
+    #: Titel der laufenden Einheit — ``None`` heißt: die letzten :data:`EINGEFUEHRT_STUNDEN`.
+    einheit: str | None
+    #: (Kennung, Titel) — nachbereitet bzw. nur laut Plan, je die jüngsten zuerst.
+    eingefuehrt: list[tuple[str, str]] = field(default_factory=list)
+    laut_plan: list[tuple[str, str]] = field(default_factory=list)
+
+    @property
+    def node_ids(self) -> list[str]:
+        return [k for k, _ in (*self.eingefuehrt, *self.laut_plan)]
+
+
+@dataclass
 class CurrentTopic:
     #: Die vergangenen Stunden, die jüngste zuerst — nachbereitet oder nicht (0.15).
     vergangene: list[TopicSlot] = field(default_factory=list)
     naechste: list[TopicSlot] = field(default_factory=list)
+    #: Begriffe über die zwei Stunden hinaus (0.20); ``None``, wenn es keine gibt.
+    bereits: BereitsEingefuehrt | None = None
 
 
 def _belegt_filter():
@@ -86,7 +109,11 @@ def _fuer_alle_lesbar(node: ContextNode, group_id: int) -> bool:
 
 
 def _inhalt(node: ContextNode) -> str:
-    titel = (node.title or "").strip()
+    return _kurz(node.title)
+
+
+def _kurz(titel: str | None) -> str:
+    titel = (titel or "").strip()
     return titel if len(titel) <= INHALT_ZEICHEN else titel[: INHALT_ZEICHEN - 1].rstrip() + "…"
 
 
@@ -306,6 +333,15 @@ def render_topic_block(
             label = "Nächste Stunde" if i == 0 else "Danach"
             ziel = f" — {s.stundenziel}" if s.stundenziel else ""
             lines.append(f"- {label} ({_fmt_datum(s.datum)}): {s.thema or '—'}{ziel}")
+    if topic is not None and topic.bereits is not None:
+        b = topic.bereits
+        rahmen = f'UE „{b.einheit}"' if b.einheit else f"letzte {EINGEFUEHRT_STUNDEN} Stunden"
+        teile = []
+        if b.eingefuehrt:
+            teile.append(" · ".join(t for _, t in b.eingefuehrt))
+        if b.laut_plan:
+            teile.append("laut Plan: " + " · ".join(t for _, t in b.laut_plan))
+        lines.append(f"- In dieser Gruppe bereits eingeführt ({rahmen}, nur Titel): {' — '.join(teile)}")
     if exam is not None:
         umfang = ", ".join(exam.unit_titles) if exam.unit_titles else "noch offen"
         lines.append(f"- Klassenarbeit: {_fmt_datum(exam.exam_date)} — Umfang: {umfang}")
@@ -373,4 +409,46 @@ async def get_current_topic(
     return CurrentTopic(
         vergangene=vergangene,
         naechste=[_to_topic_slot(s, nodes) for s in naechste_slots],
+        bereits=await _bereits_eingefuehrt(db, group_id, today, vergangene_slots, vergangene, nodes),
+    )
+
+
+async def _bereits_eingefuehrt(
+    db: AsyncSession, group_id: int, today: date, vergangene_slots: list[LessonSlot],
+    vergangene: list[TopicSlot], nodes: dict[UUID, ContextNode],
+) -> BereitsEingefuehrt | None:
+    """Begriffe der laufenden Einheit (Einheit der letzten Stunde), sonst der letzten
+    :data:`EINGEFUEHRT_STUNDEN` Stunden — ohne die, die schon an den zwei Stunden stehen.
+
+    Die Herkunft bleibt sichtbar (F3 b): nachbereitet heißt „eingeführt", sonst „laut Plan".
+    """
+    from app.planning.eingefuehrt import NACHBEREITET, eingefuehrte_begriffe
+
+    if not vergangene_slots:
+        return None
+    liste = await eingefuehrte_begriffe(db, group_id, heute=today)
+    if not liste:
+        return None
+    ue = vergangene_slots[0].ue_node_id
+    if ue is not None:
+        auswahl = [e for e in liste if e.ue_node_id == ue]
+        einheit = nodes[ue].title if ue in nodes else None
+    else:
+        daten = (await db.execute(
+            sa.select(LessonSlot.date)
+            .where(LessonSlot.group_id == group_id, LessonSlot.date < today, _belegt_filter())
+            .order_by(LessonSlot.date.desc())
+            .limit(EINGEFUEHRT_STUNDEN)
+        )).scalars().all()
+        ab = min(daten) if daten else today
+        auswahl = [e for e in liste if e.datum is not None and e.datum >= ab]
+        einheit = None
+    schon_da = {i for z in vergangene for i in z.inhalte}
+    auswahl = [e for e in auswahl if _kurz(e.titel) not in schon_da][:EINGEFUEHRT_TITEL]
+    if not auswahl:
+        return None
+    return BereitsEingefuehrt(
+        einheit=einheit,
+        eingefuehrt=[(str(e.node_id), _kurz(e.titel)) for e in auswahl if e.herkunft == NACHBEREITET],
+        laut_plan=[(str(e.node_id), _kurz(e.titel)) for e in auswahl if e.herkunft != NACHBEREITET],
     )
