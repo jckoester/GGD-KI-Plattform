@@ -361,10 +361,14 @@ export async function* streamChat(
   subjectId = null,
   groupId = null,
   stundeId = null,
+  // 0.19: `signal` (Stopp-Knopf, AbortController) und `ersetztLetzte` (die letzte eigene
+  // Nachricht samt Antwort wird durch diese ersetzt).
+  { signal = null, ersetztLetzte = false } = {},
 ) {
   let res;
   try {
     const body = { messages, conversation_id: conversationId };
+    if (ersetztLetzte) body.ersetzt_letzte = true;
     if (modelId) body.model_id = modelId;
     if (assistantId) body.assistant_id = assistantId;
     if (isTest) body.is_test = true;
@@ -379,8 +383,11 @@ export async function* streamChat(
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(body),
+      signal: signal ?? undefined,
     });
-  } catch {
+  } catch (err) {
+    // Gewollt abgebrochen — kein Verbindungsfehler; die Chatseite unterscheidet das.
+    if (signal?.aborted) throw err;
     throw new ApiError(0, "Verbindung zum Server fehlgeschlagen.");
   }
 

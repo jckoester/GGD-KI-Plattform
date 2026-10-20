@@ -149,6 +149,10 @@ class MessageItem(BaseModel):
     # **auslösenden** Nachricht — dorthin zeigt auch das Flag. Bis 09/2026 kam das
     # Banner nur live über SSE und war nach dem Neuladen weg.
     crisis: Optional[dict] = None
+    # 0.19: Die Antwort endete vorzeitig (Stopp, Tab zu) — gespeichert ist der Teil bis dahin.
+    abgebrochen: bool = False
+    # 0.19: Schreibende Werkzeuge dieser Antwort — die Oberfläche warnt beim Bearbeiten.
+    werkzeuge_mit_wirkung: list[str] = []
 
 
 class ConversationDetailResponse(BaseModel):
@@ -1596,12 +1600,27 @@ async def _persist(
     generated_image_ids: Optional[list] = None,
     provider_model: Optional[str] = None,
     bausteine: Optional[list] = None,
+    ersetze_ids: Optional[list[UUID]] = None,
+    abgebrochen: bool = False,
+    werkzeuge_mit_wirkung: Optional[list[str]] = None,
 ) -> Optional[UUID]:
     """Schreibt Nachrichten + Konversations-Update. Gibt die ID der Assistant-Nachricht
     zurück — das Frontend braucht sie, um später die Herkunft eines daraus gespeicherten
-    Diagramms oder Dokuments belegen zu können (Modell-Transparenz)."""
+    Diagramms oder Dokuments belegen zu können (Modell-Transparenz).
+
+    ``ersetze_ids`` (0.19): die bearbeitete Nachricht und ihre Antwort — im selben Commit
+    ausgeblendet, in dem die neue entsteht. Ausgeblendet, nicht gelöscht: Krisenmeldung,
+    Bausteine und Bilder hängen per CASCADE an ihnen.
+    """
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
+
+    if ersetze_ids:
+        await db.execute(
+            update(Message)
+            .where(Message.id.in_(ersetze_ids), Message.ersetzt_am.is_(None))
+            .values(ersetzt_am=func.now())
+        )
 
     # Die User-Nachricht kann bereits früh persistiert worden sein (Krisen-Erkennung).
     if not skip_user_message:
@@ -1623,6 +1642,8 @@ async def _persist(
         tokens_output=tokens_output,
         cost_usd=cost_usd,
         cost_status=cost_status,
+        abgebrochen=abgebrochen,
+        werkzeuge_mit_wirkung=werkzeuge_mit_wirkung or None,
     )
     db.add(assistant_msg)
 
@@ -1651,6 +1672,61 @@ async def _persist(
     )
     await db.commit()
     return assistant_msg.id
+
+
+async def zu_ersetzende_nachrichten(db: AsyncSession, conversation_id: UUID) -> list[UUID]:
+    """Die letzte sichtbare Nutzernachricht und alles danach (ihre Antwort) — leer, wenn es
+    keine gibt (0.19). Bereits ersetzte Nachrichten zählen nicht: Wer zweimal hintereinander
+    bearbeitet, ersetzt die zuletzt geschriebene, nicht die ursprüngliche."""
+    sichtbar = (await db.execute(
+        select(Message.id, Message.role)
+        .where(Message.conversation_id == conversation_id, Message.ersetzt_am.is_(None))
+        .order_by(*NACHRICHTEN_FOLGE)
+    )).all()
+    letzte = max((i for i, z in enumerate(sichtbar) if z.role == "user"), default=None)
+    return [] if letzte is None else [z.id for z in sichtbar[letzte:]]
+
+
+def _abbruch_sichern(*, conversation_id, user_message, attachments, teilantwort, usage,
+                     model_used, deployment_id, request_ids, image_cost, offen, client,
+                     **persist_kw) -> None:
+    """Speichert einen abgebrochenen Zug in einer eigenen Aufgabe (0.19, Schritt 5).
+
+    Aufgerufen aus dem abgebrochenen Antwort-Generator, der selbst nichts mehr abwarten kann.
+    Eigene Sitzung, weil die der Anfrage mit ihr endet. Die Kosten der gelaufenen Anfragen
+    trägt wie sonst der Nachtrag ein — mit derselben Ehrlichkeit: `ausstehend`, bis sie da sind.
+    """
+    async def _speichern():
+        for antwort in offen:
+            try:
+                await antwort.aclose()
+            except Exception:
+                pass
+        try:
+            await client.aclose()
+        except Exception:
+            pass
+        async with AsyncSessionLocal() as db:
+            nachricht_id = await _persist(
+                db, conversation_id, user_message, attachments, teilantwort, usage,
+                model_used,
+                cost_usd=image_cost or None,
+                cost_status="ausstehend" if request_ids else ("vollstaendig" if image_cost else None),
+                provider_model=await anbietermodell(deployment_id, model_used),
+                abgebrochen=True,
+                **persist_kw,
+            )
+        logger.info(
+            "Antwort abgebrochen und gespeichert: Konversation %s, %d Zeichen, %d Anfragen",
+            conversation_id, len(teilantwort), len(request_ids),
+        )
+        if nachricht_id is not None and request_ids:
+            kosten_nachtrag.nachtragen(
+                AsyncSessionLocal, message_id=nachricht_id, conversation_id=conversation_id,
+                request_ids=request_ids, wartezeiten=_SPEND_LOG_WARTEZEITEN,
+            )
+
+    im_hintergrund(_speichern, was=f"Abgebrochene Antwort {conversation_id}")
 
 
 @dataclass
@@ -1822,6 +1898,9 @@ async def chat(
     model_used = request.model_id or settings.chat_default_model
     system_prompt_snapshot: Optional[str] = None
 
+    if request.ersetzt_letzte and request.conversation_id is None:
+        raise HTTPException(status_code=422, detail="Eine neue Unterhaltung hat nichts zu ersetzen.")
+
     # Anhang-Limit serverseitig erzwingen (Sicherheits-Audit #10): das Frontend begrenzt auf
     # settings.upload_max_files, der Server muss das unabhängig prüfen — pro Nutzernachricht des
     # Requests (History inklusive, da alle Nachrichten an LiteLLM gehen).
@@ -1982,6 +2061,16 @@ async def chat(
         # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
         if request.model_id:
             model_used = request.model_id
+
+    # Letzte Nachricht bearbeiten (0.19): Welche Zeilen die neue ersetzt, steht **vor** der
+    # Krisen-Erkennung fest — die schreibt die neue Nachricht womöglich schon, und dann wäre
+    # sie selbst „die letzte".
+    ersetze_ids: list[UUID] = []
+    if request.ersetzt_letzte:
+        ersetze_ids = await zu_ersetzende_nachrichten(db, conversation_id)
+        if not ersetze_ids:
+            await client.aclose()
+            raise HTTPException(status_code=409, detail="Es gibt keine Nachricht, die sich ersetzen ließe.")
 
     # Krisen-Erkennung (ADR-008 Teil 3): lokal, parallel zum LLM-Call, OHNE Blockieren.
     # Test-Chats (Assistenten-Entwicklung) werden nicht geflaggt.
@@ -2261,6 +2350,7 @@ async def chat(
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
         _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
         _abbruch: str | None = None      # Meldung, wenn der Strom abriss oder LiteLLM ablehnte
+        _wirkende_werkzeuge: list[str] = []  # schreibende Werkzeuge, die gegriffen haben (0.19)
 
         current_messages = list(llm_messages)
         current_response = response
@@ -2431,6 +2521,9 @@ async def chat(
                         stunde_node_id=conversation_stunde_id,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
+                    if tool.writes and not (isinstance(tool_result, dict) and tool_result.get("error")):
+                        if _tc_name not in _wirkende_werkzeuge:
+                            _wirkende_werkzeuge.append(_tc_name)
                     # Ein Werkzeug darf den Stundenbezug setzen (`waehle_stunde`, 0.15). Er
                     # gilt sofort für die folgenden Aufrufe dieser Anfrage — sonst schriebe
                     # ein Aufruf ohne Kennung noch in den vorigen Bezug.
@@ -2581,6 +2674,30 @@ async def chat(
             if _runden_id and _runden_id not in _request_ids:
                 _request_ids.append(_runden_id)
 
+        except (asyncio.CancelledError, GeneratorExit):
+            # Abbruch: Stopp-Knopf, Tab geschlossen, Netz weg (0.19). uvicorn meldet es als
+            # Abbruch dieses Generators (ASGI 2.3, `listen_for_disconnect`); unter ASGI 2.4
+            # käme es als `GeneratorExit`. Hier lässt sich nichts mehr abwarten — jedes
+            # `await` würde sofort wieder abgebrochen (Versuch 20.10.2026). Gespeichert wird
+            # deshalb in einer eigenen Aufgabe mit eigener Sitzung: die Frage, der Teil der
+            # Antwort bis hierher, die Kosten der gelaufenen Anfragen. Bis 0.19 ging all das
+            # verloren.
+            if _runden_id and _runden_id not in _request_ids:
+                _request_ids.append(_runden_id)
+            _abbruch_sichern(
+                conversation_id=conversation_id, user_message=user_message,
+                attachments=last_attachments, teilantwort="".join(full_content),
+                usage=usage, model_used=model_used, deployment_id=_deployment_id,
+                request_ids=list(_request_ids), image_cost=_image_cost_total,
+                assistant_id=active_assistant_id, conv_assistant_update=conv_assistant_update,
+                skip_user_message=crisis_record is not None,
+                generated_image_ids=list(_generated_image_ids),
+                bausteine=vereinige(kontext.bausteine, _werkzeug_bausteine),
+                ersetze_ids=ersetze_ids, werkzeuge_mit_wirkung=list(_wirkende_werkzeuge),
+                offen=[response, *_extra_responses], client=client,
+            )
+            raise
+
         finally:
             await response.aclose()
             for _r in _extra_responses:
@@ -2636,6 +2753,8 @@ async def chat(
                 generated_image_ids=_generated_image_ids,
                 provider_model=await anbietermodell(_deployment_id, model_used),
                 bausteine=_bausteine,
+                ersetze_ids=ersetze_ids,
+                werkzeuge_mit_wirkung=_wirkende_werkzeuge,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
@@ -3242,7 +3361,9 @@ async def get_conversation_messages(
     messages_result = await db.execute(
         select(Message, Assistant.name.label("assistant_name"))
         .outerjoin(Assistant, Assistant.id == Message.assistant_id)
-        .where(Message.conversation_id == conversation_id)
+        # Ersetzte Nachrichten (0.19) bleiben gespeichert, gehören aber nicht mehr in den
+        # Verlauf — weder für die Person noch, über den Client, für das Modell.
+        .where(Message.conversation_id == conversation_id, Message.ersetzt_am.is_(None))
         .order_by(*NACHRICHTEN_FOLGE)
     )
     rows = messages_result.all()
@@ -3328,6 +3449,8 @@ async def get_conversation_messages(
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,
                 "images": img_map.get(msg.id, []),
+                "abgebrochen": msg.abgebrochen,
+                "werkzeuge_mit_wirkung": msg.werkzeuge_mit_wirkung or [],
                 "kontext": kontext_map.get(msg.id, []),
             })
 

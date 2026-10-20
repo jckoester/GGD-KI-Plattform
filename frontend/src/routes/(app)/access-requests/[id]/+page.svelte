@@ -107,7 +107,8 @@
     ];
     for (const m of payload.messages) {
       const who = m.role === "user" ? "Schüler:in" : "Assistent";
-      lines.push(`## ${who} — ${new Date(m.created_at).toLocaleString("de-DE")}`);
+      const zusatz = m.ersetzt ? " (später ersetzt)" : m.abgebrochen ? " (abgebrochen)" : "";
+      lines.push(`## ${who} — ${new Date(m.created_at).toLocaleString("de-DE")}${zusatz}`);
       lines.push("");
       lines.push(m.content);
       lines.push("");
@@ -193,7 +194,14 @@
 
       <div class="space-y-1">
         {#each data.messages as m, i (i)}
-          <MessageBubble message={m} />
+          {#if m.ersetzt}
+            <p class="text-xs italic text-light-tx-2 dark:text-dark-tx-2 mt-2">
+              Später durch eine bearbeitete Nachricht ersetzt — im Chat nicht mehr sichtbar:
+            </p>
+          {/if}
+          <div class:opacity-60={m.ersetzt}>
+            <MessageBubble message={m} />
+          </div>
         {/each}
       </div>
     {/if}

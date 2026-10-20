@@ -51,6 +51,9 @@ class ChatRequest(BaseModel):
     group_id: Optional[int] = None
     # Stundenbezug (0.15) — wie `group_id` nur beim Anlegen einer Konversation ausgewertet.
     stunde_node_id: Optional[UUID] = None
+    # Die letzte eigene Nachricht wird ersetzt (0.19): Sie und ihre Antwort werden
+    # ausgeblendet, sobald die neue gespeichert ist. `messages` trägt dann den Verlauf ohne sie.
+    ersetzt_letzte: bool = False
 
     @model_validator(mode="after")
     def at_least_one_message(self):

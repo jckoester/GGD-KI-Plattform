@@ -67,7 +67,8 @@ async def lade(db: AsyncSession, conversation_id: UUID, pseudonym: str) -> dict 
     # selbst ist seit 07.10.2026 eindeutig (`NACHRICHTEN_FOLGE`).
     ergebnis = await db.execute(
         select(Message)
-        .where(Message.conversation_id == conversation_id)
+        # Was die Person sieht: ohne ersetzte Nachrichten (0.19).
+        .where(Message.conversation_id == conversation_id, Message.ersetzt_am.is_(None))
         .order_by(*NACHRICHTEN_FOLGE)
     )
     nachrichten = list(ergebnis.scalars().all())[-GEKUERZT_AUF:]

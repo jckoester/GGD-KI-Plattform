@@ -576,6 +576,17 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+    # Durch eine bearbeitete Nachricht ersetzt (0088, 0.19): ausgeblendet, nicht gelöscht —
+    # Krisenmeldung, Bausteine und Bilder hängen per CASCADE an ihr. Der Verlauf lässt sie
+    # weg, die Krisen-Einsicht zeigt sie.
+    ersetzt_am: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    # Antwort vorzeitig beendet (Stopp, Tab zu, Netz weg) — gespeichert ist der Teil bis dahin.
+    abgebrochen: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    # Schreibende Werkzeuge, die diese Antwort ausgeführt hat — für den Hinweis beim
+    # Bearbeiten, dass ihre Wirkung bleibt (Plan F6).
+    werkzeuge_mit_wirkung: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

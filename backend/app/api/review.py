@@ -204,6 +204,10 @@ class ReaderMessage(BaseModel):
     role: str  # 'user' | 'assistant'
     content: str
     created_at: datetime
+    # Von der Person durch eine bearbeitete Nachricht ersetzt (0.19). Die Einsicht zeigt sie
+    # trotzdem — sie ist Teil dessen, was geschrieben wurde, und an ihr kann ein Flag hängen.
+    ersetzt: bool = False
+    abgebrochen: bool = False
 
 
 class ReaderConversationResponse(BaseModel):
@@ -267,7 +271,8 @@ async def _build_reader_payload(
         if m.role == "user":
             content, _ = _parse_stored_content(m.content)  # Anhänge-Marker entfernen
         messages.append(
-            ReaderMessage(role=m.role, content=content, created_at=m.created_at)
+            ReaderMessage(role=m.role, content=content, created_at=m.created_at,
+                          ersetzt=m.ersetzt_am is not None, abgebrochen=m.abgebrochen)
         )
 
     # Append-only-Audit: JEDER Zugriff wird protokolliert.

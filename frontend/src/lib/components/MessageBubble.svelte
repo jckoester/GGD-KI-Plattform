@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2 } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2, Pencil } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
@@ -37,6 +37,8 @@
         kontextStufe = 'aus',
         // Wohin „Zurück“ aus einem Baustein der Kontextliste führt (`/chat?id=…`).
         kontextZurueck = null,
+        // Nur an der letzten eigenen Nachricht gesetzt (0.19): öffnet das Bearbeiten.
+        onBearbeiten = null,
     } = $props();
 
     // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
@@ -371,6 +373,18 @@
             {/if}
         </div>
     </div>
+    {#if onBearbeiten}
+        <div class="flex justify-end -mt-2">
+            <button
+                onclick={onBearbeiten}
+                class="inline-flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2
+                       hover:text-light-bl dark:hover:text-dark-bl px-1 py-0.5"
+                title="Nachricht bearbeiten und neu senden — die bisherige Antwort wird ersetzt"
+            >
+                <Pencil class="w-3 h-3" /> Bearbeiten
+            </button>
+        </div>
+    {/if}
     <!-- Das Hilfe-Banner (ADR-008) folgt der Nachricht, die es ausgelöst hat:
          **unter** der eigenen Eingabe, **über** der Modellantwort. Vorher hing es
          an der Antwort und war bei langem Text erst nach dem Scrollen zu sehen. -->
@@ -382,7 +396,10 @@
 
 {:else if message.role === 'assistant'}
     <div class="flex flex-col items-start">
-        {#if istLeereAntwort(message, isStreaming)}
+        {#if message.abgebrochen && !message.content && !message.images?.length && !isStreaming}
+            <!-- Gestoppt, bevor ein Wort kam: kein „leere Antwort"-Fehler, sondern das. -->
+            <p class="text-sm italic text-light-tx-2 dark:text-dark-tx-2">Abgebrochen, bevor eine Antwort kam.</p>
+        {:else if istLeereAntwort(message, isStreaming)}
             <!-- Antwort ohne Inhalt: Bis 09/2026 rendert die Blase hier gar nichts —
                  die Frage verschwand scheinbar spurlos, das Budget war gebucht.
                  Die Regel dazu (inklusive „Bilder sind eine Antwort") steht in
@@ -407,6 +424,8 @@
             </div>
             {#if isStreaming}
                 <span class="animate-pulse cursor-default text-light-tx-2 dark:text-dark-tx-2 text-sm ml-0.5">|</span>
+            {:else if message.abgebrochen}
+                <p class="text-xs italic text-light-tx-2 dark:text-dark-tx-2 mt-1">— abgebrochen</p>
             {/if}
             <!-- Bild und Aktionen gehören **in** die Blase: Sie sind Teil
                  derselben Antwort. Außerhalb wirkten sie wie eigene Beiträge,

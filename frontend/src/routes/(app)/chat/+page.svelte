@@ -2,6 +2,7 @@
     import { onDestroy, onMount } from "svelte";
     import {
         Send,
+        Square,
         Loader2,
         AlertCircle,
         Paperclip,
@@ -11,6 +12,7 @@
         Search,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
+    import { hatteAnhaenge, istAbbruch, istBearbeitbar, letzteEigeneIndex, wirkungsHinweis } from "$lib/chat_bearbeiten.js";
     import { kontextStufe } from "$lib/kontext_anzeige.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { mentionAnfrage, ohneMentionFragment } from "$lib/mention.js";
@@ -34,6 +36,7 @@
         passendeAssistenten,
     } from "$lib/assistentenwahl.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
     import { tick } from "svelte";
     import {
         streamChat,
@@ -84,6 +87,27 @@
     let input = $state("");
     let textarea = $state(null);
     let isStreaming = $state(false);
+    // Stopp-Knopf (0.19): der AbortController des laufenden Stroms.
+    let abbruch = null;
+    // Letzte Nachricht bearbeiten (0.19): Index der Nachricht, die beim Senden ersetzt wird.
+    let bearbeitung = $state(null);
+
+    function bearbeiten(index) {
+        bearbeitung = index;
+        input = messages[index]?.content ?? "";
+        adjustTextareaHeight();
+        textarea?.focus();
+    }
+
+    function bearbeitenAbbrechen() {
+        bearbeitung = null;
+        input = "";
+        adjustTextareaHeight();
+    }
+
+    function stoppen() {
+        abbruch?.abort();
+    }
     let scrollAnchor = $state(null);
     let conversationId = $state(null);
     let loadingConversation = $state(false);
@@ -566,6 +590,12 @@
         input = "";
         adjustTextareaHeight();
 
+        // Bearbeiten (0.19): die alte Nachricht und alles danach fallen weg — auch aus dem
+        // Verlauf, der ans Modell geht. Das Backend blendet beide aus (`ersetzt_letzte`).
+        const ersetztLetzte = bearbeitung !== null && bearbeitung === letzteEigeneIndex(messages);
+        if (ersetztLetzte) messages = messages.slice(0, bearbeitung);
+        bearbeitung = null;
+
         // Neu: Anhänge snapshotten und sofort leeren
         const snapshotAttachments = readyAttachments.map((a) => ({
             filename: a.filename,
@@ -588,6 +618,8 @@
         messages = [...messages, { role: "assistant", content: "" }];
 
         isStreaming = true;
+        abbruch = new AbortController();
+        const signal = abbruch.signal;
 
         try {
             // Neu: Content je User-Nachricht aufbauen
@@ -629,6 +661,7 @@
                 pendingSubjectId, // subjectId
                 pendingGroupId, // groupId
                 pendingStundeId, // stundeId
+                { signal, ersetztLetzte },
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
@@ -826,6 +859,15 @@
                 await goto("/");
                 return;
             }
+            // Stopp-Knopf (0.19): kein Fehler. Was bis hierher kam, bleibt stehen; das
+            // Backend speichert es als abgebrochen.
+            if (istAbbruch(err, signal)) {
+                if (messages[assistantIndex]) {
+                    messages[assistantIndex] = { ...messages[assistantIndex], abgebrochen: true };
+                    messages = messages;
+                }
+                return;
+            }
 
             // Leeren Assistent-Platzhalter entfernen, falls kein Token ankam.
             //
@@ -846,6 +888,7 @@
             ];
         } finally {
             isStreaming = false;
+            abbruch = null;
             // Konversationen in Sidebar neu laden
             triggerSidebarRefresh();
             refreshBudget(); // neu: Budget-Store aktualisieren
@@ -1132,6 +1175,8 @@
                     assistantName: m.assistant_name ?? null,
                     images: m.images?.length ? m.images : undefined,
                     kontext: m.kontext?.length ? m.kontext : undefined,
+                    abgebrochen: m.abgebrochen ?? false,
+                    werkzeuge_mit_wirkung: m.werkzeuge_mit_wirkung ?? [],
                 }));
                 messages = insertSeparators(rawMessages);
                 conversationId = data.id;
@@ -1382,6 +1427,10 @@
                             granularity === "both"}
                         kontextStufe={kontextAnzeige}
                         kontextZurueck={conversationId ? `/chat?id=${conversationId}` : null}
+                        onBearbeiten={message.role === "user" && bearbeitung === null &&
+                            istBearbeitbar(messages, i, { isStreaming, conversationId })
+                            ? () => bearbeiten(i)
+                            : null}
                         costEur={granularity === "message" ||
                         granularity === "both"
                             ? kostenEinheiten(
@@ -1530,6 +1579,25 @@
                 </div>
             {/if}
 
+            {#if bearbeitung !== null}
+                <!-- Letzte Nachricht bearbeiten (0.19). Was die alte Antwort bewirkt hat,
+                     bleibt — das muss man vor dem Senden wissen (Plan F6). -->
+                {@const antwort = messages.slice(bearbeitung + 1).find((m) => m.role === "assistant")}
+                <div class="mb-2 space-y-1">
+                    <div class="flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                        <span>Sie bearbeiten Ihre letzte Nachricht — Senden ersetzt sie samt Antwort.</span>
+                        <button class="underline hover:text-light-bl dark:hover:text-dark-bl"
+                                onclick={bearbeitenAbbrechen}>Abbrechen</button>
+                    </div>
+                    {#if wirkungsHinweis(antwort)}
+                        <WarningBanner message={wirkungsHinweis(antwort)} />
+                    {/if}
+                    {#if hatteAnhaenge(messages[bearbeitung])}
+                        <InfoBanner message="Die ursprüngliche Nachricht hatte Anhänge. Fügen Sie sie bitte neu hinzu, wenn sie wieder dabei sein sollen." />
+                    {/if}
+                </div>
+            {/if}
+
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
             <div class="flex gap-2 items-start">
                 <input
@@ -1595,6 +1663,18 @@
                     <Search class="w-5 h-5" />
                 </button>
 
+                {#if isStreaming}
+                <!-- Stopp (0.19): beendet die Antwort; gespeichert wird, was bis dahin kam. -->
+                <button
+                    onclick={stoppen}
+                    title="Antwort stoppen"
+                    aria-label="Antwort stoppen"
+                    class="p-2 bg-primary text-white rounded-lg hover:bg-primary-dark
+                         transition-colors flex items-center justify-center min-w-[44px] shrink-0"
+                >
+                    <Square class="w-5 h-5" />
+                </button>
+                {:else}
                 <!-- Send-Button -->
                 <button
                     onclick={handleSubmit}
@@ -1607,12 +1687,13 @@
                          hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
-                    {#if isStreaming || piiChecking}
+                    {#if piiChecking}
                         <Loader2 class="w-5 h-5 animate-spin" />
                     {:else}
                         <Send class="w-5 h-5" />
                     {/if}
                 </button>
+                {/if}
             </div>
             {#if activeSubjectId || activeGroupId || attachments.length > 0}
                 <div class="flex flex-wrap gap-1.5">

@@ -5,11 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
-Mit Migration (0087) — **vor dem Update** prüfen, ob ein Stundenentwurf an mehreren Terminen
+Mit Migrationen (0087, 0088) — **vor dem Update** prüfen, ob ein Stundenentwurf an mehreren Terminen
 hängt; die Migration bricht sonst mit einer Liste ab (unten).
 
 ### Neu
 
+- **Letzte Nachricht bearbeiten:** ersetzt sie samt Antwort; die alten bleiben ausgeblendet gespeichert
+  (Krisen-Einsicht sieht sie). Ein Hinweis nennt, was die alte Antwort schon geändert hat. Neue
+  Felder `messages.ersetzt_am`, `werkzeuge_mit_wirkung`; `ChatRequest.ersetzt_letzte`.
+- **Antwort stoppen:** Stopp-Knopf während des Schreibens; die Teilantwort wird gespeichert und als
+  abgebrochen markiert (`messages.abgebrochen`).
 - **Doppelstunde in zwei Einzelstunden teilen** und wieder zusammenlegen (Menü ⋯ in der
   Jahresübersicht; `POST /planning/slots/{id}/teilen`, `…/zusammenlegen`). Einheit, Kategorie und
   Ausfall gelten für beide Hälften, Thema und Entwurf bleiben an der ersten. Neues Feld
@@ -26,6 +31,8 @@ hängt; die Migration bricht sonst mit einer Liste ab (unten).
   nach vorn. Gestrichene Phasen sind auch außerhalb der Nachbereitung als solche erkennbar.
 - **Stundenassistent:** bekommt die geplanten Minuten ohne gestrichene Phasen fertig gerechnet
   (`geplant_min`).
+- **Abgebrochene Antworten** (Tab geschlossen, Verbindung weg) wurden gar nicht gespeichert — auch die
+  Frage und der Kostenvermerk nicht.
 - **Neuaufbau aus dem Wochenmuster** prüft jede Stunde eines bestehenden Termins, nicht nur die
   erste — eine Doppelstunde aus dem Muster legte sich sonst über eine importierte Einzelstunde.
 

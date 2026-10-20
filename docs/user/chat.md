@@ -10,6 +10,10 @@ Auf dem Tablet schreibt es sich im **Hochformat** bequemer: Im Querformat nimmt 
 
 Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten bisherigen Verlauf des aktuellen Gesprächs — Sie müssen Zusammenhänge nicht jedes Mal neu erklären.
 
+**Antwort stoppen:** Während die KI schreibt, wird aus dem Senden-Knopf ein **Stopp-Knopf** (■). Ein Klick beendet die Antwort; was bis dahin kam, bleibt stehen und ist mit „— abgebrochen" markiert. Ebenso bleibt eine Antwort erhalten, wenn Sie den Tab schließen oder die Verbindung abreißt.
+
+**Letzte Nachricht bearbeiten:** Unter Ihrer letzten Nachricht steht **Bearbeiten**. Der Text kommt zurück ins Eingabefeld; was Sie dann senden, **ersetzt** die alte Nachricht samt Antwort — im Verlauf sehen Sie danach nur noch die neue. Zwei Dinge bleiben dabei, wie sie sind: Hat die alte Antwort schon etwas geändert (etwa einen Stundenentwurf oder die Jahresplanung) oder ein Bild erzeugt, macht das Bearbeiten das nicht rückgängig — ein Hinweis über dem Eingabefeld sagt es Ihnen vorher. Und Anhänge der alten Nachricht fügen Sie bitte neu hinzu, wenn sie wieder dabei sein sollen. Frühere Nachrichten lassen sich nicht bearbeiten.
+
 > 📷 *Screenshot folgt: Eingabefeld mit Büroklammer (Datei), Suche-Button und Modell-Auswahl.*
 <!-- Ersetzen durch: ![Chat-Eingabefeld](/help-images/chat/eingabefeld.png) -->
 

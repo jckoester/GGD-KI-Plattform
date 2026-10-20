@@ -82,7 +82,9 @@ einsehbar. In zwei eng geregelten Ausnahmefällen ist ein Zugriff möglich:
   betroffene Gespräch nehmen — aber nur im **Vier-Augen-Prinzip**: Zwei berechtigte
   Personen (die Administration und eine beratende Person, z. B. die Schulsozialarbeit)
   müssen **beide** zustimmen. Der Zugriff ist zeitlich befristet, erfolgt **nur lesend**,
-  und **jeder** Zugriff wird protokolliert.
+  und **jeder** Zugriff wird protokolliert. Eine Nachricht, die Sie später bearbeitet und
+  ersetzt haben, ist in dieser Einsicht weiterhin zu sehen (als ersetzt gekennzeichnet) —
+  in Ihrem eigenen Verlauf nicht mehr.
 - **Rechtliche Verpflichtung:** etwa auf richterliche Anordnung.
 
 Die Plattform kann ein Gespräch **nicht** von sich aus Ihrer Person zuordnen: Die
