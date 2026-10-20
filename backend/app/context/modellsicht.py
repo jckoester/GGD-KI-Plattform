@@ -261,7 +261,7 @@ def fuer_modell(
         eintrag = {
             k: v for k, v in t.items()
             if k not in ("node_id", "content", "subject_id", "fach", "metadata",
-                         "aliase", "distanz")
+                         "aliase", "distanz", "grund")
         }
         if t.get("fach"):
             eintrag["fach"] = t["fach"]

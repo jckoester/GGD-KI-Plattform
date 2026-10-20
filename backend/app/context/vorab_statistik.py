@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 SICHER = "sicher"
 ANGEBOT = "angebot"
+#: ``grund`` einer sicheren Knotenzeile: sicher, weil die Unterrichtsgruppe ihn hatte (0.20).
+GRUPPE = "gruppe"
 ZAEHLER = (
     "vorgelegt", "im_werkzeugergebnis", "nachrichten", "mit_sicher", "mit_angebot",
     "angebot_nachgeschlagen", "suchen_ohne_angebot", "angebot_ohne_sicher",
@@ -47,14 +49,19 @@ def woche_von(zeitpunkt: datetime) -> date:
 
 def zeilen(
     sicher: Iterable[str], angebot: Iterable[str], im_werkzeugergebnis: set[str], gesucht: bool,
+    *, aus_gruppe: Iterable[str] = (),
 ) -> list[dict]:
     """Die Zeilen **einer** Antwort, ohne Woche, Fach und Modell: zuerst die Wochenzeile, dann
-    die Knotenzeilen. Nicht genannte Zähler sind 0."""
+    die Knotenzeilen. Nicht genannte Zähler sind 0.
+
+    ``aus_gruppe``: sichere Knoten, die es nur wurden, weil die Gruppe sie hatte (0.20) — ihre
+    Zeile trägt ``grund = 'gruppe'``, alle anderen keinen."""
+    aus_gruppe = set(aus_gruppe)
     sicher, angebot = list(dict.fromkeys(sicher)), list(dict.fromkeys(angebot))
     nachgeschlagen = any(k in im_werkzeugergebnis for k in angebot)
     ohne_sicher = bool(angebot) and not sicher
     woche = {
-        "node_id": None, "stufe": None, "nachrichten": 1,
+        "node_id": None, "stufe": None, "grund": None, "nachrichten": 1,
         "mit_sicher": int(bool(sicher)),
         "mit_angebot": int(bool(angebot)),
         "angebot_nachgeschlagen": int(nachgeschlagen),
@@ -62,8 +69,9 @@ def zeilen(
         "angebot_ohne_sicher": int(ohne_sicher),
         "angebot_ohne_sicher_nachgeschlagen": int(ohne_sicher and nachgeschlagen),
     }
-    knoten = [{"node_id": k, "stufe": SICHER, "vorgelegt": 1} for k in sicher]
-    knoten += [{"node_id": k, "stufe": ANGEBOT, "vorgelegt": 1,
+    knoten = [{"node_id": k, "stufe": SICHER, "grund": GRUPPE if k in aus_gruppe else None,
+               "vorgelegt": 1} for k in sicher]
+    knoten += [{"node_id": k, "stufe": ANGEBOT, "grund": None, "vorgelegt": 1,
                 "im_werkzeugergebnis": int(k in im_werkzeugergebnis)} for k in angebot]
     return [{z: 0 for z in ZAEHLER} | zeile for zeile in (woche, *knoten)]
 
@@ -84,6 +92,7 @@ async def zaehlen(
             angebot=[a.node_id for a in kontext.angebot],
             im_werkzeugergebnis={b.node_id for b in werkzeug_bausteine},
             gesucht=gesucht,
+            aus_gruppe=[b.node_id for b in kontext.bausteine if b.herkunft == VORAB and b.grund == GRUPPE],
         )
         # Nur Knoten, die es noch gibt — wie beim Speichern der Bausteine: Zwischen Suche und
         # Zählen vergehen Sekunden, und ein gelöschter Knoten ließe den Fremdschlüssel anschlagen.
@@ -99,7 +108,8 @@ async def zaehlen(
         ]
         # Feste Reihenfolge (Wochenzeile zuerst, dann nach Kennung): Zwei gleichzeitige Antworten
         # sperren dieselben Zeilen in derselben Folge und können sich nicht verklemmen.
-        werte.sort(key=lambda w: (w["node_id"] is not None, str(w["node_id"] or ""), w["stufe"] or ""))
+        werte.sort(key=lambda w: (w["node_id"] is not None, str(w["node_id"] or ""), w["stufe"] or "",
+                                  w["grund"] or ""))
         stmt = insert(VorabStatistik).values(werte)
         await db.execute(stmt.on_conflict_do_update(
             constraint="uq_vorab_statistik_schluessel",

@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Im Chat mit Unterrichtsgruppe gibt die Plattform einen Fachbegriff, der nicht ganz sicher zur
+  Frage passt, als Inhalt mit, wenn die Gruppe ihn schon im Unterricht hatte (nachbereitet oder
+  laut Plan). Die Statistik der Vorab-Suche weist das je Eintrag als „davon Gruppe“ aus.
+  Migration 0089.
+
 ### Geändert
 
 - Startet eine Schüler:in einen Chat nur mit Fach (etwa über einen Fach-Assistenten) und hat sie

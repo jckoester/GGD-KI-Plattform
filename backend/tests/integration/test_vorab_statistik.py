@@ -72,6 +72,17 @@ class TestZaehlen:
                           modell=modell, zeitpunkt=ZEITPUNKT)
         assert len(await _zeilen(ohne_commit, node_id=None, subject_id=None)) == 2
 
+    async def test_sicher_wegen_der_gruppe_zaehlt_in_eigener_zeile(self, ohne_commit):
+        """0.20 (AC, Alembic 0089): `grund` gehört zum Schlüssel — derselbe Knoten, einmal sicher
+        über die Distanz, einmal wegen der Gruppe, ergibt zwei Zeilen, keine vermischte."""
+        k = await _knoten(ohne_commit, "Gemisch")
+        for grund in (None, "gruppe", "gruppe"):
+            kontext = Kontext(text="", bausteine=[Baustein(k, "T", "begriff", None, VORAB, grund=grund)])
+            await zaehlen(ohne_commit, kontext=kontext, werkzeug_bausteine=[], gesucht=False,
+                          modell="chat-standard", zeitpunkt=ZEITPUNKT)
+        zeilen = await _zeilen(ohne_commit, node_id=k)
+        assert sorted((z.grund or "", z.vorgelegt) for z in zeilen) == [("", 1), ("gruppe", 2)]
+
     async def test_schluessel_ist_nulls_not_distinct(self, ohne_commit):
         wert = (await ohne_commit.execute(sa.text(
             "SELECT indnullsnotdistinct FROM pg_index "

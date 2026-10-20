@@ -96,6 +96,10 @@ class Suchprofil:
     # Wirkung auf die Suche — die Begriffsnennung (0.16, Schritt 3) zählt sie wie das
     # eigene Fach.
     bezugsfaecher: tuple[int, ...] = ()
+    # Begriffe, die die Unterrichtsgruppe der Konversation schon hatte (Kennungen als Text;
+    # `planning.eingefuehrt`, 0.20). Nur die Vorab-Suche liest sie: Ein Treffer im Graubereich
+    # wird für sie sicher (Päckchen AC, F2 a).
+    eingefuehrt: frozenset[str] = frozenset()
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────
@@ -1344,6 +1348,13 @@ async def vorab(
        verloren. Namenstreffer filtert das nicht — wer den Namen nennt, meint den Eintrag.
        Im freien Chat gibt es kein Fach, also auch keinen Filter.
 
+    *Sicher wegen der Gruppe* (0.20, Päckchen AC, F2 a) — ein Knoten, der sonst ins Angebot
+    käme, aber in :attr:`Suchprofil.eingefuehrt` steht, geht mit Inhalt in den Prompt, solange
+    unter :data:`VORAB_MAX` Platz ist (Kennzeichen ``grund = "gruppe"``). „Stoff" im Chat der
+    Chemiegruppe, die den Stoffbegriff hatte, ist kein Alltagswort mehr; im Deutsch-Chat bleibt
+    es Angebot. Gemessen 20.10.2026: „Gemisch" lag bei 0,465 und fehlte in drei von drei
+    Antworten. Was die Fachschaft auf „nur wenn genannt" gestellt hat, bleibt dabei draußen.
+
     *Angebot* — nur der Titel, bis :data:`VORAB_ANGEBOT_MAX`. Was nicht sicher ist und
     roh höchstens :data:`VORAB_ANGEBOT` entfernt liegt, aus zwei Quellen:
 
@@ -1446,14 +1457,19 @@ async def vorab(
     angebot: list[dict] = []
     for quelle, zeilen in (("nennung", genannte), ("distanz", naechste)):
         for z in zeilen:
-            if len(angebot) >= VORAB_ANGEBOT_MAX:
-                break
             if z["distanz"] > VORAB_ANGEBOT or str(z["id"]) in gesehen:
                 continue
             if quelle == "distanz" and _nur_wenn_genannt(z):
                 continue
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
             t["distanz"] = float(z["distanz"])
+            if t["node_id"] in profil.eingefuehrt and len(sicher) < VORAB_MAX:
+                t["grund"] = "gruppe"
+                sicher.append(t)
+                gesehen.add(t["node_id"])
+                continue
+            if len(angebot) >= VORAB_ANGEBOT_MAX:
+                continue
             t["quelle"] = quelle
             angebot.append(t)
             gesehen.add(t["node_id"])

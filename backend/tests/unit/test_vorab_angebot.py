@@ -128,6 +128,7 @@ def test_messkanal_ausserhalb_der_produktion():
         ],
         "nachgeschlagen": ["n-1"],
         "suchanfragen": ["Elektronegativität"],
+        "sicher_gruppe": [],
     }
 
 

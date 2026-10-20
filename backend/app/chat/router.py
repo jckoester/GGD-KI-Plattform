@@ -362,6 +362,7 @@ _SEARCH_CONTEXT_NODES_TOOL = {
 
 def _vorab_debug_ereignis(
     angebot: list[Angebot], werkzeug_bausteine: list[Baustein], suchanfragen: list[str],
+    sicher_gruppe: list[Baustein] = (),
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -386,6 +387,8 @@ def _vorab_debug_ereignis(
         ],
         "nachgeschlagen": [a.node_id for a in angebot if a.node_id in im_ergebnis],
         "suchanfragen": suchanfragen,
+        # 0.20 (AC, F2 a): sicher nur, weil die Unterrichtsgruppe den Begriff hatte.
+        "sicher_gruppe": [{"node_id": b.node_id, "titel": b.titel} for b in sicher_gruppe],
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -2805,7 +2808,10 @@ async def chat(
                 gesucht=bool(_suchanfragen), modell=model_used,
             )
 
-        _debug = _vorab_debug_ereignis(kontext.angebot, _werkzeug_bausteine, _suchanfragen)
+        _debug = _vorab_debug_ereignis(
+            kontext.angebot, _werkzeug_bausteine, _suchanfragen,
+            [b for b in kontext.bausteine if b.grund == "gruppe"],
+        )
         if _debug:
             yield _debug
 

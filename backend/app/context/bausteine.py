@@ -50,6 +50,9 @@ class Baustein:
     #: 1 − Kosinusdistanz, nur bei thematischen Vorab-Treffern. Ein Treffer über den Namen
     #: hat keine — er ist nicht ähnlich, er heißt so.
     aehnlichkeit: float | None = None
+    #: Warum ein Vorab-Treffer sicher war: ``gruppe`` (die Unterrichtsgruppe hatte ihn, 0.20),
+    #: sonst ``None``. Nur für Statistik und Messkanal.
+    grund: str | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,7 @@ def aus_treffern(treffer: Iterable, herkunft: str) -> list[Baustein]:
             fach=t.get("fach"),
             herkunft=herkunft,
             aehnlichkeit=None if distanz is None else round(1.0 - float(distanz), 3),
+            grund=t.get("grund"),
         ))
     return bausteine
 

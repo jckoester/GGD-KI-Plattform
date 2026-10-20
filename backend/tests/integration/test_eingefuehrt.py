@@ -1,5 +1,5 @@
 """Eingeführte Begriffe einer Unterrichtsgruppe (0.20, Päckchen AC, Schritt 3)."""
-from datetime import date
+from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest
@@ -135,3 +135,36 @@ async def test_als_offen_nachbereitet_zaehlt_nicht(db_session, seed_sc_group):
     await db_session.flush()
 
     assert await eingefuehrte_begriffe(db_session, GROUP_ID, heute=TODAY) == []
+
+
+@pytest.mark.asyncio
+async def test_kontext_der_konversation_nimmt_die_eingefuehrten_mit(db_session, seed_sc_group):
+    """Verdrahtung (Schritt 5): Die Konversation mit Gruppe reicht deren Begriffe an die
+    Vorab-Suche; ein Begriff im Graubereich steht dann als Baustein mit Grund `gruppe` da, ohne
+    Gruppe nur als Angebot."""
+    from unittest.mock import AsyncMock, patch
+
+    from tests.integration.test_vorab_suche_db import FRAGE, _fuer_distanz
+
+    from app.context.search import VORAB_ANGEBOT, VORAB_SCHWELLE
+    from app.context.service import kontext_fuer_frage
+    from app.db.models import Conversation
+
+    gemisch = _knoten("Gemisch AC")
+    gemisch.embedding = _fuer_distanz((VORAB_SCHWELLE + VORAB_ANGEBOT) / 2)
+    entwurf = _entwurf(gemisch)
+    mit = Conversation(pseudonym="stud-ac", model_used="m", group_id=GROUP_ID)
+    ohne = Conversation(pseudonym="stud-ac", model_used="m")
+    db_session.add_all([gemisch, entwurf, mit, ohne,
+                        _slot(date.today() - timedelta(days=3), stunde_id=entwurf.id)])
+    await db_session.flush()
+
+    with patch("app.context.service.vektor_oder_none", AsyncMock(return_value=FRAGE)):
+        k_mit = await kontext_fuer_frage(assistant_id=None, pseudonym="stud-ac", query_text="egal",
+                                         chat_id=mit.id, db=db_session, rollen=["student"])
+        k_ohne = await kontext_fuer_frage(assistant_id=None, pseudonym="stud-ac", query_text="egal",
+                                          chat_id=ohne.id, db=db_session, rollen=["student"])
+
+    assert [(b.titel, b.grund) for b in k_mit.bausteine if b.titel == "Gemisch AC"] == [("Gemisch AC", "gruppe")]
+    assert "Gemisch AC" not in [b.titel for b in k_ohne.bausteine]
+    assert "Gemisch AC" in [a.titel for a in k_ohne.angebot]

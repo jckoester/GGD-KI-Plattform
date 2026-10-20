@@ -1917,6 +1917,10 @@ class VorabStatistik(Base):
         ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=True
     )
     stufe: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Warum der Knoten in seiner Stufe stand (0.20, Alembic 0089): leer = Name oder Distanz,
+    #: ``gruppe`` = sicher, weil die Unterrichtsgruppe ihn eingeführt hat, ``block`` = Titel in
+    #: der Block-Zeile „bereits eingeführt". Nur an Knotenzeilen; gehört zum Schlüssel.
+    grund: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     #: Fach des Chats (Unterrichtsgruppe, sonst Fachzuordnung) — nicht das Fach des Knotens.
     subject_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True
@@ -1941,8 +1945,12 @@ class VorabStatistik(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "woche", "node_id", "stufe", "subject_id", "modell",
+            "woche", "node_id", "stufe", "grund", "subject_id", "modell",
             name="uq_vorab_statistik_schluessel", postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint(
+            "grund IS NULL OR (grund IN ('gruppe', 'block') AND node_id IS NOT NULL)",
+            name="check_vorab_statistik_grund",
         ),
         CheckConstraint("stufe IN ('sicher', 'angebot')", name="check_vorab_statistik_stufe"),
         CheckConstraint(

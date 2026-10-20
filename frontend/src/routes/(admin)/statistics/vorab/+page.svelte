@@ -94,7 +94,9 @@
         vor (<em>sicher</em>) und bietet weitere nur mit Titel an. <em>Nachgeschlagen</em> heißt:
         Der angebotene Eintrag stand im Suchergebnis derselben Antwort — nicht unbedingt, weil das
         Modell gezielt nach ihm gesucht hat. Titel, die oft angeboten und nie nachgeschlagen werden,
-        sind Kandidaten für die Pflege der Suchbegriffe. Vorschau-Chats aus dem Editor zählen nicht.
+        sind Kandidaten für die Pflege der Suchbegriffe. <em>Davon Gruppe</em>: sicher nur, weil die
+        Unterrichtsgruppe den Begriff schon hatte — sonst wäre er nur angeboten worden. Vorschau-Chats
+        aus dem Editor zählen nicht.
     </p>
 
     <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -274,7 +276,12 @@
                                         {/if}
                                     </td>
                                     <td class="px-3 py-1.5 text-light-tx-2 dark:text-dark-tx-2">{k.fach ?? "fachlos"}</td>
-                                    <td class="px-3 py-1.5 text-right tabular-nums">{k.sicher}</td>
+                                    <td class="px-3 py-1.5 text-right tabular-nums">
+                                        {k.sicher}{#if k.sicher_gruppe}
+                                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                                  title="sicher, weil die Unterrichtsgruppe den Begriff schon hatte"
+                                            >(davon Gruppe {k.sicher_gruppe})</span>{/if}
+                                    </td>
                                     <td class="px-3 py-1.5 text-right tabular-nums">{k.angeboten}</td>
                                     <td class="px-3 py-1.5 text-right tabular-nums">{k.nachgeschlagen}</td>
                                     <td class="px-3 py-1.5 text-right tabular-nums">

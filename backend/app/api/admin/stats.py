@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.context.visibility import read_scope_clause
-from app.context.vorab_statistik import ANGEBOT, SICHER
+from app.context.vorab_statistik import ANGEBOT, GRUPPE, SICHER
 from app.db.models import ContextNode, ExchangeRate, Subject, VorabStatistik as VS
 from app.db.session import get_db
 from app.litellm import systemkonto
@@ -352,6 +352,8 @@ class VorabKnoten(BaseModel):
     #: Fach des **Knotens** — der Filter dagegen gilt dem Fach des Chats.
     fach: str | None
     sicher: int
+    #: Davon sicher nur, weil die Unterrichtsgruppe ihn eingeführt hat (0.20, `grund = 'gruppe'`).
+    sicher_gruppe: int = 0
     angeboten: int
     nachgeschlagen: int
 
@@ -413,6 +415,7 @@ async def get_vorab_statistik(
         sa.select(
             VS.node_id,
             sa.func.sum(sa.case((VS.stufe == SICHER, VS.vorgelegt), else_=0)).label("sicher"),
+            sa.func.sum(sa.case((VS.grund == GRUPPE, VS.vorgelegt), else_=0)).label("sicher_gruppe"),
             sa.func.sum(sa.case((VS.stufe == ANGEBOT, VS.vorgelegt), else_=0)).label("angeboten"),
             sa.func.sum(VS.im_werkzeugergebnis).label("nachgeschlagen"),
         )
@@ -426,7 +429,7 @@ async def get_vorab_statistik(
     knoten = (await db.execute(
         sa.select(
             summen.c.node_id, sa.case((sichtbar, ContextNode.title), else_=None), Subject.name,
-            summen.c.sicher, summen.c.angeboten, summen.c.nachgeschlagen,
+            summen.c.sicher, summen.c.angeboten, summen.c.nachgeschlagen, summen.c.sicher_gruppe,
         )
         .join(ContextNode, ContextNode.id == summen.c.node_id)
         .outerjoin(Subject, Subject.id == ContextNode.subject_id)
@@ -446,7 +449,8 @@ async def get_vorab_statistik(
                                           for i, z in enumerate(_VORAB_WOCHENZAEHLER)})
                 for w in wochen],
         knoten=[VorabKnoten(node_id=str(k[0]), titel=k[1], fach=k[2], sicher=int(k[3] or 0),
-                            angeboten=int(k[4] or 0), nachgeschlagen=int(k[5] or 0))
+                            angeboten=int(k[4] or 0), nachgeschlagen=int(k[5] or 0),
+                            sicher_gruppe=int(k[6] or 0))
                 for k in knoten],
         faecher=[VorabFach(id=f[0], name=f[1]) for f in faecher],
     )

@@ -691,3 +691,64 @@ class TestImKontextblock:
         assert text.index("automatisch zur letzten Nachricht") < text.index(
             "Im Wissensspeicher der Schule gibt es außerdem: Elektronegativität (Testfach N11)")
         assert "gibt es dazu" not in text
+
+
+class TestEingefuehrtInDerGruppe:
+    """0.20 (Päckchen AC, F2 a): Was die Unterrichtsgruppe hatte, wird im Graubereich sicher."""
+
+    GRAU = (VORAB_SCHWELLE + VORAB_ANGEBOT) / 2
+
+    async def test_graubereich_wird_sicher_mit_grund(self, db_session, bestand):
+        _, _, knoten = bestand
+        gemisch = knoten("begriff", "Gemisch", self.GRAU)
+        db_session.add(gemisch)
+        await db_session.flush()
+
+        e = await vorab("egal", _profil(eingefuehrt=frozenset({str(gemisch.id)})), db_session, vektor=FRAGE)
+        assert [(t["title"], t.get("grund")) for t in e.sicher] == [("Gemisch", "gruppe")]
+        assert e.angebot == []
+
+    async def test_gegenprobe_ohne_einfuehrung_bleibt_angebot(self, db_session, bestand):
+        """Dasselbe Wort in einer Gruppe ohne den Begriff — etwa „Stoff" im Deutsch-Chat."""
+        _, _, knoten = bestand
+        andere = knoten("begriff", "Anderes", 0.05)
+        db_session.add_all([knoten("begriff", "Stoffe", self.GRAU), andere])
+        await db_session.flush()
+
+        e = await vorab("egal", _profil(eingefuehrt=frozenset({str(andere.id)})), db_session, vektor=FRAGE)
+        assert [t["title"] for t in e.sicher] == ["Anderes"]
+        assert [t["title"] for t in e.angebot] == ["Stoffe"]
+
+    async def test_ausserhalb_des_angebotsbands_nicht(self, db_session, bestand):
+        """Eingeführt heißt nicht „immer": Was weiter weg liegt als das Angebot, passt nicht zur Frage."""
+        _, _, knoten = bestand
+        fern = knoten("begriff", "Fern", VORAB_ANGEBOT + 0.02)
+        db_session.add(fern)
+        await db_session.flush()
+
+        e = await vorab("egal", _profil(eingefuehrt=frozenset({str(fern.id)})), db_session, vektor=FRAGE)
+        assert e.sicher == [] and e.angebot == []
+
+    async def test_der_deckel_der_sicheren_stufe_gilt(self, db_session, bestand):
+        _, _, knoten = bestand
+        nahe = [knoten("begriff", f"Nah {i}", 0.05 + i / 100) for i in range(VORAB_MAX)]
+        grau = knoten("begriff", "Grau", self.GRAU)
+        db_session.add_all([*nahe, grau])
+        await db_session.flush()
+
+        e = await vorab("egal", _profil(eingefuehrt=frozenset({str(grau.id)})), db_session, vektor=FRAGE)
+        assert len(e.sicher) == VORAB_MAX and "Grau" not in [t["title"] for t in e.sicher]
+        assert [t["title"] for t in e.angebot] == ["Grau"]
+
+    async def test_nur_wenn_genannt_bleibt_draussen(self, db_session, bestand):
+        """Die Fachschaft hat entschieden, den Titel nur bei Nennung anzubieten — die Gruppe hebt
+        das nicht auf."""
+        _, _, knoten = bestand
+        markiert = knoten("begriff", "Umwelt (GHS09)", self.GRAU)
+        feld, wert = NUR_WENN_GENANNT
+        markiert.metadata_ = {feld: wert}
+        db_session.add(markiert)
+        await db_session.flush()
+
+        e = await vorab("egal", _profil(eingefuehrt=frozenset({str(markiert.id)})), db_session, vektor=FRAGE)
+        assert e.sicher == []

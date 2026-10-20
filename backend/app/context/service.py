@@ -261,6 +261,7 @@ async def _grundschicht(
     eigene = () if subject_id else await _faecher_der_person(db, pseudonym)
     bezug = await bezugsfaecher_von(db, subject_id)
     stufe = await stufe_der_person(db, chat_id, jwt_stufe)
+    eingefuehrt = await _eingefuehrt_in_der_gruppe(db, chat_id)
 
     profil = Suchprofil(
         pseudonym=pseudonym,
@@ -272,6 +273,7 @@ async def _grundschicht(
         grade=stufe,
         # Wie im Werkzeugweg: roh holen, in `fuer_modell` auswählen.
         mit_metadaten=True,
+        eingefuehrt=eingefuehrt,
     )
     ergebnis = await vorab(frage, profil, db, vektor=vektor)
     angebot = [
@@ -480,6 +482,23 @@ async def stufe_der_person(
         return int(str(jwt_stufe).strip())
     except (TypeError, ValueError):
         return None
+
+
+async def _eingefuehrt_in_der_gruppe(db: AsyncSession, chat_id: UUID | None) -> frozenset[str]:
+    """Die Begriffe, die die Gruppe der Konversation schon hatte (0.20, Päckchen AC, F2/F3).
+
+    Ohne Horizont: Was vor Wochen eingeführt wurde, zählt für die Vorab-Suche wie gestern —
+    gerade dann fragt eine Schüler:in „wie war das nochmal?". Leer ohne Gruppenbezug.
+    """
+    gruppe = await _conversation_group(db, chat_id)
+    if gruppe is None:
+        return frozenset()
+    from datetime import date as _date
+
+    # Lokaler Import vermeidet eine Modul-Zyklus-Abhängigkeit context ↔ planning.
+    from app.planning.eingefuehrt import eingefuehrte_begriffe
+
+    return frozenset(str(e.node_id) for e in await eingefuehrte_begriffe(db, gruppe, heute=_date.today()))
 
 
 async def _conversation_group(db: AsyncSession, chat_id: UUID | None) -> int | None:

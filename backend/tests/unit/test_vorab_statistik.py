@@ -67,3 +67,11 @@ async def test_ein_fehler_beim_zaehlen_wirft_nie():
                   modell="chat-standard")
     db.rollback.assert_awaited_once()
     db.commit.assert_not_awaited()
+
+
+def test_sicher_wegen_der_gruppe_traegt_den_grund():
+    """0.20 (AC, F2 a): eigene Zeile `grund = 'gruppe'`; Wochenzeile und Angebot ohne Grund."""
+    z = zeilen(sicher=["a", "g"], angebot=["b"], im_werkzeugergebnis=set(), gesucht=False,
+               aus_gruppe=["g"])
+    assert [(r["node_id"], r["stufe"], r["grund"]) for r in z] == [
+        (None, None, None), ("a", "sicher", None), ("g", "sicher", "gruppe"), ("b", "angebot", None)]
