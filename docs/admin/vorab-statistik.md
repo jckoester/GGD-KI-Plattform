@@ -16,6 +16,11 @@ Methoden- und Operatorenblätter) und legt sie dem Modell auf zwei Stufen vor:
   liegen. Im Prompt steht nur ihr **Titel** mit dem Hinweis, dass das Modell den Inhalt mit
   seiner Suche holen kann. Unter der Antwort erscheinen sie nur, wenn es das tut.
 
+*Seit 0.20* zählt im Chat mit Unterrichtsgruppe auch, was die Gruppe schon hatte: Ein
+Fachbegriff, der sonst nur angeboten würde, wird **sicher**, wenn er an einer vergangenen
+Stunde der Gruppe hängt (nachbereitet oder laut Plan). Dazu nennt der Block „Aktueller
+Unterricht" die Titel der Begriffe der laufenden Einheit.
+
 ## Die Zahlen
 
 **Je Woche** zählen die Spalten **Nachrichten**, nicht Einträge:
@@ -43,6 +48,14 @@ rund 60 % der Fälle nachgeschlagen, mit sicherem Treffer daneben so gut wie nie
 wurde. Das Fach ist das des Eintrags; der Filter oben gilt dem Fach des Chats. Einträge, die
 Sie nicht lesen dürfen (private Einträge anderer), stehen ohne Titel da.
 
+Zwei Zusätze seit 0.20:
+
+- **„davon Gruppe"** hinter *sicher*: so oft war der Eintrag nur sicher, weil die
+  Unterrichtsgruppe ihn hatte — ohne das wäre er angeboten worden.
+- **„im Block … nachgeschlagen …"** hinter *angeboten*: so oft stand der Titel in der Zeile
+  „In dieser Gruppe bereits eingeführt" und so oft danach im Suchergebnis. Getrennt gezählt,
+  damit die Quote des Angebots stimmt; die Wochenzahlen enthalten den Block nicht.
+
 ## Was man daraus tut
 
 - **Oft angeboten, nie nachgeschlagen:** meist ein Titel oder Suchbegriff, der zugleich ein
@@ -52,6 +65,10 @@ Sie nicht lesen dürfen (private Einträge anderer), stehen ohne Titel da.
   [Fachbegriffe pflegen](../user/fachbegriffe-pflegen.md)).
 - **Quote ohne sicheren Treffer sinkt deutlich:** ein Hinweis, dass ein anderes Modell oder
   eine geänderte Modellkonfiguration seltener sucht.
+- **Hohes „davon Gruppe" bei einem Alltagswort:** Prüfen Sie im Chat, ob der Eintrag zur
+  Frage passte. Die Gruppe hatte den Begriff — das macht ihn wahrscheinlich, aber nicht sicher.
+  Hilft das nicht, kann die Fachschaft den Eintrag auf „nur wenn genannt" stellen; dann gilt
+  der Vorrang der Gruppe für ihn nicht.
 - **Viele Suchen ohne Angebot:** Das Modell findet Einträge, die die Vorab-Suche nicht
   anbietet — ein Anlass, die Schwellen nachzumessen (Entwicklungs-Doku
   `docs/dev/kontextsuche.md`).

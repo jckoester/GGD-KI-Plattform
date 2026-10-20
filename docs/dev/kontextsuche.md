@@ -291,6 +291,31 @@ angeboten, nie nachgeschlagen") ist die Liste, an der man solche Titel und Alias
 
 ---
 
+## Was die Gruppe schon hatte (0.20)
+
+Päckchen AC (Plan „Begriffe im Schülerchat", Messung `Plaene/Messungen-0.20/`). **Eine Quelle,
+zwei Verwender:**
+
+- **Quelle** `app/planning/eingefuehrt.py` `eingefuehrte_begriffe(db, group_id, heute=)`:
+  `node_engagement(relation='introduced')` der Gruppe (nachbereitet) ∪ `refs` vergangener, **nicht**
+  nachbereiteter Stunden („laut Plan" — eine nachbereitete Stunde trägt ihre Begriffe über
+  `introduced`, sonst kämen die `refs_offen` zurück). Nur `BEGRIFF_TYPEN`, aktiv,
+  `visibility.fuer_gruppe_lesbar`. Je Begriff jüngstes Datum und Einheit.
+- **Vorab-Suche:** `Suchprofil.eingefuehrt` (aus `service._eingefuehrt_in_der_gruppe`, ohne
+  Horizont). Ein Angebotskandidat aus diesem Satz wird **sicher** (`grund="gruppe"`), solange
+  unter `VORAB_MAX` Platz ist. Knoten mit „nur wenn genannt" bleiben Angebot. `grund` geht
+  nicht ans Modell (`modellsicht.fuer_modell`), nur in Statistik (`vorab_statistik.grund`,
+  Alembic 0089) und Messkanal (`vorab_debug.sicher_gruppe`).
+- **Block „Aktueller Unterricht":** `student_context._bereits_eingefuehrt` — Einheit der letzten
+  Stunde, sonst `EINGEFUEHRT_STUNDEN` (8); ohne die Titel der zwei Stunden; `EINGEFUEHRT_TITEL`
+  (12). Die Kennungen gehen als `Kontext.block_angebot` in die Statistik (`grund="block"`, ohne
+  Wochenzähler).
+
+⚠️ **Fehltreffer beobachten, nicht wegdefinieren.** Der Stufenwechsel macht ein Alltagswort
+sicher, sobald die Gruppe den Begriff hatte. Die Gegenprobe (dasselbe Wort in einer Gruppe ohne
+Einführung bleibt Angebot) steht in `test_vorab_suche_db.py::TestEingefuehrtInDerGruppe`; im
+Betrieb zeigt `/statistics/vorab` „davon Gruppe".
+
 ## Aliase — ein zweiter Titel, kein Metadatenfeld
 
 Seit Migration **0057** liegen weitere Namen in der Tabelle `node_aliases`, vorher als

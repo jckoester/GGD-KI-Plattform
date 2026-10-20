@@ -427,6 +427,22 @@ die Stunde nachbereitet, stehen dort die eingeführten — ohne die, die Sie als
 haben; sonst die geplanten, ausdrücklich als **„laut Plan"** gekennzeichnet. Die Nachbereitung
 lohnt sich also auch hier: Erst sie sagt dem Assistenten, was wirklich drankam.
 
+*Seit 0.20* kommen die **Fachbegriffe** hinzu, die die Gruppe schon früher hatte:
+
+- Eine Zeile **„In dieser Gruppe bereits eingeführt"** nennt die Begriffe der laufenden
+  Unterrichtseinheit (ohne Einheit: der letzten acht Stunden), die nicht schon bei der letzten
+  oder vorletzten Stunde stehen — nur die Titel, höchstens zwölf, wieder getrennt nach
+  nachbereitet und „laut Plan".
+- Fragt eine Schüler:in nach einem Begriff, den die Gruppe hatte, bekommt der Assistent
+  dessen Eintrag aus dem Wissensspeicher auch dann mit, wenn die Frage nicht ganz eindeutig
+  ist — „Stoff" in Ihrer Chemiegruppe ist der Stoffbegriff, im Deutsch-Chat nicht. Das gilt
+  ohne zeitliche Grenze, also auch für den Begriff vor vier Wochen.
+- Beginnt eine Schüler:in einen Chat nur mit Fach (etwa über einen Fach-Assistenten) und hat
+  sie in diesem Fach genau eine Unterrichtsgruppe, gehört der Chat zu dieser Gruppe.
+
+Grundlage sind die Fachbegriffe, die Sie in der Leiste „Kompetenzen und Fachbegriffe" an
+Ihre Stundenentwürfe hängen. Ohne sie bleibt alles wie bisher.
+
 **Nicht** weitergegeben werden interne Planungsfelder wie Ihre Kommentare,
 Reflexionen, der Pin-Status oder Phasen-Details. Mehr dazu unter
 [Datenschutz](datenschutz.md).

@@ -22,7 +22,7 @@ Der KI-Anbieter erhält **keine** Informationen, die auf Sie persönlich schlie�
 
 ### Aktueller Unterricht in Gruppen-Chats
 
-Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Plattform einen kleinen Hinweis zum aktuellen Unterricht, damit der Assistent passend helfen kann: Thema und Inhalte der letzten und vorletzten Stunde, das nächste Thema sowie Termin und Umfang der nächsten Klassenarbeit. Als Inhalte erscheinen die Kompetenzen (und Fachbegriffe) aus dem Stundenentwurf — nur solche, die alle in der Gruppe ohnehin lesen dürfen; ist eine Stunde noch nicht nachbereitet, steht dabei „laut Plan“.
+Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Plattform einen kleinen Hinweis zum aktuellen Unterricht, damit der Assistent passend helfen kann: Thema und Inhalte der letzten und vorletzten Stunde, das nächste Thema sowie Termin und Umfang der nächsten Klassenarbeit. Als Inhalte erscheinen die Kompetenzen (und Fachbegriffe) aus dem Stundenentwurf — nur solche, die alle in der Gruppe ohnehin lesen dürfen; ist eine Stunde noch nicht nachbereitet, steht dabei „laut Plan“. Seit 0.20 nennt der Hinweis außerdem die Titel der Fachbegriffe, die die Gruppe in der laufenden Unterrichtseinheit schon hatte — ebenfalls nur solche, die alle in der Gruppe lesen dürfen.
 
 **Begriffsvorschläge im Stundenentwurf** *(seit 0.18)*: Schlägt die Leiste „Kompetenzen und Fachbegriffe" Begriffe vor, geht der Text des Entwurfs — Titel, Stundenziel und Phasen — an den KI-Anbieter, auf demselben Weg und mit demselben anonymen Code wie im Chat. Das geschieht auf Knopfdruck und automatisch, nachdem der Stundenassistent den Entwurf geändert hat; den Entwurf kennt der Assistent dann ohnehin.
 

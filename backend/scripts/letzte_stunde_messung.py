@@ -376,6 +376,16 @@ def main() -> None:
     gid = daten["gruppe"]["id"]
     fremd_gid = (daten.get("fremde_gruppe") or {}).get("id")
     fach_id = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", daten["gruppe"]["fach"])
+    # ⚠️ **`weg: fach` misst F1 nur, wenn die Messgruppe ihre einzige Gruppe im Fach ist.** Der
+    # erste Lauf (20.10.2026) nahm ein Konto mit echter Chemiegruppe — mit zweien bleibt der Chat
+    # absichtlich beim Fach, und f-a/f-d maßen „zwei Gruppen" statt F1.
+    if any(f.get("weg") == "fach" and (not args.nur or f["id"] in args.nur) for f in daten["faelle"]):
+        andere = _eins(conn, "SELECT count(*) FROM group_memberships m JOIN groups g ON g.id = m.group_id "
+                             "WHERE m.pseudonym = %s AND g.subject_id = %s AND g.type = 'teaching_group' "
+                             "AND g.id <> %s", schueler, fach_id, daten["gruppe"]["id"])
+        if andere:
+            raise SystemExit("Das Schüler:innen-Konto hat schon eine Gruppe in diesem Fach — die Fälle mit "
+                             "`weg: fach` mäßen dann „zwei Gruppen“, nicht F1. Anderes Konto (--mindestbudget).")
     ohne_gruppe: list[str] = []  # Konversationen aus `weg: fach` — `abbauen` erreicht sie nicht
     laeufe: list[dict] = []
     kopf = {"datei": args.datei.name, "beginn": datetime.now().strftime("%d.%m.%Y, %H:%M"), "modell": "?",
