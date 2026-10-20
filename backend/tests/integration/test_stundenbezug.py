@@ -20,7 +20,7 @@ from app.chat.tools import ToolContext
 from app.context.bausteine import Kontext
 from app.db.models import Conversation, LessonSlot
 from app.planning.assistant_tools import _handle_get_lesson_detail, _handle_update_lesson_phases
-from app.planning.stundenbezug import bezugszeile
+from app.planning.stundenbezug import bezug_fuer_anzeige, bezugszeile
 from tests.integration.conftest import STUDENT_PSEUDO, TEACHER1_PSEUDO, TEACHER2_PSEUDO
 
 EIGENE = 771   # teacher1 unterrichtet, student1 lernt
@@ -342,3 +342,54 @@ async def test_ohne_kennung_und_ohne_bezug(db, async_engine):
     async with _sitzungen(async_engine)() as s:
         aus = await _handle_get_lesson_detail({}, _ctx(s))
     assert "keine Bezugsstunde" in aus["error"]
+
+
+
+# ── Link im Kopf des Chats (0.19, Schritt 2) ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_wiederoeffnen_liefert_die_stunde_fuer_den_link(test_client, auth_headers, db, async_engine):
+    """Bis 0.19 fehlte `stunde_node_id` im Konversations-Endpunkt — nach dem Wiederöffnen
+    wusste die Chatseite nichts von der Stunde."""
+    stunde = await _stunde(test_client, auth_headers, EIGENE, titel="Flaschenzug")
+    async with _sitzungen(async_engine)() as s:
+        s.add(LessonSlot(id=uuid4(), group_id=EIGENE, date=date(2031, 3, 4), halbjahr=2, periods=1,
+                         start_period=2, kategorie="unterricht", stunde_node_id=UUID(stunde)))
+        await s.commit()
+    konversation = _konversation(db, EIGENE, stunde)
+    resp = await test_client.get(f"/conversations/{konversation}/messages", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["stunde"] == {
+        "stunde_node_id": stunde, "titel": "Flaschenzug", "datum": "2031-03-04",
+        "start_period": 2, "periods": 1, "group_id": EIGENE, "fach_slug": "stundenbezug",
+    }
+
+
+@pytest.mark.asyncio
+async def test_ohne_bezug_kein_link(test_client, auth_headers, db):
+    konversation = _konversation(db, EIGENE)
+    resp = await test_client.get(f"/conversations/{konversation}/messages", headers=auth_headers)
+    assert resp.json()["stunde"] is None
+
+
+@pytest.mark.asyncio
+async def test_link_nur_mit_lesezugang(test_client, auth_headers, db, async_engine):
+    """Dieselbe Leseregel wie die Systemzeile: Wer die Stunde nicht lesen darf, bekommt
+    keinen Link — auch nicht zu einer Stunde, die in seiner Konversation steht."""
+    stunde = await _stunde(test_client, auth_headers, EIGENE, titel="Keil")
+    async with _sitzungen(async_engine)() as s:
+        assert await bezug_fuer_anzeige(s, UUID(stunde), SimpleNamespace(sub=TEACHER1_PSEUDO)) is not None
+        assert await bezug_fuer_anzeige(s, UUID(stunde), SimpleNamespace(sub=TEACHER2_PSEUDO)) is None
+        assert await bezug_fuer_anzeige(s, uuid4(), SimpleNamespace(sub=TEACHER1_PSEUDO)) is None
+        assert await bezug_fuer_anzeige(s, None, SimpleNamespace(sub=TEACHER1_PSEUDO)) is None
+
+
+@pytest.mark.asyncio
+async def test_geloeschte_stunde_ohne_link(test_client, auth_headers, db, async_engine):
+    stunde = await _stunde(test_client, auth_headers, EIGENE, titel="Schiefe Ebene")
+    with db.cursor() as cur:
+        cur.execute("UPDATE context_nodes SET status = 'archived' WHERE id = %s", (stunde,))
+    db.commit()
+    async with _sitzungen(async_engine)() as s:
+        assert await bezug_fuer_anzeige(s, UUID(stunde), SimpleNamespace(sub=TEACHER1_PSEUDO)) is None

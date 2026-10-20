@@ -468,12 +468,14 @@ export async function* streamChat(
       // Stundenbezug und Gruppe, von einem Werkzeug gesetzt (`waehle_stunde`, 0.15).
       if (currentEventType === "bezug") {
         try {
-          const { group_id, subject_id, stunde_node_id } = JSON.parse(payload);
+          const { group_id, subject_id, stunde_node_id, stunde } = JSON.parse(payload);
           yield {
             type: "bezug",
             groupId: group_id ?? null,
             subjectId: subject_id ?? null,
             stundeId: stunde_node_id ?? null,
+            // Anzeige und Link im Kopf des Chats (0.19); null ohne Bezug oder Lesezugang.
+            stunde: stunde ?? null,
           };
         } catch {}
         currentEventType = null;

@@ -244,7 +244,10 @@ Stunde ein?“) oder selbst welche nennen: „Trag Katalysator als Begriff ein.�
 nach Ihrer Zustimmung ein und sagt, welche es im Wissensspeicher nicht gibt.
 
 Der Bezug bleibt am Chat: Öffnen Sie ihn später aus dem Verlauf, weiß der Assistent noch,
-um welche Stunde es geht. Weitere Wege zu ihm:
+um welche Stunde es geht. **Oben im Chat** steht dann neben dem Titel die Stunde mit Datum
+(„Rechnen mit Potenzen · Mo 5.10. ↗") — ein Klick führt zurück in den Entwurf. Der Hinweis
+erscheint auch, sobald der Assistent im freien Chat eine Stunde gewählt oder angelegt hat.
+Weitere Wege zu ihm:
 
 - **✦ an einer Phase** — Material für diese Phase, mit derselben Stunde als Bezug.
 - **Startseite** — in „Mein Tag" steht an jeder Stunde ein Assistenten-Symbol. Fehlt der

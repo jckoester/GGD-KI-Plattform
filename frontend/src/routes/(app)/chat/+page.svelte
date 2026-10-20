@@ -73,6 +73,7 @@
         activeConversationAssistantId,
         activeConversationSubjectId,
         activeConversationGroupId,
+        activeConversationStunde,
     } from "$lib/stores/pageTitle.js";
 
     // Wie in der Sidebar: `admin` ist eine Erweiterung der Lehrkraft-Rolle.
@@ -729,6 +730,7 @@
                 if (item.type === "bezug") {
                     activeConversationGroupId.set(item.groupId);
                     activeConversationSubjectId.set(item.subjectId);
+                    activeConversationStunde.set(item.stunde ?? null);
                     continue;
                 }
                 // Titel-Event
@@ -1070,6 +1072,10 @@
                 );
                 activeConversationSubjectId.set(result.subject_id);
                 activeConversationGroupId.set(result.group_id);
+                // Wer die Gruppe wechselt oder entfernt, verliert den Stundenbezug (Backend).
+                if (result.group_id !== $activeConversationStunde?.group_id) {
+                    activeConversationStunde.set(null);
+                }
             } catch (err) {
                 console.error("Fehler beim Fach-Zuweisen:", err);
             }
@@ -1144,6 +1150,7 @@
                 activeConversationAssistantId.set(data.assistant_id ?? null);
                 activeConversationSubjectId.set(data.subject_id ?? null);
                 activeConversationGroupId.set(data.group_id ?? null);
+                activeConversationStunde.set(data.stunde ?? null);
                 // Kontext-Knoten laden
                 try {
                     contextNodes = await getChatContextNodes(data.id);
@@ -1164,6 +1171,7 @@
                         activeConversationAssistantId.set(null);
                         activeConversationSubjectId.set(null);
                         activeConversationGroupId.set(null);
+                        activeConversationStunde.set(null);
                         pendingSuggestions = null;
                     }
                 } else {
@@ -1174,6 +1182,7 @@
                     activeConversationAssistantId.set(null);
                     activeConversationSubjectId.set(null);
                     activeConversationGroupId.set(null);
+                    activeConversationStunde.set(null);
                 }
                 pendingSuggestions = null;
             } finally {
@@ -1191,6 +1200,7 @@
             activeConversationAssistantId.set(null);
             activeConversationSubjectId.set(null);
             activeConversationGroupId.set(null);
+            activeConversationStunde.set(null);
             conversationAssistant = null;
             pickerOpen = false;
             subjectPickerOpen = false;
@@ -1298,6 +1308,7 @@
         activeConversationAssistantId.set(null);
         activeConversationSubjectId.set(null);
         activeConversationGroupId.set(null);
+        activeConversationStunde.set(null);
     });
 
     // Automatisch Konversationen neu laden nach Stream-Ende

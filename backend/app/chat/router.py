@@ -89,7 +89,9 @@ from app.pedagogy.hausversuche import (
     gefahr_fuer as hausversuch_gefahr,
 )
 from app.pedagogy.compose import compose_system_content, is_student_treatment
-from app.planning.stundenbezug import bezugszeile, mit_stundenwerkzeugen, stunde_fuer_bezug
+from app.planning.stundenbezug import (
+    bezug_fuer_anzeige, bezugszeile, mit_stundenwerkzeugen, stunde_fuer_bezug,
+)
 from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
@@ -157,6 +159,8 @@ class ConversationDetailResponse(BaseModel):
     assistant_name: Optional[str] = None
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
+    # Die Bezugsstunde für den Link im Kopf des Chats (0.19) — `bezug_fuer_anzeige`.
+    stunde: Optional[dict] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     is_test: bool = False
@@ -2225,6 +2229,18 @@ async def chat(
         # nichts mehr gespeichert. Dasselbe gilt für Stundenbezug und Gruppe (unten).
         nonlocal _deployment_id, conversation_stunde_id, conversation_group_id
 
+        # Neue Unterhaltung aus der Entwurfsansicht: Der Kopf des Chats zeigt die Stunde
+        # gleich, nicht erst nach dem Neuladen (0.19, Schritt 2).
+        if is_new and conversation_stunde_id is not None:
+            _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
+            _bezug = {
+                "group_id": conversation_group_id,
+                "subject_id": _gruppe.subject_id if _gruppe else None,
+                "stunde_node_id": str(conversation_stunde_id),
+                "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
+            }
+            yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
+
         full_content: list[str] = []
         usage: dict = {}
         # Eine Request-ID **je LLM-Anfrage dieses Zuges** — jede Werkzeugrunde ist eine
@@ -2432,6 +2448,7 @@ async def chat(
                         "group_id": conversation_group_id,
                         "subject_id": _gruppe.subject_id if _gruppe else None,
                         "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
+                        "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
                     }
                     yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
 
@@ -3331,6 +3348,7 @@ async def get_conversation_messages(
         assistant_name=assistant_name,
         subject_id=conversation.subject_id,
         group_id=conversation.group_id,
+        stunde=await bezug_fuer_anzeige(db, conversation.stunde_node_id, current_user),
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         is_test=conversation.is_test,

@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ContextNode, Group, LessonSlot
+from app.db.models import ContextNode, Group, LessonSlot, Subject
 from app.planning.mein_tag import stundenbezeichnung
 from app.planning.permissions import zugang_zur_stunde
 from app.planning.student_context import _fmt_datum
@@ -49,6 +49,43 @@ async def stunde_fuer_bezug(db: AsyncSession, stunde_id: UUID, user) -> ContextN
     if not await zugang_zur_stunde(stunde, user, db):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     return stunde
+
+
+async def bezug_fuer_anzeige(db: AsyncSession, stunde_id: UUID | None, user) -> dict | None:
+    """Was die Chatseite über die Bezugsstunde zeigt und wohin sie verlinkt (0.19, Schritt 2).
+
+    Titel, Termin und die Teile des Pfads zur Entwurfsansicht
+    (`/subjects/{fach_slug}/groups/{group_id}/planner/lessons/{stunde_node_id}`). None ohne
+    Bezug, für eine gelöschte Stunde und ohne Lesezugang — dieselbe Leseregel wie
+    `bezugszeile`, bei jedem Aufruf neu geprüft. Ohne Gruppe gibt es keinen Pfad, also auch
+    keinen Link.
+    """
+    if stunde_id is None:
+        return None
+    stunde = await _stunde(db, stunde_id)
+    if stunde is None or stunde.write_scope_group_id is None:
+        return None
+    try:
+        if not await zugang_zur_stunde(stunde, user, db):
+            return None
+    except HTTPException:
+        return None
+    gruppe = await db.get(Group, stunde.write_scope_group_id)
+    fach = await db.get(Subject, gruppe.subject_id) if gruppe and gruppe.subject_id else None
+    if fach is None:
+        return None
+    slot = (
+        await db.execute(sa.select(LessonSlot).where(LessonSlot.stunde_node_id == stunde.id))
+    ).scalars().first()
+    return {
+        "stunde_node_id": str(stunde.id),
+        "titel": stunde.title,
+        "datum": slot.date.isoformat() if slot else None,
+        "start_period": slot.start_period if slot else None,
+        "periods": slot.periods if slot else None,
+        "group_id": gruppe.id,
+        "fach_slug": fach.slug,
+    }
 
 
 def mit_stundenwerkzeugen(assistant) -> bool:

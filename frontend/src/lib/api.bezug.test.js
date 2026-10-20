@@ -38,8 +38,19 @@ describe("streamChat: Ereignis „bezug“ (0.15)", () => {
 
         const ereignisse = await alles(streamChat([{ role: "user", content: "x" }]));
 
-        expect(ereignisse).toContainEqual({ type: "bezug", groupId: 7, subjectId: 6, stundeId: "s-1" });
+        // Ohne `stunde` im Ereignis (Backend vor 0.19 oder ohne Lesezugang): null, kein Link.
+        expect(ereignisse).toContainEqual({ type: "bezug", groupId: 7, subjectId: 6, stundeId: "s-1", stunde: null });
         expect(ereignisse.filter((e) => typeof e === "string").join("")).toBe("Gefunden.");
+    });
+
+    it("reicht die Stunde für den Link im Kopf durch (0.19)", async () => {
+        const stunde = { stunde_node_id: "s-1", titel: "Hebel", datum: "2026-10-14", group_id: 7, fach_slug: "physik" };
+        global.fetch = vi.fn().mockResolvedValue(sseAntwort([
+            `event: bezug\ndata: ${JSON.stringify({ group_id: 7, subject_id: 6, stunde_node_id: "s-1", stunde })}\n\n`,
+            "data: [DONE]\n\n",
+        ]));
+        const ereignisse = await alles(streamChat([{ role: "user", content: "x" }]));
+        expect(ereignisse.find((e) => e.type === "bezug").stunde).toEqual(stunde);
     });
 
     it("schickt den Stundenbezug nur für eine neue Konversation mit", async () => {

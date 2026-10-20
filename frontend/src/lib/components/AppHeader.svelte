@@ -1,8 +1,9 @@
 <script>
-    import { MessageSquareWarning, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
+    import { CalendarDays, MessageSquareWarning, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
     import { page } from "$app/stores";
-    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId, activeConversationStunde } from "$lib/stores/pageTitle.js";
+    import { stundenDatum, stundenPfad, stundenText } from "$lib/chat_stunde.js";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -21,6 +22,9 @@
 
     // Abgeleiteter Titel
     let title = $derived($pageTitle || ($page.data.title ?? ""));
+
+    // Link zur Bezugsstunde des Chats (0.19) — nur, solange eine Konversation offen ist.
+    let stundenLink = $derived($activeConversationId ? stundenPfad($activeConversationStunde) : null);
 
 </script>
 
@@ -53,6 +57,24 @@
                 />
             {/if}
             <h1 class="text-lg font-semibold {textClass}">{title}</h1>
+            {#if stundenLink}
+                <a
+                    href={stundenLink}
+                    title="Zum Stundenentwurf"
+                    class="inline-flex items-center gap-1 min-w-0 rounded-full border
+                           border-light-ui-3 dark:border-dark-ui-3 px-2 py-0.5 text-xs
+                           text-light-bl dark:text-dark-bl hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                    aria-label="Zum Stundenentwurf: {stundenText($activeConversationStunde)}"
+                >
+                    <CalendarDays size={14} class="shrink-0" />
+                    <!-- Nur der Titel wird gekürzt — der Tag bleibt lesbar. -->
+                    <span class="truncate max-w-[12rem]">{$activeConversationStunde.titel}</span>
+                    {#if stundenDatum($activeConversationStunde.datum)}
+                        <span class="shrink-0">· {stundenDatum($activeConversationStunde.datum)}</span>
+                    {/if}
+                    <span class="shrink-0" aria-hidden="true">↗</span>
+                </a>
+            {/if}
         </div>
     </div>
 

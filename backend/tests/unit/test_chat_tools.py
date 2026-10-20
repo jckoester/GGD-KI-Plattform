@@ -455,6 +455,11 @@ def test_der_chat_uebernimmt_einen_gewaehlten_bezug():
     assert "conversation_group_id = tool_ctx.group_id" in zuweisungen
     # … und meldet die Änderung der Chatseite, die sonst die alte Gruppe anzeigt (Schritt 4).
     assert "event: bezug" in inspect.getsource(router)
+    # 0.19: Das Ereignis trägt die Stunde für den Link im Kopf des Chats — auch gleich zu
+    # Beginn einer neuen Konversation aus der Entwurfsansicht, nicht erst nach `waehle_stunde`.
+    quelle = inspect.getsource(router)
+    assert quelle.count('"stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)') == 2
+    assert "if is_new and conversation_stunde_id is not None:" in quelle
 
 
 # ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────

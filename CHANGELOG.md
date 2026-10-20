@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Link vom Chat zum Stundenentwurf:** Hat ein Chat eine Bezugsstunde, steht sie oben neben dem
+  Titel — mit Datum, als Link in den Entwurf. Auch nach dem Wiederöffnen und sobald der Assistent
+  eine Stunde wählt oder anlegt. `GET /conversations/{id}/messages` und das Ereignis `bezug` tragen
+  dafür `stunde`.
+
 ### Behoben
 
 - **Gestrichene Phasen zählen nicht mehr zur Unterrichtszeit** — im Stundenentwurf, im Zeitbudget
