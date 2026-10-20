@@ -585,9 +585,10 @@ class TestStepupCallback:
         app.dependency_overrides[get_db] = _no_revocation_db()
         app.dependency_overrides[get_jwt_service] = _make_jwt_service
         self.adapter = mock_redirect_adapter
-        self.fresh = lambda auth_time, ext="lehrer_1", diagnose=None: FreshIdentity(
+        self.adapter.stepup_amr = ["mfa"]
+        self.fresh = lambda auth_time, ext="lehrer_1", diagnose=None, amr=("pwd", "mfa", "otp"): FreshIdentity(
             identity=NormalizedIdentity(external_id=ext, roles=["teacher"]),
-            auth_time=auth_time, diagnose=diagnose or {},
+            auth_time=auth_time, diagnose=diagnose or {}, amr=list(amr) if amr is not None else None,
         )
         token, _ = jwt_service.issue(pseudonymize("lehrer_1", _SCHOOL_SECRET), ["teacher"], None)
         c = TestClient(app, raise_server_exceptions=False)
@@ -634,23 +635,37 @@ class TestStepupCallback:
         assert r.headers["location"].endswith("stepup_fehler=nicht_frisch")
         assert any("alter_s=-" in m for m in caplog.messages)
 
-    def test_ohne_auth_time(self, client, caplog):
-        self.adapter.exchange_code_fresh = AsyncMock(
-            return_value=self.fresh(None, diagnose={"id_token": False}))
-        with caplog.at_level("WARNING", logger="app.auth.router"):
-            client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
-        zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
-        assert "auth_time fehlt" in zeile and "'id_token': False" in zeile
+    def test_ohne_auth_time_mit_2fa_angenommen(self, client, caplog):
+        """0.19 Schritt 4b: Das Schulkonto liefert kein auth_time, beachtet aber prompt=login
+        (Passwort + 2FA, auf Prod geprüft 19.10.2026). Dann zählt der Rücksprung — mit Logzeile."""
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(None))
+        with caplog.at_level("INFO", logger="app.auth.router"):
+            r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/profile"
+        assert "stepup=" in r.headers.get("set-cookie", "")
+        assert any("Vertrauen auf prompt=login" in m and "aktion=read" in m for m in caplog.messages)
 
-    def test_ohne_auth_time_nennt_alter_von_iat(self, client, caplog):
-        """0.18.2: Das Schulkonto liefert kein auth_time — dann wenigstens, wie alt das Token ist."""
-        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(
-            None, diagnose={"id_token": True, "iat": self._jetzt() - 7, "sitzung": {"sid": "ab12"}}))
+    @pytest.mark.parametrize("amr", [["pwd"], None, []])
+    def test_ohne_zweiten_faktor_abgelehnt(self, client, caplog, amr):
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(None, amr=amr))
         with caplog.at_level("WARNING", logger="app.auth.router"):
-            client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
-        zeile = next(m for m in caplog.messages if "Step-up abgelehnt" in m)
-        assert "iat_alter_s=7" in zeile or "iat_alter_s=8" in zeile
-        assert "'sitzung': {'sid': 'ab12'}" in zeile
+            r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"] == "/profile?stepup_fehler=ohne_2fa"
+        assert "stepup=" not in r.headers.get("set-cookie", "")
+        assert any("(ohne_2fa)" in m and "['mfa']" in m for m in caplog.messages)
+
+    def test_zweiter_faktor_gilt_auch_mit_auth_time(self, client):
+        self.adapter.exchange_code_fresh = AsyncMock(
+            return_value=self.fresh(self._jetzt() - 5, amr=["pwd"]))
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"].endswith("stepup_fehler=ohne_2fa")
+
+    def test_ohne_pflichtwerte_reicht_der_ruecksprung(self, client):
+        """`stepup_amr: []` — eine Schule ohne 2FA beim Anbieter."""
+        self.adapter.stepup_amr = []
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(None, amr=None))
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.headers["location"] == "/profile"
 
     def test_anderes_konto(self, client):
         self.adapter.exchange_code_fresh = AsyncMock(

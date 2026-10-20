@@ -59,6 +59,9 @@ class FreshIdentity:
     identity: NormalizedIdentity
     auth_time: int | None
     diagnose: dict = field(default_factory=dict)
+    # Wie die Sitzung beim Anbieter entstand (`amr`, etwa ["pwd", "mfa", "otp"]); None, wenn
+    # er es nicht sagt. Der Router verlangt die Werte aus `stepup_amr` (0.18.4).
+    amr: list[str] | None = None
 
 
 class AuthAdapter(ABC):

@@ -542,12 +542,26 @@ group_role_map:
 6. **Abschluss:** Der:die Admin schließt den Fall mit einem Pflicht-Vermerk ab — als
    **erledigt** (Anliegen bearbeitet) oder **verworfen** (Fehlalarm).
 
+### Erneute Anmeldung beim Schulkonto *(seit 0.18.4)*
+
+Vor Freigabe, Ablehnung, Einsicht und Export leitet die Plattform zum Schulkonto weiter und
+verlangt dort eine neue Anmeldung (`prompt=login`); danach geht es zurück zur Ausgangsseite,
+die Aktion wird erneut angeklickt. Liefert der Anbieter den Anmeldezeitpunkt (`auth_time`),
+muss er höchstens zwei Minuten alt sein. Das Schulkonto liefert ihn nicht — dann verlässt
+sich die Plattform darauf, dass es die neue Anmeldung tatsächlich verlangt hat (auf Prod
+geprüft), und besteht auf dem **zweiten Faktor** (`mfa` in `amr`). Restrisiko und Begründung:
+ADR-008, Nachtrag vom 19.10.2026.
+
+Ohne 2FA beim Schulkonto scheitert jede Einsicht mit „… muss mit dem zweiten Faktor
+erfolgen". Eine Schule, deren Anbieter keinen zweiten Faktor kennt, setzt in der
+`auth.yaml` `oauth.stepup_amr: []` — dann genügt die erneute Anmeldung allein.
+
 ### Schutzmechanismen im Überblick
 
 | Mechanismus | Wirkung |
 |-------------|---------|
 | Zwei-Personen-Prinzip | Antragsteller:in ≠ Freigebende:r (auch auf Datenbank-Ebene erzwungen) |
-| Frische Authentifizierung (Step-up) | Freigabe und Einsicht nur nach erneuter Anmeldung |
+| Frische Authentifizierung (Step-up) | Freigabe und Einsicht nur nach erneuter Anmeldung beim Schulkonto mit Passwort und zweitem Faktor (siehe unten) |
 | Zeitfenster | Einsicht endet automatisch (Standard 48 h nach Freigabe) |
 | Read-only | Keine Antwort, keine Bearbeitung im Namen der Schüler:in |
 | Audit-Log | Jeder Zugriff append-only protokolliert |

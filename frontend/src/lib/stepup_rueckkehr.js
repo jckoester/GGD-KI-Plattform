@@ -25,6 +25,8 @@ export function stepupFehlerText(code, jetzt = new Date()) {
       return "Die erneute Anmeldung wurde abgebrochen. Die Aktion wurde nicht ausgeführt.";
     case "anderes_konto":
       return "Sie haben sich mit einem anderen Konto angemeldet als dem, mit dem Sie hier arbeiten. Die Aktion wurde nicht ausgeführt.";
+    case "ohne_2fa":
+      return "Die erneute Anmeldung muss mit dem zweiten Faktor erfolgen (etwa dem Code aus der Authenticator-App). Die Aktion wurde nicht ausgeführt.";
     case "nicht_frisch":
       return `Die erneute Anmeldung ließ sich nicht bestätigen. Bitte versuchen Sie es noch einmal. ${melden}`;
     default:

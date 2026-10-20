@@ -302,6 +302,7 @@ class TestOAuthAdapter:
             fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
         assert fresh.auth_time is None  # ungültige Signatur → keine vertrauenswürdige auth_time
         assert fresh.diagnose["signatur"] == "ungueltig"
+        assert fresh.amr is None  # ungeprüftes Token liefert auch keinen zweiten Faktor
 
     @pytest.mark.asyncio
     async def test_exchange_code_success(self, oauth_adapter):
@@ -756,6 +757,11 @@ async def test_stepup_diagnose_traegt_sitzung_und_iat(oauth_adapter):
     assert fresh.auth_time is None
     assert fresh.diagnose["iat"] == 1700000000
     assert fresh.diagnose["sitzung"]["amr"] == ["pwd"] and fresh.diagnose["sitzung"]["sid"]
+    assert fresh.amr == ["pwd"]
+
+
+def test_stepup_amr_vorgabe_ist_mfa(oauth_adapter):
+    assert oauth_adapter.stepup_amr == ["mfa"]
 
 
 def test_login_log_nennt_sitzung(oauth_adapter, caplog):

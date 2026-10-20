@@ -30,6 +30,7 @@ describe("stepupFehlerText", () => {
   it("unterscheidet Abbruch und anderes Konto", () => {
     expect(stepupFehlerText("abgebrochen", jetzt)).toContain("abgebrochen");
     expect(stepupFehlerText("anderes_konto", jetzt)).toContain("anderen Konto");
+    expect(stepupFehlerText("ohne_2fa", jetzt)).toContain("zweiten Faktor");
   });
 
   it("fällt bei unbekanntem Code auf „fehlgeschlagen“ zurück", () => {

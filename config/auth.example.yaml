@@ -28,6 +28,11 @@ oauth:
   # exakte URL steht in der OIDC-Discovery des Providers
   # (`<issuer>/.well-known/openid-configuration` → `jwks_uri`).
   # jwks_url: "https://sso.example.de/oauth2/certs"
+  #
+  # Was `amr` nach der erneuten Anmeldung vor der Krisen-Einsicht enthalten muss (seit 0.18.4).
+  # Vorgabe: der zweite Faktor. Ohne 2FA beim Anbieter auf [] setzen — sonst scheitert jede
+  # Einsicht.
+  # stepup_amr: ["mfa"]
 
 yaml_test:
   users_file: config/test_users.yaml

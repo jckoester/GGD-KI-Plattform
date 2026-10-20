@@ -159,6 +159,19 @@ entschieden (Jan, 19.10.2026), weil das Schulkonto keine frische Anmeldung nachw
 ressourcenloses Step-up (`create_token`); das ist entfernt, jede Step-up-Aktion ist jetzt an
 einen Krisen-Antrag gebunden.
 
+### Step-up im Redirect-Modus: Frische ohne `auth_time` *(0.18.4)*
+
+`_handle_stepup_callback` prüft `auth_time` nur noch, **wenn es kommt**. Fehlt es — das
+Schulkonto liefert es nie —, gilt der Rücksprung als frisch: Die Challenge schickt
+`prompt=login` (+ `max_age=0`), und das Schulkonto verlangt dann nachweislich (Prod-Test
+19.10.2026) Passwort und 2FA. Am Token prüfbar ist das nicht; `sid` bleibt bei der
+erzwungenen Anmeldung sogar gleich (nur echtes Abmelden erzeugt eine neue). In jedem Fall
+Pflicht: die Werte aus `oauth.stepup_amr` (Vorgabe `["mfa"]`) in `FreshIdentity.amr`, das
+nur aus einem geprüften bzw. über den Back-Channel gelieferten ID-Token stammt; sonst
+`stepup_fehler=ohne_2fa`. Angenommene Rücksprünge ohne `auth_time` loggen
+`Step-up angenommen ohne auth_time`. Restrisiko (Weiterleitung ohne `prompt=login`
+nachgebaut, an einem entsperrten Gerät): ADR-008, Nachtrag 19.10.2026.
+
 ### Step-up im Redirect-Modus: Rücksprung und Protokoll *(0.18.1)*
 
 Der Callback (`_handle_stepup_callback`) lehnt nie mehr mit JSON ab, sondern springt über

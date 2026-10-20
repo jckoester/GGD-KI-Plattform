@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.18.4] – 2026-10-20
+
+### Behoben
+
+- **Krisen-Einsicht mit dem Schulkonto:** Die erneute Anmeldung vor Freigabe, Einsicht und Export
+  scheiterte immer, weil das Schulkonto keinen Anmeldezeitpunkt mitschickt. Jetzt genügt die
+  erneute Anmeldung mit zweitem Faktor; Schulen ohne 2FA beim Anbieter setzen
+  `oauth.stepup_amr: []`.
+
 ## [0.18.3] – 2026-10-19
 
 ### Behoben

@@ -259,22 +259,35 @@ async def _handle_stepup_callback(
             "fehlgeschlagen", return_to, f"{wer} Code-Tausch scheitert ({type(exc).__name__})"
         )
 
-    # Frische-Sicherheitsnetz: honoriert der IdP prompt=login nicht, ist auth_time alt.
+    if pseudonymize(fresh.identity.external_id, settings.school_secret) != current.sub:
+        return _stepup_abgelehnt("anderes_konto", return_to, f"{wer} angemeldet als anderer Nutzer")
+
+    # Frische. Liefert der Anbieter `auth_time`, wird es geprüft: Honoriert er prompt=login
+    # nicht, ist es alt. Liefert er keins — so das Schulkonto (Befund 19.10.2026) —, vertrauen
+    # wir darauf, dass er `prompt=login` beachtet: Auf Prod verlangt er dabei reproduzierbar
+    # Passwort und 2FA, nur nachweisen lässt es sich am Token nicht (`sid`, `iat`, `amr`
+    # sehen aus wie bei einer stillen Bestätigung). Restrisiko, festgehalten in ADR-008:
+    # Wer an einem entsperrten Gerät die Weiterleitung ohne prompt=login nachbaut, kommt
+    # ohne Eingabe durch — braucht dafür aber auch einen freigegebenen Antrag.
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    if not auth_time_is_fresh(fresh.auth_time, now_ts):
-        if fresh.auth_time is None:
-            alter = "auth_time fehlt"
-            iat = fresh.diagnose.pop("iat", None)
-            if iat is not None:
-                alter += f" iat_alter_s={now_ts - iat}"
-        else:
-            # Negativ heißt: Zeitpunkt in der Zukunft — die Uhr des Providers geht vor.
-            alter = f"alter_s={now_ts - fresh.auth_time} (erlaubt 0–{STEPUP_AUTH_TIME_MAX_AGE})"
+    if fresh.auth_time is not None and not auth_time_is_fresh(fresh.auth_time, now_ts):
+        # Negativ heißt: Zeitpunkt in der Zukunft — die Uhr des Providers geht vor.
+        alter = f"alter_s={now_ts - fresh.auth_time} (erlaubt 0–{STEPUP_AUTH_TIME_MAX_AGE})"
         return _stepup_abgelehnt(
             "nicht_frisch", return_to, f"{wer} {alter} diagnose={fresh.diagnose}"
         )
-    if pseudonymize(fresh.identity.external_id, settings.school_secret) != current.sub:
-        return _stepup_abgelehnt("anderes_konto", return_to, f"{wer} angemeldet als anderer Nutzer")
+    pflicht = list(getattr(adapter, "stepup_amr", []) or [])
+    fehlt = [w for w in pflicht if w not in (fresh.amr or [])]
+    if fehlt:
+        return _stepup_abgelehnt(
+            "ohne_2fa", return_to,
+            f"{wer} amr={fresh.amr} ohne {fehlt} diagnose={fresh.diagnose}",
+        )
+    if fresh.auth_time is None:
+        logger.info(
+            "Step-up angenommen ohne auth_time (Vertrauen auf prompt=login): %s amr=%s",
+            wer, fresh.amr,
+        )
 
     token = issue_stepup_token(settings.jwt_secret, current.sub, action, resource_id)
     secure = settings.environment != "development"

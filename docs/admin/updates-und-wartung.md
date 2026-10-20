@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.18.3          # die auszurollende Version
+git checkout 0.18.4          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -12,7 +12,7 @@ docker compose up -d
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.3`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.18.4`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
@@ -20,7 +20,7 @@ docker compose up -d
 >
 > ```bash
 > docker compose exec backend curl -s localhost:8000/health
-> # {"status":"ok","version":"0.18.3"}
+> # {"status":"ok","version":"0.18.4"}
 > ```
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
@@ -558,29 +558,28 @@ Häufige Meldungen und ihre Bedeutung:
 
 ## Troubleshooting
 
-**„Die erneute Anmeldung ließ sich nicht bestätigen" — in der Krisen-Einsicht** *(seit
-0.18.1; das Token-Anlegen braucht seit 0.18.3 nur eine Anmeldung, die höchstens 15 Minuten
-zurückliegt)*
-Vor besonders geschützten Aktionen meldet man sich beim Schulkonto noch einmal an. Die
-Plattform verlangt dabei eine **frische** Anmeldung: höchstens zwei Minuten alt, belegt durch
-den Zeitpunkt `auth_time`, den das Schulkonto mitschickt. Scheitert die Prüfung, steht im
-Backend-Log eine Zeile mit dem Grund — Lehrkräfte bekommen die Uhrzeit dazu angezeigt:
+**Die erneute Anmeldung vor der Krisen-Einsicht scheitert** *(seit 0.18.1 protokolliert, seit
+0.18.4 mit 2FA-Pflicht)*
+Vor Freigabe, Einsicht und Export meldet man sich beim Schulkonto noch einmal an
+([Ablauf](content-moderation.md#erneute-anmeldung-beim-schulkonto-seit-0184)). Scheitert das,
+steht im Backend-Log eine Zeile mit dem Grund — Lehrkräfte bekommen dazu die Uhrzeit angezeigt.
+Angenommene Anmeldungen ohne Anmeldezeitpunkt stehen ebenfalls im Log:
 
 ```bash
-docker compose logs backend | grep "Step-up abgelehnt"
-# WARNING Step-up abgelehnt (nicht_frisch): aktion=create_token nutzer=3f9a1c2e… alter_s=5412 (erlaubt 0–120) diagnose={'id_token': True, 'signatur': 'ungeprueft', 'userinfo_auth_time': False, 'claims': ['aud', 'auth_time', 'exp', 'iat', 'iss', 'sub']}
+docker compose logs backend | grep -E "Step-up (abgelehnt|angenommen)"
+# WARNING Step-up abgelehnt (ohne_2fa): aktion=read nutzer=3f9a1c2e… amr=['pwd'] ohne ['mfa'] diagnose={…}
+# INFO    Step-up angenommen ohne auth_time (Vertrauen auf prompt=login): aktion=read nutzer=3f9a1c2e… amr=['pwd', 'mfa', 'otp']
 ```
 
 | Im Log | heißt |
 |---|---|
-| `alter_s=` groß (Minuten, Stunden) | Das Schulkonto hat keine neue Anmeldung verlangt, sondern die bestehende Sitzung bestätigt |
-| `alter_s=` negativ | Der Zeitpunkt liegt in der Zukunft — die Uhr des Schulkontos geht vor (oder die des Servers nach) |
-| `auth_time fehlt`, `'id_token': False` | Das Schulkonto schickt kein ID-Token |
-| `auth_time fehlt`, `auth_time` nicht unter `claims` | Das ID-Token trägt keinen Anmeldezeitpunkt |
-| `'signatur': 'ungueltig'` | `oauth.jwks_url` ist gesetzt, die Signatur passt aber nicht zu den Schlüsseln |
-| `auth_time fehlt iat_alter_s=…` *(seit 0.18.2)* | Wie oben; dazu, wie alt das ID-Token ist. `sitzung` nennt Hash-Anfang der `sid`, `amr`, `acr` — vergleichbar mit der Zeile `OAuth-Login: … sitzung=` beim Login |
+| `(ohne_2fa)` | Angemeldet ohne zweiten Faktor — oder der Anbieter kennt keinen: dann `oauth.stepup_amr: []` |
+| `(nicht_frisch)` mit `alter_s=` groß | Der Anbieter liefert `auth_time`, hat aber keine neue Anmeldung verlangt |
+| `(nicht_frisch)` mit `alter_s=` negativ | Der Zeitpunkt liegt in der Zukunft — die Uhr des Anbieters geht vor (oder die des Servers nach) |
+| `'signatur': 'ungueltig'` | `oauth.jwks_url` ist gesetzt, die Signatur passt aber nicht — dann fehlt auch `amr` |
 | `(anderes_konto)` | Angemeldet wurde mit einem anderen Konto |
 | `(abgebrochen)` / `(fehlgeschlagen)` | Abbruch beim Schulkonto / Code-Tausch oder Rücksprung gescheitert |
+| `sitzung=` | Hash-Anfang der `sid`, `amr`, `acr` — vergleichbar mit der Zeile `OAuth-Login: … sitzung=` |
 
 Das Log enthält nur Namen und Ja/Nein, keine Token-Inhalte.
 

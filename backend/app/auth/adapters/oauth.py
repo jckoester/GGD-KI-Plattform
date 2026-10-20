@@ -119,6 +119,10 @@ class OAuthConfig(BaseModel):
     # Bleibt er None, greift der bisherige Back-Channel-Trust (ID-Token kommt über TLS
     # direkt vom Token-Endpoint) — dann OHNE Signaturprüfung (Warnung im Log).
     jwks_url: str | None = None
+    # Was `amr` nach einer erneuten Anmeldung (Step-up) enthalten muss (0.18.4). Vorgabe `mfa`:
+    # Die Krisen-Einsicht verlangt den zweiten Faktor (Jan, 19.10.2026). Eine Schule ohne
+    # 2FA beim Anbieter setzt `stepup_amr: []` — sonst scheitert jede Einsicht.
+    stepup_amr: list[str] = ["mfa"]
 
     @property
     def effective_auth_url(self) -> str:
@@ -277,6 +281,7 @@ class OAuthAdapter(AuthAdapter):
         identity = self._userinfo_to_identity(userinfo)
         id_token = token_json.get("id_token")
         auth_time = None
+        amr = None
         # Für das Log bei einer Ablehnung: nur Namen und Ja/Nein, nie Werte.
         diagnose = {
             "id_token": bool(id_token),
@@ -299,12 +304,21 @@ class OAuthAdapter(AuthAdapter):
                 claims = _unverified_jwt_claims(id_token)
             diagnose["claims"] = sorted(claims or {})
             diagnose["sitzung"] = sitzungsmerkmale(claims or {})
+            # Nur aus einem geprüften (oder über den Back-Channel gelieferten) ID-Token —
+            # bei ungültiger Signatur sind `claims` None und `amr` bleibt leer.
+            if isinstance((claims or {}).get("amr"), list):
+                amr = [str(a) for a in claims["amr"]]
             if isinstance((claims or {}).get("iat"), (int, float)):
                 diagnose["iat"] = int(claims["iat"])
             raw_at = (claims or {}).get("auth_time")
             if isinstance(raw_at, (int, float)):
                 auth_time = int(raw_at)
-        return FreshIdentity(identity=identity, auth_time=auth_time, diagnose=diagnose)
+        return FreshIdentity(identity=identity, auth_time=auth_time, diagnose=diagnose, amr=amr)
+
+    @property
+    def stepup_amr(self) -> list[str]:
+        """Pflichtwerte in `amr` nach einem Step-up (`oauth.stepup_amr`)."""
+        return list(self._config.stepup_amr)
 
     async def _fetch_jwks(self) -> dict | None:
         try:
