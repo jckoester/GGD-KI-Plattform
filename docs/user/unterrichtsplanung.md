@@ -180,6 +180,10 @@ Eine *offene* Phase zählt dagegen mit.
   Fachschaft freigeben können.
 - **Material**: Freitext **oder** verknüpfter Material-Knoten. Im Feld tippen Sie
   einen Namen ein; mit **`@`** suchen Sie einen vorhandenen Knoten und verlinken ihn.
+  **Methodenblätter** (etwa ein Merkblatt zur Gedichtanalyse) verlinken Sie hier, beim
+  Material der Phase, in der die Klasse damit arbeitet — nicht unter *Methode*: Die Methode
+  beschreibt, wie die Phase abläuft (Sozialform, Arrangement), das Methodenblatt das fachliche
+  Verfahren, das die Schüler:innen anwenden.
 
 > 📷 *Screenshot folgt: Methodenspalte mit gestapelter Sozialform/Methode und der Vorschlagsliste.*
 <!-- Ersetzen durch: ![Sozialform und Methode](/help-images/unterrichtsplanung/methode-sozialform.png) -->
