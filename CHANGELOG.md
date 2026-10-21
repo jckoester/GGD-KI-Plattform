@@ -5,10 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.21.0] – 2026-10-21
+
+Planung im Alltag: Knopf „Aktuelle Woche“, Eingabefelder und Dialoge der Jahresplanung mit
+Tastatur und Fokus. Keine Migration.
+
 ### Neu
 
 - **Jahresplan:** Knopf „Aktuelle Woche“ scrollt die Wochenliste zur Woche von heute (in den
   Ferien zur nächsten Unterrichtswoche).
+
+### Geändert
+
+- **Nachbereitung:** Die gewählten Knöpfe ✓ / ⏸ / ✕ einer Phase tragen die Farbe als Fläche und
+  Rahmen, die Schrift bleibt gut lesbar. Das Band „2. Halbjahr“ ebenso.
+- **Update:** Aufräumen (`docker image prune -f && docker builder prune -f`) gehört jetzt zum
+  regulären Update-Ablauf in der Admin-Doku.
 
 ### Behoben
 
@@ -19,12 +31,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   beim Öffnen in den Dialog, Tab bleibt darin, Escape schließt (jetzt auch das Wochenmuster), und
   danach steht der Fokus wieder auf dem Knopf, der den Dialog geöffnet hat.
 
-### Geändert
+### Nach dem Update
 
-- **Nachbereitung:** Die gewählten Knöpfe ✓ / ⏸ / ✕ einer Phase tragen die Farbe als Fläche und
-  Rahmen, die Schrift bleibt gut lesbar. Das Band „2. Halbjahr“ ebenso.
-- **Update:** Aufräumen (`docker image prune -f && docker builder prune -f`) gehört jetzt zum
-  regulären Update-Ablauf in der Admin-Doku.
+- Backend **und** Frontend neu bauen (keine Migration); offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.20.0] – 2026-10-20
 

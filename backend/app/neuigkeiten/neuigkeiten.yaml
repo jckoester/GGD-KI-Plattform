@@ -80,3 +80,14 @@
     Assistent den Eintrag aus dem Wissensspeicher mit — auch Wochen später. Nachbereitete
     Stunden zählen als eingeführt, die übrigen vergangenen „laut Plan".
   link: /help/unterrichtsplanung
+
+- id: "0.21-aktuelle-woche"
+  version: "0.21.0"
+  datum: 2026-10-21
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Jahresplan: „Aktuelle Woche“"
+  text: >-
+    Ein Knopf über dem Jahresplan springt zur Woche von heute — in den Ferien zur nächsten
+    Unterrichtswoche. Außerdem öffnet ein Klick auf das Thema einer Stunde das Feld jetzt gleich
+    mit Cursor.
