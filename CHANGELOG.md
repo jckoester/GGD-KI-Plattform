@@ -19,6 +19,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   beim Öffnen in den Dialog, Tab bleibt darin, Escape schließt (jetzt auch das Wochenmuster), und
   danach steht der Fokus wieder auf dem Knopf, der den Dialog geöffnet hat.
 
+### Geändert
+
+- **Nachbereitung:** Die gewählten Knöpfe ✓ / ⏸ / ✕ einer Phase tragen die Farbe als Fläche und
+  Rahmen, die Schrift bleibt gut lesbar. Das Band „2. Halbjahr“ ebenso.
+- **Update:** Aufräumen (`docker image prune -f && docker builder prune -f`) gehört jetzt zum
+  regulären Update-Ablauf in der Admin-Doku.
+
 ## [0.20.0] – 2026-10-20
 
 Eingeführte Fachbegriffe der Unterrichtsgruppe im Chat. Eine Migration (0089).

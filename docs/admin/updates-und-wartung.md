@@ -8,7 +8,16 @@ git checkout 0.20.0          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
+# Nach der Prüfung im Browser: Vorgänger-Images und Build-Zwischenspeicher entfernen
+docker image prune -f && docker builder prune -f
 ```
+
+> **Aufräumen gehört zu jedem Update.** Jeder Neubau lässt das bisherige Image und einen
+> wachsenden Build-Zwischenspeicher zurück; nach einer Reihe kurz aufeinanderfolgender Updates
+> war die Platte voll, und die Datenbank startete nicht mehr (Oktober 2026). Beide Befehle
+> entfernen nur, was kein laufender Container braucht — am besten erst, wenn die neue Version
+> läuft und im Browser geprüft ist. Mehr unter
+> [Speicherplatz freigeben](#speicherplatz-freigeben).
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist

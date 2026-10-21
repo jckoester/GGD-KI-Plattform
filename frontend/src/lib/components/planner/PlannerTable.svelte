@@ -222,9 +222,8 @@
             <!-- Halbjahresbruch-Band -->
             <div
                 class="px-3 py-1.5 mb-3 ml-1 text-xs font-semibold
-                  text-yellow-700 dark:text-yellow-200
-                  bg-yellow-50 dark:bg-[color-mix(in_srgb,var(--color-yellow-300)_8%,transparent)]
-                  border-y-2 border-yellow-300 dark:border-[color-mix(in_srgb,var(--color-yellow-400)_30%,transparent)]"
+                  text-light-tx dark:text-dark-tx bg-light-ye-bg dark:bg-dark-ye-bg
+                  border-y-2 border-light-ye dark:border-dark-ye"
             >
                 2. Halbjahr
             </div>

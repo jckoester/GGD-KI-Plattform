@@ -22,8 +22,8 @@
     if (!item) return 'bg-light-ui-3 dark:bg-dark-ui-3'
     if (!item.soll_std) return 'bg-light-ui-3 dark:bg-dark-ui-3'
     const ratio = item.zugewiesen / item.soll_std
-    if (ratio > 1.05) return 'bg-orange-400'
-    if (ratio >= 0.9) return 'bg-green-400'
+    if (ratio > 1.05) return 'bg-light-or-2 dark:bg-dark-or'
+    if (ratio >= 0.9) return 'bg-light-gr-2 dark:bg-dark-gr'
     return 'bg-light-bl dark:bg-dark-bl'
   }
 </script>
@@ -39,7 +39,7 @@
           <span class="font-medium text-light-tx dark:text-dark-tx">{balance.total_slots}</span> Slots gesamt
         </span>
         {#if balance.unzugewiesen > 0}
-          <span class="text-orange-600 dark:text-orange-400">
+          <span class="text-light-or dark:text-dark-or">
             <span class="font-medium">{balance.unzugewiesen}</span> nicht zugewiesen
           </span>
         {/if}
@@ -110,7 +110,7 @@
                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                   {bal.zugewiesen}{bal.soll_std ? `/${bal.soll_std}` : ''} Std
                   {#if bal.puffer > 0}
-                    <span class="text-orange-500">(+{bal.puffer})</span>
+                    <span class="text-light-or dark:text-dark-or">(+{bal.puffer})</span>
                   {/if}
                 </span>
               </div>
