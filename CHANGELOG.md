@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.20.0] – 2026-10-20
+
+Eingeführte Fachbegriffe der Unterrichtsgruppe im Chat. Eine Migration (0089).
+
 ### Neu
 
 - Im Chat mit Unterrichtsgruppe gibt die Plattform einen Fachbegriff, der nicht ganz sicher zur
@@ -26,6 +30,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Der Lernstand bei Assistenten mit Wissensbereich enthält nur noch Inhalte, die die fragende
   Person lesen darf, und nur aus der Unterrichtsgruppe des Chats.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0089) — wie im regulären Update.
+- Backend **und** Frontend neu bauen; offene Browser-Tabs einmal neu laden.
+- Danach Speicherplatz freigeben: `docker image prune -f` und `docker builder prune -f`.
 
 ## [0.19.0] – 2026-10-20
 

@@ -67,3 +67,16 @@
     etwa für eine Klassenarbeit — und wieder zusammenlegen. Ein Chat mit Bezugsstunde zeigt
     oben einen Link zum Entwurf. Gestrichene Phasen zählen nicht mehr zur Unterrichtszeit.
   link: /help/unterrichtsplanung
+
+- id: "0.20-begriffe-im-schuelerchat"
+  version: "0.20.0"
+  datum: 2026-10-20
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Ihre Fachbegriffe helfen im Schüler-Chat"
+  text: >-
+    Fachbegriffe, die Sie an Ihre Stundenentwürfe hängen, kennt jetzt auch der Chat Ihrer
+    Schüler:innen: Fragt jemand nach einem Begriff, den die Gruppe schon hatte, bekommt der
+    Assistent den Eintrag aus dem Wissensspeicher mit — auch Wochen später. Nachbereitete
+    Stunden zählen als eingeführt, die übrigen vergangenen „laut Plan".
+  link: /help/unterrichtsplanung
