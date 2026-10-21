@@ -374,6 +374,35 @@ METHODEN: list[Baustein] = [
             "handeln darin, ohne dass die Folgen ihrer Entscheidungen vorhersehbar sind."
         ),
     ),
+    Baustein(
+        "Harkness-Methode",
+        # Nach Susann Kubicek, „Die Harkness Methode – Das agile Unterrichtsgespräch"
+        # (Agilität und Bildungsprozesse, Kap. 2.11). Ablaufsatz ohne „kein Handheben" —
+        # die Verneinung zöge den Knoten ans Melden heran (siehe Regel 2 oben).
+        ("Harkness-Gespräch", "Harkness-Diskussion", "Harkness-Tisch", "Agiles Unterrichtsgespräch"),
+        content=(
+            "Die Lernenden diskutieren ein vorbereitetes Thema selbstständig miteinander, "
+            "idealerweise an einem ovalen Tisch, an dem alle einander sehen. Die Redebeiträge "
+            "richten sich an die Mitschüler:innen, niemand meldet sich; wer etwas sagen will, "
+            "spricht. Die Lehrkraft sitzt dazwischen — jede Stunde an einem anderen Platz — und "
+            "greift nur ein, wenn das Gespräch vom Thema abkommt oder Information fehlt. Die "
+            "Stunde trägt die Hausaufgabe: Das Thema wird vorher erarbeitet, die Aufgabe dazu "
+            "sollte kontrovers, rätselhaft oder einarbeitungsbedürftig sein. Die Lernenden "
+            "brauchen ein explizites Regelwerk (zuhören, Redeanteile ausbalancieren, an "
+            "Gedanken anknüpfen, nachfragen, zitieren, zusammenfassen); in der Einführungsphase "
+            "hilft ein schematisches Gesprächsprotokoll, das nicht Inhalte, sondern Redeanteile "
+            "und Gesprächsrichtungen festhält und am Stundenende ausgewertet wird. Die Form "
+            "braucht Zeit zum Einüben und Gelassenheit bei Pausen; sie eignet sich vor allem "
+            "für die Oberstufe. Bei prüfungsrelevanten Themen kann die Lehrkraft stärker "
+            "führen und den freien Austausch trotzdem zulassen. Entwickelt 1930 von Edward S. "
+            "Harkness für die Phillips Exeter Academy."
+        ),
+        ablauf=(
+            "Die Lernenden sitzen um einen gemeinsamen Tisch und führen das Gespräch über ein "
+            "zu Hause vorbereitetes Thema selbst, indem sie sich direkt aneinander wenden; die "
+            "Lehrkraft sitzt dazwischen und greift nur ein, wenn das Gespräch abschweift."
+        ),
+    ),
 ]
 
 BESTAND: list[tuple[str, list[Baustein]]] = [
