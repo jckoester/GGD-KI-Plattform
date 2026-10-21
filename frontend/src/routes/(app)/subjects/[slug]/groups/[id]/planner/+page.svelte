@@ -242,8 +242,13 @@
   // `null` heißt geschlossen; sonst `{ modus, datum }`.
   let ausfallDialog = $state(null)
 
+  // Der Menüpunkt, der den Ausfall-Dialog öffnet, verschwindet mit dem Menü — der Fokus geht
+  // danach auf den Menü-Knopf derselben Zeile zurück. Die Kennung überdauert `ausfallDialog = null`.
+  let ausfallZiel = $state(null)
+  $effect(() => { if (ausfallDialog?.slotId) ausfallZiel = ausfallDialog.slotId })
+
   function ausfallEintragen(slot) {
-    ausfallDialog = { modus: 'eintragen', datum: slot.date }
+    ausfallDialog = { modus: 'eintragen', datum: slot.date, slotId: slot.id }
   }
 
   async function ausfallBestaetigt({ reichweite, notiz }) {
@@ -291,7 +296,7 @@
   }
 
   function ausfallZurueck(slot) {
-    ausfallDialog = { modus: 'zuruecknehmen', datum: slot.date }
+    ausfallDialog = { modus: 'zuruecknehmen', datum: slot.date, slotId: slot.id }
   }
 
   /**
@@ -672,6 +677,7 @@
   gruppenname={group?.name ?? ''}
   onConfirm={ausfallBestaetigt}
   onClose={() => { ausfallDialog = null }}
+  fokusZurueck={() => document.querySelector(`[data-slot="${ausfallZiel}"] [aria-label="Weitere Aktionen"]`)}
 />
 
 <UnitDialog

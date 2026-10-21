@@ -16,6 +16,7 @@
    * neu formuliert.
    */
   import { eintragFrage, ruecknahmeWarnung } from '$lib/ausfall.js'
+  import Dialog from '$lib/components/Dialog.svelte'
 
   const {
     open = false,
@@ -24,6 +25,7 @@
     gruppenname = '',
     onConfirm,
     onClose,
+    fokusZurueck = null,        // Rückfall für den Fokus nach dem Schließen (Menüpunkt weg)
   } = $props()
 
   let reichweite = $state('gruppe')
@@ -58,26 +60,11 @@
     }
   }
 
-  function onKeydown(e) {
-    if (e.key === 'Escape') onClose()
-  }
 </script>
 
 {#if open}
-  <!-- Klick daneben schließt (Maus); per Tastatur Escape oder die Knöpfe. -->
-  <div
-    role="presentation"
-    class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-    onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
-  >
-    <div
-      class="bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-xl shadow-2xl w-full max-w-md p-6"
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-      onkeydown={onKeydown}
-    >
-      <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">
+  <Dialog open {onClose} {fokusZurueck} titelId="ausfall-dialog-titel" breite="max-w-md">
+      <h2 id="ausfall-dialog-titel" class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">
         {zuruecknehmen ? 'Ausfall zurücknehmen' : 'Ich falle aus'}
       </h2>
       <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">{datumText}</p>
@@ -144,6 +131,5 @@
           {arbeitet ? 'Einen Moment…' : zuruecknehmen ? 'Zurücknehmen' : 'Eintragen'}
         </button>
       </div>
-    </div>
-  </div>
+  </Dialog>
 {/if}

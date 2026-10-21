@@ -1,5 +1,6 @@
 <script>
   import { UE_PALETTE } from '$lib/planner.js'
+  import Dialog from '$lib/components/Dialog.svelte'
   import { createUnit, updateUnit, deleteUnit, getGroupCurriculumChapters } from '$lib/api.js'
   import { curriculumLage } from '$lib/curriculumlage.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -113,8 +114,8 @@
     }
   }
 
+  // Escape übernimmt der Rahmen (`Dialog.svelte`).
   function onKeydown(e) {
-    if (e.key === 'Escape') onClose()
     if (e.key === 'Enter' && !saving) save()
   }
 
@@ -122,21 +123,8 @@
 </script>
 
 {#if open}
-  <!-- Backdrop -->
-  <!-- Klick daneben schließt (Maus); per Tastatur Escape oder die Knöpfe. -->
-  <div
-    role="presentation"
-    class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-    onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
-  >
-    <div
-      class="bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-xl shadow-2xl w-full max-w-md p-6"
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-      onkeydown={onKeydown}
-    >
-      <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-4">
+  <Dialog open {onClose} titelId="ue-dialog-titel" breite="max-w-md" onkeydown={onKeydown}>
+      <h2 id="ue-dialog-titel" class="text-base font-semibold text-light-tx dark:text-dark-tx mb-4">
         {isEdit ? 'Unterrichtseinheit bearbeiten' : 'Unterrichtseinheit anlegen'}
       </h2>
 
@@ -284,6 +272,5 @@
           </div>
         </div>
       {/if}
-    </div>
-  </div>
+  </Dialog>
 {/if}

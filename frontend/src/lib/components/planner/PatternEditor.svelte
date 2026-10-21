@@ -17,6 +17,7 @@
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
   import WarningBanner from '$lib/components/WarningBanner.svelte'
+  import Dialog from '$lib/components/Dialog.svelte'
 
   const { open = false, groupId, patterns = [], onSaved, onGenerated, onClose } = $props()
 
@@ -255,14 +256,9 @@
 </script>
 
 {#if open}
-  <div
-    role="presentation"
-    class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
-    onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
-  >
-    <div class="bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-xl shadow-2xl w-full max-w-lg p-6">
+  <Dialog open {onClose} titelId="muster-dialog-titel" breite="max-w-lg">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx">Wochenmuster bearbeiten</h2>
+        <h2 id="muster-dialog-titel" class="text-base font-semibold text-light-tx dark:text-dark-tx">Wochenmuster bearbeiten</h2>
         <button
           onclick={onClose}
           aria-label="Schließen"
@@ -522,6 +518,5 @@
           </button>
         </div>
       </div>
-    </div>
-  </div>
+  </Dialog>
 {/if}

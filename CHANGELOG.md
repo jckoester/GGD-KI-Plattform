@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Jahresplan:** Ein Klick auf das Thema einer Stunde öffnet das Eingabefeld jetzt mit Cursor —
   bisher musste man ein zweites Mal genau in die Zeile treffen. Ebenso die Notiz zum Termin.
   Escape verwirft das Getippte zuverlässig.
+- **Dialoge der Jahresplanung** (Unterrichtseinheit, Wochenmuster, Ausfall): Der Fokus springt
+  beim Öffnen in den Dialog, Tab bleibt darin, Escape schließt (jetzt auch das Wochenmuster), und
+  danach steht der Fokus wieder auf dem Knopf, der den Dialog geöffnet hat.
 
 ## [0.20.0] – 2026-10-20
 
