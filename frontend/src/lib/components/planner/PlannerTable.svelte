@@ -1,6 +1,6 @@
 <script>
     import { tick } from "svelte";
-    import { groupSlotsByWeek, isoWeek } from "$lib/planner.js";
+    import { groupSlotsByWeek, wochenSchluessel, zielwoche } from "$lib/planner.js";
     import PlannerRow from "./PlannerRow.svelte";
     import SpecialDayRow from "./SpecialDayRow.svelte";
 
@@ -49,11 +49,13 @@
     let didScroll = false;
     let headerEl = $state(null); // Sticky-Spaltenheader, dessen Höhe beim Scrollen abgezogen wird
 
-    function currentWeekKey() {
-        const now = new Date();
-        const ds = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const { week, year } = isoWeek(ds);
-        return `${year}-W${String(week).padStart(2, "0")}`;
+    // Von außen aufrufbar (Knopf „Aktuelle Woche", 0.21) und beim ersten Aufbau: zur Woche
+    // von heute, in Ferien zur nächsten, nach dem Schuljahr zur letzten (`zielwoche`).
+    export function scrollToCurrentWeek(behavior = "smooth") {
+        const keys = weekItems.filter((i) => i.type === "week").map((i) => i.key);
+        const target = zielwoche(keys, wochenSchluessel());
+        if (!target) return;
+        scrollToEl(document.querySelector(`[data-week="${target}"]`), behavior);
     }
 
     // Scrollt das Element so in den Scroll-Container, dass es direkt unter dem
@@ -90,18 +92,7 @@
     $effect(() => {
         if (didScroll || !weekItems.length) return;
         didScroll = true;
-
-        const keys = weekItems.filter((i) => i.type === "week").map((i) => i.key);
-        const wk = currentWeekKey();
-        // Exakte Woche; sonst die nächste folgende; sonst die letzte (Schuljahr vorbei).
-        const target = keys.includes(wk)
-            ? wk
-            : (keys.find((k) => k > wk) ?? keys.at(-1));
-        if (!target) return;
-
-        tick().then(() =>
-            scrollToEl(document.querySelector(`[data-week="${target}"]`)),
-        );
+        tick().then(() => scrollToCurrentWeek("auto"));
     });
 
     function unitForId(id) {

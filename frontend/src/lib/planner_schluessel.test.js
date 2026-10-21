@@ -77,7 +77,7 @@ describe("Schlüssel der Wochenliste", () => {
     })
 
     it("Wochen behalten ihren Schlüssel `JJJJ-Wnn`", () => {
-        // ⚠️ `PlannerTable` vergleicht ihn mit `currentWeekKey()`, um beim Öffnen zur
+        // ⚠️ `PlannerTable` vergleicht ihn mit `wochenSchluessel()`, um beim Öffnen zur
         // aktuellen Woche zu scrollen. Ein anderes Format bräche das lautlos.
         const items = groupSlotsByWeek([slot("a", "2026-10-05")], {})
         const woche = items.find((i) => i.type === "week")

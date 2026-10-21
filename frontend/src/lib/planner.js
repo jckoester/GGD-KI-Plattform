@@ -323,3 +323,30 @@ export function nachbereitungsVorbelegung(phasen) {
     }
     return stati
 }
+
+/**
+ * Wochenschlüssel `JJJJ-Wnn` eines Kalendertags in **Ortszeit** — derselbe, den
+ * `groupSlotsByWeek` an die Wochen hängt.
+ *
+ * @param {Date} tag
+ */
+export function wochenSchluessel(tag = new Date()) {
+    const ds = `${tag.getFullYear()}-${String(tag.getMonth() + 1).padStart(2, '0')}-${String(tag.getDate()).padStart(2, '0')}`
+    const { week, year } = isoWeek(ds)
+    return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+/**
+ * Zu welcher Woche „Aktuelle Woche" springt (0.21) — und der Sprung beim Öffnen.
+ *
+ * Die Woche von heute; in Ferien (keine eigene Woche in der Liste) die nächste folgende;
+ * nach dem letzten Termin die letzte. `null` ohne Wochen.
+ *
+ * @param {string[]} schluessel  Wochenschlüssel der Liste, aufsteigend
+ * @param {string} heute         Wochenschlüssel von heute
+ */
+export function zielwoche(schluessel, heute) {
+    if (!schluessel?.length) return null
+    if (schluessel.includes(heute)) return heute
+    return schluessel.find((k) => k > heute) ?? schluessel.at(-1)
+}

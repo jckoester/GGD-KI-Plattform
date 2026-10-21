@@ -471,6 +471,22 @@
         Assistent
       </a>
 
+      <!-- Zur Woche von heute (0.21): Die Liste ist ein ganzes Schuljahr lang. -->
+      <button
+        onclick={() => plannerTable?.scrollToCurrentWeek()}
+        disabled={!overview}
+        class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+               text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors
+               disabled:opacity-50"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/>
+          <circle cx="12" cy="16" r="2"/>
+        </svg>
+        Aktuelle Woche
+      </button>
+
       <!-- Undo-Button -->
       <button
         onclick={openUndoPanel}

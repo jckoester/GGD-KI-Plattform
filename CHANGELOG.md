@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Jahresplan:** Knopf „Aktuelle Woche“ scrollt die Wochenliste zur Woche von heute (in den
+  Ferien zur nächsten Unterrichtswoche).
+
 ## [0.20.0] – 2026-10-20
 
 Eingeführte Fachbegriffe der Unterrichtsgruppe im Chat. Eine Migration (0089).
