@@ -14,6 +14,22 @@
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
+  // ⚠️ **Das Feld holt sich den Fokus selbst** (0.21, Päckchen H). Bis dahin ersetzte der Klick
+  // den Knopf durch ein Eingabefeld **ohne** Cursor: Man musste die schmale Textzeile ein
+  // zweites Mal genau treffen („greift nur, wenn der Klick die Mitte trifft", Jan 03.10.2026),
+  // und weil das Feld nie fokussiert war, blieb es offen, bis man es traf. Dasselbe galt für
+  // die Notiz zum Termin.
+  let themaInputEl = $state(null)
+  let noteInputEl = $state(null)
+  $effect(() => {
+    if (!themaInputEl) return
+    themaInputEl.focus()
+    const ende = themaInputEl.value.length
+    themaInputEl.setSelectionRange(ende, ende)
+  })
+  $effect(() => {
+    noteInputEl?.focus()
+  })
   let themaInput   = $state('')
 
   // Popovers
@@ -217,9 +233,10 @@
     {#if editingThema}
       <input
         type="text"
+        bind:this={themaInputEl}
         bind:value={themaInput}
         onblur={commitThema}
-        onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { editingThema = false } }}
+        onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { themaInput = slot.thema ?? ''; editingThema = false } }}
         class="w-full bg-transparent border-b border-primary dark:border-primary-dark
                outline-none text-sm text-light-tx dark:text-dark-tx"
       />
@@ -525,6 +542,7 @@
   >
     <div class="col-span-5 px-4 py-2.5">
       <textarea
+        bind:this={noteInputEl}
         bind:value={noteInput}
         rows="2"
         placeholder="Notiz zu diesem Termin …"
