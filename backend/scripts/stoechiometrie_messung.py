@@ -29,6 +29,7 @@ des Laufs werden am Ende gelöscht — ihr Inhalt steht im Protokoll.
 Budgets des Schüler:innen-Kontos.
 """
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
@@ -50,6 +51,11 @@ REPO = HIER.parent.parent
 PROMPT = REPO / "config/prompts/stoechiometrie_assistent.md"
 SZENARIEN = HIER / "szenarien/stoechiometrie.yaml"
 NAME = "Rechenhilfe Stöchiometrie"
+#: Einrichtung v3 (Plan, 23.10.2026): alle Lernverhalten-Augmentierungen an außer den
+#: Reflexions-Hinweisen — sie erzeugen „Möchtest du noch …?"-Anhängsel.
+EINRICHTUNG_OHNE = ["metacognitive_nudges"]
+#: Festes Modell des Assistenten (Jan, 24.10.2026, nach Lauf 3): chat-komplex.
+EINRICHTUNG_MODELL = "chat-komplex"
 
 
 def _lade(name: str):
@@ -187,14 +193,19 @@ def selbsttest(faelle: list[dict]) -> bool:
 # ── Einrichtung ──────────────────────────────────────────────────────────────
 
 
-def assistent(conn) -> int:
+def assistent(conn, prompt_datei: Path = PROMPT, ohne: list[str] | None = None) -> int:
     """Rechenhilfe Stöchiometrie nach der Tabelle „Einrichtung" im Plan — angelegt oder auf den
-    Stand der Promptdatei gebracht."""
-    prompt = PROMPT.read_text(encoding="utf-8").strip()
+    Stand der Promptdatei gebracht.
+
+    Für Experimente in Schritt 5: ``prompt_datei`` (eine Variante außerhalb des Repos) und
+    ``ohne`` (abgeschaltete Lernverhalten-Augmentierungen). Ohne beides: die Einrichtung des
+    Plans. Der nächste Lauf ohne Optionen stellt sie wieder her."""
+    prompt = prompt_datei.read_text(encoding="utf-8").strip()
+    ohne = EINRICHTUNG_OHNE if ohne is None else ohne
     chemie = _eins(conn, "SELECT id FROM subjects WHERE slug = 'chemie'")
     werte = dict(system_prompt=prompt, subject_id=chemie, audience="student", scope="all_students",
-                 status="active", min_grade=8, max_grade=13, model="", tool_groups="[]",
-                 disabled_augmentations="{}")
+                 status="active", min_grade=8, max_grade=13, model=EINRICHTUNG_MODELL, tool_groups="[]",
+                 disabled_augmentations="{" + ",".join(ohne) + "}")
     kennung = _eins(conn, "SELECT id FROM assistants WHERE name = %s", NAME)
     with conn.cursor() as cur:
         if kennung is None:
@@ -223,15 +234,21 @@ def assistent(conn) -> int:
     return kennung
 
 
-def prompt_stand() -> str:
+def prompt_stand(prompt_datei: Path = PROMPT) -> str:
     def git(*a):
         return subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True).stdout.strip()
+    if prompt_datei.resolve() != PROMPT:
+        basis = git("log", "-1", "--format=%h", "--", str(PROMPT.relative_to(REPO)))
+        return f"**Variante** `{prompt_datei.name}` (nicht im Repo; Basis {basis})"
     rel = str(PROMPT.relative_to(REPO))
     status = git("status", "--porcelain", "--", rel)
     if status.startswith("??"):
         return "unversioniert (noch nicht im Repo)"
     hash_ = git("log", "-1", "--format=%h %cs", "--", rel)
-    return f"{hash_}{' + uncommittete Änderungen' if status else ''}"
+    if not status:
+        return hash_
+    inhalt = hashlib.sha256(PROMPT.read_bytes()).hexdigest()[:10]
+    return f"{hash_} + uncommittete Änderungen (Inhalt sha256 `{inhalt}`)"
 
 
 def knoten_der_antwort(conn, konversation: str) -> list[str]:
@@ -246,14 +263,15 @@ def knoten_der_antwort(conn, konversation: str) -> list[str]:
 # ── Lauf ─────────────────────────────────────────────────────────────────────
 
 
-def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis: str) -> dict:
+def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis: str,
+                      modell: str | None = None) -> dict:
     token = jwt.issue(pseudonym=schueler, roles=["student"], grade=str(fall["stufe"]))[0]
     zuege, verlauf, konversation = [], [], None
     with httpx.Client(base_url=basis, timeout=300.0, headers={"Cookie": f"session={token}"}) as client:
         for nr, zug in enumerate(fall["zuege"], start=1):
             try:
                 ergebnis = chat_probe.frage_stellen(client, zug["schueler"], assistent=kennung, gruppe=None,
-                                                    verlauf=verlauf, konversation=konversation)
+                                                    verlauf=verlauf, konversation=konversation, modell=modell)
             except (httpx.HTTPError, SystemExit) as fehler:
                 zuege.append({"nr": nr, "schueler": zug["schueler"], "abbruch": f"{type(fehler).__name__}: {fehler}"})
                 break
@@ -290,7 +308,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     t = [f"# Rechenhilfe Stöchiometrie — Lauf {kopf['lauf']}", "",
          f"- **Datum:** {kopf['datum']}", f"- **Modell:** {kopf['modell']}",
          f"- **Assistent:** „{NAME}“, ID {kopf['assistent']} (Chemie, Schüler:innen, Kl. 8–13, ohne Wissensbereich, "
-         "ohne Fähigkeiten, alle Lernverhalten-Augmentierungen an)",
+         "ohne Fähigkeiten, " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
+                                  else "alle Lernverhalten-Augmentierungen an)"),
          f"- **Prompt-Stand:** `config/prompts/stoechiometrie_assistent.md` {kopf['prompt']}",
          f"- **Importstand:** {kopf['import']}",
          "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; Chat über den "
@@ -352,13 +371,19 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
 def main() -> None:
     p = argparse.ArgumentParser(description="Messung Rechenhilfe Stöchiometrie")
     p.add_argument("--selbsttest", action="store_true", help="nur das Prüfinstrument testen")
-    p.add_argument("--lauf", type=int, default=1)
+    p.add_argument("--lauf", default="1", help="Bezeichnung des Laufs (Dateiname verlauf-<lauf>)")
     p.add_argument("--ziel", type=Path, default=None, help="Ordner für verlauf-<n>.md und verlauf-<n>.json")
     p.add_argument("--nur", action="append", default=[], help="nur diesen Fall (mehrfach möglich)")
     p.add_argument("--basis", default="http://localhost:8000")
     p.add_argument("--konto", default=None, help="Pseudonym-Anfang des Schüler:innen-Kontos")
     p.add_argument("--importstand", default="nicht angegeben")
     p.add_argument("--behalten", action="store_true", help="Konversationen nicht löschen")
+    p.add_argument("--modell", default=None,
+                   help="Modell-Alias je Anfrage (z. B. chat-komplex); ohne = Modell des Assistenten bzw. Standard")
+    p.add_argument("--prompt", type=Path, default=PROMPT, help="Promptvariante (Experiment, Schritt 5)")
+    p.add_argument("--ohne-augmentierung", action="append", default=None, dest="ohne",
+                   help="abgeschaltete Lernverhalten-Augmentierungen statt der Einrichtung "
+                        f"({', '.join(EINRICHTUNG_OHNE)}); mehrfach möglich, „keine“ = alle an")
     args = p.parse_args()
 
     faelle = yaml.safe_load(SZENARIEN.read_text(encoding="utf-8"))["faelle"]
@@ -372,7 +397,10 @@ def main() -> None:
         faelle = [f for f in faelle if f["id"] in args.nur]
 
     conn = entfall.verbindung()
-    kennung = assistent(conn)
+    if args.ohne is not None:
+        args.ohne = [o for o in args.ohne if o != "keine"]
+    kennung = assistent(conn, args.prompt, args.ohne)
+    args.ohne = EINRICHTUNG_OHNE if args.ohne is None else args.ohne
     zeile = _alle(conn, "SELECT pseudonym FROM pseudonym_audit WHERE roles::text LIKE '%%student%%' "
                         "AND litellm_key IS NOT NULL AND pseudonym LIKE %s ORDER BY created_at LIMIT 1",
                   (args.konto or "") + "%")
@@ -380,12 +408,12 @@ def main() -> None:
         raise SystemExit("Kein Schüler:innen-Konto mit LiteLLM-Schlüssel gefunden.")
     schueler = zeile[0][0]
     jwt = get_jwt_service()
-    print(f"\nAssistent {kennung}, Prompt {prompt_stand()}, {len(faelle)} Fälle\n")
+    print(f"\nAssistent {kennung}, Prompt {prompt_stand(args.prompt)}, ohne {args.ohne or '—'}, {len(faelle)} Fälle\n")
 
     ergebnisse = []
     try:
         for fall in faelle:
-            ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis))
+            ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell))
     finally:
         if not args.behalten:
             with conn.cursor() as cur:
@@ -397,7 +425,7 @@ def main() -> None:
 
     modelle = sorted({z["modell"] for f in ergebnisse for z in f["zuege"] if z.get("modell")})
     kopf = {"lauf": args.lauf, "datum": datetime.now(timezone.utc).astimezone().strftime("%d.%m.%Y, %H:%M"),
-            "modell": ", ".join(modelle) or "?", "assistent": kennung, "prompt": prompt_stand(),
+            "modell": ", ".join(modelle) or "?", "assistent": kennung, "prompt": prompt_stand(args.prompt), "ohne": args.ohne,
             "import": args.importstand}
     text = protokoll(kopf, ergebnisse)
     if args.ziel:
