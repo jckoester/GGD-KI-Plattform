@@ -62,6 +62,12 @@ Fachschaften. Das Fach entscheidet mit, welcher Assistent sich aus der Planung z
 Einen eigenen **Stundenassistenten** legen Sie mit einem Klick als Kopie des schulweiten an —
 siehe [Unterrichtsplanung](unterrichtsplanung.md#ein-eigener-stundenassistent).
 
+**Klassenstufe und Sichtbarkeit:** Neben „Freigabe für“ können Sie die **Klassenstufen**
+eingrenzen, etwa 8 bis 10 — jüngere und ältere Schüler:innen sehen den Assistenten dann
+nicht. Leer heißt: keine Grenze. Unter **Sichtbarkeit** wählen Sie „Versteckt“, wenn der
+Assistent in keiner Liste erscheinen soll; über einen Link, den Sie im Unterricht verteilen,
+bleibt er für die Freigegebenen nutzbar.
+
 **Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange Ihr Entwurf eingereicht ist, können Sie ihn nicht ändern —
 aber Sie können die **Einreichung zurückziehen** und weiterarbeiten. Ist er freigegeben,

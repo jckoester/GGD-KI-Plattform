@@ -45,3 +45,41 @@ describe('Anzeige filtert, Einstieg und Direktlink nicht (Quelltext-Wächter)', 
         expect(lies('lib/assistentenwahl.js')).not.toMatch(/zurAnzeige|\.visibility/)
     })
 })
+
+// Quelltext statt Verhalten — das Projekt mountet keine Svelte-Komponenten.
+describe('Wächter: Editor (0.22, C1 Schritt 2)', () => {
+    const quelle = lies('lib/components/AssistantEditor.svelte')
+
+    it('Klassenstufen hängen nicht mehr am Scope „Jahrgang“', () => {
+        expect(quelle).not.toMatch(/form\.scope === "grade"/)
+        expect(quelle).toMatch(/\{#if zeigtKlassenstufen\}/)
+        expect(quelle).toMatch(/zeigtKlassenstufen = \$derived\(form\.audience !== "teacher"\)/)
+        expect(quelle).toMatch(/zeigtKlassenstufen && form\.min_grade/)
+        expect(quelle).toMatch(/zeigtKlassenstufen && form\.max_grade/)
+    })
+
+    it('hat ein Feld für visibility und sendet es mit', () => {
+        expect(quelle).toMatch(/id="ae-visibility"/)
+        expect(quelle).toMatch(/bind:value=\{form\.visibility\}/)
+        expect(quelle).toMatch(/visibility: form\.visibility,/)
+        expect(quelle).toMatch(/value: "hidden"/)
+        // `private` bietet der Editor nicht an; ein Altbestand erscheint als versteckt.
+        expect(quelle).not.toMatch(/value: "private",\s*label: "Privat"/)
+        expect(quelle).toMatch(/a\.visibility === "public" \? "public" : "hidden"/)
+    })
+
+    it('der Scope heißt „Freigabe für“, nicht mehr „Sichtbarkeit“', () => {
+        const scopeLabel = quelle.match(/for="ae-scope"[\s\S]*?<\/label>/)[0]
+        expect(scopeLabel).toMatch(/Freigabe für/)
+        expect(scopeLabel).not.toMatch(/Sichtbarkeit/)
+    })
+})
+
+describe('Wächter: Link für versteckte Assistenten', () => {
+    it('der Editor zeigt ihn, und der Chat nimmt ?assistant_id aus der vollen Liste', () => {
+        expect(lies('lib/components/AssistantEditor.svelte')).toMatch(
+            /\/chat\?assistant_id=\$\{form\.id\}/,
+        )
+        expect(lies('routes/(app)/chat/+page.svelte')).toMatch(/paramId && availableAssistants\.length/)
+    })
+})

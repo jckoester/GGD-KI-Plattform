@@ -14,6 +14,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Assistenten mit Sichtbarkeit „versteckt“** stehen nicht mehr in Übersicht, Auswahl,
   Werkzeug- und Fachseiten, bleiben aber über Link und Einstiege erreichbar. Die Sichtbarkeit
   „privat“ entfällt: Sie wird beim Anlegen, Ändern und Importieren zu „versteckt“.
+- **Assistenten-Editor:** Klassenstufen lassen sich bei jeder Freigabe setzen, nicht nur beim
+  Scope „Jahrgang“. Neues Feld **Sichtbarkeit** („In Übersichten zeigen“ / „Versteckt“, mit Link
+  zum Verteilen). Die bisherige Beschriftung „Sichtbarkeit“ für die Reichweite heißt jetzt
+  **„Freigabe für“**, auch unter „Meine Assistenten“.
 
 ## [0.21.0] – 2026-10-21
 

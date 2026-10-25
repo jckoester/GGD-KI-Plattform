@@ -356,7 +356,7 @@
             <th class="pb-3 pr-4">Name</th>
             <th class="pb-3 pr-4">Status</th>
             <th class="pb-3 pr-4">Zielgruppe</th>
-            <th class="pb-3 pr-4">Sichtbarkeit</th>
+            <th class="pb-3 pr-4">Freigabe für</th>
             <th class="pb-3 pr-4">Aktualisiert</th>
             <th class="pb-3">Aktionen</th>
           </tr>
@@ -399,7 +399,7 @@
                 {AUDIENCE_LABELS[item.audience] || item.audience}
               </td>
 
-              <!-- Sichtbarkeit -->
+              <!-- Freigabe für (Scope) -->
               <td class="py-3 pr-4 text-light-tx-2 dark:text-dark-tx-2">
                 {scopeLabel(item)}
               </td>

@@ -374,6 +374,21 @@
         { value: "all", label: "Alle" },
     ];
 
+    const VISIBILITY_OPTIONS = [
+        {
+            value: "public",
+            label: "In Übersichten zeigen",
+            hinweis:
+                "Erscheint in der Assistentenauswahl im Chat, unter Assistenten und auf der Fachseite.",
+        },
+        {
+            value: "hidden",
+            label: "Versteckt",
+            hinweis:
+                "Erscheint in keiner Liste. Wer freigegeben ist, erreicht ihn trotzdem über einen Link oder einen Einstieg auf der Startseite — etwa für einen Assistenten, den Sie im Unterricht gezielt verteilen.",
+        },
+    ];
+
     const AUDIENCE_OPTIONS = [
         { value: "student", label: "Schüler:innen" },
         { value: "teacher", label: "Lehrkräfte" },
@@ -412,6 +427,7 @@
             max_tokens: null,
             audience: "student",
             scope: "private",
+            visibility: "public",
             scope_group_id: null,
             min_grade: null,
             max_grade: null,
@@ -472,6 +488,8 @@
             max_tokens: a.max_tokens !== null ? String(a.max_tokens) : null,
             audience: a.audience || "student",
             scope: a.scope || "private",
+            // `private` ist seit 0.22 `hidden` (das Modell speichert nur noch dies).
+            visibility: a.visibility === "public" ? "public" : "hidden",
             scope_group_id:
                 a.scope_group_id !== null && a.scope_group_id !== undefined
                     ? String(a.scope_group_id)
@@ -508,22 +526,21 @@
             max_tokens: form.max_tokens ? parseInt(form.max_tokens) : null,
             audience: form.audience,
             scope: form.scope,
+            visibility: form.visibility,
             scope_group_id: needsGroup(form.scope)
                 ? form.scope_group_id
                     ? parseInt(form.scope_group_id)
                     : null
                 : null,
+            // Klassenstufen gelten unabhängig von der Freigabe, aber nur für
+            // Schüler:innen — bei Zielgruppe Lehrkräfte wären sie wirkungslos.
             min_grade:
-                form.scope === "grade"
-                    ? form.min_grade
-                        ? parseInt(form.min_grade)
-                        : null
+                zeigtKlassenstufen && form.min_grade
+                    ? parseInt(form.min_grade)
                     : null,
             max_grade:
-                form.scope === "grade"
-                    ? form.max_grade
-                        ? parseInt(form.max_grade)
-                        : null
+                zeigtKlassenstufen && form.max_grade
+                    ? parseInt(form.max_grade)
                     : null,
             tags: form.tags
                 .split(",")
@@ -680,6 +697,11 @@
     // Rückfrage. Schulweite sind freigegeben — dort gibt es den Rückzug vor der Freigabe
     // und danach den Löschantrag, der **nichts abschaltet**.
     let schulweit = $derived(SCHOOLWIDE_SCOPES.has(form.scope));
+    let zeigtKlassenstufen = $derived(form.audience !== "teacher");
+    let visibilityHinweis = $derived(
+        VISIBILITY_OPTIONS.find((o) => o.value === form.visibility)?.hinweis ??
+            "",
+    );
     let loeschantragOffen = $derived(!!form.deletion_requested_at);
     // Gespeicherter Stand, nicht das Formular: Gelöscht wird, was auf dem Server steht.
     let loeschbar = $derived(!isAdmin && !isNew && loeschsperre(savedForm) === null);
@@ -1430,7 +1452,7 @@
                         </div>
                     </div>
 
-                    <!-- Zielgruppe & Sichtbarkeit -->
+                    <!-- Zielgruppe & Freigabe -->
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <label
@@ -1459,7 +1481,7 @@
                                 for="ae-scope"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
-                                Sichtbarkeit
+                                Freigabe für
                             </label>
                             <select
                                 id="ae-scope"
@@ -1560,15 +1582,15 @@
                         </div>
                     {/if}
 
-                    <!-- Jahrgang (konditionell für grade-Scope) -->
-                    {#if form.scope === "grade"}
+                    <!-- Klassenstufen (unabhängig von der Freigabe, nur für Schüler:innen) -->
+                    {#if zeigtKlassenstufen}
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <label
                                     for="ae-min-grade"
                                     class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                                 >
-                                    Jahrgang von
+                                    Klassenstufe von
                                 </label>
                                 <input
                                     id="ae-min-grade"
@@ -1588,7 +1610,7 @@
                                     for="ae-max-grade"
                                     class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                                 >
-                                    Jahrgang bis
+                                    Klassenstufe bis
                                 </label>
                                 <input
                                     id="ae-max-grade"
@@ -1604,7 +1626,45 @@
                                 />
                             </div>
                         </div>
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 -mt-2">
+                            Schüler:innen außerhalb dieser Stufen sehen und nutzen den Assistenten
+                            nicht. Leer heißt: keine Grenze. Für Lehrkräfte gilt die Stufe nicht.
+                        </p>
                     {/if}
+
+                    <!-- Sichtbarkeit in Übersichten -->
+                    <div class="space-y-2">
+                        <label
+                            for="ae-visibility"
+                            class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                        >
+                            Sichtbarkeit
+                        </label>
+                        <select
+                            id="ae-visibility"
+                            bind:value={form.visibility}
+                            disabled={!canEdit}
+                            class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {#each VISIBILITY_OPTIONS as opt (opt.value)}
+                                <option value={opt.value}>{opt.label}</option>
+                            {/each}
+                        </select>
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            {visibilityHinweis} Wer den Assistenten nutzen darf, legt „Freigabe für“
+                            fest.
+                        </p>
+                        {#if form.visibility === "hidden" && form.id}
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Link zum Verteilen:
+                                <code class="select-all text-light-tx dark:text-dark-tx"
+                                    >{`${location.origin}/chat?assistant_id=${form.id}`}</code
+                                >
+                            </p>
+                        {/if}
+                    </div>
 
                     <!-- Tags -->
                     <div class="space-y-2">

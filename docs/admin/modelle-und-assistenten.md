@@ -358,8 +358,16 @@ Freigabe erfolgt unter `/settings/assistants`:
 - **Deaktiviert:** Der Assistent ist nur für Admins und Lehrkräfte sichtbar
   (z. B. für Assistenten in Entwicklung).
 
-Die Sichtbarkeit kann pro Assistent gesteuert werden. Eine granulare
-Freigabe nach Rolle oder Jahrgang ist in einer späteren Version geplant.
+Wer einen Assistenten nutzen darf, legt im Editor **„Freigabe für“** fest (Scope).
+Zwei weitere Felder engen das ein:
+
+- **Klassenstufe von/bis:** Schüler:innen außerhalb der Stufen sehen und nutzen den
+  Assistenten nicht — unabhängig von der Freigabe. Ist die Stufe einer Person unbekannt,
+  gilt keine Grenze. Für Lehrkräfte und für die Erstellerin gilt die Stufe nie.
+- **Sichtbarkeit:** „Versteckt“ nimmt den Assistenten aus allen Listen (Chat-Auswahl,
+  Assistenten-Übersicht, Werkzeuge, Fachseite). Über einen Link oder einen Einstieg auf
+  der Startseite bleibt er für alle Freigegebenen nutzbar. Der frühere Wert `private`
+  wird beim Speichern und beim YAML-Import zu `hidden`.
 
 ## Löschanträge von Lehrkräften
 
