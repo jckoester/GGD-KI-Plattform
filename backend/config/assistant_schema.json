@@ -22,7 +22,13 @@
         "audience":        { "type": "string", "enum": ["student", "teacher", "all"] },
         "visibility":      { "type": "string", "enum": ["public", "private", "hidden"] },
         "available_from":  { "type": ["string", "null"] },
-        "available_until": { "type": ["string", "null"] }
+        "available_until": { "type": ["string", "null"] },
+
+        "suggest":                 { "type": "string", "enum": ["specific", "fallback", "never"] },
+        "suggestion_text":         { "type": "string" },
+        "trigger_examples":        { "type": "array", "items": { "type": "string" } },
+        "trigger_counterexamples": { "type": "array", "items": { "type": "string" } },
+        "fallbacks":               { "type": "array", "items": { "type": "string" } }
       }
     },
     "config": {

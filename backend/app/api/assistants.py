@@ -6,10 +6,12 @@ from typing import Any, Optional
 
 import jsonschema
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, or_, select, func, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.assistants import ausloeser
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.config import settings
@@ -103,6 +105,9 @@ def _doc_to_out(doc: AssistantDocument) -> AssistantDocumentOut:
     )
 
 
+# Ein Satz im Vorschlagsdialog (C2) — kein Absatz.
+SUGGESTION_TEXT_MAX = 300
+
 # ── Konsolidierte Schemas (ersetzt TeacherAssistant* und Admin Assistant*) ───
 
 class AssistantCreate(BaseModel):
@@ -130,6 +135,12 @@ class AssistantCreate(BaseModel):
     disabled_augmentations: list[str] = []
     # Leer = alle konfigurierten Bildarten (siehe config/image_models.yaml).
     image_kinds: list[str] = []
+    # Vorschlag im Chat (Päckchen C1, F4/F5) — ausgewertet erst mit C2.
+    suggest: str = "never"
+    suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
+    fallbacks: list[int] = []
+    trigger_examples: list[str] = []
+    trigger_counterexamples: list[str] = []
 
 
 class AssistantUpdate(BaseModel):
@@ -157,6 +168,12 @@ class AssistantUpdate(BaseModel):
     tool_groups: Optional[list[str]] = None
     disabled_augmentations: Optional[list[str]] = None
     image_kinds: Optional[list[str]] = None
+    suggest: Optional[str] = None
+    suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
+    fallbacks: Optional[list[int]] = None
+    # Ganze Liste; ein Text, der bleibt, behält seinen Vektor (`ausloeser.setze`).
+    trigger_examples: Optional[list[str]] = None
+    trigger_counterexamples: Optional[list[str]] = None
 
 
 class AssistantResponse(BaseModel):
@@ -194,6 +211,14 @@ class AssistantResponse(BaseModel):
     disabled_augmentations: list[str] = []
     image_kinds: list[str] = []
     documents: list[AssistantDocumentOut] = []
+    suggest: str = "never"
+    suggestion_text: Optional[str] = None
+    fallbacks: list[int] = []
+    # **`None` heißt „nicht geladen“**, nicht „keine“: Wie die Dokumente füllt nur die
+    # Einzelansicht (und Anlegen, Ändern, Import) die Listen — in Übersichten kosteten sie
+    # eine Abfrage je Zeile und würden nicht gebraucht.
+    trigger_examples: Optional[list[str]] = None
+    trigger_counterexamples: Optional[list[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -241,8 +266,18 @@ def _parse_iso(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _assistant_to_yaml(assistant: Assistant, subject_slug: Optional[str]) -> str:
-    """Serialisiert Assistent in YAML-Format."""
+def _assistant_to_yaml(
+    assistant: Assistant,
+    subject_slug: Optional[str],
+    ausloeser_listen: Optional[dict[str, list[str]]] = None,
+    fallback_namen: Optional[list[str]] = None,
+) -> str:
+    """Serialisiert Assistent in YAML-Format.
+
+    Rückfälle stehen **mit Namen** im YAML, nicht mit ID: Eine ID gilt nur in dieser
+    Datenbank, der Export soll aber auch in einer anderen Installation tragen.
+    """
+    listen = ausloeser_listen or {}
     data = {
         "metadata": {
             "name": assistant.name,
@@ -255,9 +290,17 @@ def _assistant_to_yaml(assistant: Assistant, subject_slug: Optional[str]) -> str
             "available_from": assistant.available_from.isoformat() if assistant.available_from else None,
             "available_until": assistant.available_until.isoformat() if assistant.available_until else None,
             "updated": assistant.updated_at.date().isoformat(),
+            # Vorschlag (C1) — nur, was vom Vorgabewert abweicht.
+            "suggest": assistant.suggest if assistant.suggest != "never" else None,
+            "suggestion_text": assistant.suggestion_text,
+            "trigger_examples": listen.get(ausloeser.BEISPIEL) or None,
+            "trigger_counterexamples": listen.get(ausloeser.GEGENBEISPIEL) or None,
+            "fallbacks": fallback_namen or None,
         },
         "config": {
-            "model": assistant.model,
+            # Leer = schulweiter Standard. Weglassen statt `""`: Das Schema verlangt
+            # `minLength: 1`, ein solcher Export ließ sich sonst nicht wieder einspielen.
+            "model": assistant.model or None,
             "temperature": float(assistant.temperature) if assistant.temperature is not None else None,
             "max_tokens": assistant.max_tokens,
             "system_prompt": assistant.system_prompt,
@@ -350,6 +393,8 @@ def _yaml_to_assistant_fields(
         "audience": meta["audience"],
         "scope": "private",
         "visibility": meta.get("visibility", "public"),
+        "suggest": meta.get("suggest") or "never",
+        "suggestion_text": (meta.get("suggestion_text") or "").strip() or None,
         "min_grade": min(grades) if grades else None,
         "max_grade": max(grades) if grades else None,
         "tags": meta.get("tags"),
@@ -371,6 +416,9 @@ VALID_SCOPES = {
     "teaching_group", "grade", "all_students", "all",
 }
 VALID_VISIBILITIES = {"public", "private", "hidden"}
+VALID_SUGGEST = {"specific", "fallback", "never"}
+# Der Dialog in C2 zeigt höchstens zwei Rückfälle; drei lassen einem Gelöschten Ersatz.
+MAX_FALLBACKS = 3
 GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 # ⚠️ **`teachers` gehört dazu** (Entscheidung Jan, 25.09.2026). Der Scope „Alle
 # Lehrkräfte" erreicht das ganze Kollegium; er stand bis dahin weder in dieser Menge noch
@@ -434,6 +482,7 @@ def validate_assistant_fields(
     max_grade: Optional[int] = None,
     available_from: Optional[datetime] = None,
     available_until: Optional[datetime] = None,
+    suggest: Optional[str] = None,
 ) -> None:
     """Validiert Business-Regeln fuer Assistenten. Wirft HTTPException(422)."""
     if name is not None and not name.strip():
@@ -446,6 +495,8 @@ def validate_assistant_fields(
         raise HTTPException(status_code=422, detail="Ungültiger scope-Wert")
     if visibility is not None and visibility not in VALID_VISIBILITIES:
         raise HTTPException(status_code=422, detail="Ungültiger visibility-Wert")
+    if suggest is not None and suggest not in VALID_SUGGEST:
+        raise HTTPException(status_code=422, detail="Ungültiger suggest-Wert")
     if scope is not None and scope in GROUP_SCOPES and scope_group_id is None:
         raise HTTPException(
             status_code=422, detail="Gruppen-Scope erfordert eine scope_group_id"
@@ -469,6 +520,105 @@ def validate_assistant_fields(
             raise HTTPException(
                 status_code=422, detail="min_grade darf nicht größer als max_grade sein"
             )
+
+
+# ── Vorschlag: Auslöser-Beispiele und Rückfälle (Päckchen C1, Schritt 3) ─────
+
+
+def _bereinigte_ausloeser(beispiele, gegenbeispiele) -> dict[str, Optional[list[str]]]:
+    """Beide Listen bereinigt; ``None`` bleibt ``None`` (= nicht geändert)."""
+    try:
+        return {
+            ausloeser.BEISPIEL: (
+                None if beispiele is None else ausloeser.bereinige(beispiele, ausloeser.BEISPIEL)
+            ),
+            ausloeser.GEGENBEISPIEL: (
+                None if gegenbeispiele is None
+                else ausloeser.bereinige(gegenbeispiele, ausloeser.GEGENBEISPIEL)
+            ),
+        }
+    except ausloeser.AusloeserFehler as fehler:
+        raise HTTPException(status_code=422, detail=str(fehler))
+
+
+async def _gepruefte_fallbacks(
+    db: AsyncSession, ids: list[int], eigene_id: Optional[int]
+) -> list[int]:
+    """Dubletten weg; jede ID muss ein anderer, vorhandener Assistent sein."""
+    eindeutig = list(dict.fromkeys(ids))
+    if eigene_id is not None and eigene_id in eindeutig:
+        raise HTTPException(
+            status_code=422, detail="Ein Assistent kann nicht sein eigener Rückfall sein"
+        )
+    if len(eindeutig) > MAX_FALLBACKS:
+        raise HTTPException(
+            status_code=422, detail=f"Höchstens {MAX_FALLBACKS} Rückfall-Assistenten"
+        )
+    if eindeutig:
+        vorhanden = set(
+            (await db.execute(select(Assistant.id).where(Assistant.id.in_(eindeutig)))).scalars()
+        )
+        fehlen = [i for i in eindeutig if i not in vorhanden]
+        if fehlen:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Rückfall-Assistent nicht gefunden: {', '.join(map(str, fehlen))}",
+            )
+    return eindeutig
+
+
+async def _speichere_ausloeser(
+    db: AsyncSession, assistant_id: int, listen: dict[str, Optional[list[str]]]
+) -> int:
+    """Gleicht die gesendeten Listen ab; gibt die Zahl neu einzubettender Texte zurück."""
+    neu = 0
+    for art, texte in listen.items():
+        if texte is not None:
+            neu += await ausloeser.setze(db, assistant_id, art, texte)
+    return neu
+
+
+def _einbetten_nach_speichern(
+    hintergrund: BackgroundTasks, db: AsyncSession, assistant_id: int
+) -> None:
+    """Gleich einbetten statt erst nachts — eigene Sitzung am selben Engine (wie 0.14)."""
+    hintergrund.add_task(
+        ausloeser.einbetten_im_hintergrund,
+        assistant_id,
+        async_sessionmaker(db.bind, class_=AsyncSession, expire_on_commit=False),
+    )
+
+
+async def _mit_ausloesern(
+    db: AsyncSession, antwort: AssistantResponse
+) -> AssistantResponse:
+    listen = await ausloeser.lade(db, antwort.id)
+    return antwort.model_copy(update={
+        "trigger_examples": listen[ausloeser.BEISPIEL],
+        "trigger_counterexamples": listen[ausloeser.GEGENBEISPIEL],
+    })
+
+
+async def _fallbacks_nach_namen(
+    db: AsyncSession, namen: list, hinweise: list[str]
+) -> list[int]:
+    """Rückfälle eines YAML-Imports: Name → ID, nur bei genau einem Treffer.
+
+    Was sich nicht eindeutig zuordnen lässt, wird übergangen und genannt — wie eine
+    unbekannte Fähigkeit (`_uebernimm_bekannte`): Der Import soll nicht daran scheitern,
+    dass es den Rückfall hier (noch) nicht gibt.
+    """
+    ids: list[int] = []
+    for name in dict.fromkeys(str(n).strip() for n in namen if str(n).strip()):
+        treffer = list(
+            (await db.execute(select(Assistant.id).where(Assistant.name == name))).scalars()
+        )
+        if len(treffer) == 1:
+            ids.append(treffer[0])
+        else:
+            grund = "nicht vorhanden" if not treffer else "Name mehrfach vergeben"
+            hinweise.append(f"Rückfall-Assistent übergangen ({grund}): {name}")
+    return ids[:MAX_FALLBACKS]
 
 
 # ── Permission Helpers ───────────────────────────────────────────────────────
@@ -736,13 +886,14 @@ async def get_assistant(
         )
     ).scalars().all()
 
-    response = AssistantResponse.model_validate(assistant)
+    response = await _mit_ausloesern(db, AssistantResponse.model_validate(assistant))
     return response.model_copy(update={"documents": [_doc_to_out(d) for d in docs]})
 
 
 @router.post("", response_model=AssistantResponse, status_code=201)
 async def create_assistant(
     request: AssistantCreate,
+    hintergrund: BackgroundTasks,
     current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> AssistantResponse:
@@ -758,8 +909,11 @@ async def create_assistant(
         max_grade=request.max_grade,
         available_from=request.available_from,
         available_until=request.available_until,
+        suggest=request.suggest,
     )
-    
+    listen = _bereinigte_ausloeser(request.trigger_examples, request.trigger_counterexamples)
+    fallbacks = await _gepruefte_fallbacks(db, request.fallbacks, None)
+
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     sort_order = request.sort_order if "admin" in current_user.roles else 0
     initial_status = _initial_status(
@@ -788,6 +942,9 @@ async def create_assistant(
         tool_groups=request.tool_groups,
         disabled_augmentations=request.disabled_augmentations,
         image_kinds=request.image_kinds,
+        suggest=request.suggest,
+        suggestion_text=(request.suggestion_text or "").strip() or None,
+        fallbacks=fallbacks,
         sort_order=sort_order,
         creator_role=creator_role,
         created_by=current_user.sub,
@@ -796,15 +953,20 @@ async def create_assistant(
         updated_at=datetime.now(timezone.utc),
     )
     db.add(assistant)
+    await db.flush()
+    neu = await _speichere_ausloeser(db, assistant.id, listen)
     await db.commit()
     await db.refresh(assistant)
-    return AssistantResponse.model_validate(assistant)
+    if neu:
+        _einbetten_nach_speichern(hintergrund, db, assistant.id)
+    return await _mit_ausloesern(db, AssistantResponse.model_validate(assistant))
 
 
 @router.patch("/{assistant_id}", response_model=AssistantResponse)
 async def update_assistant(
     assistant_id: int,
     request: AssistantUpdate,
+    hintergrund: BackgroundTasks,
     current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> AssistantResponse:
@@ -820,8 +982,22 @@ async def update_assistant(
     update_data = request.model_dump(exclude_unset=True)
     validate_assistant_fields(**{k: update_data.get(k) for k in (
         "name", "system_prompt", "audience", "scope", "visibility", "scope_group_id",
-        "min_grade", "max_grade", "available_from", "available_until",
+        "min_grade", "max_grade", "available_from", "available_until", "suggest",
     )})
+    # Die Listen sind keine Spalten — sie gehen in die eigene Tabelle.
+    listen = _bereinigte_ausloeser(
+        update_data.pop("trigger_examples", None),
+        update_data.pop("trigger_counterexamples", None),
+    )
+    if "fallbacks" in update_data:
+        update_data["fallbacks"] = await _gepruefte_fallbacks(
+            db, update_data["fallbacks"] or [], assistant.id
+        )
+    if "suggestion_text" in update_data:
+        update_data["suggestion_text"] = (update_data["suggestion_text"] or "").strip() or None
+    # `null` hieße hier „Spalte leeren“, und `suggest` ist NOT NULL.
+    if update_data.get("suggest", "") is None:
+        update_data.pop("suggest")
     
     # sort_order: nur Admin kann das aendern
     if not is_admin and "sort_order" in update_data:
@@ -851,10 +1027,13 @@ async def update_assistant(
         setattr(assistant, field, value)
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
-    
+    neu = await _speichere_ausloeser(db, assistant.id, listen)
+
     await db.commit()
     await db.refresh(assistant)
-    return AssistantResponse.model_validate(assistant)
+    if neu:
+        _einbetten_nach_speichern(hintergrund, db, assistant.id)
+    return await _mit_ausloesern(db, AssistantResponse.model_validate(assistant))
 
 
 @router.delete("/{assistant_id}", status_code=204)
@@ -871,7 +1050,15 @@ async def delete_assistant(
     
     is_admin = "admin" in current_user.roles
     _check_assistant_delete_permission(assistant, current_user, is_admin)
-    
+
+    # Aus den Rückfall-Listen der anderen nehmen — ein Array kennt keinen Fremdschlüssel.
+    await db.execute(
+        text(
+            "UPDATE assistants SET fallbacks = array_remove(fallbacks, :id)"
+            " WHERE :id = ANY(fallbacks)"
+        ),
+        {"id": assistant_id},
+    )
     await db.delete(assistant)
     await db.commit()
 
@@ -1186,6 +1373,7 @@ async def delete_assistant_document(
 
 @router.post("/import", response_model=AssistantImportResponse, status_code=201)
 async def import_assistant(
+    hintergrund: BackgroundTasks,
     file: UploadFile = File(...),
     model_override: Optional[str] = None,
     current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
@@ -1247,8 +1435,14 @@ async def import_assistant(
         max_grade=fields.get("max_grade"),
         available_from=fields.get("available_from"),
         available_until=fields.get("available_until"),
+        suggest=fields.get("suggest"),
     )
-    
+    meta = data["metadata"]
+    listen = _bereinigte_ausloeser(
+        meta.get("trigger_examples") or [], meta.get("trigger_counterexamples") or []
+    )
+    fields["fallbacks"] = await _fallbacks_nach_namen(db, meta.get("fallbacks") or [], hinweise)
+
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     
     # Assistent erstellen
@@ -1263,16 +1457,19 @@ async def import_assistant(
         sort_order=0,  # Importierte Assistenten kommen als Draft, sort_order ist Admin-Sache
     )
     db.add(assistant)
+    await db.flush()
+    neu = await _speichere_ausloeser(db, assistant.id, listen)
     await db.commit()
     await db.refresh(assistant)
+    if neu:
+        _einbetten_nach_speichern(hintergrund, db, assistant.id)
 
     if hinweise:
         logger.info(
             "Assistenten-Import '%s': %s", assistant.name, " · ".join(hinweise)
         )
-    return AssistantImportResponse(
-        **AssistantResponse.model_validate(assistant).model_dump(), hinweise=hinweise
-    )
+    antwort = await _mit_ausloesern(db, AssistantResponse.model_validate(assistant))
+    return AssistantImportResponse(**antwort.model_dump(), hinweise=hinweise)
 
 
 @router.get("/{assistant_id}/export")
@@ -1298,7 +1495,17 @@ async def export_assistant(
         )
         subject_slug = subj_result.scalar_one_or_none()
     
-    yaml_content = _assistant_to_yaml(assistant, subject_slug)
+    fallback_namen: list[str] = []
+    if assistant.fallbacks:
+        namen = dict(
+            (await db.execute(
+                select(Assistant.id, Assistant.name).where(Assistant.id.in_(assistant.fallbacks))
+            )).all()
+        )
+        fallback_namen = [namen[i] for i in assistant.fallbacks if i in namen]
+    yaml_content = _assistant_to_yaml(
+        assistant, subject_slug, await ausloeser.lade(db, assistant.id), fallback_namen
+    )
     
     # Dateiname: name kleingeschrieben, Leerzeichen -> Bindestrich
     slug = assistant.name.lower().replace(" ", "-")

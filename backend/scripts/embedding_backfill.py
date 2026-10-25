@@ -2,6 +2,9 @@
 """
 Generiert Embeddings für alle Knoten mit embedding IS NULL (Backfill-Cron).
 
+Danach die offenen Auslöser-Beispiele der Assistenten (Päckchen C1): ohne Vektor oder mit
+dem Vektor eines anderen Modells. Nicht bei ``--dry-run`` und nicht bei ``--content-type``.
+
 Verwendung:
     python scripts/embedding_backfill.py
     python scripts/embedding_backfill.py --dry-run
@@ -15,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.assistants import ausloeser
 from app.crons.embedding_backfill_service import backfill_embeddings
 from app.db.session import AsyncSessionLocal
 
@@ -48,7 +52,16 @@ async def run(
         stats.skipped,
         stats.duration_ms,
     )
-    return 1 if stats.errors else 0
+    fehler = stats.errors
+    if not dry_run and not content_types:
+        async with AsyncSessionLocal() as db:
+            beispiele = await ausloeser.einbetten(db)
+        logger.info(
+            "embedding_backfill ausloeser found=%d ok=%d errors=%d",
+            beispiele.gefunden, beispiele.ok, beispiele.fehler,
+        )
+        fehler += beispiele.fehler
+    return 1 if fehler else 0
 
 
 def main() -> None:

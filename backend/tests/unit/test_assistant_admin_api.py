@@ -186,6 +186,9 @@ class TestAssistantResponse:
             # Wie tool_groups: Der server_default greift erst beim INSERT, ein frisch
             # konstruiertes ORM-Objekt hätte hier None.
             image_kinds=[],
+            # Ebenso die Vorschlagsfelder (0090).
+            suggest="never",
+            fallbacks=[],
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
             creator_role="teacher",
@@ -798,6 +801,8 @@ class TestFaehigkeitenImRoundTrip:
             import_metadata=None,
             tool_groups=["image_generation", "planning"],
             image_kinds=["standard"],
+            suggest="never",
+            suggestion_text=None,
         )
         werte.update(over)
         return SimpleNamespace(**werte)
@@ -842,6 +847,59 @@ class TestFaehigkeitenImRoundTrip:
         )
         data = yaml.safe_load(_assistant_to_yaml(self._assistent(), subject_slug=None))
         jsonschema.validate(instance=data, schema=schema)
+
+        # Schulweiter Standard (`model = ""`) und alle Vorschlagsfelder belegt.
+        voll = _assistant_to_yaml(
+            self._assistent(model="", suggest="specific", suggestion_text="Rechenhilfe."),
+            subject_slug=None,
+            ausloeser_listen={"beispiel": ["a"], "gegenbeispiel": ["b"]},
+            fallback_namen=["NW-Aufgaben"],
+        )
+        jsonschema.validate(instance=yaml.safe_load(voll), schema=schema)
+
+    def test_beide_schemakopien_gleich(self):
+        """`config/` liest die App (Prod: Mount nach `/app/config`); die Kopie unter
+        `backend/config/` darf nicht davon abweichen, solange es sie gibt."""
+        from pathlib import Path
+
+        wurzel = Path(__file__).resolve().parents[3]
+        assert (wurzel / "config" / "assistant_schema.json").read_text(encoding="utf-8") == (
+            wurzel / "backend" / "config" / "assistant_schema.json"
+        ).read_text(encoding="utf-8")
+
+
+class TestVorschlagImRoundTrip:
+    """Päckchen C1, Schritt 3: `suggest`, `suggestion_text`, Beispiele, Rückfälle im YAML."""
+
+    _assistent = staticmethod(TestFaehigkeitenImRoundTrip._assistent)
+
+    def test_vorgabe_wird_nicht_geschrieben(self):
+        data = yaml.safe_load(_assistant_to_yaml(self._assistent(), subject_slug=None))
+        for feld in ("suggest", "suggestion_text", "trigger_examples",
+                     "trigger_counterexamples", "fallbacks"):
+            assert feld not in data["metadata"]
+
+    def test_rueckfaelle_mit_namen_und_felder_zurueck(self):
+        data = yaml.safe_load(_assistant_to_yaml(
+            self._assistent(suggest="fallback", suggestion_text="Hilfe."),
+            subject_slug=None,
+            ausloeser_listen={"beispiel": ["x", "y"], "gegenbeispiel": []},
+            fallback_namen=["Allgemein"],
+        ))
+        assert data["metadata"]["fallbacks"] == ["Allgemein"]
+        assert data["metadata"]["trigger_examples"] == ["x", "y"]
+        assert "trigger_counterexamples" not in data["metadata"]
+
+        felder = _yaml_to_assistant_fields(data, subject_id=None)
+        assert felder["suggest"] == "fallback"
+        assert felder["suggestion_text"] == "Hilfe."
+        # Listen und Rückfälle sind keine Spalten — der Import-Endpunkt legt sie an.
+        assert "trigger_examples" not in felder and "fallbacks" not in felder
+
+    def test_leeres_modell_faellt_weg(self):
+        data = yaml.safe_load(_assistant_to_yaml(self._assistent(model=""), subject_slug=None))
+        assert "model" not in data["config"]
+        assert _yaml_to_assistant_fields(data, subject_id=None)["model"] == ""
 
 
 class TestUnbekannteWerteBeimImport:

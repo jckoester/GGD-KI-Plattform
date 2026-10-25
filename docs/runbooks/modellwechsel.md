@@ -124,6 +124,11 @@ python scripts/embedding_backfill.py --dry-run                 # Anzahl prüfen
 python scripts/embedding_backfill.py --batch-size 100          # eigentlicher Lauf
 ```
 
+Derselbe Lauf bettet danach die **Auslöser-Beispiele der Assistenten** neu ein
+(`assistant_trigger_examples`). Deren Spalte hat keine feste Breite und muss in Schritt 3
+nicht umgestellt werden: Ein Vektor, dessen `embedding_model` nicht dem eingestellten Modell
+entspricht, gilt als offen. Bei `--dry-run` und `--content-type` bleiben sie liegen.
+
 Danach den Prüfsatz laufen lassen — er zeigt, ob das neue Modell die erwarteten Treffer
 liefert, und ist der eigentliche Grund, einen Modellwechsel überhaupt bewerten zu können:
 

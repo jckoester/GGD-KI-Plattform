@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Assistenten: Auslöser-Beispiele und Vorschlagsfelder** (Grundlage für den Vorschlag im
+  Chat, noch ohne Oberfläche): Beispiele und Gegenbeispiele typischer erster Nachrichten mit
+  Embedding, dazu `suggest`, `suggestion_text` und Rückfall-Assistenten; über API und YAML
+  (Rückfälle dort mit Namen). Migration 0090.
+
 ### Geändert
 
 - **Assistenten: Klassenstufen wirken.** Ein Assistent mit Klassenstufen (etwa 8–13) erscheint
@@ -18,6 +25,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Scope „Jahrgang“. Neues Feld **Sichtbarkeit** („In Übersichten zeigen“ / „Versteckt“, mit Link
   zum Verteilen). Die bisherige Beschriftung „Sichtbarkeit“ für die Reichweite heißt jetzt
   **„Freigabe für“**, auch unter „Meine Assistenten“.
+
+### Behoben
+
+- **YAML-Export eines Assistenten mit schulweitem Standardmodell** ließ sich nicht wieder
+  importieren.
 
 ## [0.21.0] – 2026-10-21
 

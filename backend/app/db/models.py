@@ -6,7 +6,7 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger, Float, SmallInteger, case
+from sqlalchemy import Numeric, Boolean, BigInteger, Float, Integer, SmallInteger, case
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -417,6 +417,20 @@ class Assistant(Base):
     )
     sort_order: Mapped[int] = mapped_column(default=0, server_default=text("0"))
 
+    # Vorschlag im Chat (Alembic 0090, Päckchen C1 F5; ausgewertet erst mit C2).
+    # `specific` — eng umrissene Aufgabe; `fallback` — allgemeiner Assistent eines Gebiets;
+    # `never` — nie vorschlagen (Vorgabe: ohne Auslöser-Beispiele gäbe es nichts zu vergleichen).
+    suggest: Mapped[str] = mapped_column(
+        Text, nullable=False, default="never", server_default=text("'never'")
+    )
+    # Der Satz, mit dem der Dialog den Assistenten anbietet — die Beschreibung ist für Admins.
+    suggestion_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # IDs allgemeiner Assistenten, die unter einem spezifischen Treffer erscheinen. Beim
+    # Löschen eines Assistenten nimmt `delete_assistant` ihn aus allen Listen.
+    fallbacks: Mapped[list] = mapped_column(
+        ARRAY(Integer), nullable=False, default=list, server_default=text("'{}'")
+    )
+
     available_from:  Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     available_until: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
@@ -467,6 +481,10 @@ class Assistant(Base):
             name="check_assistant_visibility",
         ),
         CheckConstraint(
+            "suggest IN ('specific', 'fallback', 'never')",
+            name="check_assistant_suggest",
+        ),
+        CheckConstraint(
             "creator_role IN ('admin', 'teacher')",
             name="check_assistant_creator_role",
         ),
@@ -493,6 +511,44 @@ class AssistantDocument(Base):
 
     __table_args__ = (
         Index("idx_assistant_documents_assistant_id", "assistant_id"),
+    )
+
+
+# 4c. assistant_trigger_examples (Alembic 0090, Päckchen C1 Schritt 3)
+class AssistantTriggerExample(Base):
+    """Eine typische erste Nachricht, für die ein Assistent passt — oder gerade nicht.
+
+    ``art``: ``beispiel`` oder ``gegenbeispiel`` (F4 b). Gepflegt über die Listen
+    ``trigger_examples``/``trigger_counterexamples`` am Assistenten
+    (:mod:`app.assistants.ausloeser`).
+
+    ⚠️ **Der Vektor gilt nur zusammen mit ``embedding_model``.** Die Spalte hat keine feste
+    Breite (anders als ``context_nodes.embedding``); ein Vektor eines anderen Modells ist
+    veraltet und wird neu eingebettet, statt die Spalte umzustellen.
+    """
+
+    __tablename__ = "assistant_trigger_examples"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    assistant_id: Mapped[int] = mapped_column(
+        ForeignKey("assistants.id", ondelete="CASCADE"), nullable=False
+    )
+    art: Mapped[str] = mapped_column(Text, nullable=False)
+    # `text_` wie `metadata_`: Ein Attribut `text` verdeckte im Klassenrumpf `sqlalchemy.text`.
+    text_: Mapped[str] = mapped_column("text", Text, nullable=False)
+    position: Mapped[int] = mapped_column(nullable=False, default=0, server_default=text("0"))
+    embedding: Mapped[Optional[list]] = mapped_column(Vector(), nullable=True)
+    embedding_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "art IN ('beispiel', 'gegenbeispiel')", name="check_trigger_example_art"
+        ),
+        UniqueConstraint("assistant_id", "art", "text", name="uq_trigger_example_text"),
+        Index("ix_trigger_examples_assistant", "assistant_id"),
     )
 
 
