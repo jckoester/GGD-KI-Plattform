@@ -59,6 +59,13 @@
     } from "$lib/api.js";
     import { SCOPE_ANCHOR_CONTENT_TYPES } from "$lib/taxonomy.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
+    import {
+        EMPFOHLEN_MAX,
+        EMPFOHLEN_MIN,
+        listenHinweis,
+        listeZuZeilen,
+        zeilenZuListe,
+    } from "$lib/ausloeser_editor.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
     // ── Props ─────────────────────────────────────────────────────────────────
@@ -389,6 +396,26 @@
         },
     ];
 
+    const SUGGEST_OPTIONS = [
+        {
+            value: "never",
+            label: "Nicht vorschlagen",
+            hinweis: "Der Chat bietet diesen Assistenten nie von sich aus an.",
+        },
+        {
+            value: "specific",
+            label: "Für eine bestimmte Aufgabe",
+            hinweis:
+                "Eng umrissen, mit festem Ablauf — etwa eine Rechenhilfe Stöchiometrie. Wird angeboten, wenn eine Nachricht zu den Beispielen passt.",
+        },
+        {
+            value: "fallback",
+            label: "Allgemein für ein Gebiet",
+            hinweis:
+                "Breiter Assistent, etwa für naturwissenschaftliche Aufgaben. Wird auch angeboten, wenn es keinen passenden spezifischen gibt.",
+        },
+    ];
+
     const AUDIENCE_OPTIONS = [
         { value: "student", label: "Schüler:innen" },
         { value: "teacher", label: "Lehrkräfte" },
@@ -439,6 +466,9 @@
             tool_groups: [],
             disabled_augmentations: [],
             image_kinds: [],
+            suggest: "never",
+            trigger_examples: "",
+            trigger_counterexamples: "",
             status: "draft",
             reject_reason: null,
             deletion_requested_at: null,
@@ -508,6 +538,10 @@
             tool_groups: a.tool_groups ?? [],
             disabled_augmentations: a.disabled_augmentations ?? [],
             image_kinds: a.image_kinds ?? [],
+            suggest: a.suggest || "never",
+            // Ein Eintrag je Zeile; zurück zur Liste erst in `buildPayload`.
+            trigger_examples: listeZuZeilen(a.trigger_examples),
+            trigger_counterexamples: listeZuZeilen(a.trigger_counterexamples),
             status: a.status || "draft",
             reject_reason: a.reject_reason || null,
             deletion_requested_at: a.deletion_requested_at || null,
@@ -550,6 +584,9 @@
             available_until: form.available_until || null,
             // Greift nur in der Schüler-Behandlung; bei Lehrkraft-Zielgruppe ohne Wirkung.
             disabled_augmentations: form.disabled_augmentations,
+            suggest: form.suggest,
+            trigger_examples: zeilenZuListe(form.trigger_examples),
+            trigger_counterexamples: zeilenZuListe(form.trigger_counterexamples),
         };
         if (isAdmin) {
             p.sort_order = parseInt(form.sort_order) || 0;
@@ -614,6 +651,9 @@
                         ...mapAssistantToForm(template),
                         name: `Kopie von ${template.name}`,
                         status: "draft",
+                        // Beispiele kommen mit, der Vorschlag nicht: Sonst böte der Chat
+                        // Vorlage und Kopie für dieselbe Nachricht an.
+                        suggest: "never",
                         sort_order: 0,
                         reject_reason: null,
                         // Eine Kopie erbt keinen Löschantrag der Vorlage.
@@ -698,6 +738,15 @@
     // und danach den Löschantrag, der **nichts abschaltet**.
     let schulweit = $derived(SCHOOLWIDE_SCOPES.has(form.scope));
     let zeigtKlassenstufen = $derived(form.audience !== "teacher");
+    let suggestHinweis = $derived(
+        SUGGEST_OPTIONS.find((o) => o.value === form.suggest)?.hinweis ?? "",
+    );
+    let beispielHinweis = $derived(
+        listenHinweis(form.trigger_examples, "beispiel", form.suggest),
+    );
+    let gegenbeispielHinweis = $derived(
+        listenHinweis(form.trigger_counterexamples, "gegenbeispiel", form.suggest),
+    );
     let visibilityHinweis = $derived(
         VISIBILITY_OPTIONS.find((o) => o.value === form.visibility)?.hinweis ??
             "",
@@ -1856,6 +1905,106 @@
                                 Der Assistent sucht in allen Knoten, die diesen Wissensgebieten zugeordnet sind.
                             </p>
                         {/if}
+                    </div>
+
+                    <!-- Vorschlag im Chat (Päckchen C1, Schritt 4) -->
+                    <div
+                        class="space-y-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3"
+                    >
+                        <h3 class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                            Vorschlag im Chat
+                        </h3>
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Passt eine Nachricht im normalen Chat zu diesem Assistenten, kann der
+                            Chat ihn anbieten — zunächst nur Schüler:innen, und nur, wer ihn nutzen
+                            darf.
+                        </p>
+                        <div class="space-y-2">
+                            <label
+                                for="ae-suggest"
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                Vorschlagen
+                            </label>
+                            <select
+                                id="ae-suggest"
+                                bind:value={form.suggest}
+                                disabled={!canEdit}
+                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {#each SUGGEST_OPTIONS as opt (opt.value)}
+                                    <option value={opt.value}>{opt.label}</option>
+                                {/each}
+                            </select>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                {suggestHinweis}
+                            </p>
+                            {#if form.suggest !== "never" && form.visibility === "hidden"}
+                                <WarningBanner
+                                    message="Versteckte Assistenten werden nicht vorgeschlagen."
+                                />
+                            {/if}
+                        </div>
+                        <div class="space-y-1">
+                            <label
+                                for="ae-trigger-examples"
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                Auslöser-Beispiele
+                            </label>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Eine Nachricht je Zeile: typische erste Nachrichten in Schülersprache, auch mit Halbsätzen und Tippfehlern. {EMPFOHLEN_MIN}–{EMPFOHLEN_MAX} Stück.
+                            </p>
+                            <textarea
+                                id="ae-trigger-examples"
+                                bind:value={form.trigger_examples}
+                                disabled={!canEdit}
+                                rows="5"
+                                placeholder="Wie viel g CO2 entstehen, wenn man 10 g Kohlenstoff verbrennt?"
+                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+                            ></textarea>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                {beispielHinweis.zaehler}
+                            </p>
+                            {#if beispielHinweis.fehler}
+                                <ErrorBanner message={beispielHinweis.fehler} />
+                            {:else if beispielHinweis.warnung}
+                                <WarningBanner message={beispielHinweis.warnung} />
+                            {/if}
+                        </div>
+                        <div class="space-y-1">
+                            <label
+                                for="ae-trigger-counterexamples"
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                Gegenbeispiele
+                            </label>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Was nicht hierher gehört, aber ähnlich klingt — etwa Aufgaben des Nachbarassistenten oder Verständnisfragen, die im Chat bleiben sollen.
+                            </p>
+                            <textarea
+                                id="ae-trigger-counterexamples"
+                                bind:value={form.trigger_counterexamples}
+                                disabled={!canEdit}
+                                rows="5"
+                                placeholder="Was ist eigentlich ein Mol?"
+                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+                            ></textarea>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                {gegenbeispielHinweis.zaehler}
+                            </p>
+                            {#if gegenbeispielHinweis.fehler}
+                                <ErrorBanner message={gegenbeispielHinweis.fehler} />
+                            {:else if gegenbeispielHinweis.warnung}
+                                <WarningBanner message={gegenbeispielHinweis.warnung} />
+                            {/if}
+                        </div>
                     </div>
 
                     <!-- Verfügbarkeit -->

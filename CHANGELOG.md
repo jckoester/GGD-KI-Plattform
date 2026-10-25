@@ -8,9 +8,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Neu
 
 - **Assistenten: Auslöser-Beispiele und Vorschlagsfelder** (Grundlage für den Vorschlag im
-  Chat, noch ohne Oberfläche): Beispiele und Gegenbeispiele typischer erster Nachrichten mit
+  Chat, der selbst noch folgt): Beispiele und Gegenbeispiele typischer erster Nachrichten mit
   Embedding, dazu `suggest`, `suggestion_text` und Rückfall-Assistenten; über API und YAML
   (Rückfälle dort mit Namen). Migration 0090.
+- **Assistenten-Editor:** Abschnitt „Vorschlag im Chat“ mit Art des Vorschlags, Auslöser-Beispielen
+  und Gegenbeispielen (eine Nachricht je Zeile, Zähler und Hinweise).
 
 ### Geändert
 

@@ -28,3 +28,13 @@ def test_zu_viele():
 def test_zu_lang_nennt_die_liste():
     with pytest.raises(AusloeserFehler, match="Gegenbeispiele"):
         bereinige(["x" * (ausloeser.MAX_ZEICHEN + 1)], ausloeser.GEGENBEISPIEL)
+
+
+def test_grenzen_im_editor_gleich():
+    """`frontend/src/lib/ausloeser_editor.js` spiegelt die Grenzen — Wächter gegen Auseinanderlaufen."""
+    import re
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[3] / "frontend/src/lib/ausloeser_editor.js").read_text()
+    assert int(re.search(r"MAX_EINTRAEGE = (\d+)", js).group(1)) == ausloeser.MAX_EINTRAEGE
+    assert int(re.search(r"MAX_ZEICHEN = (\d+)", js).group(1)) == ausloeser.MAX_ZEICHEN

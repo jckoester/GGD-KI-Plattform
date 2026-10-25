@@ -68,6 +68,14 @@ nicht. Leer heißt: keine Grenze. Unter **Sichtbarkeit** wählen Sie „Versteck
 Assistent in keiner Liste erscheinen soll; über einen Link, den Sie im Unterricht verteilen,
 bleibt er für die Freigegebenen nutzbar.
 
+**Vorschlag im Chat:** Im gleichnamigen Abschnitt legen Sie fest, ob der Chat Ihren
+Assistenten von sich aus anbieten darf — für eine bestimmte Aufgabe oder allgemein für ein
+Gebiet. Dazu tragen Sie **Auslöser-Beispiele** ein: typische erste Nachrichten in
+Schülersprache, eine je Zeile, am besten 5 bis 15. **Gegenbeispiele** sind Nachrichten, die
+ähnlich klingen, aber nicht hierher gehören. Ohne Beispiele wird nichts vorgeschlagen, und
+versteckte Assistenten nie. *Der Vorschlag selbst folgt in einer späteren Version; die
+Beispiele können Sie schon jetzt pflegen.*
+
 **Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange Ihr Entwurf eingereicht ist, können Sie ihn nicht ändern —
 aber Sie können die **Einreichung zurückziehen** und weiterarbeiten. Ist er freigegeben,
