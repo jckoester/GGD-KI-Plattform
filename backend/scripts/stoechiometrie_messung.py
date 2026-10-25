@@ -25,6 +25,11 @@ in „10,2". Vor dem ersten Lauf prüft `--selbsttest` das Instrument in beide R
 **Eigene Daten:** Der Assistent bleibt bestehen (Name ist der Schlüssel). Die Konversationen
 des Laufs werden am Ende gelöscht — ihr Inhalt steht im Protokoll.
 
+**Dazu, nach dem Lauf** (seit Lauf 4, 24.10.2026):
+`assistent_systemtext.py <verlauf.json> <fall> <konto>` baut den Systemtext eines Zugs nach und legt ihn
+ins JSON; `stoechiometrie_zusatz.py <verlauf.json> <verlauf.md> [Kopfzeile …]` hängt Frageform, fremde
+Zahlen (D1/D4/D5) und den E1-Verlauf an das Protokoll an.
+
 ⚠️ Nur für Entwicklungsinstanzen — eigene Sitzungs-Token, echte Modellaufrufe auf Kosten des
 Budgets des Schüler:innen-Kontos.
 """
