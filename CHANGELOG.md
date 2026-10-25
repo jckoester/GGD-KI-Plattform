@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- **Assistenten: Klassenstufen wirken.** Ein Assistent mit Klassenstufen (etwa 8–13) erscheint
+  Schüler:innen anderer Stufen weder in der Übersicht noch in der Auswahl, und der Chat
+  lehnt ihn ab. Lehrkräfte sehen alle Stufen; ist die Stufe einer Schüler:in unbekannt, wird
+  nicht gefiltert.
+- **Assistenten mit Sichtbarkeit „versteckt“** stehen nicht mehr in Übersicht, Auswahl,
+  Werkzeug- und Fachseiten, bleiben aber über Link und Einstiege erreichbar. Die Sichtbarkeit
+  „privat“ entfällt: Sie wird beim Anlegen, Ändern und Importieren zu „versteckt“.
+
 ## [0.21.0] – 2026-10-21
 
 Planung im Alltag: Knopf „Aktuelle Woche“, Eingabefelder und Dialoge der Jahresplanung mit

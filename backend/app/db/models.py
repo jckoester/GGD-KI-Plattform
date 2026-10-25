@@ -4,7 +4,7 @@ from datetime import datetime, date, timezone
 from uuid import UUID, UUID as UUIDType
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
 from sqlalchemy import Numeric, Boolean, BigInteger, Float, SmallInteger, case
 from pgvector.sqlalchemy import Vector
@@ -376,6 +376,15 @@ class Assistant(Base):
     visibility: Mapped[str] = mapped_column(
         Text, default="public", server_default=text("'public'")
     )
+
+    @validates("visibility")
+    def _visibility_ohne_private(self, _key, wert):
+        """`private` heißt seit 0.22 `hidden` (Päckchen C1, F3, Jan 25.10.2026): nicht in
+        Übersicht und Vorschlag, über Link und Einstieg erreichbar. Neben dem **Scope**
+        `private` war ein zweites „privat“ nur verwirrend. Angenommen wird der alte Wert
+        weiter (ältere YAML-Exporte), gespeichert wird `hidden` — hier, damit jeder
+        Schreibweg (API, Import, Seed, Skripte) dasselbe tut."""
+        return "hidden" if wert == "private" else wert
 
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)

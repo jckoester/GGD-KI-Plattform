@@ -1,4 +1,5 @@
 <script>
+  import { zurAnzeige } from '$lib/assistentenliste.js'
   /**
    * Die Übersicht einer Unterrichtsgruppe — für **beide** Rollen dieselbe Seite.
    *
@@ -53,7 +54,7 @@
   // ── Assistenten dieser Gruppe ─────────────────────────────────────────────
   const gruppenAssistenten = $derived(
     subject
-      ? $assistants.filter(
+      ? zurAnzeige($assistants).filter(
           (a) =>
             a.subject_id === subject.id &&
             (a.scope === 'all' ||

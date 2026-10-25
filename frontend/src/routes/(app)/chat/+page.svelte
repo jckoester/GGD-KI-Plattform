@@ -1,4 +1,5 @@
 <script>
+    import { zurAnzeige } from "$lib/assistentenliste.js";
     import { onDestroy, onMount } from "svelte";
     import {
         Send,
@@ -128,6 +129,9 @@
     // Zustand bleibt dann folgenlos.
     let legendeOffen = $state(false);
     let availableAssistants = $state([]);
+    // Was die Auswahl zeigt — ohne `hidden` (0.22, C1). Direktlink und Einstiege lesen
+    // weiter `availableAssistants`: Ein versteckter Assistent bleibt dort erreichbar.
+    const angezeigteAssistenten = $derived(zurAnzeige(availableAssistants));
     let selectedAssistant = $state(null);
     // Ein Einstieg suchte einen Assistenten mit dieser Fähigkeit und fand keinen (0.15).
     let fehlendeFaehigkeit = $state(null);
@@ -948,7 +952,7 @@
         adjustTextareaHeight();
         // /-Shortcut für Assistenten-Auswahl
         // e.target.value statt input: bind:value aktualisiert input erst nach dem Handler
-        if (e.target.value === "/" && availableAssistants.length > 0) {
+        if (e.target.value === "/" && angezeigteAssistenten.length > 0) {
             input = "";
             pickerOpen = true;
             return;
@@ -1454,7 +1458,7 @@
             <!-- AssistantPicker Overlay -->
             {#if pickerOpen}
                 <AssistantPicker
-                    assistants={availableAssistants}
+                    assistants={angezeigteAssistenten}
                     subjectId={activeSubjectId}
                     onselect={handleAssistantSelect}
                     onclose={handlePickerClose}
@@ -1853,7 +1857,7 @@
                         ? ''
                         : 'hidden'} {kompakt ? '' : 'sm:block'}"
                 >
-                    {#if availableAssistants.length > 0}
+                    {#if angezeigteAssistenten.length > 0}
                         Verwende <code>/</code> um {selectedAssistant ||
                         conversationAssistant
                             ? "den Assistenten zu wechseln"

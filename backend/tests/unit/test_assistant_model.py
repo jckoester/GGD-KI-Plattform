@@ -107,3 +107,31 @@ class TestAssistantModel:
         mapper = inspect(Assistant)
         import_meta_col = mapper.columns['import_metadata']
         assert isinstance(import_meta_col.type, JSONB)
+
+
+class TestVisibilityPrivateWirdHidden:
+    """0.22 (Päckchen C1, F3, Jan 25.10.2026): `private` als Sichtbarkeit heißt jetzt `hidden`."""
+
+    def test_beim_anlegen(self):
+        assert Assistant(name="a", visibility="private").visibility == "hidden"
+
+    def test_beim_aendern(self):
+        a = Assistant(name="a", visibility="public")
+        a.visibility = "private"
+        assert a.visibility == "hidden"
+
+    @pytest.mark.parametrize("wert", ["public", "hidden"])
+    def test_andere_werte_bleiben(self, wert):
+        assert Assistant(name="a", visibility=wert).visibility == wert
+
+    def test_yaml_import_eines_alten_exports(self):
+        """Ein Export von vor 0.22 mit `visibility: private` landet als `hidden`."""
+        from app.api.assistants import _yaml_to_assistant_fields
+
+        felder = _yaml_to_assistant_fields(
+            {"metadata": {"name": "Alt", "audience": "student", "visibility": "private"},
+             "config": {"system_prompt": "Du hilfst."}},
+            subject_id=None,
+        )
+        erlaubt = {k: v for k, v in felder.items() if hasattr(Assistant, k)}
+        assert Assistant(**erlaubt).visibility == "hidden"

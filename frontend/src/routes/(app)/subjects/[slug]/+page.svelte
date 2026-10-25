@@ -1,4 +1,5 @@
 <script>
+    import { zurAnzeige } from "$lib/assistentenliste.js";
     /**
      * Die Fachseite — zwei grundverschiedene Aufgaben, je nach Rolle.
      *
@@ -67,7 +68,7 @@
     );
 
     const subjectAssistants = $derived(
-        subject ? $assistants.filter((a) => a.subject_id === subject.id) : [],
+        subject ? zurAnzeige($assistants).filter((a) => a.subject_id === subject.id) : [],
     );
 
     // ── Frühere Gruppen dieses Fachs (nur die Zahl, für den Hinweis) ──────────

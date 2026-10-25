@@ -1,4 +1,5 @@
 <script>
+    import { zurAnzeige } from "$lib/assistentenliste.js";
     import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { onMount } from "svelte";
@@ -28,7 +29,7 @@
             const data = await getAssistants();
             // Nur artefakterzeugende Werkzeug-Assistenten; die Sichtbarkeit
             // (audience/Zeitfenster/Scope) filtert bereits das Backend.
-            assistants = (data.items ?? []).filter(isToolAssistant);
+            assistants = zurAnzeige(data.items).filter(isToolAssistant);
         } catch (err) {
             error = err.message ?? "Fehler beim Laden der Werkzeuge";
         } finally {

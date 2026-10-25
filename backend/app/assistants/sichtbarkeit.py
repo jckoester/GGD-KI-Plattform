@@ -27,10 +27,17 @@ Bestand gegeneinander laufen. Dasselbe Muster wie bei den Wissensknoten
   womit ihre Klasse arbeitet, selbst wenn eine Kollegin ihn angelegt hat.
 * **`teachers`** für Lehrkräfte und Admins.
 * Schulweite Scopes für alle — dort entscheidet allein die Zielgruppe.
+* **Klassenstufe** (`min_grade`/`max_grade`, seit 0.22, Päckchen C1, F1/F2): gilt nur für
+  Schüler:innen und nur, wenn ihre Stufe bekannt ist (aus dem Schulkonto, wie
+  `context.service.stufe_der_person`). Unbekannt bleibt unbekannt — kein Ausschluss.
+  Lehrkräfte sehen alle Stufen; die Erstellerin ihren eigenen sowieso. Bei Gruppen-Scopes
+  gelten Gruppe **und** Stufe.
 
-**Was hier bewusst *nicht* geprüft wird:** `min_grade`/`max_grade` und `visibility`
-werden heute nirgends ausgewertet. Sie hier einzubauen hieße, zwei Zusagen zu erfinden,
-die es bisher nicht gab; sie stehen als eigener Befund im Todo.
+**Was hier bewusst *nicht* geprüft wird:** `visibility`. `hidden` heißt „nicht in
+Übersicht und Vorschlag, aber benutzbar“ (C1, F3) — das ist eine Frage der **Darstellung**
+(`frontend/src/lib/assistentenliste.js`), nicht des Zugangs. Die Einstiege wählen aus der
+vollen Liste (`assistentenwahl.js`); stünde `hidden` hier, fänden sie einen versteckten
+Assistenten nicht mehr.
 """
 from __future__ import annotations
 
@@ -66,6 +73,8 @@ class Zugang:
     gruppen: frozenset[int]
     #: Davon die, in denen sie als Lehrkraft geführt wird.
     lehrgruppen: frozenset[int]
+    #: Klassenstufe aus dem Schulkonto; ``None``, wenn unbekannt (C1, F2).
+    stufe: int | None = None
 
     @property
     def lehrkraft(self) -> bool:
@@ -88,7 +97,28 @@ async def lade_zugang(db: AsyncSession, user: JwtPayload) -> Zugang:
         rollen=frozenset(user.roles or ()),
         gruppen=frozenset(g for g, _r in zeilen),
         lehrgruppen=frozenset(g for g, r in zeilen if r == "teacher"),
+        stufe=_stufe(getattr(user, "grade", None)),
     )
+
+
+def _stufe(roh) -> int | None:
+    """„9" → 9; alles andere → unbekannt. Dieselbe Lesart wie `stufe_der_person`."""
+    try:
+        return int(str(roh).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _stufe_ungefiltert(zugang: Zugang) -> bool:
+    """Für wen die Klassenstufe eines Assistenten nicht gilt: Lehrkräfte und Unbekannte."""
+    return zugang.lehrkraft or zugang.stufe is None
+
+
+def _stufe_passt(assistant: Assistant, zugang: Zugang) -> bool:
+    if _stufe_ungefiltert(zugang):
+        return True
+    return ((assistant.min_grade is None or assistant.min_grade <= zugang.stufe)
+            and (assistant.max_grade is None or assistant.max_grade >= zugang.stufe))
 
 
 def _zielgruppe_passt(audience: str, zugang: Zugang) -> bool:
@@ -113,6 +143,9 @@ def darf_nutzen(assistant: Assistant, zugang: Zugang, *, jetzt=None) -> bool:
 
     if assistant.created_by == zugang.pseudonym:
         return True
+
+    if not _stufe_passt(assistant, zugang):
+        return False
 
     if assistant.scope in GRUPPENSCOPES:
         gruppe = assistant.scope_group_id
@@ -174,14 +207,23 @@ def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
             and_(Assistant.scope_group_id.in_(gruppen), zielgruppe),
         ),
     )
+    stufe = sa.true() if _stufe_ungefiltert(zugang) else and_(
+        or_(Assistant.min_grade.is_(None), Assistant.min_grade <= zugang.stufe),
+        or_(Assistant.max_grade.is_(None), Assistant.max_grade >= zugang.stufe),
+    )
     # Positivliste, spiegelbildlich zu `darf_nutzen`: `private` steht nicht darin und
     # ist damit ausgeschlossen, ohne dass es eigens verboten werden müsste.
     return and_(
         aktiv,
         or_(
             Assistant.created_by == zugang.pseudonym,
-            gruppenzugang,
-            and_(Assistant.scope == "teachers", zugang.lehrkraft),
-            and_(Assistant.scope.in_(sorted(OFFENE_SCOPES)), zielgruppe),
+            and_(
+                stufe,
+                or_(
+                    gruppenzugang,
+                    and_(Assistant.scope == "teachers", zugang.lehrkraft),
+                    and_(Assistant.scope.in_(sorted(OFFENE_SCOPES)), zielgruppe),
+                ),
+            ),
         ),
     )

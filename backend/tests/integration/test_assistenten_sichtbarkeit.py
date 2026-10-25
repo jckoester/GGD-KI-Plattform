@@ -32,9 +32,9 @@ SCHUELERIN = "schuelerin-der-gruppe"
 FREMDE_SCHUELERIN = "schuelerin-fremd"
 
 
-def _jwt(pseudonym: str, *rollen: str) -> JwtPayload:
+def _jwt(pseudonym: str, *rollen: str, grade: str | None = None) -> JwtPayload:
     return JwtPayload(
-        sub=pseudonym, roles=list(rollen), grade=None,
+        sub=pseudonym, roles=list(rollen), grade=grade,
         jti="00000000-0000-4000-8000-000000000000", iat=0, exp=2**31,
     )
 
@@ -82,8 +82,8 @@ async def _assistent(db_session, **felder) -> Assistant:
     return assistant
 
 
-async def _zugang(db_session, pseudonym: str, *rollen: str) -> Zugang:
-    return await lade_zugang(db_session, _jwt(pseudonym, *rollen))
+async def _zugang(db_session, pseudonym: str, *rollen: str, grade: str | None = None) -> Zugang:
+    return await lade_zugang(db_session, _jwt(pseudonym, *rollen, grade=grade))
 
 
 class TestGruppenfreigabe:
@@ -193,23 +193,43 @@ class TestFunktionUndAbfrageSagenDasselbe:
             ),
             await _assistent(db_session, scope="teaching_group", scope_group_id=None),
             await _assistent(db_session, scope="all", audience="all", status="draft"),
+            # Klassenstufen (0.22, C1): beide Grenzen, nur unten, nur oben, eigener, Gruppe
+            await _assistent(db_session, scope="all_students", audience="student",
+                             min_grade=8, max_grade=13, created_by="wer-anders"),
+            await _assistent(db_session, scope="all", audience="all",
+                             min_grade=5, max_grade=7, created_by="wer-anders"),
+            await _assistent(db_session, scope="all", audience="student", min_grade=10,
+                             created_by="wer-anders"),
+            await _assistent(db_session, scope="all", audience="student", max_grade=6,
+                             created_by="wer-anders"),
+            await _assistent(db_session, scope="all_students", audience="student",
+                             min_grade=11, max_grade=13),
+            await _assistent(
+                db_session, scope="teaching_group", scope_group_id=welt["gruppe"].id,
+                audience="student", min_grade=10, max_grade=13,
+                created_by="irgendeine-kollegin",
+            ),
         ]
 
     @pytest.mark.parametrize(
-        "pseudonym,rollen",
+        "pseudonym,rollen,grade",
         [
-            (SCHUELERIN, ("student",)),
-            (FREMDE_SCHUELERIN, ("student",)),
-            (GRUPPENLEHRKRAFT, ("teacher",)),
-            (FREMDE_LEHRKRAFT, ("teacher",)),
-            (ERSTELLERIN, ("teacher",)),
-            ("admin-person", ("teacher", "admin")),
+            (SCHUELERIN, ("student",), None),
+            (SCHUELERIN, ("student",), "5"),
+            (SCHUELERIN, ("student",), "9"),
+            (SCHUELERIN, ("student",), "12"),
+            (SCHUELERIN, ("student",), "J1"),
+            (FREMDE_SCHUELERIN, ("student",), "9"),
+            (GRUPPENLEHRKRAFT, ("teacher",), None),
+            (FREMDE_LEHRKRAFT, ("teacher",), None),
+            (ERSTELLERIN, ("teacher",), None),
+            ("admin-person", ("teacher", "admin"), None),
         ],
     )
-    async def test_dieselbe_menge(self, db_session, welt, pseudonym, rollen):
+    async def test_dieselbe_menge(self, db_session, welt, pseudonym, rollen, grade):
         bestand = await self._bestand(db_session, welt)
         ids = [a.id for a in bestand]
-        zugang = await _zugang(db_session, pseudonym, *rollen)
+        zugang = await _zugang(db_session, pseudonym, *rollen, grade=grade)
 
         aus_der_funktion = {a.id for a in bestand if darf_nutzen(a, zugang)}
         aus_der_abfrage = set((await db_session.execute(
@@ -230,6 +250,40 @@ class TestFunktionUndAbfrageSagenDasselbe:
         zugang = await _zugang(db_session, SCHUELERIN, "student")
         sichtbar = {a.id for a in bestand if darf_nutzen(a, zugang)}
         assert sichtbar and len(sichtbar) < len(bestand)
+
+
+class TestKlassenstufe:
+    """0.22 (Päckchen C1, F1/F2): Klassenstufen wirken — nur für Schüler:innen mit bekannter Stufe."""
+
+    async def test_fuenftklaesslerin_sieht_kl_8_bis_13_nicht(self, db_session, welt):
+        a = await _assistent(db_session, scope="all_students", min_grade=8, max_grade=13,
+                             created_by="wer-anders")
+        assert not darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade="5"))
+        assert darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade="9"))
+
+    async def test_grenzen_gehoeren_dazu(self, db_session, welt):
+        a = await _assistent(db_session, scope="all_students", min_grade=8, max_grade=13,
+                             created_by="wer-anders")
+        for stufe, soll in (("7", False), ("8", True), ("13", True)):
+            assert darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade=stufe)) is soll
+
+    async def test_stufe_unbekannt_wird_nicht_ausgeschlossen(self, db_session, welt):
+        a = await _assistent(db_session, scope="all_students", min_grade=8, max_grade=13,
+                             created_by="wer-anders")
+        assert darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student"))
+        assert darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade="J1"))
+
+    async def test_lehrkraft_sieht_alle_stufen(self, db_session, welt):
+        a = await _assistent(db_session, scope="all", audience="all", min_grade=11,
+                             created_by="wer-anders")
+        assert darf_nutzen(a, await _zugang(db_session, FREMDE_LEHRKRAFT, "teacher", grade="5"))
+
+    async def test_gruppe_und_stufe_gelten_beide(self, db_session, welt):
+        a = await _assistent(db_session, scope="teaching_group", scope_group_id=welt["gruppe"].id,
+                             min_grade=10, created_by="irgendeine-kollegin")
+        assert not darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade="9"))
+        assert darf_nutzen(a, await _zugang(db_session, SCHUELERIN, "student", grade="10"))
+        assert darf_nutzen(a, await _zugang(db_session, GRUPPENLEHRKRAFT, "teacher"))
 
 
 class TestChatWeg:

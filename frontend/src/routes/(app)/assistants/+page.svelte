@@ -1,4 +1,5 @@
 <script>
+    import { zurAnzeige } from "$lib/assistentenliste.js";
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -33,7 +34,7 @@
     onMount(async () => {
         try {
             const data = await getAssistants()
-            assistants = data.items
+            assistants = zurAnzeige(data.items)
         } catch (err) {
             error = err.message ?? 'Fehler beim Laden der Assistenten'
         } finally {
