@@ -1,0 +1,46 @@
+# Referenz für scripts/ionenladungen_probe.py (26.10.2026, Entwurf Claude — gegen das
+# „Periodensystem der Grundbausteine" der Schule prüfen, Jan).
+#
+# Je Element:
+#   haupt      Ladung(en), die das PSE der Grundbausteine als häufigste zeigt — müssen in der
+#              Antwort stehen
+#   zulaessig  weitere Ladungen, die nicht falsch sind (z. B. Fe2+ neben Fe3+) — dürfen stehen
+# Alles andere in der Antwort gilt als falsch. Ladungen als ganze Zahlen mit Vorzeichen.
+elemente:
+  # Hauptgruppen
+  H:  {haupt: [+1], zulaessig: [-1]}
+  Li: {haupt: [+1]}
+  Na: {haupt: [+1]}
+  K:  {haupt: [+1]}
+  Rb: {haupt: [+1]}
+  Cs: {haupt: [+1]}
+  Be: {haupt: [+2]}
+  Mg: {haupt: [+2]}
+  Ca: {haupt: [+2]}
+  Sr: {haupt: [+2]}
+  Ba: {haupt: [+2]}
+  Al: {haupt: [+3]}
+  N:  {haupt: [-3]}
+  P:  {haupt: [-3]}
+  O:  {haupt: [-2]}
+  S:  {haupt: [-2]}
+  Se: {haupt: [-2]}
+  F:  {haupt: [-1]}
+  Cl: {haupt: [-1]}
+  Br: {haupt: [-1]}
+  I:  {haupt: [-1]}
+  Sn: {haupt: [+2], zulaessig: [+4]}
+  Pb: {haupt: [+2], zulaessig: [+4]}
+  # Nebengruppen
+  Cr: {haupt: [+3], zulaessig: [+2]}
+  Mn: {haupt: [+2], zulaessig: [+3, +4]}
+  Fe: {haupt: [+2, +3]}
+  Co: {haupt: [+2], zulaessig: [+3]}
+  Ni: {haupt: [+2]}
+  Cu: {haupt: [+2], zulaessig: [+1]}
+  Zn: {haupt: [+2]}
+  Ag: {haupt: [+1]}
+  Cd: {haupt: [+2]}
+  Au: {haupt: [+3], zulaessig: [+1]}
+  Hg: {haupt: [+2], zulaessig: [+1]}
+  Pt: {haupt: [+2], zulaessig: [+4]}

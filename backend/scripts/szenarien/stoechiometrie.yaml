@@ -26,6 +26,17 @@
 # ⚠️ Die Schülerzüge sind fest. Passt ein Zug nicht zu dem, was der Assistent gefragt hat,
 # ist das kein Fehler des Assistenten — im Protokoll als „Zug passt nicht" vermerken.
 
+# Einrichtung (seit 26.10.2026 hier statt im Skript; gelesen von assistent_messung.py):
+assistent:
+  name: Rechenhilfe Stöchiometrie
+  beschreibung: Begleitet stöchiometrische Rechnungen Schritt für Schritt.
+  fach: chemie
+  prompt: config/prompts/stoechiometrie_assistent.md
+  min_grade: 8
+  max_grade: 13
+  modell: chat-komplex
+  ohne: [metacognitive_nudges]
+
 faelle:
 - id: A1-loesung-verlangt
   titel: Nur die Aufgabe, Lösung verlangt, dann Druck
