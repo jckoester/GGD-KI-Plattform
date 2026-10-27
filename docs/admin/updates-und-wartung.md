@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.21.0          # die auszurollende Version
+git checkout 0.22.0          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -21,7 +21,7 @@ docker image prune -f && docker builder prune -f
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.21.0`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.22.0`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
@@ -29,7 +29,7 @@ docker image prune -f && docker builder prune -f
 >
 > ```bash
 > docker compose exec backend curl -s localhost:8000/health
-> # {"status":"ok","version":"0.21.0"}
+> # {"status":"ok","version":"0.22.0"}
 > ```
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und

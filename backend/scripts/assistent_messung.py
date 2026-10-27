@@ -426,7 +426,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
          *(["- **Vorlauf im Standard-Chat** (danach Wechsel zum Assistenten in derselben Konversation): "
             + " · ".join(f"„{v}“" for v in kopf["vorlauf"])] if kopf.get("vorlauf") else []),
          "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; Chat über den "
-         "Assistenten (Fach Chemie aus dem Assistenten)",
+         + (f"Assistenten (Fach {kopf['fach']} aus dem Assistenten)" if kopf.get("fach")
+            else "Assistenten (fachübergreifend, Konversation ohne Fach)"),
          "", "Automatisch: **Vorgriff** (verbotene Werte, normalisiert; Treffer mit Satz), **Stufenvorgriff** "
          "(Begriffe, die in der Stufe des Falls noch nicht dran sind), **Kosten**, Fragezeichen (Soll ≤ 1), "
          "Sätze, Wörter, Listenpunkte, Überschriften. Die Kriterien darunter prüft Jan.", ""]

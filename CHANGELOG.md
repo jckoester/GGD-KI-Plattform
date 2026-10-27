@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.22.0] – 2026-10-27
+
+Drei Schüler-Assistenten für Chemie und Naturwissenschaften, Grundlagen für den Assistenten-Vorschlag
+im Chat, Bildungsplan-Bausteine in der Fassung der Klassenstufe. Eine Migration (0090).
+
 ### Neu
 
 - **Assistenten: Auslöser-Beispiele und Vorschlagsfelder** (Grundlage für den Vorschlag im
@@ -51,6 +56,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Biologie neu scrapen und importieren.
 - **YAML-Export eines Assistenten mit schulweitem Standardmodell** ließ sich nicht wieder
   importieren.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0090) — wie im regulären Update.
+- Backend **und** Frontend neu bauen; offene Browser-Tabs einmal neu laden.
+- Assistenten einspielen:
+  `docker compose exec backend python scripts/seed_assistants.py --config config/assistants.example.yaml`
+  (`--dry-run` zeigt vorher, was angelegt wird). Vorhandene Assistenten bleiben unverändert.
+- Unter `/settings/models` das Modell `chat-komplex` für Schüler:innen der Klassen 5–13 freischalten.
+- Biologie neu scrapen und importieren (`--fach BIO`), damit Biologie V2 Operatoren hat
+  (Ablauf: `docs/admin/bildungsplan-import.md`).
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.21.0] – 2026-10-21
 

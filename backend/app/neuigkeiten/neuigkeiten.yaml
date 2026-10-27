@@ -91,3 +91,28 @@
     Ein Knopf über dem Jahresplan springt zur Woche von heute — in den Ferien zur nächsten
     Unterrichtswoche. Außerdem öffnet ein Klick auf das Thema einer Stunde das Feld jetzt gleich
     mit Cursor.
+
+- id: "0.22-fassung-der-gruppe"
+  version: "0.22.0"
+  datum: 2026-10-27
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Bildungsplan in der Fassung Ihrer Gruppe"
+  text: >-
+    Im Chat mit einer Unterrichtsgruppe, etwa beim Stundenassistenten, sieht der Assistent nur
+    noch die Bildungsplan-Fassung, die für diese Gruppe gilt — Kompetenzen und Operatoren einer
+    7. Klasse also nach V3, die einer 9. Klasse nach V2. Wer ohne Gruppe chattet, sieht wie
+    bisher alle Fassungen.
+  link: /help/unterrichtsplanung
+
+- id: "0.22-schueler-assistenten"
+  version: "0.22.0"
+  datum: 2026-10-27
+  rollen: [teacher]
+  titel: "Neue Assistenten für Ihre Schüler:innen"
+  text: >-
+    Drei Assistenten begleiten Schüler:innen beim Üben, ohne Lösungen vorzusagen: für
+    stöchiometrische Berechnungen und für Reaktionsgleichungen (Chemie, ab Klasse 8) sowie für
+    naturwissenschaftliche Aufgaben (Klasse 5–13), der auch auf Operatoren wie „erläutere“ oder
+    „bewerte“ achtet.
+  link: /help/assistenten
