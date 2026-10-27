@@ -33,6 +33,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,11 @@ def tools_for(
         # Team greift zusätzlich am LiteLLM-Proxy (Schritt 8).
         greifen.add("image_generation")
 
-    result = [tool for tool in TOOL_REGISTRY.values() if tool.groups & greifen]
+    # Messschalter (nur development): ausgeblendete Werkzeuge, etwa `get_operatoren` für die
+    # Werkzeugwahl-Messung vor seiner Entfernung.
+    aus = settings.werkzeuge_aus_menge
+    result = [tool for tool in TOOL_REGISTRY.values()
+              if tool.groups & greifen and tool.name not in aus]
 
     schema_ctx = SchemaContext(assistant=assistant, erlaubte_modelle=erlaubte_modelle)
     return [_mit_aufgeloestem_schema(t, schema_ctx) for t in result]

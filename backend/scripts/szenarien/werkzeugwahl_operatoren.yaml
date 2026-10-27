@@ -1,0 +1,101 @@
+# Werkzeugwahl-Messung vor der Entfernung von `get_operatoren` (27.10.2026).
+#
+# Kriterium 1 aus docs/admin/updates-und-wartung.md („Wann `get_operatoren` entfällt“):
+# Aufzählungs- und Listenfragen gehen an `list_context_nodes`, nicht an die Suche — auch
+# ohne `get_operatoren`. Gemessen in zwei Armen: Backend normal und Backend mit
+# `WERKZEUGE_AUS=get_operatoren` (nur development). Ablauf: docs/dev/assistenten-messen.md.
+#
+# Als Lehrkraft ohne Unterrichtsgruppe, ohne Assistenten (freier Chat). `fach` ist das Fach
+# der Konversation (Slug), `null` = ohne Fach.
+#
+# Felder je Fall:
+# - eins_von: mindestens eines dieser Werkzeuge muss aufgerufen werden
+# - nicht:    keines dieser Werkzeuge darf aufgerufen werden
+# - vollstaendig: jeder `list_context_nodes`-Aufruf liefert alles (geliefert = gesamt)
+# - soll: was Jan in der Antwort prüft (Zahl, Liste)
+
+faelle:
+# ── Aufzählungsfälle aus config/search_eval.yaml, als Fragen ─────────────────
+- id: A1-nennen-faecher
+  frage: In welchen Fächern gibt es im Bildungsplan den Operator „nennen“?
+  fach: null
+  eins_von: [list_context_nodes]
+  vollstaendig: true
+  soll: alle Fächer, keine Auswahl „zum Beispiel“
+
+- id: A2-beurteilen-anzahl
+  frage: In wie vielen Fächern kommt der Operator „beurteilen“ vor?
+  fach: null
+  eins_von: [list_context_nodes]
+  vollstaendig: true
+  soll: eine Zahl, die zur Aufzählung passt
+
+# ── Planung mit Fach (hier griff ohne get_operatoren die Suche) ──────────────
+- id: P1-chemie-alle
+  frage: Welche Operatoren gibt es in Chemie?
+  fach: chemie
+  eins_von: [list_context_nodes, get_operatoren]
+  nicht: [search_context_nodes]
+  vollstaendig: true
+  soll: alle 20 Operatoren der geltenden Fassung (Chemie V2)
+
+- id: P2-chemie-afb3
+  frage: Welche Operatoren gehören in Chemie zum Anforderungsbereich III?
+  fach: chemie
+  eins_von: [list_context_nodes, get_operatoren]
+  nicht: [search_context_nodes]
+  vollstaendig: true
+  soll: die 5 Operatoren mit AFB III (Chemie V2)
+
+- id: P3-chemie-erlaeutern
+  frage: Was verlangt der Operator „erläutern“ in Chemie genau?
+  fach: chemie
+  eins_von: [list_context_nodes, get_operatoren, search_context_nodes]
+  soll: die Definition aus dem Bildungsplan (V2), nicht aus dem Allgemeinwissen
+
+- id: P4-chemie-aufgabe
+  frage: Formuliere eine Aufgabe zu Redoxreaktionen für Klasse 9 mit einem Operator aus dem Anforderungsbereich II.
+  fach: chemie
+  soll: ein Operator, der in Chemie zu AFB II gehört (Werkzeug nicht vorgeschrieben)
+
+- id: P5-biologie-liste
+  frage: Gib mir die Operatorenliste für Biologie.
+  fach: biologie
+  eins_von: [list_context_nodes, get_operatoren]
+  nicht: [search_context_nodes]
+  vollstaendig: true
+  soll: vollständige Liste; ohne Stufe stehen V2 und V3 nebeneinander (list) bzw. nur V3 (get_operatoren)
+
+# ── Dieselben Fragen ohne Fach der Konversation ──────────────────────────────
+- id: F1-chemie-alle-ohne-fach
+  frage: Welche Operatoren gibt es in Chemie?
+  fach: null
+  eins_von: [list_context_nodes]
+  vollstaendig: true
+  soll: alle Chemie-Operatoren
+
+- id: F2-chemie-afb3-ohne-fach
+  frage: Welche Operatoren gehören in Chemie zum Anforderungsbereich III?
+  fach: null
+  eins_von: [list_context_nodes]
+  vollstaendig: true
+  soll: die Chemie-Operatoren mit AFB III
+
+- id: F3-erlaeutern-ohne-fach
+  frage: Was verlangt der Operator „erläutern“?
+  fach: null
+  eins_von: [list_context_nodes, search_context_nodes]
+  soll: Definition(en) aus dem Bildungsplan; nennt, dass sie je Fach/Fassung abweichen
+
+# ── Gegenproben: kein Operatorbezug ──────────────────────────────────────────
+- id: G1-redox-mit-fach
+  frage: Was ist eine Redoxreaktion?
+  fach: chemie
+  nicht: [list_context_nodes, get_operatoren]
+  soll: kurze Erklärung, kein Operator-Werkzeug
+
+- id: G2-bindung-ohne-fach
+  frage: Erkläre mir kurz den Unterschied zwischen Ionenbindung und Atombindung.
+  fach: null
+  nicht: [list_context_nodes, get_operatoren]
+  soll: kurze Erklärung, kein Operator-Werkzeug

@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     embedding_retry_max_wait_s: float = 5.0
     frontend_origin: str = "http://localhost:5173"
     environment: str = "development"
+    # Nur für Messungen (Werkzeugwahl ohne ein bestimmtes Werkzeug): kommagetrennte Namen
+    # aus `TOOL_REGISTRY`, die keiner Konversation angeboten werden. Außerhalb von
+    # `development` verweigert der Start (`_werkzeuge_aus_nur_in_dev`).
+    werkzeuge_aus: str = ""
     auth_config_path: str = "config/auth.yaml"
     budget_tiers_path: str = "config/budget_tiers.yaml"
     crisis_triggers_path: str = "config/crisis_triggers.yaml"
@@ -360,6 +364,18 @@ class Settings(BaseSettings):
                 f"IMAGE_SIZES. Gültig: {', '.join(sorted(self.image_sizes))}."
             )
         return self
+
+    @model_validator(mode="after")
+    def _werkzeuge_aus_nur_in_dev(self) -> "Settings":
+        """`WERKZEUGE_AUS` verändert, was das Modell kann — auf einer echten Instanz wäre das
+        ein stiller Funktionsverlust. Deshalb nur in `development`."""
+        if self.werkzeuge_aus.strip() and self.environment != "development":
+            raise ValueError("WERKZEUGE_AUS ist nur für Messungen in development gedacht.")
+        return self
+
+    @property
+    def werkzeuge_aus_menge(self) -> frozenset[str]:
+        return frozenset(n.strip() for n in self.werkzeuge_aus.split(",") if n.strip())
 
     @model_validator(mode="after")
     def _require_strong_master_key_in_prod(self) -> "Settings":

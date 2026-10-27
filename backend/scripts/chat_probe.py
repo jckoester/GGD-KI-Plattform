@@ -156,6 +156,7 @@ def main() -> None:
     p.add_argument("--datei", type=Path, help="Datei mit einer Frage je Zeile")
     p.add_argument("--assistent", type=int, default=None)
     p.add_argument("--gruppe", type=int, default=None)
+    p.add_argument("--fach", type=int, default=None, help="subject_id als Fach der Konversation (ohne Gruppe)")
     p.add_argument("--stunde", default=None,
                    help="Kennung einer Unterrichtsstunde als Stundenbezug (nur mit --rolle teacher)")
     p.add_argument("--modell", default=None,
@@ -201,7 +202,8 @@ def main() -> None:
         for frage in fragen:
             ergebnisse.append(
                 frage_stellen(client, frage, assistent=args.assistent,
-                              gruppe=args.gruppe, modell=args.modell, stunde=args.stunde)
+                              gruppe=args.gruppe, modell=args.modell, stunde=args.stunde,
+                              fach=args.fach)
             )
 
     if args.json:

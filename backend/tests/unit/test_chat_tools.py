@@ -48,6 +48,22 @@ def test_context_search_always_included():
         tools_mod.TOOL_REGISTRY.update(saved)
 
 
+def test_werkzeuge_aus_blendet_aus(monkeypatch):
+    """Messschalter `WERKZEUGE_AUS`: das genannte Werkzeug fehlt, die übrigen bleiben."""
+    import app.chat.router  # noqa: F401 — registriert die Werkzeuge
+
+    monkeypatch.setattr(settings, "werkzeuge_aus", " get_operatoren ,")
+    namen = {t.name for t in tools_for(None, None, False)}
+    assert "get_operatoren" not in namen and "list_context_nodes" in namen
+
+
+def test_werkzeuge_aus_nur_in_development():
+    from app.config import Settings
+
+    with pytest.raises(ValueError, match="WERKZEUGE_AUS"):
+        Settings(environment="test", werkzeuge_aus="get_operatoren")
+
+
 def test_planning_tool_not_included_without_group():
     """Planning Tools ohne group_id nicht aktiv."""
     import app.chat.tools as tools_mod
