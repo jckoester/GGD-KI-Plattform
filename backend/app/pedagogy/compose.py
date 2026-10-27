@@ -73,13 +73,14 @@ def compose_system_content(
     stufe: int | None = None,
     bezug: str | None = None,
     fach: str | None = None,
+    operator_abschnitt: str | None = None,
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
     Reihenfolge: universelle Basis · [Vorrang des Wissensspeichers] ·
     Zielgruppen-Erweiterung · [Klassenstufe — nur Schüler-Behandlung] · [Fach] · [Bezugsstunde] ·
-    [Wissens-Kontext + Assistenten-Prompt] · [Lernverhalten-Augmentierungen — nur
-    Schüler-Behandlung].
+    [Wissens-Kontext + Assistenten-Prompt] · [Operator dieser Aufgabe] ·
+    [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
 
     ``stufe`` steht **vor** dem Kontext, nicht darin: Sie gilt für die ganze Antwort,
@@ -119,6 +120,12 @@ def compose_system_content(
         parts.append(ctx)
     elif prompt:
         parts.append(prompt)
+
+    # Päckchen AF: **hinter** dem Assistenten-Prompt — an dieser Stelle stand der Abschnitt im
+    # Prüfregel-Versuch (Läufe 14–18, Zusatz am Prompt). Eine andere Stelle wäre eine andere,
+    # ungemessene Bedingung. Für alle Rollen: Ob er kommt, entscheidet der Assistent.
+    if operator_abschnitt and operator_abschnitt.strip():
+        parts.append(operator_abschnitt.strip())
 
     if student_treatment:
         augs = _augmentation_texts(pedagogy, disabled_augmentations)

@@ -62,6 +62,7 @@ from app.context.bausteine import (
     vereinige,
 )
 from app.context.bausteine import speichere as bausteine_speichern
+from app.context.operator_abschnitt import Operatorabschnitt, operator_abschnitt
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.context.vorab_statistik import zaehlen as vorab_zaehlen
 from app.context.filters import Knotenfilter
@@ -359,9 +360,14 @@ _SEARCH_CONTEXT_NODES_TOOL = {
 }
 
 
+#: Wie viele Nutzernachrichten der Operator-Abschnitt rückwärts absucht (Päckchen AF, B6).
+_OPERATOR_NACHRICHTEN = 6
+
+
 def _vorab_debug_ereignis(
     angebot: list[Angebot], werkzeug_bausteine: list[Baustein], suchanfragen: list[str],
     sicher_gruppe: list[Baustein] = (), aufzaehlungen: list[dict] = (),
+    operator: Optional[Operatorabschnitt] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -392,6 +398,11 @@ def _vorab_debug_ereignis(
         # `list_context_nodes` mit Filtern und Umfang — schlägt das Modell den Operator nach,
         # mit oder ohne Fach, und wie groß ist die Antwort?
         "aufzaehlungen": list(aufzaehlungen),
+        # Päckchen AF: welcher Operator erkannt wurde, aus welchen Fächern und Fassungen.
+        "operator": (
+            {"operatoren": operator.operatoren, "faecher": operator.faecher,
+             "fassungen": operator.fassungen} if operator is not None else None
+        ),
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -2099,12 +2110,34 @@ async def chat(
         active_assistant.disabled_augmentations if active_assistant is not None else None
     )
     student_treatment = is_student_treatment(audience, user_is_student)
+    _stufe = await stufe_der_person(db, conversation_id, current_user.grade)
+    # Päckchen AF: Operator der Aufgabe — nur bei Assistenten mit Fächerkreis (F3). Die
+    # Nutzernachrichten **neueste zuerst**: Ein Folgezug nennt den Operator nicht mehr (B6).
+    _operator: Optional[Operatorabschnitt] = None
+    _kreis = getattr(active_assistant, "operator_faecher", None) or []
+    if _kreis:
+        try:
+            _operator = await operator_abschnitt(
+                [_user_text(m) for m in reversed(request.messages) if m.role == "user"][
+                    :_OPERATOR_NACHRICHTEN],
+                _kreis,
+                konversationsfach_id=await subject_of_conversation(
+                    db, conversation_id, conversation_group_id),
+                stufe=_stufe,
+                pseudonym=current_user.sub,
+                rollen=current_user.roles,
+                db=db,
+            )
+        except Exception:
+            # Fehlt der Abschnitt, antwortet der Prompt mit seinen Kurzfassungen — besser als
+            # eine abgebrochene Antwort.
+            logger.exception("Operator-Abschnitt nicht gebaut (Konversation %s)", conversation_id)
     llm_messages.append({
         "role": "system",
         "content": compose_system_content(
             pedagogy,
             student_treatment=student_treatment,
-            stufe=await stufe_der_person(db, conversation_id, current_user.grade),
+            stufe=_stufe,
             fach=await _fach_name(db, conversation_id),
             bezug=await bezugszeile(
                 db, conversation_stunde_id, current_user,
@@ -2113,6 +2146,7 @@ async def chat(
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,
+            operator_abschnitt=_operator.text if _operator is not None else None,
         ),
     })
     if pedagogy.output_format.strip():
@@ -2747,6 +2781,7 @@ async def chat(
             kontext.angebot, _werkzeug_bausteine, _suchanfragen,
             [b for b in kontext.bausteine if b.grund == "gruppe"],
             _aufzaehlungen,
+            _operator,
         )
         if _debug:
             yield _debug

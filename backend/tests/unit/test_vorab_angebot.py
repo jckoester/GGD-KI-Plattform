@@ -130,7 +130,21 @@ def test_messkanal_ausserhalb_der_produktion():
         "suchanfragen": ["Elektronegativität"],
         "sicher_gruppe": [],
         "aufzaehlungen": [],
+        "operator": None,
     }
+
+
+def test_messkanal_traegt_den_operator():
+    """Päckchen AF: erkannter Operator, Fächer, Fassungen — nicht der Abschnittstext."""
+    from app.context.operator_abschnitt import Operatorabschnitt
+
+    op = Operatorabschnitt(text="## Operator dieser Aufgabe\nerläutern (…): …", operatoren=["erläutern"],
+                           faecher=["Biologie"], fassungen=["2016.V2"])
+    with patch("app.chat.router.settings") as mock_settings:
+        mock_settings.environment = "development"
+        ereignis = _vorab_debug_ereignis([], [], [], operator=op)
+    assert json.loads(ereignis.split("data: ", 1)[1])["operator"] == {
+        "operatoren": ["erläutern"], "faecher": ["Biologie"], "fassungen": ["2016.V2"]}
 
 
 def test_messkanal_traegt_die_aufzaehlungen():

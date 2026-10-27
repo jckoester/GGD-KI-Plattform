@@ -187,6 +187,25 @@ class TestFachImSystemkontext:
         assert "zum Fach Chemie" in self._inhalt(student_treatment=False, fach="Chemie")
 
 
+class TestOperatorDieserAufgabe:
+    """Päckchen AF: der Abschnitt steht **hinter** dem Assistenten-Prompt (wie im
+    Prüfregel-Versuch) und vor den Lernverhalten-Augmentierungen."""
+
+    _inhalt = TestKlassenstufeImSystemkontext._inhalt
+    ABSCHNITT = "## Operator dieser Aufgabe\nerläutern (Biologie, Fassung für Klasse 9): …"
+
+    def test_hinter_dem_prompt(self):
+        inhalt = self._inhalt(assistant_system_prompt="PROMPT-ENDE", operator_abschnitt=self.ABSCHNITT)
+        assert inhalt.index("PROMPT-ENDE") < inhalt.index("## Operator dieser Aufgabe")
+
+    def test_ohne_abschnitt_nichts(self):
+        assert "Operator dieser Aufgabe" not in self._inhalt(assistant_system_prompt="P")
+
+    def test_auch_fuer_lehrkraefte(self):
+        """Ob er kommt, entscheidet der Assistent (Fächerkreis), nicht die Rolle."""
+        assert self.ABSCHNITT in self._inhalt(student_treatment=False, operator_abschnitt=self.ABSCHNITT)
+
+
 class TestBezugsstunde:
     """Die Zeile zum Stundenbezug (0.15, Päckchen A Schritt 2) — für jede Behandlung, vor dem
     Kontext und vor dem Assistenten-Prompt: Sie gilt für die ganze Unterhaltung."""
