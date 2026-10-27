@@ -25,6 +25,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import FachMehrfachauswahl from "$lib/components/FachMehrfachauswahl.svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import {
         getModels,
@@ -466,6 +467,7 @@
             tool_groups: [],
             disabled_augmentations: [],
             image_kinds: [],
+            operator_faecher: [],
             suggest: "never",
             trigger_examples: "",
             trigger_counterexamples: "",
@@ -538,6 +540,7 @@
             tool_groups: a.tool_groups ?? [],
             disabled_augmentations: a.disabled_augmentations ?? [],
             image_kinds: a.image_kinds ?? [],
+            operator_faecher: a.operator_faecher ?? [],
             suggest: a.suggest || "never",
             // Ein Eintrag je Zeile; zurück zur Liste erst in `buildPayload`.
             trigger_examples: listeZuZeilen(a.trigger_examples),
@@ -593,6 +596,8 @@
             p.tool_groups = form.tool_groups;
             // Leer = alle konfigurierten Bildarten.
             p.image_kinds = form.image_kinds;
+            // Leer = kein Abschnitt „Operator dieser Aufgabe" (Päckchen AF).
+            p.operator_faecher = form.operator_faecher;
         }
         return p;
     }
@@ -2189,6 +2194,27 @@
                                     {/each}
                                 </div>
                             {/if}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label
+                                for="ae-operator-faecher"
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                Operatoren aus diesen Fächern
+                            </label>
+                            <p id="ae-operator-faecher-hinweis" class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Nennt eine Aufgabe einen Operator („Erläutere …“, „Werte … aus“),
+                                bekommt der Assistent dessen Definition in der Fassung der Klasse aus
+                                diesen Fächern. Gedacht für einen Prompt, der Antworten gegen den
+                                Operator prüft. Leer = aus.
+                            </p>
+                            <FachMehrfachauswahl
+                                id="ae-operator-faecher"
+                                beschreibung="ae-operator-faecher-hinweis"
+                                faecher={subjects}
+                                bind:gewaehlt={form.operator_faecher}
+                            />
                         </div>
                     {/if}
 

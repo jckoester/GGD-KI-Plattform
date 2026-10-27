@@ -7,7 +7,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Assistenten: Fächer für Operatoren** (`operator_faecher`, Fach-Slugs; über API, YAML und Seed). Grundlage
+- **Assistenten: Fächer für Operatoren** (`operator_faecher`, Fach-Slugs; im Editor unter den Fähigkeiten als
+  Fächerauswahl mit Suchfeld, nur für Admins; über API, YAML und Seed). Grundlage
   für den Abschnitt „Operator dieser Aufgabe“; leer heißt aus. Der Assistent für naturwissenschaftliche
   Aufgaben führt Biologie, Chemie, Physik, NwT und NiT. Migration 0091.
 - **Operator der Aufgabe im Systemtext:** Nennt eine Nachricht an einen solchen Assistenten einen Operator
