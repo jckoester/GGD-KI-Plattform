@@ -640,36 +640,24 @@ Backend-Log:
 docker compose logs backend | grep "^.*Tool '"
 # INFO Tool 'search_context_nodes' (Runde 1) → Felder ['exakte_namenstraeger', …]
 # INFO Tool 'list_context_nodes' (Runde 1) → Felder ['bausteine', 'gesamt', …]
-# INFO Tool 'get_operatoren' (Runde 1) → Felder ['hinweis']
 ```
 
-Damit lässt sich unterscheiden, welches der drei Werkzeuge gegriffen hat:
+Damit lässt sich unterscheiden, welches der beiden Werkzeuge gegriffen hat:
 
 | Werkzeug | wofür |
 |---|---|
 | `search_context_nodes` | „Was gibt es zu diesem Thema?" — Namensträger und nächstliegende Bausteine |
 | `list_context_nodes` | „Alle, die …" / „Wie viele?" — vollständige, gezählte Liste |
-| `get_operatoren` | Operatoren des Konversationsfachs; ohne Fachbezug ein `hinweis` statt einer Liste |
 
 Greift ein Modell für eine „alle …"-Frage zu `search_context_nodes` statt zu
 `list_context_nodes`, bekommt es eine nach Ähnlichkeit gekürzte Liste und antwortet
-womöglich unvollständig. Solche Fehlgriffe sind hier sichtbar — und der Grund, aus dem
-`get_operatoren` vorerst bestehen bleibt.
+womöglich unvollständig. Solche Fehlgriffe sind hier sichtbar.
 
-**Wann `get_operatoren` entfällt.** Das Werkzeug ist seit 09/2026 nur noch ein Preset der
-Aufzählung (Typ = `operator`, Fach = Konversationsfach); es tut nichts, was
-`list_context_nodes` nicht könnte. Es bleibt allein deshalb, weil Modelle bei
-fachbezogenen Fragen erwiesenermaßen dorthin greifen. Entfernt wird es, wenn **beides**
-zutrifft:
-
-1. Alle Aufzählungsfälle des Prüfsatzes (`config/search_eval.yaml`, Abschnitt
-   `aufzaehlungen`) wählen in einem Werkzeugwahl-Durchlauf `list_context_nodes`.
-2. **Zwei Wochen** Produktivbetrieb ohne einen Fehlgriff auf `get_operatoren` im Log —
-   also ohne eine Zeile `Tool 'get_operatoren' … → Felder ['hinweis']`, die auf eine Frage
-   folgte, die kein einzelnes Fach meinte.
-
-Beobachtet wird mit dem `grep` oben. Punkt 2 ist der eigentliche Nachweis: Punkt 1 misst
-eine Laborsituation, Punkt 2 den echten Gebrauch.
+Bis 0.22 gab es ein drittes Werkzeug, `get_operatoren` (die Operatoren des Konversationsfachs). Es entfiel in 0.23,
+nachdem eine Werkzeugwahl-Messung gezeigt hatte, dass Listen- und Aufzählungsfragen auch ohne es an
+`list_context_nodes` gehen (`backend/scripts/werkzeugwahl_messung.py`, gemessen mit `WERKZEUGE_AUS=get_operatoren`,
+nur in `development` erlaubt). Ein Modell, das den Namen noch kennt, bekommt die Liste der verfügbaren
+Werkzeuge zurück (`Unbekanntes Tool` im Log).
 
 Der Suchtext selbst wird **nicht** protokolliert — er ist Nutzereingabe und gehört nicht
 in Logs.

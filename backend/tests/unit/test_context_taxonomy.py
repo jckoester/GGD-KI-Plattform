@@ -327,6 +327,8 @@ class TestModellMetadata:
     OHNE_FELDSCHEMA = {
         "stoffsteckbrief": {"eigenschaften"},
         "bauteil": {"schaltzeichen.beschreibung", "schaltzeichen.kennung"},
+        # Operatoren kommen nur aus dem Bildungsplan-Import, ohne Feldschema.
+        "operator": {"afb"},
     }
 
     def test_nur_felder_die_es_gibt(self):
@@ -361,6 +363,8 @@ class TestModellMetadata:
 
         assert "fehlvorstellungen" in modell_metadata_felder("begriff")
         assert "eigenschaften" in modell_metadata_felder("stoffsteckbrief")
+        # Ohne AFB rät das Modell die Anforderungsbereiche (Werkzeugwahl-Messung 27.10.2026).
+        assert "afb" in modell_metadata_felder("operator")
 
     def test_unbekannter_typ_gibt_nichts_preis(self):
         """Der Normalfall: Wer nicht in der Tabelle steht, schickt keine Metadaten.

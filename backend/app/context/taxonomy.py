@@ -505,7 +505,7 @@ def rollen_typ_bonus(rollen) -> dict[str, float]:
 #
 # Ein Typ, der hier **nicht** steht, gibt nichts mit. Das ist der Normalfall und der
 # Stand vor AP3; der Weg dorthin bleibt `Suchprofil.mit_metadaten` für Aufrufer, die
-# die rohe Spalte selbst auswerten (`get_operatoren`, Breadcrumb im Ankerkontext).
+# die rohe Spalte selbst auswerten (Breadcrumb im Ankerkontext).
 #
 # ⚠️ Diese Tabelle ist **Schritt 14** aus `docs/dev/neuer-knotentyp.md`. Ein neuer
 # Typ mit fachlich gehaltvollen Feldern, der hier fehlt, verliert sie im Gespräch
@@ -551,6 +551,10 @@ MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
         "schaltzeichen.beschreibung",
         "schaltzeichen.kennung",
     ),
+    # Anforderungsbereich (I–III) aus dem Bildungsplan-Import. Bis 27.10.2026 sah ihn das
+    # Modell nur über `get_operatoren` (rohe Metadaten, entfernt 0.23): Über die Aufzählung beantwortet,
+    # riet es bei „Welche Operatoren gehören zu AFB III?“ (Werkzeugwahl-Messung).
+    "operator": ("afb",),
 }
 
 

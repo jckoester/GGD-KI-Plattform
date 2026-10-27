@@ -47,7 +47,7 @@ def test_aus_treffern_rechnet_aehnlichkeit_und_laesst_fremde_formen_weg():
         {"node_id": "a", "title": "Oxidation", "content_type": "begriff", "fach": "Chemie",
          "distanz": 0.249},
         {"node_id": "b", "title": "Wasser", "content_type": "begriff", "fach": None},
-        {"operatoren": ["nennen"]},          # fremde Form (z. B. get_operatoren)
+        {"operatoren": ["nennen"]},          # fremde Form (bis 0.23 get_operatoren)
         "kein dict",
     ]
     bausteine = aus_treffern(treffer, VORAB)

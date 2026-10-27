@@ -9,8 +9,8 @@
  *
  * **Die Folgen sind größer, als es aussieht.** Am Fach hängen der Fachbonus der Suche
  * (er entscheidet messbar über die Reihenfolge der Treffer), die Wahl der
- * Bildungsplan-Fassung über den Jahrgang, das Werkzeug `get_operatoren` (das ohne Fach
- * gar nicht antwortet) und die Einordnung in der Historie. Wer von der Fachseite kam,
+ * Bildungsplan-Fassung über den Jahrgang und die Einordnung in der Historie (bis 0.23 auch
+ * das Werkzeug `get_operatoren`, das ohne Fach gar nicht antwortete). Wer von der Fachseite kam,
  * bekam also eine **schlechtere** Suche als über den Umweg „Chat öffnen, Fach von Hand
  * wählen".
  *

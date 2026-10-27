@@ -7,8 +7,8 @@ Der zweite Weg — die Vorschlagsliste im Chat (SSE `context_suggestions`) — i
 ADR-017/AP1 entfallen. Die Form**prüfung**, die er brauchte, ist damit ebenfalls weg;
 `fuer_modell` prüft ohnehin je Eintrag und reicht fremde Formen durch (siehe
 ``TestFuerModell``). Genau daran war der Stream einmal abgerissen: Die Gruppe
-`context_search` enthält auch `get_operatoren`, dessen Einträge `operator`/`afb`/
-`bedeutung` tragen und keinen `title`.
+`context_search` enthielt bis 0.23 `get_operatoren`, dessen Einträge `operator`/`afb`/
+`bedeutung` trugen und keinen `title`.
 """
 
 # ⚠️ **Seit 26.09.2026 nicht mehr aus `app.chat.router`.** Die Auswahl gilt für zwei
@@ -82,7 +82,7 @@ class TestFuerModell:
         assert knoten["title"] == "Titel" and "node_id" not in knoten
 
     def test_hinweis_dict_wird_nicht_angefasst(self):
-        """`get_operatoren` ohne Fachbezug liefert einen Hinweis statt einer Liste."""
+        """Ein Hinweis statt einer Liste (so antwortete `get_operatoren` ohne Fachbezug)."""
         assert fuer_modell([{"hinweis": "kein Fachbezug"}]) == [{"hinweis": "kein Fachbezug"}]
 
 

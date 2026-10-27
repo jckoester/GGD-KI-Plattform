@@ -251,7 +251,7 @@ def fuer_modell(
     aufbereitet = []
     for t in treffer:
         if not isinstance(t, dict) or "node_id" not in t:
-            aufbereitet.append(t)          # fremde Form (z. B. get_operatoren)
+            aufbereitet.append(t)          # fremde Form (bis 0.23 `get_operatoren`)
             continue
         # `subject_id` ist eine interne Zahl — für das Modell wertlos und irreführend.
         # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
@@ -324,9 +324,8 @@ def werkzeug_nutzlast(ergebnis) -> str:
     Serialisierung an zwei Zweigen im Streaming-Pfad des Routers, und damit hätte ein
     dritter Zweig den Hinweis leicht vergessen.
 
-    Zwei Formen, weil die Werkzeuge zwei liefern: Die Suche und die Aufzählung geben
-    einen fertigen Umschlag (Dict), ``get_operatoren`` noch eine flache Liste, die hier
-    durch :func:`fuer_modell` geht.
+    Suche und Aufzählung geben einen fertigen Umschlag (Dict). Eine flache Liste (bis 0.23
+    die Form von ``get_operatoren``) geht hier noch durch :func:`fuer_modell`.
     """
     if isinstance(ergebnis, list):
         ergebnis = {"nodes": fuer_modell(ergebnis)}

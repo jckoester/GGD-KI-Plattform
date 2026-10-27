@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Entfernt
+
+- **Chat-Werkzeug `get_operatoren`.** Operatorenlisten liefert `list_context_nodes`.
+
+### Behoben
+
+- **Anforderungsbereiche der Operatoren** (AFB I–III) erreichen den Assistenten jetzt über Suche und
+  Aufzählung.
+- **Aufzählung einer Bausteinart eines Fachs** (etwa alle Operatoren der Biologie) liefert bis zu 60 statt 20
+  Bausteine.
+
 ## [0.22.0] – 2026-10-27
 
 Drei Schüler-Assistenten für Chemie und Naturwissenschaften, Grundlagen für den Assistenten-Vorschlag

@@ -189,7 +189,7 @@ ihr Plan — deshalb wird hier **gefiltert**, nicht gekennzeichnet.
 - **Wo:** `_auf_geltende_fassung` (`context/search.py`) — in der Vorab-Suche, in `suche()`
   und seit 0.22 auch in `aufzaehlung()`. Wirksam nur mit `Suchprofil.grade`.
 - **Woher die Stufe:** `stufe_der_person`, wie oben. Die Chat-Werkzeuge
-  (`search_context_nodes`, `list_context_nodes`, `get_operatoren`) ermitteln sie **je
+  (`search_context_nodes`, `list_context_nodes`) ermitteln sie **je
   Aufruf** und geben sie ins Profil — `waehle_stunde` kann die Gruppe mitten in der
   Anfrage setzen. Lehrkräfte bekommen so die Edition ihrer Gruppe; ohne Gruppe (und bei
   allen ohne Stufe) wird nicht gefiltert.
@@ -202,8 +202,10 @@ ihr Plan — deshalb wird hier **gefiltert**, nicht gekennzeichnet.
   eigene Bausteine) bleiben immer.
 - **Zählung:** `gesamt` der Aufzählung zählt nach dem Filter. Über dem Deckel
   (`_AUFZAEHLUNG_MAX` = 500) gilt die rohe Zahl aus der Datenbank, und der Hinweis sagt es.
-- **`get_operatoren`** nimmt die gefilterte Liste; die Auswahl „neueste Edition“ bleibt nur
-  als Rückfall, wenn nicht gefiltert wurde.
+- **Fachlisten:** Eine Bausteinart eines Fachs (`content_type` und `subject` gesetzt, etwa
+  „alle Operatoren der Biologie“) liefert `list_context_nodes` bis `_FACHLISTE_MAX` = 60
+  statt 20. Das war bis 0.23 die Aufgabe von `get_operatoren`, das mit der
+  Werkzeugwahl-Messung vom 27.10.2026 entfallen ist.
 - Der Parameter `grade` von `list_context_nodes` ist etwas anderes: Er filtert Bausteine mit
   **Klassenband** (`min_grade`/`max_grade`), nicht Editionen.
 

@@ -67,7 +67,6 @@ from app.context.vorab_statistik import zaehlen as vorab_zaehlen
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
 from app.context.search import (
-    _AUFZAEHLUNG_MAX,
     Suchprofil,
     abgrenzungen_zu,
     aufzaehlung,
@@ -787,6 +786,11 @@ def _zeitraum_grenzen(name: str, heute: date) -> tuple[date, date] | None:
     return None
 
 
+#: Grenze der Aufzählung für eine Bausteinart eines Fachs. Gemessen 27.10.2026: Biologie
+#: ohne Stufe hat 47 Operatoren (V2 und V3), die übliche Grenze von 20 schnitt sie ab.
+_FACHLISTE_MAX = 60
+
+
 _LIST_CONTEXT_NODES_TOOL = {
     "type": "function",
     "function": {
@@ -944,7 +948,13 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             rollen=ctx.user.roles,
             subject_id=subject_id,
             grade=stufe,
-            aufzaehlung=settings.assistant_context_limit,
+            # Eine Bausteinart eines Fachs („alle Operatoren der Biologie“) ist eine
+            # geschlossene Liste und wird ganz geliefert (vorher Sache von `get_operatoren`, entfernt 0.23).
+            aufzaehlung=(
+                max(settings.assistant_context_limit, _FACHLISTE_MAX)
+                if content_type and subject_id is not None
+                else settings.assistant_context_limit
+            ),
         ),
         ctx.db,
         gruppierung=args.get("gruppierung"),
@@ -994,23 +1004,6 @@ register_tool(ChatTool(
 ))
 
 
-_GET_OPERATOREN_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "get_operatoren",
-        "description": (
-            "Gibt die offiziellen Operatoren (handlungsleitende Verben) des Fachs "
-            "dieser Konversation laut Bildungsplan zurück — je Operator mit Definition "
-            "und Anforderungsbereich (AFB I–III). Nutze dieses Tool, um Aufgaben­"
-            "stellungen mit den korrekten fachspezifischen Operatoren zu formulieren "
-            "oder um die korrekte Verwendung von Operatoren in einer Schülerlösung zu "
-            "prüfen. Ohne Fachbezug der Konversation liefert es eine leere Liste."
-        ),
-        "parameters": {"type": "object", "properties": {}},
-    },
-}
-
-
 async def _fach_name(db: AsyncSession, conversation_id: UUID | None) -> Optional[str]:
     """Name des Konversationsfachs für die Zeile im Systemtext (`fach_hinweis`)."""
     subject_id = await subject_of_conversation(db, conversation_id)
@@ -1050,118 +1043,6 @@ async def subject_of_conversation(
 async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
     """Wie :func:`subject_of_conversation`, aber aus dem ``ToolContext``."""
     return await subject_of_conversation(ctx.db, ctx.conversation_id, ctx.group_id)
-
-
-async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
-    """Operatoren des Konversations-Fachs in der geltenden Fassung für den Assistenten.
-
-    Deterministisch (keine Top-k-Suche): liefert die vollständige Operatorenliste des
-    Fachs, alphabetisch — in der **Fassung, die für die Stufe der Person gilt**
-    (Päckchen AE, F3 a, 27.10.2026: Gruppe der Konversation, sonst Anmeldung). Ohne Stufe,
-    oder wenn sich für Operatoren keine Fassung bestimmen lässt, wie bis dahin die neueste
-    importierte (`bp_version`).
-
-    Gedacht für die **Unterrichtsplanung**, wo das Fach feststeht. Kann es nicht
-    antworten — kein Fachbezug, kein Import —, gibt es statt einer leeren Liste einen
-    ``hinweis`` zurück, der den Grund nennt und auf ``search_context_nodes`` verweist.
-
-    **Seit ADR-017/AP3 nur noch ein Preset der Aufzählung** (Typ = ``operator``,
-    Fach = Konversationsfach). Nach außen ändert sich nichts: dieselbe Antwortform,
-    dieselbe Werkzeugbeschreibung. Damit hängt die Operatorenliste an derselben
-    Sichtbarkeits- und Filterlogik wie alles andere.
-
-    **Es tut nichts, was ``list_context_nodes`` nicht könnte** — es bleibt allein, weil
-    Modelle bei fachbezogenen Fragen erwiesenermaßen hierher greifen. Das Kriterium für
-    die Entfernung steht in ``docs/admin/updates-und-wartung.md`` (Abschnitt „Wann
-    `get_operatoren` entfällt"): alle Aufzählungsfälle des Prüfsatzes wählen im
-    Werkzeugwahl-Durchlauf ``list_context_nodes``, **und** zwei Wochen Produktivbetrieb
-    ohne Fehlgriff im Log. Der zweite Teil ist der eigentliche Nachweis; bis er vorliegt,
-    bleibt das Werkzeug.
-    """
-    subject_id = await _resolve_conversation_subject_id(ctx)
-    if subject_id is None:
-        # Kein `[]`: Eine leere Liste ist von „es gibt keine Operatoren" nicht zu
-        # unterscheiden, und genau so hat ein Modell sie einmal gedeutet — es meldete,
-        # der Kontextspeicher enthalte nichts, während 1.278 Operatoren darin lagen.
-        #
-        # ⚠️ **Die Formulierung entscheidet, gemessen.** Die erste Fassung nannte die
-        # Einschränkung zuerst und den Ausweg als Empfehlung („… antwortet nur für ein
-        # Fach … `search_context_nodes` verwenden"). Ein Modell machte daraus „der
-        # Operator-Katalog **im System** kann nur fachspezifisch abgefragt werden" und
-        # fragte nach einem Fach, statt zu suchen. Deshalb jetzt drei Eigenschaften:
-        # die Verallgemeinerung ausdrücklich verneinen, direktiv statt empfehlend
-        # formulieren, und die Rückfrage ausschließen.
-        return {
-            "hinweis": (
-                "Dieses Werkzeug konnte nicht antworten, weil die Konversation keinem "
-                "Fach zugeordnet ist. Das ist KEINE Einschränkung des Wissensgraphen: "
-                "Er enthält die Operatoren aller Fächer. Rufe jetzt "
-                "search_context_nodes mit dem gesuchten Begriff auf und frage NICHT "
-                "nach einem Fach."
-            )
-        }
-    abschnitt = await aufzaehlung(
-        Knotenfilter(content_type=("operator",), subject_id=subject_id),
-        Suchprofil(
-            pseudonym=ctx.user.sub,
-            rollen=ctx.user.roles,
-            subject_id=subject_id,
-            # Päckchen AE, F3 (a): die Fassung, die für diese Stufe gilt — nicht mehr stets
-            # die neueste. Ohne Stufe (Lehrkraft ohne Gruppe) wie bisher.
-            grade=await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade),
-            # Die Operatorenliste eines Fachs ist vollständig zu liefern — sie ist der
-            # Zweck dieses Werkzeugs. Ein Fach führt selten mehr als 40 Operatoren.
-            aufzaehlung=_AUFZAEHLUNG_MAX,
-        ),
-        ctx.db,
-        mit_metadaten=True,
-    )
-    rows = abschnitt.treffer
-    if not rows:
-        return {
-            "hinweis": (
-                "Für das Fach dieser Konversation sind keine Operatoren importiert. "
-                "Andere Fächer können welche führen. Rufe search_context_nodes mit dem "
-                "gesuchten Begriff auf, bevor du antwortest, im Wissensgraph sei nichts "
-                "vorhanden."
-            )
-        }
-    # Mit bekannter Stufe hat die Aufzählung schon auf die geltende Fassung gefiltert
-    # (`_auf_geltende_fassung`, je Fach und Bausteinart) — dann steht hier nur noch eine,
-    # und „neueste“ ist genau sie. Ohne Stufe (oder ohne bestimmbare Fassung) liegen
-    # mehrere nebeneinander; Operatoren tragen keine Kompetenznummer und fallen in der
-    # Aufzählung nicht zusammen. Dann bleibt es beim Rückfall auf die neueste.
-    newest = max(n.get("bp_version") or "" for n in rows)
-    current = [n for n in rows if (n.get("bp_version") or "") == newest]
-    current.sort(key=lambda n: (n.get("title") or "").lower())
-    out: list[dict] = []
-    for n in current:
-        md = n.get("metadata") or {}
-        afb = md.get("afb") or []
-        entry = {
-            "operator": n.get("title"),
-            "afb": ", ".join(afb) if isinstance(afb, list) else str(afb),
-            "bedeutung": n.get("content") or "",
-        }
-        # Seit Migration 0057 stehen die Synonyme in `node_aliases` und kommen als
-        # eigenes Trefferfeld, nicht mehr aus den rohen Metadaten.
-        if n.get("aliase"):
-            entry["synonyme"] = n["aliase"]
-        out.append(entry)
-    return out
-
-
-async def _get_operatoren_handler(args: dict, ctx: ToolContext) -> list[dict] | dict:
-    return await _exec_get_operatoren(ctx)
-
-
-register_tool(ChatTool(
-    name="get_operatoren",
-    groups=frozenset({"context_search"}),
-    writes=False,
-    definition=_GET_OPERATOREN_TOOL,
-    handler=_get_operatoren_handler,
-))
 
 
 # ── Bildgenerierung (Phase 16) ────────────────────────────────────────────────

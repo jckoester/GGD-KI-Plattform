@@ -211,99 +211,15 @@ def test_student_planning_not_included_without_group():
         mod.TOOL_REGISTRY.update(saved)
 
 
-# ── get_operatoren (Operatoren-Zugriff für Assistenten) ───────────────────────
+# ── get_operatoren (entfernt 0.23) ─────────────────────────────────────────────
 
 
-def test_get_operatoren_registered_as_context_search():
-    """get_operatoren ist immer aktiv (Gruppe context_search) und read-only."""
-    from app.chat import router  # noqa: F401 — registriert das Tool
-    tool = TOOL_REGISTRY.get("get_operatoren")
-    assert tool is not None
-    assert tool.groups == {"context_search"}
-    assert tool.writes is False
+def test_get_operatoren_ist_entfernt():
+    """Werkzeugwahl-Messung 27.10.2026: Listen- und Aufzählungsfragen gehen ohne es an
+    `list_context_nodes`. Kommt es zurück, braucht es eine neue Begründung."""
+    import app.chat.router  # noqa: F401 — registriert die Werkzeuge
 
-
-async def test_get_operatoren_ohne_fachbezug_nennt_den_grund():
-    """Ohne Fachbezug → begründeter Hinweis statt leerer Liste, kein DB-Zugriff.
-
-    Die frühere Fassung gab `[]` zurück, und ein Modell hat das erwartungsgemäß als
-    „es gibt nichts" gelesen: Auf die Frage nach Operatorendefinitionen antwortete es,
-    der Kontextspeicher enthalte keine — bei 1.278 vorhandenen Operatoren. Eine leere
-    Liste kann nicht zwischen „kann ich nicht beantworten" und „gibt es nicht"
-    unterscheiden; der Hinweis kann es.
-    """
-    from app.chat import router
-    db = MagicMock()
-    db.get = AsyncMock()  # darf nicht aufgerufen werden
-    ctx = ToolContext(db=db, user=None, group_id=None, conversation_id=None)
-    result = await router._exec_get_operatoren(ctx)
-    assert isinstance(result, dict) and "hinweis" in result
-    hinweis = result["hinweis"]
-    assert "search_context_nodes" in hinweis, (
-        "Der Hinweis muss den Weg nennen, der stattdessen trägt"
-    )
-    # Die Formulierung ist gemessen, nicht Geschmack: Eine Fassung, die nur die
-    # Einschränkung nannte und den Ausweg empfahl, führte dazu, dass ein Modell sie zur
-    # Einschränkung des ganzen Systems verallgemeinerte und nach einem Fach fragte,
-    # statt zu suchen.
-    assert "KEINE Einschränkung des Wissensgraphen" in hinweis, (
-        "Der Hinweis muss der Verallgemeinerung auf den ganzen Wissensgraph widersprechen"
-    )
-    assert "Rufe jetzt" in hinweis, "direktiv, nicht empfehlend"
-    assert "frage NICHT nach einem Fach" in hinweis, (
-        "Die Rückfrage nach dem Fach muss ausdrücklich ausgeschlossen sein"
-    )
-    db.get.assert_not_called()
-
-
-async def test_get_operatoren_current_edition_only_and_mapping():
-    """Liefert nur die neueste Edition, alphabetisch, mit operator/afb/bedeutung/synonyme.
-
-    Seit ADR-017/AP3 holt das Werkzeug seine Knoten über die Aufzählung der Suchschicht
-    (Preset: Typ `operator`, Fach der Konversation). Die **Antwortform** ist die Zusage
-    nach außen und bleibt unverändert — deshalb prüft dieser Test sie weiter unverändert.
-    """
-    from unittest.mock import patch
-
-    from app.chat import router
-    from app.context.search import Abschnitt
-
-    treffer = [
-        # Die Synonyme kommen seit Migration 0057 als eigenes Trefferfeld `aliase`,
-        # nicht mehr aus den rohen Metadaten.
-        {"title": "anwenden", "content": "alte Fassung", "bp_version": "2016",
-         "metadata": {"afb": ["II"]}},
-        {"title": "beurteilen", "content": "def-b", "bp_version": "2016.V2",
-         "metadata": {"afb": ["III"]}, "aliase": ["bewerten"]},
-        {"title": "analysieren", "content": "def-a", "bp_version": "2016.V2",
-         "metadata": {"afb": ["II", "III"]}},
-    ]
-
-    db = MagicMock()
-    db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))  # Group → Fach
-
-    ctx = ToolContext(
-        db=db, user=SimpleNamespace(sub="p", roles=["teacher"], grade=None),
-        group_id=2, conversation_id=None,
-    )
-    with patch.object(
-        router, "aufzaehlung",
-        new=AsyncMock(return_value=Abschnitt(treffer=treffer, gesamt=3, vollstaendig=True)),
-    ) as gezaehlt:
-        result = await router._exec_get_operatoren(ctx)
-
-    # Das Preset: nur Operatoren, nur das Fach der Konversation, mit Metadaten (afb).
-    filter_ = gezaehlt.await_args.args[0]
-    assert filter_.content_type == ("operator",) and filter_.subject_id == 6
-    assert gezaehlt.await_args.kwargs["mit_metadaten"] is True
-
-    # Nur 2016.V2-Operatoren, alphabetisch nach Titel
-    assert [r["operator"] for r in result] == ["analysieren", "beurteilen"]
-    assert result[0]["afb"] == "II, III"
-    assert "synonyme" not in result[0]           # keine aliase → Feld weggelassen
-    assert result[1]["afb"] == "III"
-    assert result[1]["bedeutung"] == "def-b"
-    assert result[1]["synonyme"] == ["bewerten"]
+    assert "get_operatoren" not in TOOL_REGISTRY
 
 
 def test_student_sees_only_student_planning_not_planning_tools():

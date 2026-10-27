@@ -172,8 +172,8 @@ def tools_for(
         # Team greift zusätzlich am LiteLLM-Proxy (Schritt 8).
         greifen.add("image_generation")
 
-    # Messschalter (nur development): ausgeblendete Werkzeuge, etwa `get_operatoren` für die
-    # Werkzeugwahl-Messung vor seiner Entfernung.
+    # Messschalter (nur development): ausgeblendete Werkzeuge — so wurde vor der Entfernung
+    # von `get_operatoren` (0.23) gemessen, ob die Werkzeugwahl ohne es hält.
     aus = settings.werkzeuge_aus_menge
     result = [tool for tool in TOOL_REGISTRY.values()
               if tool.groups & greifen and tool.name not in aus]

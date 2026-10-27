@@ -1,7 +1,7 @@
 """Päckchen AE, Schritt 1 (27.10.2026): Die Chat-Werkzeuge geben die Stufe der Person ins
 Suchprofil — `Suchprofil.grade` entscheidet, welche Bildungsplan-Fassung gilt
-(`search._auf_geltende_fassung`). Vorher fehlte sie in allen drei, und `list_context_nodes`
-lieferte „erklären“ in jeder Fassung jedes Fachs.
+(`search._auf_geltende_fassung`). Vorher fehlte sie in allen Werkzeugen (damals mit
+`get_operatoren`), und `list_context_nodes` lieferte „erklären“ in jeder Fassung jedes Fachs.
 
 Die Stufe kommt aus `stufe_der_person` (Gruppe der Konversation, sonst Anmeldung) — dieselbe
 Quelle wie die Zeile im Systemtext (F2: über die Stufe der Gruppe, auch für Lehrkräfte).
@@ -35,15 +35,6 @@ async def test_list_context_nodes(stufe):
     assert auf.await_args.args[0].subject_id is None
 
 
-@pytest.mark.parametrize("stufe", [9, None])
-async def test_get_operatoren(stufe):
-    with patch.object(router, "stufe_der_person", new=AsyncMock(return_value=stufe)), \
-         patch.object(router, "_resolve_conversation_subject_id", new=AsyncMock(return_value=6)), \
-         patch.object(router, "aufzaehlung", new=AsyncMock(return_value=Abschnitt(gesamt=0))) as auf:
-        await router._exec_get_operatoren(_ctx())
-    assert auf.await_args.args[1].grade == stufe
-
-
 @pytest.mark.parametrize("stufe", [11, None])
 async def test_search_context_nodes(stufe):
     ergebnis = Suchergebnis(identifikation=Abschnitt(gesamt=0), thematisch=Abschnitt(gesamt=0))
@@ -54,3 +45,20 @@ async def test_search_context_nodes(stufe):
          patch.object(router, "bp_baender_zu", new=AsyncMock(return_value={})):
         await router._search_context_nodes_handler({"query": "erklären"}, _ctx())
     assert such.await_args.args[1].grade == stufe
+
+
+@pytest.mark.parametrize("args, fach_id, grenze", [
+    ({"content_type": "operator", "subject": "Biologie"}, 3, router._FACHLISTE_MAX),
+    ({"content_type": "operator"}, None, None),          # über alle Fächer: übliche Grenze
+    ({"titel": "Ion", "subject": "Chemie"}, 4, None),     # ohne Bausteinart: übliche Grenze
+])
+async def test_fachliste_wird_ganz_geliefert(args, fach_id, grenze):
+    """Werkzeugwahl-Messung 27.10.2026: „alle Operatoren der Biologie“ kam als 20 von 47."""
+    from app.config import settings
+
+    with patch.object(router, "stufe_der_person", new=AsyncMock(return_value=None)), \
+         patch.object(router, "aufzaehlung", new=AsyncMock(return_value=Abschnitt(gesamt=0))) as auf, \
+         patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})), \
+         patch.object(router, "_subject_id_aus_name", new=AsyncMock(return_value=fach_id)):
+        await router._list_context_nodes_handler(args, _ctx())
+    assert auf.await_args.args[1].aufzaehlung == (grenze or settings.assistant_context_limit)
