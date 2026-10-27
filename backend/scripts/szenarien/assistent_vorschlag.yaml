@@ -1,0 +1,169 @@
+# Prüfsatz „Assistent vorschlagen" (Päckchen C1, Schritt 0 · F6, Jan 25.10.2026 „wie vorgeschlagen")
+# Plan: Plaene/Assistenten-Vorschlag-C1-Plan.md · Konzept: Konzept/Notiz-Assistenten-Vorschlag.md
+#
+# Gemessen wird in Schritt 5 (`assistent_vorschlag_messung.py`): Die Nachricht wird eingebettet und
+# gegen die Auslöser-Beispiele (`assistant_trigger_examples`, art = beispiel) der Kandidaten verglichen;
+# je Assistent zählt das **beste** Beispiel (kleinste Kosinus-Distanz), kein Mittelwert. Gegenbeispiele
+# (art = gegenbeispiel) werden mitgemessen — ob ihr Abstand hilft, entscheidet Schritt 5.
+#
+# ⚠️ **Die Positiven sind zurückgehalten.** Sie stammen aus den ersten Zügen der Messszenarien und
+# stehen nicht unter den eingebetteten Beispielen (Seed `config/assistants.example.yaml`); ein
+# Unit-Test hält das fest — sonst misst der Satz Abstand null. Dasselbe gilt für die Negativen
+# gegenüber den Gegenbeispielen.
+#
+# ── Kriterium (F6, vor dem ersten Lauf festgelegt) ───────────────────────────
+#
+# Auswahl = höchstens zwei **spezifische** Assistenten über der Schwelle S_spez (bester zuerst), dazu
+# höchstens zwei **Rückfall-Assistenten** über ihrer eigenen, lockereren Schwelle S_rueck.
+#
+#   K1 Spezifisch: Je spezifischem Assistenten stehen mindestens 4 von 5 Positiven in der Auswahl.
+#   K2 Rückfall:   Der Rückfall-Assistent steht bei mindestens 4 von 5 seiner Positiven in der Auswahl.
+#   K3 Gegenprobe Begriff/Alltag: Keine Begriffsfrage und keine Alltagsnachricht bringt irgendeinen
+#                  Assistenten in die Auswahl (0 von 10).
+#   K4 Gegenprobe Nachbar: Je Assistent steht er bei höchstens 1 von 5 Nachbar-Negativen in der
+#                  Auswahl (`nicht`). Für den Rückfall-Assistenten sind die Nachbarn fachfremde
+#                  Aufgaben (Mathe ohne NW-Bezug).
+#   K5 In der Assistenten-Konversation (vorläufig, Schwellen und Marge legt Schritt 5 fest):
+#                  `bleiben` — kein Vorschlag; `wechsel` — der andere Assistent liegt um die Marge näher
+#                  als der aktuelle und steht in der Auswahl; `beenden` — „Assistent beenden und weiter
+#                  chatten“ wird angeboten (Nachricht weit vom aktuellen Assistenten, kein anderer trifft).
+#                  Ziel: je Art höchstens ein Fehler (bleiben 6, wechsel 3, beenden 3 Fälle).
+#
+# Erfüllt die Embedding-Stufe K1–K4 nicht, wird für C2 der **Klassifikator-Aufruf** (Stufe 2 der
+# Notiz) geplant — nicht eine lockerere Schwelle.
+#
+# ── Aufbau ───────────────────────────────────────────────────────────────────
+#
+# Je Fall:
+#   quelle   `datei#fall-id` aus scripts/szenarien/ — Text = erster Schülerzug dieses Falls
+#   text     stattdessen ein eigener Text
+#   stufe    Klassenstufe (Kandidatenmenge: Klassenstufen-Filter wie in der Übersicht)
+#   soll     Assistenten, die in der Auswahl stehen müssen (leer = keiner)
+#   darf     Assistenten, die stehen dürfen, ohne zu zählen (Rückfall unter einem spezifischen Treffer)
+#   nicht    Assistenten, deren Erscheinen als Fehltreffer zählt (alle übrigen zählen nicht mit)
+#   art      positiv | nachbar | begriff | alltag | fachfremd
+# In `in_assistent` zusätzlich: `aktuell` (Assistent der Konversation), `erwartet` bleiben|wechsel|beenden.
+
+assistenten:
+  spezifisch: [stöchiometrische Berechnungen, Reaktionsgleichungen]
+  rueckfall: [naturwissenschaftliche Aufgaben]
+
+faelle:
+
+# ── Positive (zurückgehalten) ────────────────────────────────────────────────
+
+- {quelle: "stoechiometrie.yaml#A1-loesung-verlangt", stufe: 9, art: positiv,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#C6-massenanteil-bezug", stufe: 9, art: positiv,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#C7-konzentration-ml", stufe: 10, art: positiv,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#C10-teilchenzahl-geteilt", stufe: 9, art: positiv,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#F2-titration-kursstufe", stufe: 11, art: positiv,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+
+- {quelle: "reaktionsgleichung.yaml#A1-magnesium-loesung-verlangt", stufe: 8, art: positiv,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#A4-methan-nicht-ausgeglichen", stufe: 9, art: positiv,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#A7-faellung-ohne-ladung", stufe: 10, art: positiv,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#B4-veresterung", stufe: 10, art: positiv,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#C1-permanganat-eisen", stufe: 11, art: positiv,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+
+- {quelle: "nw_aufgaben.yaml#R1-geschwindigkeit-loesung-verlangt", stufe: 7, art: positiv,
+   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {quelle: "nw_aufgaben.yaml#E1-kirschen-osmose", stufe: 9, art: positiv,
+   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {quelle: "nw_aufgaben.yaml#V3-enzym-temperatur", stufe: 11, art: positiv,
+   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {quelle: "nw_aufgaben.yaml#P1-duenger-planen", stufe: 8, art: positiv,
+   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {quelle: "nw_aufgaben.yaml#B1-beurteilen-eauto", stufe: 10, art: positiv,
+   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+
+# ── Nachbar-Negative: Aufgabe des jeweils anderen Chemie-Assistenten ─────────
+
+# … gegen „stöchiometrische Berechnungen" (Gleichungsaufgaben ohne Rechnung)
+- {quelle: "reaktionsgleichung.yaml#A2-index-veraendert", stufe: 8, art: nachbar,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#A8-redox-elektronen-kl10", stufe: 10, art: nachbar,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#B5-ethanol-verbrennung", stufe: 10, art: nachbar,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "reaktionsgleichung.yaml#C6-ladung-nicht-ausgeglichen", stufe: 11, art: nachbar,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "nw_aufgaben.yaml#S3-uebergabe-reaktionsgleichung", stufe: 9, art: nachbar,
+   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+
+# … gegen „Reaktionsgleichungen" (Rechenaufgaben, auch wenn eine Gleichung darin vorkommt)
+- {quelle: "stoechiometrie.yaml#C8-begrenzender-stoff", stufe: 10, art: nachbar,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#C9-molares-volumen-bedingungen", stufe: 10, art: nachbar,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#D3-nur-ergebnis-falsch", stufe: 9, art: nachbar,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "stoechiometrie.yaml#E1-ratlos-stufen", stufe: 9, art: nachbar,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+- {quelle: "nw_aufgaben.yaml#S2-uebergabe-stoechiometrie", stufe: 9, art: nachbar,
+   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+
+# … gegen „naturwissenschaftliche Aufgaben" (fachfremde Aufgaben, Mathe ohne NW-Bezug)
+- {quelle: "nw_aufgaben.yaml#S5-mathe-ausserhalb", stufe: 8, art: fachfremd, soll: [],
+   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {text: "Wie berechnet man den Flächeninhalt eines Kreises mit r = 3 cm?", stufe: 7, art: fachfremd, soll: [],
+   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {text: "Prozentrechnung: Wie viel sind 20 % von 85 €?", stufe: 7, art: fachfremd, soll: [],
+   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {text: "Analysiere das Gedicht „Der Panther“ von Rilke", stufe: 10, art: fachfremd, soll: [],
+   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+- {text: "Welche Ursachen hatte der Erste Weltkrieg?", stufe: 9, art: fachfremd, soll: [],
+   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+
+# ── Begriffsfragen: bleiben im freien Chat ───────────────────────────────────
+
+- {text: "Was bedeutet eigentlich Stoffmenge?", stufe: 9, art: begriff, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Was ist eine Oxidation?", stufe: 8, art: begriff, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Was versteht man unter Osmose?", stufe: 9, art: begriff, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Was ist der Unterschied zwischen einem Atom und einem Ion?", stufe: 9, art: begriff, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Was heißt Energieerhaltung?", stufe: 8, art: begriff, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+
+# ── Alltag und Organisatorisches ─────────────────────────────────────────────
+
+- {text: "Wann schreiben wir die nächste Physikarbeit?", stufe: 9, art: alltag, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Kannst du mir eine Entschuldigung für die Schule schreiben?", stufe: 8, art: alltag, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Ich hab heute echt keine Lust auf Hausaufgaben", stufe: 9, art: alltag, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Mach mir eine Gliederung für mein Referat über Vulkane", stufe: 8, art: alltag, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+- {text: "Welche Bücher brauche ich für die Oberstufe?", stufe: 10, art: alltag, soll: [],
+   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+
+# ── In einer Assistenten-Konversation (Schwelle „Assistent beenden" und Marge, K5) ──
+
+in_assistent:
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "und wie viel Liter sind das dann?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "Wo finde ich die molare Masse von Magnesium?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   text: "Gleich mir noch Fe + O2 -> Fe2O3 aus, das ist eine andere Aufgabe"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: beenden, text: "Schreib mir eine Gliederung für mein Referat über den Klimawandel"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "Was ist ein Oxidationsmittel nochmal?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "Muss ich da jetzt eine 2 vor das Wasser schreiben?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   text: "Und wie viel Gramm Wasser entstehen dann aus 4 g Wasserstoff?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: beenden, text: "Kannst du mir bei der Englisch-Hausaufgabe helfen?"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "und welche Einheit hat das Ergebnis?"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "Ist das jetzt beschreiben oder schon erklären?"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   text: "Gleich mir mal die Gleichung Al + O2 -> Al2O3 aus"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: beenden, text: "Wer war eigentlich Napoleon?"}
