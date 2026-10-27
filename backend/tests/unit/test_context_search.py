@@ -156,23 +156,33 @@ class TestEditionen:
         """Ein Knoten ohne BP-Fassung ist keine Fassung von irgendetwas und bleibt."""
         from app.context.search import _filtere_auf_frontier
 
-        treffer = [{"bp_version": None, "subject_id": 1, "title": "Notiz"}]
-        assert _filtere_auf_frontier(treffer, {1: "2016.V3"}) == treffer
+        treffer = [{"bp_version": None, "subject_id": 1, "content_type": "notiz", "title": "Notiz"}]
+        assert _filtere_auf_frontier(treffer, {(1, "notiz"): "2016.V3"}) == treffer
 
     def test_frontier_filtert_die_alte_fassung(self):
         from app.context.search import _filtere_auf_frontier
 
-        alt = {"bp_version": "2016", "subject_id": 1}
-        neu = {"bp_version": "2016.V3", "subject_id": 1}
-        assert _filtere_auf_frontier([alt, neu], {1: "2016.V3"}) == [neu]
+        alt = {"bp_version": "2016", "subject_id": 1, "content_type": "ik_kompetenz"}
+        neu = {"bp_version": "2016.V3", "subject_id": 1, "content_type": "ik_kompetenz"}
+        assert _filtere_auf_frontier([alt, neu], {(1, "ik_kompetenz"): "2016.V3"}) == [neu]
 
     def test_fach_ohne_bestimmbare_fassung_bleibt_ungefiltert(self):
         """Sonst bliebe von einem Fach, dessen Fassung sich nicht bestimmen lässt,
         gar nichts übrig."""
         from app.context.search import _filtere_auf_frontier
 
-        treffer = [{"bp_version": "2016", "subject_id": 9}]
-        assert _filtere_auf_frontier(treffer, {1: "2016.V3"}) == treffer
+        treffer = [{"bp_version": "2016", "subject_id": 9, "content_type": "ik_kompetenz"}]
+        assert _filtere_auf_frontier(treffer, {(1, "ik_kompetenz"): "2016.V3"}) == treffer
+
+    def test_art_ohne_bestimmbare_fassung_bleibt_ungefiltert(self):
+        """Päckchen AE: Biologie V2 hat auf Dev keine Operatoren. Für Kompetenzen gilt V2,
+        für Operatoren lässt sich keine Fassung bestimmen — sie bleiben, statt zu verschwinden."""
+        from app.context.search import _filtere_auf_frontier
+
+        kompetenz = {"bp_version": "2016.V3", "subject_id": 1, "content_type": "ik_kompetenz"}
+        operator = {"bp_version": "2016.V3", "subject_id": 1, "content_type": "operator"}
+        frontier = {(1, "ik_kompetenz"): "2016.V2"}
+        assert _filtere_auf_frontier([kompetenz, operator], frontier) == [operator]
 
     def test_ueberhang_deckt_die_bereinigung(self):
         """Filter und Zusammenfassung entfernen Treffer **nach** der Abfrage. Ohne

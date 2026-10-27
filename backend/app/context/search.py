@@ -529,19 +529,24 @@ _KANDIDATEN_FAKTOR = 3
 
 async def _frontier_je_fach(
     db: AsyncSession, subject_ids: set[int], grade: int
-) -> dict[int, str]:
-    """{subject_id: geltende bp_version} für diese Stufe im laufenden Schuljahr.
+) -> dict[tuple[int, str], str]:
+    """{(subject_id, content_type): geltende bp_version} für diese Stufe im laufenden Schuljahr.
 
-    Fächer ohne bestimmbare Fassung fehlen im Ergebnis — für sie wird nicht gefiltert.
-    Der Editionsbestand kommt je Fach aus der DB, damit der Inhalts-Fallback greift (neue
-    Edition laut Fahrplan in Kraft, aber für dieses Fach noch nicht importiert → vorige
-    Edition gilt weiter).
+    Kombinationen ohne bestimmbare Fassung fehlen im Ergebnis — für sie wird nicht
+    gefiltert. Der Editionsbestand kommt aus der DB, damit der Inhalts-Fallback greift (neue
+    Edition laut Fahrplan in Kraft, aber noch nicht importiert → vorige Edition gilt weiter).
+
+    ⚠️ **Je Fach *und Bausteinart*, nicht je Fach** (Päckchen AE, 27.10.2026). Eine Fassung
+    kann eine Art ganz entbehren: Auf Dev hat Biologie V2 170 aktive Knoten, aber **keinen
+    Operator** (die der Basisfassung sind archiviert, die von V3 gelten erst in Kl. 5–7). Je
+    Fach gewählt galt für Kl. 9 V2 — und von den Operatoren blieb nichts übrig. Je Art gewählt
+    gibt es für Operatoren in Kl. 9 keine geltende Fassung, also wird nicht gefiltert.
     """
     if not subject_ids:
         return {}
 
     zeilen = await db.execute(
-        sa.select(ContextNode.subject_id, ContextNode.bp_version)
+        sa.select(ContextNode.subject_id, ContextNode.content_type, ContextNode.bp_version)
         .where(
             ContextNode.subject_id.in_(subject_ids),
             ContextNode.status == "active",
@@ -549,29 +554,31 @@ async def _frontier_je_fach(
         )
         .distinct()
     )
-    bestand: dict[int, set[str]] = {}
-    for subject_id, bp_version in zeilen.all():
-        bestand.setdefault(subject_id, set()).add(bp_version)
+    bestand: dict[tuple[int, str], set[str]] = {}
+    for subject_id, content_type, bp_version in zeilen.all():
+        bestand.setdefault((subject_id, content_type), set()).add(bp_version)
 
-    frontier: dict[int, str] = {}
-    for subject_id, verfuegbar in bestand.items():
+    frontier: dict[tuple[int, str], str] = {}
+    for schluessel, verfuegbar in bestand.items():
         gilt = aktive_bp_version(grade, verfuegbar)
         if gilt:
-            frontier[subject_id] = gilt
+            frontier[schluessel] = gilt
     return frontier
 
 
-def _filtere_auf_frontier(treffer: list[dict], frontier: dict[int, str]) -> list[dict]:
+def _filtere_auf_frontier(
+    treffer: list[dict], frontier: dict[tuple[int, str], str]
+) -> list[dict]:
     """Nur die geltende Fassung behalten — unversionierte Knoten bleiben immer.
 
-    Fächer ohne Eintrag in ``frontier`` werden nicht gefiltert; sonst bliebe von einem
-    Fach, dessen Fassung sich nicht bestimmen lässt, gar nichts übrig.
+    Kombinationen (Fach, Art) ohne Eintrag in ``frontier`` werden nicht gefiltert; sonst
+    bliebe von einer Art, deren Fassung sich nicht bestimmen lässt, gar nichts übrig.
     """
     return [
         t
         for t in treffer
         if not t.get("bp_version")
-        or frontier.get(t.get("subject_id")) in (None, t.get("bp_version"))
+        or frontier.get((t.get("subject_id"), t.get("content_type"))) in (None, t.get("bp_version"))
     ]
 
 
@@ -685,8 +692,13 @@ async def aufzaehlung(
     zeilen = (await db.execute(stmt)).mappings().all()
     roh_gesamt = zeilen[0]["gesamt"] if zeilen else 0
 
-    treffer = fasse_fassungen_zusammen(
-        [_treffer(z, mit_metadaten=mit_metadaten) for z in zeilen], _treffer_schluessel
+    # Päckchen AE (0.22): Mit bekannter Stufe nur die Bildungsplan-Fassung, die für sie gilt
+    # — wie in Suche und Vorab. Ohne Stufe nur zusammenfassen, wie bisher. Gezählt wird
+    # danach: `gesamt` ist die Zahl der Bausteine, die für diese Person gelten. (Operatoren
+    # tragen keine Kompetenznummer und fallen sonst nie zusammen — „erklären“ kam in jeder
+    # Fassung jedes Fachs, bis zu 37-mal.)
+    treffer = await _auf_geltende_fassung(
+        [_treffer(z, mit_metadaten=mit_metadaten) for z in zeilen], profil, db
     )
     gruppen = _gruppiere(treffer, gruppierung) if gruppierung else None
 
@@ -694,7 +706,7 @@ async def aufzaehlung(
     # über alle Operatoren „500 von 500" — der Deckel als Gesamtzahl ausgegeben, was
     # vollständig aussieht und um mehr als das Doppelte danebenliegt (1 278 sind es).
     # Über dem Deckel gilt die rohe Zählung aus der Datenbank; sie ist exakt, nur eben
-    # vor der Fassungs-Zusammenfassung, die auf den geholten Zeilen arbeitet.
+    # vor Fassungsfilter und -Zusammenfassung, die auf den geholten Zeilen arbeiten.
     gedeckelt = roh_gesamt > _AUFZAEHLUNG_MAX
     return Abschnitt(
         treffer=treffer[: profil.aufzaehlung],
@@ -702,9 +714,10 @@ async def aufzaehlung(
         vollstaendig=not gedeckelt and len(treffer) <= profil.aufzaehlung,
         gruppen=gruppen,
         hinweis=(
-            f"Mehr als {_AUFZAEHLUNG_MAX} Treffer: Gezählt ist der Bestand, gruppiert "
-            f"und um Fassungs-Dubletten bereinigt sind nur die ersten "
-            f"{_AUFZAEHLUNG_MAX}. Grenze die Suche ein."
+            f"Mehr als {_AUFZAEHLUNG_MAX} Treffer: Gezählt ist der Bestand in allen "
+            f"Fassungen; gruppiert, auf die geltende Fassung gefiltert und um "
+            f"Fassungs-Dubletten bereinigt sind nur die ersten {_AUFZAEHLUNG_MAX}. "
+            f"Grenze die Suche ein."
             if gedeckelt
             else None
         ),
