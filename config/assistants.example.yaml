@@ -159,6 +159,10 @@ assistants:
     disabled_augmentations: [metacognitive_nudges]
     system_prompt_file: config/prompts/nw_aufgaben_assistent.md
     tags: [biologie, chemie, physik, nwt]
+    # Päckchen AF: Aus diesen Fächern kommt die Definition des Operators, den die Aufgabe nennt.
+    # `nit` gibt es erst ab 2027/28 (in config/subjects.yaml noch auskommentiert); bis dahin
+    # übergeht der Seed es mit Warnung.
+    operator_faecher: [biologie, chemie, physik, nwt, nit]
     suggest: fallback
     suggestion_text: >-
       Für Aufgaben aus Biologie, Chemie, Physik und NwT gibt es einen Assistenten, der dich

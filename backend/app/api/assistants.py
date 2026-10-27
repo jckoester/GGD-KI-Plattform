@@ -135,6 +135,8 @@ class AssistantCreate(BaseModel):
     disabled_augmentations: list[str] = []
     # Leer = alle konfigurierten Bildarten (siehe config/image_models.yaml).
     image_kinds: list[str] = []
+    # Päckchen AF: Fach-Slugs für den Abschnitt „Operator dieser Aufgabe“; leer = aus.
+    operator_faecher: list[str] = []
     # Vorschlag im Chat (Päckchen C1, F4/F5) — ausgewertet erst mit C2.
     suggest: str = "never"
     suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
@@ -168,6 +170,7 @@ class AssistantUpdate(BaseModel):
     tool_groups: Optional[list[str]] = None
     disabled_augmentations: Optional[list[str]] = None
     image_kinds: Optional[list[str]] = None
+    operator_faecher: Optional[list[str]] = None
     suggest: Optional[str] = None
     suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
     fallbacks: Optional[list[int]] = None
@@ -210,6 +213,7 @@ class AssistantResponse(BaseModel):
     tool_groups: list[str] = []
     disabled_augmentations: list[str] = []
     image_kinds: list[str] = []
+    operator_faecher: list[str] = []
     documents: list[AssistantDocumentOut] = []
     suggest: str = "never"
     suggestion_text: Optional[str] = None
@@ -310,6 +314,7 @@ def _assistant_to_yaml(
             # die Bildart-Auswahl — der Assistent sah identisch aus und konnte weniger.
             "tool_groups": list(assistant.tool_groups or []) or None,
             "image_kinds": list(assistant.image_kinds or []) or None,
+            "operator_faecher": list(assistant.operator_faecher or []) or None,
         },
     }
     # None-Werte aus config entfernen
@@ -563,6 +568,21 @@ async def _gepruefte_fallbacks(
             raise HTTPException(
                 status_code=422,
                 detail=f"Rückfall-Assistent nicht gefunden: {', '.join(map(str, fehlen))}",
+            )
+    return eindeutig
+
+
+async def _gepruefte_operator_faecher(db: AsyncSession, slugs: list[str]) -> list[str]:
+    """Klein geschrieben, ohne Dubletten; jedes Fach muss es hier geben."""
+    eindeutig = list(dict.fromkeys(s.strip().lower() for s in slugs if s and s.strip()))
+    if eindeutig:
+        vorhanden = set(
+            (await db.execute(select(Subject.slug).where(Subject.slug.in_(eindeutig)))).scalars()
+        )
+        fehlen = [s for s in eindeutig if s not in vorhanden]
+        if fehlen:
+            raise HTTPException(
+                status_code=422, detail=f"Fach nicht gefunden: {', '.join(fehlen)}"
             )
     return eindeutig
 
@@ -913,6 +933,7 @@ async def create_assistant(
     )
     listen = _bereinigte_ausloeser(request.trigger_examples, request.trigger_counterexamples)
     fallbacks = await _gepruefte_fallbacks(db, request.fallbacks, None)
+    operator_faecher = await _gepruefte_operator_faecher(db, request.operator_faecher)
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     sort_order = request.sort_order if "admin" in current_user.roles else 0
@@ -942,6 +963,7 @@ async def create_assistant(
         tool_groups=request.tool_groups,
         disabled_augmentations=request.disabled_augmentations,
         image_kinds=request.image_kinds,
+        operator_faecher=operator_faecher,
         suggest=request.suggest,
         suggestion_text=(request.suggestion_text or "").strip() or None,
         fallbacks=fallbacks,
@@ -992,6 +1014,10 @@ async def update_assistant(
     if "fallbacks" in update_data:
         update_data["fallbacks"] = await _gepruefte_fallbacks(
             db, update_data["fallbacks"] or [], assistant.id
+        )
+    if "operator_faecher" in update_data:
+        update_data["operator_faecher"] = await _gepruefte_operator_faecher(
+            db, update_data["operator_faecher"] or []
         )
     if "suggestion_text" in update_data:
         update_data["suggestion_text"] = (update_data["suggestion_text"] or "").strip() or None
@@ -1442,6 +1468,13 @@ async def import_assistant(
         meta.get("trigger_examples") or [], meta.get("trigger_counterexamples") or []
     )
     fields["fallbacks"] = await _fallbacks_nach_namen(db, meta.get("fallbacks") or [], hinweise)
+    wunsch = [str(s).strip().lower() for s in data["config"].get("operator_faecher") or []]
+    fields["operator_faecher"] = _uebernimm_bekannte(
+        list(dict.fromkeys(wunsch)),
+        set((await db.execute(select(Subject.slug).where(Subject.slug.in_(wunsch)))).scalars())
+        if wunsch else set(),
+        "Fächer für Operatoren", hinweise,
+    )
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     

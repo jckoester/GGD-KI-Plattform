@@ -156,3 +156,37 @@ async def test_rueckfaelle_bei_vorhandenem_nachtragen(sitzungen, tmp_path):
     a, _, _ = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
     rueck, _, _ = await _lade(sitzungen, f"{PRAEFIX}Allgemein")
     assert a.fallbacks == [rueck.id]
+
+
+async def test_operator_faecher_beim_anlegen(sitzungen, tmp_path):
+    """Päckchen AF: Fächer, die es hier nicht gibt, werden übergangen, nicht als Fehler."""
+    stand = await SEED.seed(_yaml(tmp_path, f"""
+  - name: {PRAEFIX}NW
+    system_prompt: P
+    audience: student
+    operator_faecher: [{SLUG.upper()}, gibt-es-nicht]
+"""), session_factory=sitzungen)
+    assert (stand["angelegt"], stand["fehler"]) == (1, 0)
+    a, _, _ = await _lade(sitzungen, f"{PRAEFIX}NW")
+    assert a.operator_faecher == [SLUG]
+
+
+async def test_operator_faecher_nachtragen(sitzungen, tmp_path):
+    """Der Prod-Fall nach 0.22: der NW-Assistent ist da, das Feld leer. Eigene bleiben."""
+    async with sitzungen() as db:
+        db.add(Assistant(name=f"{PRAEFIX}NW", system_prompt="P", model="", audience="student",
+                         scope="all_students", suggest="fallback", fallbacks=[]))
+        db.add(Assistant(name=f"{PRAEFIX}Eigen", system_prompt="P", model="", audience="student",
+                         scope="all_students", suggest="never", fallbacks=[], operator_faecher=["andere"]))
+        await db.commit()
+    await SEED.seed(_yaml(tmp_path, f"""
+  - name: {PRAEFIX}NW
+    system_prompt: P
+    operator_faecher: [{SLUG}]
+  - name: {PRAEFIX}Eigen
+    system_prompt: P
+    operator_faecher: [{SLUG}]
+"""), session_factory=sitzungen)
+    nw, _, _ = await _lade(sitzungen, f"{PRAEFIX}NW")
+    eigen, _, _ = await _lade(sitzungen, f"{PRAEFIX}Eigen")
+    assert (nw.operator_faecher, eigen.operator_faecher) == ([SLUG], ["andere"])

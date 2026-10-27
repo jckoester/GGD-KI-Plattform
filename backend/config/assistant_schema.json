@@ -42,7 +42,8 @@
         "system_prompt": { "type": "string", "minLength": 1 },
 
         "tool_groups":   { "type": ["array", "null"], "items": { "type": "string" } },
-        "image_kinds":   { "type": ["array", "null"], "items": { "type": "string" } }
+        "image_kinds":   { "type": ["array", "null"], "items": { "type": "string" } },
+        "operator_faecher": { "type": ["array", "null"], "items": { "type": "string" } }
       }
     }
   }

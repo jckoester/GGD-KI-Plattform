@@ -6,7 +6,7 @@ Idempotent anhand des Namens: Existiert bereits ein Assistent gleichen Namens,
 wird er übersprungen — mit **zwei** Ausnahmen: Hat er noch keine Auslöser-Beispiele und
 nennt der Eintrag welche, werden sie nachgetragen, samt `suggest` und `suggestion_text`
 (Päckchen C1, 26.10.2026); hat er noch keine Rückfälle (`fallbacks`), ebenso diese
-(27.10.2026). So bekommt auch ein schon von Hand angelegter Assistent seine
+(27.10.2026), und ebenso die Fächer für Operatoren (`operator_faecher`, Päckchen AF). So bekommt auch ein schon von Hand angelegter Assistent seine
 Beispiele; eigene Beispiele werden nie überschrieben.
 
 Felder je Eintrag (alle außer `name` und Prompt optional):
@@ -14,7 +14,8 @@ Felder je Eintrag (alle außer `name` und Prompt optional):
 `status`, `visibility`, `tool_groups`, `tags`, `icon`, `sort_order`, `subject` (Slug),
 `min_grade`, `max_grade`, `disabled_augmentations`, `documents` (Dateien wie
 `system_prompt_file`; als Dokument des Assistenten angehängt), `suggest`, `suggestion_text`,
-`trigger_examples`, `trigger_counterexamples`, `fallbacks` (Namen anderer Assistenten).
+`trigger_examples`, `trigger_counterexamples`, `fallbacks` (Namen anderer Assistenten),
+`operator_faecher` (Fach-Slugs).
 
 Nach dem Anlegen werden die Beispiele eingebettet; scheitert das, holt es der nächtliche
 `embedding_backfill.py` nach.
@@ -53,6 +54,22 @@ _cfg_base_docker = _SCRIPT_DIR.parent / "config"
 _cfg_base_local = _SCRIPT_DIR.parent.parent / "config"
 _cfg_base = _cfg_base_docker if (_cfg_base_docker / "assistants.yaml").exists() or \
             (_cfg_base_docker / "assistants.example.yaml").exists() else _cfg_base_local
+
+
+async def _operator_faecher(db: AsyncSession, entry: dict) -> list[str]:
+    """`operator_faecher` des Eintrags, soweit es die Fächer hier gibt.
+
+    Ein fehlendes Fach wird übergangen, nicht als Fehler gewertet: Die Fächerliste ist
+    schulspezifisch (`config/subjects.yaml`), und eine Schule ohne NwT soll den Assistenten
+    trotzdem bekommen."""
+    slugs = list(dict.fromkeys(str(s).strip().lower() for s in entry.get("operator_faecher") or []))
+    if not slugs:
+        return []
+    vorhanden = set((await db.execute(select(Subject.slug).where(Subject.slug.in_(slugs)))).scalars())
+    fehlen = [s for s in slugs if s not in vorhanden]
+    if fehlen:
+        logger.warning("  Fach für Operatoren übergangen (nicht vorhanden): %s", ", ".join(fehlen))
+    return [s for s in slugs if s in vorhanden]
 
 
 def _default_config() -> Path:
@@ -138,6 +155,15 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
                 continue
 
             existing = (await db.execute(select(Assistant).where(Assistant.name == name))).scalar_one_or_none()
+            operator_faecher = await _operator_faecher(db, entry)
+            if existing and operator_faecher and not existing.operator_faecher:
+                # Wie Rückfälle: nur nachtragen, wenn noch keine gesetzt sind (Päckchen AF).
+                if dry_run:
+                    logger.info("  DRY   %s → würde Fächer für Operatoren nachtragen", name)
+                else:
+                    existing.operator_faecher = operator_faecher
+                    logger.info("  NACH  %s (id=%d): Fächer für Operatoren %s", name, existing.id,
+                                ", ".join(operator_faecher))
             if existing and entry.get("fallbacks") and not existing.fallbacks:
                 # Rückfälle wie Beispiele: nur nachtragen, wenn noch keine gesetzt sind.
                 if dry_run:
@@ -206,6 +232,7 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
                     max_grade=entry.get("max_grade"),
                     disabled_augmentations=entry.get("disabled_augmentations") or [],
                     image_kinds=[],
+                    operator_faecher=operator_faecher,
                     suggest=entry.get("suggest") or "never",
                     suggestion_text=(entry.get("suggestion_text") or "").strip() or None,
                     fallbacks=[],

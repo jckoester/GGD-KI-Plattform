@@ -60,3 +60,20 @@ def test_rueckfaelle_zeigen_auf_assistenten_der_datei():
         for r in e.get("fallbacks") or []:
             assert r in namen, (e["name"], r)
             assert next(x for x in EINTRAEGE if x["name"] == r)["suggest"] == "fallback"
+
+
+def test_nw_assistent_hat_operator_faecher():
+    """Päckchen AF: Ohne Fächerkreis bekäme der Prompt (v5d) nie den Abschnitt „Operator
+    dieser Aufgabe"; die Fächer müssen in der ausgelieferten `subjects.yaml` stehen."""
+    import yaml
+    from pathlib import Path
+
+    wurzel = Path(__file__).resolve().parents[3]
+    eintraege = yaml.safe_load((wurzel / "config/assistants.example.yaml").read_text(encoding="utf-8"))
+    nw = next(e for e in eintraege["assistants"] if e["name"] == "naturwissenschaftliche Aufgaben")
+    slugs = {f["slug"] for f in yaml.safe_load(
+        (wurzel / "config/subjects.yaml").read_text(encoding="utf-8"))["subjects"]}
+    # Fächer, die erst noch kommen (in `subjects.yaml` auskommentiert): NiT ab 2027/28.
+    kommen_noch = {"nit"}
+    assert nw["operator_faecher"] and set(nw["operator_faecher"]) <= slugs | kommen_noch
+    assert "bnt" not in nw["operator_faecher"]          # entfällt mit V3

@@ -405,6 +405,14 @@ class Assistant(Base):
         JSONB, nullable=False, server_default=text("'[]'")
     )
 
+    # Päckchen AF (Alembic 0091): Fächer (Slugs), aus denen die Plattform die Definition eines
+    # Operators holt, den die Schülernachricht nennt („Erläutere …"), und als Abschnitt
+    # „Operator dieser Aufgabe" in den Systemtext setzt. **Leer = aus** — der Abschnitt gehört
+    # zu einem Prompt mit Prüfregel (Plan „Operator-im-Satz-AF-Plan", F2/F3).
+    operator_faecher: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+
     # Pädagogische Lernverhalten-Augmentierungen (pedagogy.yaml), die für diesen
     # Assistenten deaktiviert sind — Liste von Augmentierungs-Keys. Greift nur in der
     # Schüler-Behandlung (Phase 13).
