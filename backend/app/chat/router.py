@@ -833,7 +833,11 @@ _LIST_CONTEXT_NODES_TOOL = {
                 },
                 "grade": {
                     "type": "integer",
-                    "description": "Jahrgangsstufe, für die der Baustein gilt.",
+                    "description": (
+                        "Jahrgangsstufe, für die der Baustein gilt (Klassenband). Die "
+                        "Bildungsplan-Fassung wählt die Plattform selbst nach der Stufe "
+                        "der fragenden Person."
+                    ),
                 },
                 "gruppierung": {
                     "type": "string",

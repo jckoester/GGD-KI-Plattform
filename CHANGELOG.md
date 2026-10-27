@@ -23,8 +23,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
-- **Suche im Wissensspeicher aus dem Chat** liefert Bildungsplan-Bausteine in der Fassung, die für
-  die Klassenstufe gilt (Stufe der Unterrichtsgruppe bzw. der Anmeldung), statt aller Fassungen.
+- **Suche, Aufzählung und Operatoren aus dem Chat** liefern Bildungsplan-Bausteine in der Fassung,
+  die für die Klassenstufe gilt (Stufe der Unterrichtsgruppe bzw. der Anmeldung), statt aller Fassungen —
+  für Lehrkräfte in einer Gruppen-Konversation die Fassung der Gruppe. Fehlt einer Fassung eine
+  Bausteinart ganz, wird sie nicht ausgefiltert.
 - **Systemtext nennt das Fach der Konversation**, wenn sie eines hat („Diese Konversation gehört zum
   Fach Physik.“) — neben der Klassenstufe, für alle Rollen.
 - **Assistenten: Klassenstufen wirken.** Ein Assistent mit Klassenstufen (etwa 8–13) erscheint

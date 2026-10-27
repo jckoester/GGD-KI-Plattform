@@ -32,7 +32,7 @@ verrechnet werden:
 - **Thematische Auswahl** — „was passt dazu". Vektorsuche, **nie** vollständig, ohne
   Gesamtzahl.
 - **Aufzählung** — „alle, die …". Deterministische Filterabfrage mit Zählung vor dem
-  Limit, Fassungs-Deduplizierung und Gruppierung.
+  Limit, Editionsfilter (mit bekannter Stufe), Fassungs-Deduplizierung und Gruppierung.
 - **Vorab-Suche** (`vorab()`) — „was gehört vermutlich zu dieser Nachricht". Läuft zu
   **jeder** Chat-Nachricht, ohne dass jemand danach fragt, in **zwei Stufen** (seit 0.16):
   bis zu fünf **sichere** Treffer als Inhalt im System-Prompt (exakter Namens- oder
@@ -177,6 +177,35 @@ ordnen hieße, eine Vorliebe zu behaupten, für die es keine Grundlage gibt.
 
 Die **Aufzählung** kennzeichnet, sortiert aber nicht: Sie beantwortet „alle, die …“
 und ist nach Fach und Titel geordnet — das ist ihre Aussage.
+
+### Bildungsplan-Edition: hier wird gefiltert (0.22)
+
+Nicht zu verwechseln mit den Fassungen eines Fachbegriffs oben: Solange eine neue
+Bildungsplan-Edition jahrgangsweise nach oben wächst, liegen Kompetenzen, Leitideen und
+Operatoren in **zwei Editionen** im Speicher (heute V2 für Kl. 8–13, V3 für Kl. 5–7). Eine
+V2-Kompetenz ist für eine Klasse, die nach V3 lernt, keine „spätere Fassung“, sondern nicht
+ihr Plan — deshalb wird hier **gefiltert**, nicht gekennzeichnet.
+
+- **Wo:** `_auf_geltende_fassung` (`context/search.py`) — in der Vorab-Suche, in `suche()`
+  und seit 0.22 auch in `aufzaehlung()`. Wirksam nur mit `Suchprofil.grade`.
+- **Woher die Stufe:** `stufe_der_person`, wie oben. Die Chat-Werkzeuge
+  (`search_context_nodes`, `list_context_nodes`, `get_operatoren`) ermitteln sie **je
+  Aufruf** und geben sie ins Profil — `waehle_stunde` kann die Gruppe mitten in der
+  Anfrage setzen. Lehrkräfte bekommen so die Edition ihrer Gruppe; ohne Gruppe (und bei
+  allen ohne Stufe) wird nicht gefiltert.
+- **Welche Edition:** je **Fach und Bausteinart** die Edition, die laut Fahrplan
+  (`config/subjects.yaml`, `editions.aktive_bp_version`) für Stufe und Schuljahr gilt und
+  von der es aktive Knoten dieser Art gibt. ⚠️ **Je Art, nicht je Fach:** Eine Edition kann
+  eine Art ganz entbehren (Biologie V2 hatte bis 0.22 keine Operatoren); je Fach gewählt
+  bliebe von dieser Art nichts übrig. Lässt sich keine Edition bestimmen, wird diese Art
+  nicht gefiltert. Unversionierte Knoten (`bp_version` leer — Fachbegriffe, Methodik,
+  eigene Bausteine) bleiben immer.
+- **Zählung:** `gesamt` der Aufzählung zählt nach dem Filter. Über dem Deckel
+  (`_AUFZAEHLUNG_MAX` = 500) gilt die rohe Zahl aus der Datenbank, und der Hinweis sagt es.
+- **`get_operatoren`** nimmt die gefilterte Liste; die Auswahl „neueste Edition“ bleibt nur
+  als Rückfall, wenn nicht gefiltert wurde.
+- Der Parameter `grade` von `list_context_nodes` ist etwas anderes: Er filtert Bausteine mit
+  **Klassenband** (`min_grade`/`max_grade`), nicht Editionen.
 
 ⚠️ **Im Embedding und im Namensabgleich bleiben Aliase unverändert** — dort sind sie
 richtig. Drei Prüfsatzfälle halten das fest („Mol“, „Molzahl“,
