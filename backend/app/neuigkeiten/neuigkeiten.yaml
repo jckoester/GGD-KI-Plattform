@@ -116,3 +116,15 @@
     naturwissenschaftliche Aufgaben (Klasse 5–13), der auch auf Operatoren wie „erläutere“ oder
     „bewerte“ achtet.
   link: /help/assistenten
+
+- id: "0.23-operatoren-pruefen"
+  version: "0.23.0"
+  datum: 2026-10-27
+  rollen: [teacher]
+  titel: "Operatoren nach dem Bildungsplan"
+  text: >-
+    Der Assistent für naturwissenschaftliche Aufgaben erkennt den Operator einer Aufgabe
+    („Erläutere …“, „Werte … aus“) und prüft die Antwort Ihrer Schüler:innen gegen dessen
+    Definition im Bildungsplan, in der Fassung ihrer Klasse: Fehlt bei „erläutern“ das Beispiel
+    oder bei „bewerten“ der Wertmaßstab, fragt er genau danach — ohne es vorzusagen.
+  link: /help/assistenten

@@ -57,6 +57,11 @@ das Ergebnis nicht vorab — auch nicht, wenn Sie darum bitten. Er erklärt auf 
 Klasse: In Klasse 8 ist eine Oxidation eine Reaktion mit Sauerstoff, die Fassung mit Elektronen
 kommt später.
 
+Der Assistent für naturwissenschaftliche Aufgaben achtet außerdem auf den **Operator** der
+Aufgabe („Erläutere …“, „Werte … aus“, „Bewerte …“). Was der verlangt, entnimmt er dem
+Bildungsplan in der Fassung Ihrer Klasse, und er prüft Ihre Antwort daran: Fehlt bei
+„erläutern“ das Beispiel oder bei „bewerten“ der Maßstab, fragt er danach.
+
 Geht Ihre Aufgabe eher in das Gebiet eines anderen Assistenten — etwa eine Rechnung im
 Assistenten für Reaktionsgleichungen —, sagt er es Ihnen; wechseln können Sie mit **`/`**
 im Eingabefeld, ohne den Chat zu verlieren.

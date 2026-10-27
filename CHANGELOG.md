@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.23.0] – 2026-10-27
+
+Der Assistent für naturwissenschaftliche Aufgaben prüft Antworten gegen die Bildungsplan-Definition des
+Operators; das Werkzeug `get_operatoren` entfällt. Eine Migration (0091).
+
 ### Neu
 
 - **Assistenten: Fächer für Operatoren** (`operator_faecher`, Fach-Slugs; im Editor unter den Fähigkeiten als
@@ -31,6 +36,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Aufzählung.
 - **Aufzählung einer Bausteinart eines Fachs** (etwa alle Operatoren der Biologie) liefert bis zu 60 statt 20
   Bausteine.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0091) — wie im regulären Update.
+- Backend **und** Frontend neu bauen; offene Browser-Tabs einmal neu laden.
+- Assistenten einspielen:
+  `docker compose exec backend python scripts/seed_assistants.py --config config/assistants.example.yaml`.
+  Beim vorhandenen Assistenten für naturwissenschaftliche Aufgaben trägt das die Fächer für Operatoren
+  nach; `nit` übergeht es mit Warnung, solange es das Fach nicht gibt.
+- **Neuen Prompt von Hand übernehmen** — der Seed ändert einen vorhandenen Assistenten nicht: unter
+  `/assistants/manage` den Assistenten „naturwissenschaftliche Aufgaben“ öffnen, den System-Prompt durch den
+  Inhalt von `config/prompts/nw_aufgaben_assistent.md` ersetzen, speichern. Er gilt für neue Chats.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.22.0] – 2026-10-27
 
