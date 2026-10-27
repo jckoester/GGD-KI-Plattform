@@ -104,6 +104,17 @@ async def test_bewerten_klasse_9_ohne_abgrenzung(async_engine, daten):
     assert len(a.text.splitlines()) == 2 and "Abgrenzung" not in a.text
 
 
+async def test_fehlt_in_der_fassung_dann_die_neueste_mit_hinweis(async_engine, daten):
+    """Lauf 19, B1: *beurteilen* gibt es nur in V3 — eine 9. Klasse (V2) bekommt die V3-Definition,
+    gekennzeichnet, samt Abgrenzung aus derselben Fassung."""
+    a = await _abschnitt(async_engine, ["Beurteile, ob Elektroautos umweltfreundlicher sind."], 9)
+    assert a.text.splitlines()[1:] == [
+        "beurteilen (AF Biologie, Fassung V3; in der Fassung für Klasse 9 kein eigener Operator): "
+        "ein Sachurteil fällen",
+        "Abgrenzung – bewerten (AF Biologie, Fassung V3): zu einem begründeten Werturteil gelangen",
+    ]
+
+
 async def test_konversationsfach_im_kreis_gilt_allein(async_engine, daten):
     a = await _abschnitt(async_engine, ["Erläutere die Elektrolyse."], 9, fach=321)
     assert a.faecher == ["AF Chemie"]

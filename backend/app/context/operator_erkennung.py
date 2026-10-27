@@ -166,15 +166,21 @@ def _berichtet(woerter: list[str], index: Operatorindex) -> list[Muster]:
 
 
 def erkenne(text: str, index: Operatorindex) -> list[str]:
-    """Die Titel der Operatoren, mit denen Sätze in ``text`` beginnen (Imperativ) oder die ein
-    Satz mit „sollen/müssen" im Infinitiv nennt — in der Reihenfolge des Vorkommens, ohne
-    Doppelte, höchstens :data:`MAX_OPERATOREN`."""
-    gefunden: list[str] = []
+    """Die Titel der Operatoren, mit denen Sätze in ``text`` beginnen (Imperativ) — oder, nur
+    wenn es keinen Imperativ gibt, die ein Satz mit „sollen/müssen" im Infinitiv nennt. In der
+    Reihenfolge des Vorkommens, ohne Doppelte, höchstens :data:`MAX_OPERATOREN`.
+
+    ⚠️ **Der Imperativ hat Vorrang** (Lauf 19, O8): „Gib an, welche Stoffe entstehen. … Muss ich
+    das noch erklären?" — die Rückfrage nennt *erklären*, die Aufgabe ist *angeben*. Eine
+    Aufgabenstellung im Imperativ ist das stärkere Zeichen als ein berichteter Auftrag.
+    """
+    befohlen: list[str] = []
+    berichtet: list[str] = []
     for teile in _saetze(text):
         woerter = [w for t in teile for w in t]
         for m in _berichtet(woerter, index):
-            if m.titel not in gefunden:
-                gefunden.append(m.titel)
+            if m.titel not in berichtet:
+                berichtet.append(m.titel)
         start = 0
         while start < len(woerter) - 1 and _VORSPANN.match(woerter[start]):
             start += 1
@@ -199,8 +205,6 @@ def erkenne(text: str, index: Operatorindex) -> list[str]:
             continue
         bestes = max(m.gewicht for m in passend)
         for m in passend:
-            if m.gewicht == bestes and m.titel not in gefunden:
-                gefunden.append(m.titel)
-        if len(gefunden) >= MAX_OPERATOREN:
-            break
-    return gefunden[:MAX_OPERATOREN]
+            if m.gewicht == bestes and m.titel not in befohlen:
+                befohlen.append(m.titel)
+    return (befohlen or berichtet)[:MAX_OPERATOREN]

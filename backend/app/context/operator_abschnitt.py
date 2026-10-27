@@ -12,6 +12,9 @@ gibt es in Klasse 7 nicht). Liegt das Fach der Konversation im Kreis, gilt nur d
 **Gleicher Wortlaut wird zusammengefasst** (Plan B5): In einer Fassung sind die NW-Fächer
 meist wortgleich. Unterscheidet sich der Wortlaut, stehen alle Fassungen mit ihren Fächern da.
 
+**Fehlt der Operator in der Fassung der Klasse**, gilt die neueste Fassung, die ihn kennt — mit
+Hinweis in der Zeile (Lauf 19, B1; Jan 27.10.2026).
+
 **Abgrenzung** (Plan B7): Zu *bewerten* gehört *beurteilen* und umgekehrt — aber nur, wenn
 der Partner in derselben Fassung vorkommt (in V3; in V2 fasst *bewerten* beides). Die
 Operator-Knoten tragen keine Abgrenzungs-Kanten, deshalb steht das Paar hier im Code.
@@ -110,7 +113,9 @@ async def _definitionen(
     return [t for t in neueste.values() if (t.get("content") or "").strip()]
 
 
-def _zeilen(titel: str, treffer: list[dict], stufe: int | None, praefix: str = "") -> list[str]:
+def _zeilen(
+    titel: str, treffer: list[dict], stufe: int | None, praefix: str = "", zusatz: str = ""
+) -> list[str]:
     """Je Wortlaut eine Zeile: „erläutern (Biologie, Physik, Fassung für Klasse 7): …"."""
     nach_wortlaut: dict[str, list[dict]] = {}
     for t in treffer:
@@ -119,7 +124,7 @@ def _zeilen(titel: str, treffer: list[dict], stufe: int | None, praefix: str = "
     for wortlaut, gruppe in nach_wortlaut.items():
         faecher = ", ".join(sorted({t.get("fach") or "?" for t in gruppe}))
         fassung = _fassung(stufe, [t.get("bp_version") for t in gruppe])
-        zeilen.append(f"{praefix}{titel} ({faecher}, {fassung}): {wortlaut}")
+        zeilen.append(f"{praefix}{titel} ({faecher}, {fassung}{zusatz}): {wortlaut}")
     return zeilen
 
 
@@ -159,17 +164,27 @@ async def operator_abschnitt(
     fassungen: set[str] = set()
     for titel in erkannt:
         treffer = await _definitionen(db, titel, kreis, stufe, pseudonym, rollen)
+        # Kennt die Fassung der Klasse den Operator nicht (V2 hat kein *beurteilen*, Lauf 19 B1),
+        # gilt die neueste, die ihn kennt — mit Hinweis. Jan, 27.10.2026: Lehrkräfte, Schulbücher
+        # und Schüler:innen trennen Operatoren nie so scharf nach Fassung; ohne Abschnitt suchte
+        # das Modell selbst und bekam Operatoren aus über einem Dutzend Fächern.
+        fassung_der_definition, zusatz = stufe, ""
+        if not treffer and stufe is not None:
+            treffer = await _definitionen(db, titel, kreis, None, pseudonym, rollen)
+            fassung_der_definition = None
+            zusatz = f"; in der Fassung für Klasse {stufe} kein eigener Operator"
         if not treffer:
             continue
-        zeilen += _zeilen(titel, treffer, stufe)
+        zeilen += _zeilen(titel, treffer, fassung_der_definition, zusatz=zusatz)
         partner = ABGRENZUNG.get(titel)
         if partner and partner not in erkannt:
             # Nur, wo der Partner in **derselben** Fassung steht wie der Operator selbst.
             eigene = {(t.get("subject_id"), t.get("bp_version")) for t in treffer}
-            gegen = [t for t in await _definitionen(db, partner, kreis, stufe, pseudonym, rollen)
+            gegen = [t for t in await _definitionen(db, partner, kreis, fassung_der_definition,
+                                                    pseudonym, rollen)
                      if (t.get("subject_id"), t.get("bp_version")) in eigene]
             if gegen:
-                zeilen += _zeilen(partner, gegen, stufe, praefix="Abgrenzung – ")
+                zeilen += _zeilen(partner, gegen, fassung_der_definition, praefix="Abgrenzung – ")
         faecher |= {t.get("fach") or "?" for t in treffer}
         fassungen |= {t.get("bp_version") or "" for t in treffer}
     if not zeilen:

@@ -13,8 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Aufgaben führt Biologie, Chemie, Physik, NwT und NiT. Migration 0091.
 - **Operator der Aufgabe im Systemtext:** Nennt eine Nachricht an einen solchen Assistenten einen Operator
   („Erläutere …“, „Werte … aus“, „Das sollen wir erklären“), steht seine Definition in der Fassung der
-  Klasse im Systemtext, bei *bewerten*/*beurteilen* mit Abgrenzung. Folgenachrichten behalten den Operator
-  der Aufgabe davor.
+  Klasse im Systemtext, bei *bewerten*/*beurteilen* mit Abgrenzung; kennt diese Fassung ihn nicht, die neueste
+  mit Hinweis. Folgenachrichten behalten den Operator der Aufgabe davor.
 
 ### Geändert
 

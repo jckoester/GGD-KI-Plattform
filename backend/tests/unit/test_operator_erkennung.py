@@ -60,6 +60,8 @@ INDEX = Operatorindex.aus(TITEL)
     ("Warum hört man im Weltall nichts? Sollen wir begründen.", ["begründen"]),
     ("Wir müssen die Messreihe auswerten.", ["auswerten"]),
     ("Wir sollen rausfinden, ob Bohnen Licht brauchen.", []),               # kein Operator
+    # Imperativ vor berichtetem Auftrag (Lauf 19, O8)
+    ("Gib an, welche Stoffe entstehen. Meine Antwort: Sauerstoff. Muss ich das noch erklären?", ["angeben"]),
     ("Ich soll morgen erklären können, was Ionen sind.", ["erklären"]),    # Fehltreffer, hingenommen
     # keine Aufgabe
     ("Erkläre mir den Treibhauseffekt.", []),                              # F5
