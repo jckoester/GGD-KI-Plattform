@@ -41,6 +41,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Bildungsplan Biologie V2 ohne Operatoren:** Der Scraper übernimmt jetzt auch eine fremd verlinkte
+  Operatorenliste (Biologie verweist auf die gemeinsame Liste der Naturwissenschaften). Nach dem Update
+  Biologie neu scrapen und importieren.
 - **YAML-Export eines Assistenten mit schulweitem Standardmodell** ließ sich nicht wieder
   importieren.
 

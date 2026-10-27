@@ -949,7 +949,7 @@ def expand_operator_title(raw: str) -> tuple[str, list[str]]:
 
 
 def parse_operator_list(
-    soup: BeautifulSoup, url: str, parent_bp_id: str
+    soup: BeautifulSoup, url: str, parent_bp_id: str, op_basis_bp_id: str | None = None
 ) -> list[dict[str, Any]]:
     """Extrahiert Operator-Knoten aus der Operatoren-Anhangseite (content_type='operator').
 
@@ -957,12 +957,17 @@ def parse_operator_list(
     Synthetische bp_id: ``{op_page_bp_id}_{NR:02d}``. AFB als Liste (komma-getrennt,
     Mehrfachzuordnung möglich). Titel-Synonyme → ``metadata.aliase`` via
     ``expand_operator_title``. Keine Tabelle → leere Liste (Fach ohne Operatoren-Anhang).
+
+    ``op_basis_bp_id``: die ID, unter der die Knoten entstehen. Ohne Angabe aus der URL
+    (``…_OP``). **Nötig für fremd verlinkte Listen** (27.10.2026): Biologie V2 verweist auf
+    die gemeinsame NW-Seite ``/,Lde/4-Operatoren1`` — ihre Adresse trägt keine BP-ID, und
+    die Knoten gehören trotzdem zu Biologie und ihrer Fassung.
     """
     tbl = soup.find('table', attrs={'border': '1'})
     if tbl is None:
         return []
     return operator_knoten_aus_tabelle(
-        tbl, url, parent_bp_id, _extract_bp_id_from_url(url)
+        tbl, url, parent_bp_id, op_basis_bp_id or _extract_bp_id_from_url(url)
     )
 
 

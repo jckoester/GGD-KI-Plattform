@@ -134,18 +134,28 @@ def _discover_all_ik_urls(soup: BeautifulSoup, base_bp_id: str) -> dict[str, str
     return result
 
 
-def _discover_operator_url(soup: BeautifulSoup, fach_bp_id: str) -> str | None:
-    """Findet die verlinkte Operatoren-Anhangseite ({fach_bp_id}_OP) auf der Fachplan-Seite.
+def _discover_operator_url(soup: BeautifulSoup, fach_bp_id: str) -> tuple[str, bool] | None:
+    """Findet die verlinkte Operatorenseite auf der Fachplan-Seite: ``(url, fremd)``.
 
-    Operatoren stehen als eigener Gliederungspunkt im Fach-BP. Kein Link → None
-    (Fach ohne Operatoren-Anhang, z. B. nur als PDF veröffentlichte Fremdsprachen).
+    Zuerst die eigene Anhangseite ``{fach_bp_id}_OP``. Gibt es sie nicht, ein Link mit dem
+    Text bzw. Titel „Operatoren“ (``fremd = True``): **Biologie V2 verweist auf die gemeinsame
+    Liste der Naturwissenschaften** (``/,Lde/4-Operatoren1``), Chemie auf eine eigene Fassung
+    derselben Seite (Jan, 27.10.2026). Bis dahin übersprang der Scraper Biologie V2 still
+    („Kein Operatoren-Link“), und das Fach stand in V2 ohne Operatoren da.
+
+    Kein Link → None (Fach ohne Operatoren-Anhang, z. B. nur als PDF veröffentlichte
+    Fremdsprachen).
     """
     op_bp_id = f"{fach_bp_id}_OP"
+    fremd = None
     for a in soup.find_all('a', href=True):
         path_part = a['href'].split(',Lde/')[-1].split('?')[0].rstrip('/')
         if path_part == op_bp_id:
-            return a['href'] if a['href'].startswith('http') else BASE_URL + path_part
-    return None
+            return (a['href'] if a['href'].startswith('http') else BASE_URL + path_part), False
+        beschriftung = (a.get('title') or a.get_text(" ", strip=True) or "").strip().lower()
+        if fremd is None and beschriftung == "operatoren" and ',Lde/' in a['href']:
+            fremd = a['href'] if a['href'].startswith('http') else BASE_URL + path_part
+    return (fremd, True) if fremd else None
 
 
 def _discover_pk_gruppen(soup: BeautifulSoup, base_bp_id: str) -> list[tuple[str, str]]:
@@ -290,14 +300,18 @@ async def _sammle_klassisch(
 
     # Operatoren-Anhang entdecken (eigene Seite {fachplan}_OP, editionsspezifisch)
     fach_bp_id = bp_id_basis + suffix
-    op_url = _discover_operator_url(soup, fach_bp_id)
-    if op_url is None:
+    gefunden = _discover_operator_url(soup, fach_bp_id)
+    if gefunden is None:
         logger.info(f"Kein Operatoren-Link fuer {fach_bp_id} (uebersprungen)")
     else:
+        op_url, fremd = gefunden
+        if fremd:
+            logger.info(f"Operatoren fuer {fach_bp_id} aus fremd verlinkter Liste: {op_url}")
         try:
             op_html = await fetch(client, op_url)
             op_soup = BeautifulSoup(op_html, 'lxml')
-            operator_nodes = parse_operator_list(op_soup, op_url, fach_bp_id)
+            # Die Knoten gehören dem Fach und seiner Fassung — auch bei einer gemeinsamen Liste.
+            operator_nodes = parse_operator_list(op_soup, op_url, fach_bp_id, f"{fach_bp_id}_OP")
             if operator_nodes:
                 nodes.extend(operator_nodes)
             else:

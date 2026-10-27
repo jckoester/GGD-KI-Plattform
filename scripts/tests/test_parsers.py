@@ -573,3 +573,50 @@ class TestParseOperatorList:
         from bs4 import BeautifulSoup
         empty = BeautifulSoup("<html><body><p>kein Anhang</p></body></html>", 'lxml')
         assert parse_operator_list(empty, OPERATOREN_CH_URL, self.PARENT) == []
+
+
+class TestFremdVerlinkteOperatoren:
+    """Biologie V2 verweist auf die gemeinsame NW-Liste (`/,Lde/4-Operatoren1`), Chemie auf eine
+    eigene Fassung derselben Seite (27.10.2026). Vorher blieb Biologie V2 ohne Operatoren."""
+
+    BIO = "BP2016BW_ALLG_GYM_BIO.V2"
+    GEMEINSAM = "https://www.bildungsplaene-bw.de/,Lde/4-Operatoren1"
+
+    def test_biologie_findet_die_gemeinsame_liste(self):
+        from scripts.scraper.bildungsplan_scraper import _discover_operator_url
+
+        url, fremd = _discover_operator_url(load_fixture('biologie_v2_fachplan_live.html'), self.BIO)
+        assert url.endswith("4-Operatoren1") and fremd
+
+    def test_eigene_liste_hat_vorrang(self):
+        from scripts.scraper.bildungsplan_scraper import _discover_operator_url
+
+        # Die Fixture ist die Basisfassung (`…_CH`); sie verlinkt ihre eigene Liste `…_CH_OP`.
+        url, fremd = _discover_operator_url(load_fixture('chemie_fachplan_live.html'), "BP2016BW_ALLG_GYM_CH")
+        assert url.endswith("BP2016BW_ALLG_GYM_CH_OP") and not fremd
+
+    def test_ohne_link_nichts(self):
+        from bs4 import BeautifulSoup
+
+        from scripts.scraper.bildungsplan_scraper import _discover_operator_url
+
+        seite = BeautifulSoup('<a href="/,Lde/BP2016BW_ALLG_GYM_BIO.V2_IK_5-6_01">Kompetenz</a>', 'lxml')
+        assert _discover_operator_url(seite, self.BIO) is None
+
+    def test_gemeinsame_liste_gehoert_dem_fach_und_seiner_fassung(self):
+        nodes = parse_operator_list(load_fixture('operatoren_nw_gemeinsam_live.html'), self.GEMEINSAM,
+                                    self.BIO, f"{self.BIO}_OP")
+        assert len(nodes) == 19
+        assert nodes[0]['bp_id'] == "BP2016BW_ALLG_GYM_BIO.V2_OP_01"
+        assert {n['bp_version'] for n in nodes} == {"2016.V2"}
+        assert all(n['parent_bp_id'] == self.BIO for n in nodes)
+        erlaeutern = next(n for n in nodes if n['title'] == 'erläutern')
+        assert "Beispiele" in erlaeutern['content']   # V2-Lesart
+
+    def test_ohne_ausdrueckliche_id_bleibt_es_beim_fehler(self):
+        """Die Adresse der gemeinsamen Seite trägt keine BP-ID — ohne `op_basis_bp_id` ist das
+        ein Parse-Fehler, kein stilles Erfinden einer ID."""
+        from scripts.scraper.parsers import ScraperParseError
+
+        with pytest.raises(ScraperParseError):
+            parse_operator_list(load_fixture('operatoren_nw_gemeinsam_live.html'), self.GEMEINSAM, self.BIO)
