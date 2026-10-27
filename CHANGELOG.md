@@ -43,6 +43,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Abbruch bei Modellen, die zwei Werkzeuge zugleich aufrufen** (etwa Claude): Die Aufrufe einer Runde
+  wurden zu einem verschmolzen, die Antwort brach mit „Der KI-Dienst hat die Anfrage mittendrin abgelehnt“
+  ab. Jetzt wird jeder Aufruf für sich ausgeführt und beantwortet.
 - **Bildungsplan Biologie V2 ohne Operatoren:** Der Scraper übernimmt jetzt auch eine fremd verlinkte
   Operatorenliste (Biologie verweist auf die gemeinsame Liste der Naturwissenschaften). Nach dem Update
   Biologie neu scrapen und importieren.

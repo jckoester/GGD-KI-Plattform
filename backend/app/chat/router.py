@@ -2481,9 +2481,12 @@ async def chat(
                 _deployment_id = (
                     current_response.headers.get("x-litellm-model-id") or _deployment_id
                 )
-                _tc_id: str | None = None
-                _tc_name: str | None = None
-                _tc_args: list[str] = []
+                # Die Werkzeugaufrufe dieser Runde, **je `index`** gesammelt. ⚠️ Bis 10/2026
+                # gab es nur einen Satz Variablen: Rief ein Modell zwei Werkzeuge parallel
+                # auf (Claude tut das, `chat-komplex` nie), gewann der letzte Name, und die
+                # Argumente beider hingen aneinander (`{…}{…}`) — das Werkzeug scheiterte,
+                # der Anbieter wies die Folgeanfrage mit 400 ab (Messung 27.10.2026, Lauf 11).
+                _aufrufe: dict[int, dict] = {}
                 _finish_reason: str | None = None
                 _runden_id: str | None = None
                 _runde_hat_text = False
@@ -2514,13 +2517,17 @@ async def chat(
 
                         if delta.get("tool_calls"):
                             for tc in delta["tool_calls"]:
+                                # Ohne `index` (manche Anbieter) alles in einen Aufruf — wie bisher.
+                                aufruf = _aufrufe.setdefault(
+                                    tc.get("index") or 0, {"id": None, "name": None, "args": []}
+                                )
                                 if tc.get("id"):
-                                    _tc_id = tc["id"]
+                                    aufruf["id"] = tc["id"]
                                 fn = tc.get("function") or {}
                                 if fn.get("name"):
-                                    _tc_name = fn["name"]
+                                    aufruf["name"] = fn["name"]
                                 if fn.get("arguments"):
-                                    _tc_args.append(fn["arguments"])
+                                    aufruf["args"].append(fn["arguments"])
                             if "usage" in chunk:
                                 usage = chunk["usage"]
                             continue
@@ -2550,7 +2557,8 @@ async def chat(
                     _request_ids.append(_runden_id)
 
                 # -- Tool-Call verarbeiten oder abbrechen --
-                if _finish_reason != "tool_calls" or not _tc_name:
+                _calls = [a for _, a in sorted(_aufrufe.items()) if a["name"]]
+                if _finish_reason != "tool_calls" or not _calls:
                     break
 
                 # Die letzte Anfrage verlangte eine Antwort (s. u.), das Modell rief trotzdem
@@ -2572,133 +2580,133 @@ async def chat(
                         break
                     continue
 
-                tool = _tool_map.get(_tc_name)
-                if tool is None:
-                    logger.warning(
-                        "Unbekanntes Tool '%s' (Runde %d) — das Modell bekommt die verfügbaren Namen",
-                        _tc_name, _round + 1,
-                    )
-                    tool = _unbekanntes_werkzeug(_tc_name, sorted(_tool_map))
-
-                yield (
-                    f"event: tool_status\n"
-                    f"data: {json.dumps({'tool': _tc_name, 'round': _round + 1})}\n\n"
-                )
-
-                _bezug_vorher = (conversation_stunde_id, conversation_group_id)
-                try:
-                    args = json.loads("".join(_tc_args) or "{}")
-                    if _tc_name == "search_context_nodes":
-                        _suchanfragen.append(str(args.get("query", "")))
-                    tool_ctx = ToolContext(
-                        db=db,
-                        user=current_user,
-                        group_id=conversation_group_id,
-                        conversation_id=conversation_id,
-                        litellm_key=litellm_key,
-                        assistant=active_assistant,
-                        erlaubte_modelle=_erlaubte_modelle,
-                        bausteine=_werkzeug_bausteine,
-                        stunde_node_id=conversation_stunde_id,
-                    )
-                    tool_result = await tool.handler(args, tool_ctx)
-                    if _tc_name == "list_context_nodes":
-                        _aufzaehlungen.append({
-                            **{k: args.get(k) for k in ("titel", "content_type", "subject", "grade")},
-                            **({k: tool_result.get(k) for k in ("gesamt", "geliefert", "hinweis")}
-                               if isinstance(tool_result, dict) else {}),
-                        })
-                    if tool.writes and not (isinstance(tool_result, dict) and tool_result.get("error")):
-                        if _tc_name not in _wirkende_werkzeuge:
-                            _wirkende_werkzeuge.append(_tc_name)
-                    # Ein Werkzeug darf den Stundenbezug setzen (`waehle_stunde`, 0.15). Er
-                    # gilt sofort für die folgenden Aufrufe dieser Anfrage — sonst schriebe
-                    # ein Aufruf ohne Kennung noch in den vorigen Bezug.
-                    conversation_stunde_id = tool_ctx.stunde_node_id
-                    conversation_group_id = tool_ctx.group_id
-                except Exception:
-                    logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
-                    tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
-
-                # Die Chatseite zeigt Fach und Gruppe über dem Eingabefeld — ohne dieses
-                # Ereignis stimmte die Anzeige nach `waehle_stunde` erst nach dem Neuladen.
-                if (conversation_stunde_id, conversation_group_id) != _bezug_vorher:
-                    _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
-                    _bezug = {
-                        "group_id": conversation_group_id,
-                        "subject_id": _gruppe.subject_id if _gruppe else None,
-                        "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
-                        "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
-                    }
-                    yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
-
-                # Welches Werkzeug gegriffen hat, ließ sich bisher nirgends ablesen: Das
-                # SSE-Ereignis `tool_status` trägt den Namen, wird im Frontend aber von
-                # niemandem ausgewertet. Damit war nicht zu klären, warum ein Assistent
-                # meldete, der Wissensgraph enthalte nichts — ob er gesucht oder das
-                # falsche Werkzeug gegriffen hatte.
-                #
-                # ⚠️ **Ohne die Argumente.** Sie enthalten den Suchtext, also Nutzereingabe:
-                # genau das, wovor die PII-Warnung schützt. Für die Frage „welches Werkzeug
-                # lief?" genügen Name und Umfang des Ergebnisses.
-                logger.info(
-                    "Tool '%s' (Runde %d) → %s",
-                    _tc_name, _round + 1, _ergebnis_umfang(tool_result),
-                )
-
-                # Eine Suche des Assistenten öffnet **kein** Vorschlagsfenster mehr
-                # (ADR-017, Befund 7). Das Fenster ist ein Angebot an die Nutzer:in,
-                # Bausteine anzuheften; der Assistent hat sie bereits gelesen. Beides
-                # über denselben Kanal zu bedienen, hieß: Wer nur eine Frage stellte,
-                # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
-                # Befüllt wird das Fenster jetzt allein vom Suchknopf über
-                # `POST /context/search`.
-                if "context_search" in tool.groups:
-                    # Serialisierung **und** Lesehinweis liegen in einer Funktion —
-                    # siehe `werkzeug_nutzlast`, dort auch die beiden Ergebnisformen.
-                    tool_result_str = werkzeug_nutzlast(tool_result)
-                elif _tc_name == "generate_image" and isinstance(tool_result, dict):
-                    # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
-                    # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)
-                    # sammeln. Der LLM erhält eine bereinigte Bestätigung OHNE cost_usd/image_id.
-                    if tool_result.get("status") == "ok" and tool_result.get("image_id"):
-                        _generated_image_ids.append(UUID(tool_result["image_id"]))
-                        if tool_result.get("cost_usd") is not None:
-                            _image_cost_total += float(tool_result["cost_usd"])
-                        yield (
-                            f"event: image\n"
-                            f"data: {json.dumps({
-                                'image_id': tool_result['image_id'],
-                                'size': tool_result.get('size'),
-                                'bildart': tool_result.get('bildart'),
-                                'provider_model': tool_result.get('provider_model'),
-                                'prompt': tool_result.get('bild_prompt'),
-                            })}\n\n"
+                _assistent_aufrufe: list[dict] = []
+                _werkzeug_antworten: list[dict] = []
+                for _call in _calls:
+                    _tc_id, _tc_name, _tc_args = _call["id"], _call["name"], _call["args"]
+                    tool = _tool_map.get(_tc_name)
+                    if tool is None:
+                        logger.warning(
+                            "Unbekanntes Tool '%s' (Runde %d) — das Modell bekommt die verfügbaren Namen",
+                            _tc_name, _round + 1,
                         )
-                    tool_result_str = json.dumps({
-                        k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
-                    })
-                else:
-                    tool_result_str = _werkzeug_json(_tc_name, tool_result)
+                        tool = _unbekanntes_werkzeug(_tc_name, sorted(_tool_map))
 
+                    yield (
+                        f"event: tool_status\n"
+                        f"data: {json.dumps({'tool': _tc_name, 'round': _round + 1})}\n\n"
+                    )
+
+                    _bezug_vorher = (conversation_stunde_id, conversation_group_id)
+                    try:
+                        args = json.loads("".join(_tc_args) or "{}")
+                        if _tc_name == "search_context_nodes":
+                            _suchanfragen.append(str(args.get("query", "")))
+                        tool_ctx = ToolContext(
+                            db=db,
+                            user=current_user,
+                            group_id=conversation_group_id,
+                            conversation_id=conversation_id,
+                            litellm_key=litellm_key,
+                            assistant=active_assistant,
+                            erlaubte_modelle=_erlaubte_modelle,
+                            bausteine=_werkzeug_bausteine,
+                            stunde_node_id=conversation_stunde_id,
+                        )
+                        tool_result = await tool.handler(args, tool_ctx)
+                        if _tc_name == "list_context_nodes":
+                            _aufzaehlungen.append({
+                                **{k: args.get(k) for k in ("titel", "content_type", "subject", "grade")},
+                                **({k: tool_result.get(k) for k in ("gesamt", "geliefert", "hinweis")}
+                                   if isinstance(tool_result, dict) else {}),
+                            })
+                        if tool.writes and not (isinstance(tool_result, dict) and tool_result.get("error")):
+                            if _tc_name not in _wirkende_werkzeuge:
+                                _wirkende_werkzeuge.append(_tc_name)
+                        # Ein Werkzeug darf den Stundenbezug setzen (`waehle_stunde`, 0.15). Er
+                        # gilt sofort für die folgenden Aufrufe dieser Anfrage — sonst schriebe
+                        # ein Aufruf ohne Kennung noch in den vorigen Bezug.
+                        conversation_stunde_id = tool_ctx.stunde_node_id
+                        conversation_group_id = tool_ctx.group_id
+                    except Exception:
+                        logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
+                        tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
+
+                    # Die Chatseite zeigt Fach und Gruppe über dem Eingabefeld — ohne dieses
+                    # Ereignis stimmte die Anzeige nach `waehle_stunde` erst nach dem Neuladen.
+                    if (conversation_stunde_id, conversation_group_id) != _bezug_vorher:
+                        _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
+                        _bezug = {
+                            "group_id": conversation_group_id,
+                            "subject_id": _gruppe.subject_id if _gruppe else None,
+                            "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
+                            "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
+                        }
+                        yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
+
+                    # Welches Werkzeug gegriffen hat, ließ sich bisher nirgends ablesen: Das
+                    # SSE-Ereignis `tool_status` trägt den Namen, wird im Frontend aber von
+                    # niemandem ausgewertet. Damit war nicht zu klären, warum ein Assistent
+                    # meldete, der Wissensgraph enthalte nichts — ob er gesucht oder das
+                    # falsche Werkzeug gegriffen hatte.
+                    #
+                    # ⚠️ **Ohne die Argumente.** Sie enthalten den Suchtext, also Nutzereingabe:
+                    # genau das, wovor die PII-Warnung schützt. Für die Frage „welches Werkzeug
+                    # lief?" genügen Name und Umfang des Ergebnisses.
+                    logger.info(
+                        "Tool '%s' (Runde %d) → %s",
+                        _tc_name, _round + 1, _ergebnis_umfang(tool_result),
+                    )
+
+                    # Eine Suche des Assistenten öffnet **kein** Vorschlagsfenster mehr
+                    # (ADR-017, Befund 7). Das Fenster ist ein Angebot an die Nutzer:in,
+                    # Bausteine anzuheften; der Assistent hat sie bereits gelesen. Beides
+                    # über denselben Kanal zu bedienen, hieß: Wer nur eine Frage stellte,
+                    # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
+                    # Befüllt wird das Fenster jetzt allein vom Suchknopf über
+                    # `POST /context/search`.
+                    if "context_search" in tool.groups:
+                        # Serialisierung **und** Lesehinweis liegen in einer Funktion —
+                        # siehe `werkzeug_nutzlast`, dort auch die beiden Ergebnisformen.
+                        tool_result_str = werkzeug_nutzlast(tool_result)
+                    elif _tc_name == "generate_image" and isinstance(tool_result, dict):
+                        # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
+                        # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)
+                        # sammeln. Der LLM erhält eine bereinigte Bestätigung OHNE cost_usd/image_id.
+                        if tool_result.get("status") == "ok" and tool_result.get("image_id"):
+                            _generated_image_ids.append(UUID(tool_result["image_id"]))
+                            if tool_result.get("cost_usd") is not None:
+                                _image_cost_total += float(tool_result["cost_usd"])
+                            yield (
+                                f"event: image\n"
+                                f"data: {json.dumps({
+                                    'image_id': tool_result['image_id'],
+                                    'size': tool_result.get('size'),
+                                    'bildart': tool_result.get('bildart'),
+                                    'provider_model': tool_result.get('provider_model'),
+                                    'prompt': tool_result.get('bild_prompt'),
+                                })}\n\n"
+                            )
+                        tool_result_str = json.dumps({
+                            k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
+                        })
+                    else:
+                        tool_result_str = _werkzeug_json(_tc_name, tool_result)
+
+                    _assistent_aufrufe.append({
+                        "id": _tc_id,
+                        "type": "function",
+                        "function": {"name": _tc_name, "arguments": "".join(_tc_args)},
+                    })
+                    _werkzeug_antworten.append(
+                        {"role": "tool", "tool_call_id": _tc_id, "content": tool_result_str}
+                    )
+
+                # **Eine** Assistenten-Nachricht mit allen Aufrufen der Runde, danach je Aufruf
+                # die Antwort mit seiner `tool_call_id` — so verlangt es das Protokoll.
                 current_messages = current_messages + [
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [{
-                            "id": _tc_id,
-                            "type": "function",
-                            "function": {
-                                "name": _tc_name,
-                                "arguments": "".join(_tc_args),
-                            },
-                        }],
-                    },
-                    {
-                        "role": "tool",
-                        "tool_call_id": _tc_id,
-                        "content": tool_result_str,
-                    },
+                    {"role": "assistant", "content": None, "tool_calls": _assistent_aufrufe},
+                    *_werkzeug_antworten,
                 ]
 
                 # Nächste Runde mit Werkzeugen, damit weitere Aufrufe möglich sind — außer

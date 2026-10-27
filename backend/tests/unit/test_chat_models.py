@@ -1181,3 +1181,44 @@ async def test_vorschau_zaehlt_nicht():
     zaehlen, _, ausgabe = await _chat_zaehlt(is_test=True)
     zaehlen.assert_not_awaited()
     assert "[DONE]" in ausgabe
+
+
+# ── Parallele Werkzeugaufrufe (27.10.2026) ────────────────────────────────────
+#
+# Claude ruft in einer Runde zwei Werkzeuge zugleich auf; die Teile kommen verschachtelt,
+# unterschieden nur durch `index`. Bis 10/2026 verschmolz der Router sie zu einem Aufruf
+# (`{…}{…}`) — das Werkzeug scheiterte, der Anbieter wies die Folgeanfrage ab.
+
+
+def _zwei_parallele_aufrufe() -> _Strom:
+    return _Strom([
+        _zeile({"tool_calls": [{"index": 0, "id": "call-a",
+                                "function": {"name": "probe", "arguments": '{"x":'}}]}),
+        _zeile({"tool_calls": [{"index": 1, "id": "call-b",
+                                "function": {"name": "probe", "arguments": '{"y": 2}'}}]}),
+        _zeile({"tool_calls": [{"index": 0, "function": {"arguments": " 1}"}}]}, "tool_calls"),
+    ])
+
+
+async def test_parallele_werkzeugaufrufe_werden_getrennt_ausgefuehrt():
+    modell = _Modell(lambda req, n: _zwei_parallele_aufrufe() if n == 1 else _text("Fertig."))
+    ausgabe, aufrufe, _ = await _chat_mit_werkzeug(modell)
+
+    assert aufrufe == [{"x": 1}, {"y": 2}]
+    folge = modell.nutzlasten[1]["messages"]
+    assistent = [m for m in folge if m.get("role") == "assistant" and m.get("tool_calls")]
+    assert len(assistent) == 1
+    assert [c["id"] for c in assistent[0]["tool_calls"]] == ["call-a", "call-b"]
+    assert [c["function"]["arguments"] for c in assistent[0]["tool_calls"]] == ['{"x": 1}', '{"y": 2}']
+    antworten = [m for m in folge if m.get("role") == "tool"]
+    assert [m["tool_call_id"] for m in antworten] == ["call-a", "call-b"]
+    assert "Fertig." in ausgabe
+
+
+async def test_aufruf_ohne_index_wie_bisher():
+    """Manche Anbieter senden kein `index` — dann bleibt es bei einem Aufruf."""
+    modell = _Modell(lambda req, n: _werkzeugaufruf() if n == 1 else _text("Ok."))
+    _, aufrufe, _ = await _chat_mit_werkzeug(modell)
+    assert aufrufe == [{}]
+    folge = modell.nutzlasten[1]["messages"]
+    assert [m["tool_call_id"] for m in folge if m.get("role") == "tool"] == ["call-1"]
