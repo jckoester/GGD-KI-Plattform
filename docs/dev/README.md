@@ -66,6 +66,7 @@ cd frontend && npm install && npm run dev
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
 - [Artefaktbibliothek](artefaktbibliothek.md) — `artifacts`-Modell, Promotion/Idempotenz, ggb-Export
 - [Material-Werkstatt](material-werkstatt.md) — Dokument-Editor, Export-Pfade (weasyprint/Pandoc), Dialekt-Parität
+- [Schüler-Assistenten messen und ausliefern](assistenten-messen.md) — Szenarien, Messskript, Seed, Auslöser-Beispiele, Vorschlagsmessung
 - [Hinweise auf Neuerungen](neuigkeiten.md) — Hinweise auf der Startseite schreiben, wer sie sieht
 - [Lokales Dev-Setup](dev-setup.md) — Entwicklungsumgebung ohne Docker
 - [Backend-Entwicklung](backend-entwicklung.md) — Migrationen, Tests, Skripte

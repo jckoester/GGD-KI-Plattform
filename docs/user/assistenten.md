@@ -40,6 +40,27 @@ gewollt und hilft beim eigenen Verstehen. **Lehrkräfte** erhalten dagegen volls
 direkte Antworten (z. B. für die Unterrichtsvorbereitung). Manche Assistenten sind für
 beide Gruppen sichtbar und verhalten sich dann je nach angemeldeter Person unterschiedlich.
 
+## Assistenten für Naturwissenschaften
+
+Drei Assistenten bringt die Plattform für Schüler:innen mit. Sie heißen nach dem Muster
+„Assistent für …“:
+
+| Assistent | Wobei er hilft | Klassen |
+|---|---|---|
+| **stöchiometrische Berechnungen** | Rechnen mit Massen, Stoffmengen, Volumina und Konzentrationen bei chemischen Reaktionen | 8–13 |
+| **Reaktionsgleichungen** | Gleichungen aufstellen und ausgleichen, von der Wortgleichung bis zur Redoxgleichung | 8–13 |
+| **naturwissenschaftliche Aufgaben** | Aufgaben aus Biologie, Chemie, Physik und NwT: rechnen, erklären, Versuche und Diagramme auswerten, Experimente planen, beurteilen | 5–13 |
+
+Alle drei arbeiten gleich: **Sie rechnen und schreiben selbst, der Assistent begleitet.** Er
+fragt nach dem nächsten Schritt, gibt einen Hinweis, wenn Sie nicht weiterkommen, und nennt
+das Ergebnis nicht vorab — auch nicht, wenn Sie darum bitten. Er erklärt auf dem Stand Ihrer
+Klasse: In Klasse 8 ist eine Oxidation eine Reaktion mit Sauerstoff, die Fassung mit Elektronen
+kommt später.
+
+Geht Ihre Aufgabe eher in das Gebiet eines anderen Assistenten — etwa eine Rechnung im
+Assistenten für Reaktionsgleichungen —, sagt er es Ihnen; wechseln können Sie mit **`/`**
+im Eingabefeld, ohne den Chat zu verlieren.
+
 ## Eigene Assistenten erstellen
 
 Das Anlegen von Assistenten ist Lehrkräften und Administratoren vorbehalten. Wenn Sie eine Idee für einen nützlichen Assistenten haben, sprechen Sie Ihre Lehrkraft oder den IT-Verantwortlichen an.

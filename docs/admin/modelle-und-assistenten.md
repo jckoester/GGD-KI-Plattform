@@ -253,6 +253,16 @@ tragen Auslöser-Beispiele für den Vorschlag im Chat.
   `assistants.example.yaml`. Wer eine eigene führt, übernimmt neue Einträge von dort oder ruft
   das Skript mit `--config config/assistants.example.yaml` auf.
 
+**Auslöser-Beispiele** (Editor, Abschnitt „Vorschlag im Chat“): typische erste Nachrichten,
+für die ein Assistent passt, und Gegenbeispiele, die ähnlich klingen, aber nicht zu ihm gehören.
+Sie werden beim Speichern eingebettet (dasselbe Embedding-Modell wie die Suche im
+Wissensspeicher, über den Proxy; die Kosten trägt das Systemkonto). Was dabei scheitert, holt
+der nächtliche `embedding_backfill.py` nach — auch nach einem Wechsel des Embedding-Modells, ohne
+Umstellen einer Spalte. Der **Vorschlag im Chat** selbst kommt mit einer späteren Version; die
+Beispiele lassen sich schon pflegen. Eine erste Messung (27.10.2026) zeigt: Für eng umrissene
+Assistenten trennen die Beispiele gut von ihren Nachbarn, für breite Rückfall-Assistenten nicht
+von Alltagssätzen — der Vorschlag wird deshalb zusätzlich ein kurzes Modell fragen.
+
 Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodell
 (`CHAT_DEFAULT_MODEL`). Nur wenn er an ein **bestimmtes** Modell gebunden sein soll:
 
