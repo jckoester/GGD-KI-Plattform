@@ -225,6 +225,47 @@ Taxonomie und lässt den Embedding-Backfill laufen.
 
 ---
 
+## Operator der Aufgabe (0.23, Päckchen AF)
+
+Nennt eine Schülernachricht einen Operator („Erläutere die Funktion …“), setzt die Plattform
+dessen Definition als Abschnitt **„Operator dieser Aufgabe“** in den Systemtext — ohne
+Werkzeugrunde. Gedacht für einen Prompt mit Prüfregel (Assistent für naturwissenschaftliche
+Aufgaben, Prompt v5d): Gemessen wirkt die Definition **nur zusammen mit** der Regel, die
+Antwort Merkmal für Merkmal dagegen zu prüfen (Läufe 8–11 ohne Regel: keine Wirkung; 17–20 mit
+Regel: O1/O3/O5/O6 getroffen).
+
+- **Wer:** nur Assistenten mit `operator_faecher` (Fächerkreis, leer = aus). Freier Chat und
+  andere Assistenten bleiben unberührt.
+- **Erkennen** (`context/operator_erkennung.py`, reine Funktion): Befehlsform am Satzanfang —
+  regelmäßig über `nennung.stamm`, trennbar über eine Partikelliste („Werte … aus“, Partikel am
+  Satz- oder Teilsatzende, auch vor „und“), unregelmäßig über eine Ausnahmetabelle („Miss“,
+  „Gib … an“, „Nimm Stellung“). Nur ohne Imperativ zählt ein Infinitiv in einem Satz mit
+  „sollen/müssen“ („Das sollen wir erklären“). Formen werden **abgeleitet, nicht gespeichert** —
+  Operatoren entstehen nur durch den Scraper, gepflegte Aliase gingen beim Neuimport verloren.
+- **Nicht erkannt** wird bewusst: „Erkläre mir/uns …“ (eine Bitte an den Assistenten), ein
+  Operator mitten im Satz ohne Anführungszeichen, die Ihr-Form („Erklärt“). Ein Nomen am
+  Satzanfang („Vergleiche zeigen …“) trifft wie ein Imperativ — das kostet einen Abschnitt, mehr
+  nicht: Ohne vorgelegte Antwort greift die Prüfregel nicht.
+- **Folgezüge:** abgesucht werden die letzten 6 Nutzernachrichten, neueste zuerst; der jüngste
+  Operator gilt („keine ahnung“ behält den der Aufgabe).
+- **Definition** (`context/operator_abschnitt.py`): Kreis = Fächer des Assistenten, die in der
+  Klassenstufe unterrichtet werden (`subjects.min_grade/max_grade`); liegt das Konversationsfach
+  im Kreis, nur dieses. Fassung je Fach wie oben (`_auf_geltende_fassung`). Gleicher Wortlaut
+  wird zusammengefasst, abweichende stehen mit Fachnamen nebeneinander. Kennt die Fassung der
+  Klasse den Operator nicht (V2 hat kein *beurteilen*), gilt die neueste, die ihn kennt — mit
+  Hinweis in der Zeile. Zu *bewerten*/*beurteilen* kommt der Partner als „Abgrenzung“, wenn er
+  in derselben Fassung steht (Paartabelle im Code — Operator-Knoten tragen keine
+  Abgrenzungs-Kanten).
+- **Stelle:** hinter dem Assistenten-Prompt (`compose_system_content`, `operator_abschnitt`) —
+  dort stand er im Versuch; eine andere Stelle wäre eine ungemessene Bedingung.
+- **Messen:** `vorab_debug.operator` (erkannte Operatoren, Fächer, Fassungen); im Prüfsatz das
+  Feld `operator` je Zug (`docs/dev/assistenten-messen.md`).
+
+Kosten (Lauf 19, `chat-komplex`): Eingabe +2 %, Antwort je Zug +13 % gegenüber dem Handzusatz
+nur in den O-Fällen — vor allem längere Ausgaben.
+
+---
+
 ## Die Vorab-Suche: Zusage und Angebot (0.16)
 
 **Ein Inhalt wird geglaubt, also muss er sicher sein. Ein Titel kostet nichts, also darf er

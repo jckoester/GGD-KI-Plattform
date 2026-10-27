@@ -248,7 +248,8 @@ tragen Auslöser-Beispiele für den Vorschlag im Chat.
   die Stufen 5–13 freischalten, sonst lehnt der Proxy die Anfragen ab. Kosten rund 0,008 USD
   je Antwort.
 - **Schon von Hand angelegt?** Ein Assistent gleichen Namens wird nicht verändert. Hat er noch
-  keine Auslöser-Beispiele, trägt das Skript nur diese nach (samt Vorschlagsart und -text), ebenso fehlende Rückfälle.
+  keine Auslöser-Beispiele, trägt das Skript nur diese nach (samt Vorschlagsart und -text), ebenso fehlende Rückfälle und
+  ein leeres Feld „Operatoren aus diesen Fächern“.
 - ⚠️ **Eine eigene `config/assistants.yaml` hat Vorrang** vor der mitgelieferten
   `assistants.example.yaml`. Wer eine eigene führt, übernimmt neue Einträge von dort oder ruft
   das Skript mit `--config config/assistants.example.yaml` auf.
@@ -320,6 +321,22 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
 Schreibende Planungs-Funktionen bleiben damit strikt an die Lehrkraft-Rolle gebunden;
 für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt
 `student_planning`.
+
+### Operatoren aus diesen Fächern (`operator_faecher`)
+
+Unter den Fähigkeiten (nur für Admins): Nennt eine Aufgabe einen Operator („Erläutere …“,
+„Werte … aus“, „Das sollen wir begründen“), bekommt der Assistent dessen Definition aus dem
+Bildungsplan — in der Fassung, die für die Klasse gilt — als Abschnitt im Systemtext. **Leer =
+aus.** Sinnvoll nur mit einem Prompt, der Antworten gegen den Operator prüft; ohne eine solche
+Regel ändert die Definition die Antworten nicht (gemessen).
+
+- Der Assistent für naturwissenschaftliche Aufgaben bringt `biologie, chemie, physik, nwt, nit`
+  mit. Ein Fach, das es an der Schule nicht gibt, übergeht der Seed mit Warnung; `nit` gibt es
+  erst ab 2027/28.
+- ⚠️ **Nachgetragen wird nur ein leeres Feld.** Kommt später ein Fach dazu (etwa NiT), ergänzt
+  man es im Editor; der Seed lässt ein gesetztes Feld stehen.
+- Ein Fach, das es nicht (mehr) gibt, steht im Editor kursiv; der YAML-Import übergeht es mit
+  Hinweis.
 
 ### Stundenentwurfs-Assistent einrichten
 
