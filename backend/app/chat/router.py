@@ -1049,10 +1049,13 @@ async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
 
 
 async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
-    """Operatoren des Konversations-Fachs (aktuelle Edition) für den Assistenten.
+    """Operatoren des Konversations-Fachs in der geltenden Fassung für den Assistenten.
 
-    Deterministisch (keine Top-k-Suche): liefert die vollständige Operatorenliste
-    der neuesten importierten Edition (`bp_version`) des Fachs, alphabetisch.
+    Deterministisch (keine Top-k-Suche): liefert die vollständige Operatorenliste des
+    Fachs, alphabetisch — in der **Fassung, die für die Stufe der Person gilt**
+    (Päckchen AE, F3 a, 27.10.2026: Gruppe der Konversation, sonst Anmeldung). Ohne Stufe,
+    oder wenn sich für Operatoren keine Fassung bestimmen lässt, wie bis dahin die neueste
+    importierte (`bp_version`).
 
     Gedacht für die **Unterrichtsplanung**, wo das Fach feststeht. Kann es nicht
     antworten — kein Fachbezug, kein Import —, gibt es statt einer leeren Liste einen
@@ -1119,9 +1122,11 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
                 "vorhanden."
             )
         }
-    # Aktuelle Edition = neuestes bp_version (V1/V2/V3 koexistieren als Knoten).
-    # Operatoren tragen keine Kompetenznummer, werden von der Fassungs-Deduplizierung
-    # der Aufzählung also nicht erfasst — die Auswahl der Edition bleibt hier.
+    # Mit bekannter Stufe hat die Aufzählung schon auf die geltende Fassung gefiltert
+    # (`_auf_geltende_fassung`, je Fach und Bausteinart) — dann steht hier nur noch eine,
+    # und „neueste“ ist genau sie. Ohne Stufe (oder ohne bestimmbare Fassung) liegen
+    # mehrere nebeneinander; Operatoren tragen keine Kompetenznummer und fallen in der
+    # Aufzählung nicht zusammen. Dann bleibt es beim Rückfall auf die neueste.
     newest = max(n.get("bp_version") or "" for n in rows)
     current = [n for n in rows if (n.get("bp_version") or "") == newest]
     current.sort(key=lambda n: (n.get("title") or "").lower())

@@ -120,3 +120,39 @@ async def test_gesamt_zaehlt_nach_dem_filter(async_engine, operatoren):
     """`gesamt` ist die Zahl der Bausteine, die für die Person gelten — nicht der Bestand."""
     abschnitt, _ = await _erklaeren(async_engine, 7, subject_id=BIO["id"])
     assert abschnitt.gesamt == 1 and abschnitt.vollstaendig
+
+
+# ── Schritt 3: get_operatoren (F3 a) ─────────────────────────────────────────
+
+
+async def _get_operatoren(async_engine, stufe):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.chat import router
+
+    fabrik = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    with patch("app.context.editions.load_subjects_config", return_value=FAHRPLAN), \
+         patch("app.context.editions.aktuelles_schuljahr_start", return_value=2026), \
+         patch.object(router, "_resolve_conversation_subject_id", new=AsyncMock(return_value=BIO["id"])), \
+         patch.object(router, "stufe_der_person", new=AsyncMock(return_value=stufe)):
+        async with fabrik() as db:
+            ctx = router.ToolContext(db=db, user=SimpleNamespace(sub="ae-test", roles=["student"], grade=None),
+                                     group_id=None, conversation_id=None)
+            return await router._exec_get_operatoren(ctx)
+
+
+async def test_get_operatoren_klasse_9_bekommt_v2(async_engine, operatoren):
+    """Vorher stets die neueste Fassung (V3) — für eine Neuntklässlerin, die nach V2 lernt."""
+    (eintrag,) = await _get_operatoren(async_engine, 9)
+    assert eintrag["bedeutung"] == DEF[(310, "2016.V2")]
+
+
+async def test_get_operatoren_klasse_7_bekommt_v3(async_engine, operatoren):
+    (eintrag,) = await _get_operatoren(async_engine, 7)
+    assert eintrag["bedeutung"] == DEF[(310, "2016.V3")]
+
+
+async def test_get_operatoren_ohne_stufe_wie_bisher_die_neueste(async_engine, operatoren):
+    (eintrag,) = await _get_operatoren(async_engine, None)
+    assert eintrag["bedeutung"] == DEF[(310, "2016.V3")]
