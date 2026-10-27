@@ -691,12 +691,18 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     deckeln.
     """
     tiefe = settings.assistant_context_limit
+    # Stufe vorab (Päckchen AE, 0.22): Sie entscheidet, welche Bildungsplan-Fassung gilt
+    # (`Suchprofil.grade` → `_auf_geltende_fassung`), und unten den Stufenvermerk. Je
+    # Aufruf ermittelt, nicht je Anfrage: `waehle_stunde` kann die Gruppe mitten in der
+    # Anfrage setzen, und mit ihr ändert sich die Stufe.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
     ergebnis = await suche(
         args.get("query", ""),
         Suchprofil(
             pseudonym=ctx.user.sub,
             rollen=ctx.user.roles,
             subject_id=await _resolve_conversation_subject_id(ctx),
+            grade=stufe,
             identifikation=tiefe,
             thematisch=tiefe,
             # Roh geholt, ausgewählt wird in `fuer_modell` (Paket 9, AP3). Kostet
@@ -719,8 +725,9 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     # Klassenstufe (N5) und Stufenvermerk je Treffer (N6). Die passende Fassung wandert
     # nach vorn; **ausgeblendet wird nichts** — wer ausdrücklich nach der späteren
     # Fassung fragt, soll sie finden, statt eine Antwort aus dem Modellwissen zu
-    # bekommen.
-    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
+    # bekommen. (Das gilt für die *Fassungen eines Fachbegriffs*; welche
+    # *Bildungsplan-Edition* gilt, hat `Suchprofil.grade` oben schon entschieden — eine
+    # V2-Kompetenz ist für eine V3-Klasse keine spätere Fassung, sondern nicht ihr Plan.)
     baender = await bp_baender_zu(ctx.db, alle, stufe) if stufe is not None else {}
     vermerke = stufen_vermerke(alle, stufe, baender)
     if vermerke:
@@ -916,6 +923,8 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
 
     titel = (args.get("titel") or "").strip()
     content_type = (args.get("content_type") or "").strip()
+    # Stufe vorab (Päckchen AE): geltende Bildungsplan-Fassung in der Aufzählung.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
     abschnitt = await aufzaehlung(
         Knotenfilter(
             titel=normalisiere_titel(titel) if titel else None,
@@ -930,6 +939,7 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             pseudonym=ctx.user.sub,
             rollen=ctx.user.roles,
             subject_id=subject_id,
+            grade=stufe,
             aufzaehlung=settings.assistant_context_limit,
         ),
         ctx.db,
@@ -944,7 +954,6 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     # ⚠️ **Hier wird gekennzeichnet, aber nicht sortiert.** Eine Aufzählung beantwortet
     # „alle, die …" und ist nach Fach und Titel geordnet; diese Ordnung ist die Aussage.
     # Sie nach Stufe umzustellen machte aus der Liste eine Rangfolge.
-    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
     baender = (
         await bp_baender_zu(ctx.db, abschnitt.treffer, stufe) if stufe is not None else {}
     )
@@ -1090,6 +1099,9 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
             pseudonym=ctx.user.sub,
             rollen=ctx.user.roles,
             subject_id=subject_id,
+            # Päckchen AE, F3 (a): die Fassung, die für diese Stufe gilt — nicht mehr stets
+            # die neueste. Ohne Stufe (Lehrkraft ohne Gruppe) wie bisher.
+            grade=await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade),
             # Die Operatorenliste eines Fachs ist vollständig zu liefern — sie ist der
             # Zweck dieses Werkzeugs. Ein Fach führt selten mehr als 40 Operatoren.
             aufzaehlung=_AUFZAEHLUNG_MAX,

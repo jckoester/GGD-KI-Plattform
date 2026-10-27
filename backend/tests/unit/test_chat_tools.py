@@ -267,7 +267,7 @@ async def test_get_operatoren_current_edition_only_and_mapping():
     db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))  # Group → Fach
 
     ctx = ToolContext(
-        db=db, user=SimpleNamespace(sub="p", roles=["teacher"]),
+        db=db, user=SimpleNamespace(sub="p", roles=["teacher"], grade=None),
         group_id=2, conversation_id=None,
     )
     with patch.object(
