@@ -52,6 +52,7 @@ def test_pruefsatz_nicht_unter_den_beispielen(szenario, name):
     assert (kopf["min_grade"], kopf["max_grade"], kopf["modell"]) == (
         eintrag["min_grade"], eintrag["max_grade"], eintrag["model"])
     assert kopf["ohne"] == eintrag["disabled_augmentations"]
+    assert kopf.get("operator_faecher", []) == eintrag.get("operator_faecher", [])
 
 
 def test_rueckfaelle_zeigen_auf_assistenten_der_datei():

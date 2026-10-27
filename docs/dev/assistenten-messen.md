@@ -30,7 +30,7 @@ venv/bin/python scripts/assistent_messung.py --szenarien scripts/szenarien/reakt
 
 Das Skript legt den Assistenten aus dem **Kopf der Szenariodatei** an oder bringt ihn auf den
 Stand der Promptdatei (Name, Fach — `null` = fachübergreifend —, Klassenstufen, Modell,
-abgeschaltete Augmentierungen), spielt jeden Fall als neue Konversation mit der Stufe des Falls
+abgeschaltete Augmentierungen, Fächer für Operatoren `operator_faecher` — nur die, die es hier gibt), spielt jeden Fall als neue Konversation mit der Stufe des Falls
 durch und schreibt ein Protokoll (`verlauf-<lauf>.md` zum Abhaken, `.json` zum Vergleichen). Die
 Konversationen werden danach gelöscht.
 
@@ -41,11 +41,14 @@ Automatisch geprüft je Zug:
 | `verboten` (je Zug) | Werte, die die Schüler:in noch nicht genannt hat — **Vorgriff**. Normalisiert (LaTeX, mhchem, Dezimalkomma, Zahlen an Ziffergrenzen); der Selbsttest prüft das Instrument in beide Richtungen |
 | `stufenfremd` (je Fall) | Begriffe, die in der Stufe noch nicht dran sind — **Stufenvorgriff**; ein Wort trifft seine Zusammensetzungen |
 | `werkzeug` (je Zug, optional) | Soll-Werkzeug, z. B. `list_context_nodes`; Zusammenfassung „Operator nachgeschlagen: n von m“ |
+| `operator` (je Zug, optional) | Soll der Operator-Erkennung (Päckchen AF): welche Operatoren der Messkanal melden soll, `[]` = keiner; Zusammenfassung „Operator erkannt wie Soll: n von m“ |
 | Kosten | Tokens und USD je Zug aus `messages` (wartet auf nachgetragene Kosten), Anteil des Prompts an den Eingabetokens (tiktoken) |
 
 `muss`/`darf_nicht` prüft ein Mensch im Protokoll. Optionen: `--nur <fall>` (mehrfach), `--prompt`
 (Variante außerhalb des Repos), `--ohne-augmentierung`, `--vorlauf <yaml>` (Standard-Chat-Züge
-vorab, dann Wechsel zum Assistenten in derselben Konversation).
+vorab, dann Wechsel zum Assistenten in derselben Konversation), `--systemtext-zusatz` (Feld
+`systemtext_zusatz` eines Falls von Hand an den Prompt; dann ohne Fächerkreis, sonst stünde die
+Definition doppelt da — der Vergleichsarm zum Plattformabschnitt).
 
 ⚠️ **zsh teilt Variablen nicht an Leerzeichen.** `NUR="--nur A --nur B"; … $NUR` übergibt *ein*
 Argument, und das Skript bricht ab. Mehrere `--nur` als bash-Array oder ausgeschrieben.

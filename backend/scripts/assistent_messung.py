@@ -84,10 +84,15 @@ def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
         "max_grade": kopf.get("max_grade"),
         "modell": kopf.get("modell", VORGABE_MODELL),
         "ohne": list(kopf.get("ohne", VORGABE_OHNE)),
+        # Päckchen AF: Fächerkreis für den Abschnitt „Operator dieser Aufgabe" (leer = aus).
+        "operator_faecher": [str(f) for f in kopf.get("operator_faecher") or []],
     }
     # YAML liest `36` als Zahl — Prüfwerte sind immer Text.
     for fall in daten["faelle"]:
         fall["stufenfremd"] = [str(w) for w in fall.get("stufenfremd") or []]
+        for zug in fall["zuege"]:
+            if zug.get("operator") is not None:
+                zug["operator"] = [str(o) for o in zug["operator"]]
         for zug in fall["zuege"]:
             zug["verboten"] = [str(v) for v in zug.get("verboten") or []]
     return profil, daten["faelle"]
@@ -240,7 +245,7 @@ def selbsttest(faelle: list[dict]) -> bool:
 
 
 def assistent(conn, profil: dict, prompt_datei: Path | None = None,
-              ohne: list[str] | None = None) -> int:
+              ohne: list[str] | None = None, operator_faecher: list[str] | None = None) -> int:
     """Den Assistenten des Profils anlegen oder auf den Stand der Promptdatei bringen.
 
     Für Experimente: ``prompt_datei`` (eine Variante außerhalb des Repos) und ``ohne``
@@ -255,17 +260,22 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
     werte = dict(system_prompt=prompt, subject_id=chemie, audience="student", scope="all_students",
                  status="active", min_grade=profil["min_grade"], max_grade=profil["max_grade"],
                  model=profil["modell"], tool_groups="[]",
-                 disabled_augmentations="{" + ",".join(ohne) + "}")
+                 disabled_augmentations="{" + ",".join(ohne) + "}",
+                 # Nur Fächer, die es hier gibt — wie der Seed (`nit` kommt erst 2027/28).
+                 operator_faecher=json.dumps([
+                     f for f in (profil["operator_faecher"] if operator_faecher is None else operator_faecher)
+                     if _eins(conn, "SELECT 1 FROM subjects WHERE slug = %s", f)]))
     kennung = _eins(conn, "SELECT id FROM assistants WHERE name = %s", name)
     with conn.cursor() as cur:
         if kennung is None:
             cur.execute(
                 "INSERT INTO assistants (name, description, system_prompt, subject_id, audience, scope, status, "
-                "min_grade, max_grade, model, tool_groups, disabled_augmentations, visibility, tags, "
-                "created_by, creator_role, created_at, updated_at) VALUES "
+                "min_grade, max_grade, model, tool_groups, disabled_augmentations, operator_faecher, visibility, "
+                "tags, created_by, creator_role, created_at, updated_at) VALUES "
                 "(%(name)s, %(beschreibung)s, %(system_prompt)s, %(subject_id)s, %(audience)s, %(scope)s, "
                 "%(status)s, %(min_grade)s, %(max_grade)s, %(model)s, %(tool_groups)s::jsonb, "
-                "%(disabled_augmentations)s::text[], 'public', '{}'::text[], '__messung__', 'admin', now(), now()) "
+                "%(disabled_augmentations)s::text[], %(operator_faecher)s::jsonb, 'public', '{}'::text[], "
+                "'__messung__', 'admin', now(), now()) "
                 "RETURNING id",
                 werte | {"name": name, "beschreibung": profil["beschreibung"]},
             )
@@ -275,7 +285,8 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
                 "UPDATE assistants SET system_prompt = %(system_prompt)s, subject_id = %(subject_id)s, "
                 "audience = %(audience)s, scope = %(scope)s, status = %(status)s, min_grade = %(min_grade)s, "
                 "max_grade = %(max_grade)s, model = %(model)s, tool_groups = %(tool_groups)s::jsonb, "
-                "disabled_augmentations = %(disabled_augmentations)s::text[], updated_at = now() WHERE id = %(id)s",
+                "disabled_augmentations = %(disabled_augmentations)s::text[], "
+                "operator_faecher = %(operator_faecher)s::jsonb, updated_at = now() WHERE id = %(id)s",
                 werte | {"id": kennung},
             )
     # Anker leeren: „Wissensbereich leer" (Plan, Einrichtung).
@@ -387,6 +398,8 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                 "angebot": [a["titel"] for a in (ergebnis.get("vorab_debug") or {}).get("angebot", [])],
                 "suchanfragen": (ergebnis.get("vorab_debug") or {}).get("suchanfragen", []),
                 "aufzaehlungen": (ergebnis.get("vorab_debug") or {}).get("aufzaehlungen", []),
+                "operator": (ergebnis.get("vorab_debug") or {}).get("operator"),
+                "operator_soll": zug.get("operator"),
                 "werkzeug_soll": zug.get("werkzeug"),
                 "knoten": knoten_der_antwort(conn, konversation),
                 "vorgriffe": vorgriffe(ergebnis["antwort"], zug.get("verboten")),
@@ -462,6 +475,17 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
                 t.append(f"  - `list_context_nodes`: titel={a.get('titel')!r}, content_type={a.get('content_type')!r}, "
                          f"subject={a.get('subject')!r}, grade={a.get('grade')!r} → gesamt {a.get('gesamt')}, "
                          f"geliefert {a.get('geliefert')}" + (f", Hinweis: {a['hinweis']}" if a.get("hinweis") else ""))
+            if z.get("operator") or z.get("operator_soll") is not None:
+                op = z.get("operator") or {}
+                erkannt = op.get("operatoren") or []
+                zeile = (f"**Operator:** {', '.join(erkannt) or '—'}"
+                         + (f" ({', '.join(op.get('faecher') or [])}; {', '.join(op.get('fassungen') or [])})"
+                            if erkannt else ""))
+                if z.get("operator_soll") is not None:
+                    ok = erkannt == z["operator_soll"]
+                    zeile = (f"{'✓' if ok else '⚠️'} {zeile}"
+                             + ("" if ok else f" — Soll: {', '.join(z['operator_soll']) or 'keiner'}"))
+                t.append(f"- {zeile}")
             if z.get("werkzeug_soll"):
                 ok = z["werkzeug_soll"] in z["werkzeuge"]
                 t.append(f"- {'✓' if ok else '⚠️'} **Soll-Werkzeug `{z['werkzeug_soll']}`:** "
@@ -501,8 +525,24 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
              + ("" if not stufe else " — " + "; ".join(
                  f"{i} Zug {z['nr']}: {', '.join(v['wert'] for v in z['stufenvorgriffe'])}" for i, z in stufe)))
     t += werkzeug_zusammenfassung(zuege)
+    t += operator_zusammenfassung(zuege)
     t += kosten_zusammenfassung(kopf, zuege)
     return "\n".join(t) + "\n"
+
+
+def operator_zusammenfassung(zuege: list[tuple[str, dict]]) -> list[str]:
+    """Erkennung gegen das Soll (Feld `operator` je Zug, Päckchen AF) und wie oft ein Abschnitt kam."""
+    soll = [(i, z) for i, z in zuege if z.get("operator_soll") is not None]
+    mit = [z for _, z in zuege if (z.get("operator") or {}).get("operatoren")]
+    if not soll and not mit:
+        return []
+    falsch = [f"{i} Zug {z['nr']}" for i, z in soll
+              if ((z.get("operator") or {}).get("operatoren") or []) != z["operator_soll"]]
+    zeilen = [f"- **Operator-Abschnitt:** in {len(mit)} Zügen"]
+    if soll:
+        zeilen.append(f"- **Operator erkannt wie Soll:** {len(soll) - len(falsch)} von {len(soll)}"
+                      + (f" — abweichend: {'; '.join(falsch)}" if falsch else ""))
+    return zeilen
 
 
 def werkzeug_zusammenfassung(zuege: list[tuple[str, dict]]) -> list[str]:
@@ -594,7 +634,8 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     conn = entfall.verbindung()
     if args.ohne is not None:
         args.ohne = [o for o in args.ohne if o != "keine"]
-    kennung = assistent(conn, profil, args.prompt, args.ohne)
+    # Mit Handzusatz (Versuch Prüfregel, Arm B) ohne Fächerkreis — sonst stünde die Definition doppelt da.
+    kennung = assistent(conn, profil, args.prompt, args.ohne, [] if args.systemtext_zusatz else None)
     args.ohne = profil["ohne"] if args.ohne is None else args.ohne
     zeile = _alle(conn, "SELECT pseudonym FROM pseudonym_audit WHERE roles::text LIKE '%%student%%' "
                         "AND litellm_key IS NOT NULL AND pseudonym LIKE %s ORDER BY created_at LIMIT 1",

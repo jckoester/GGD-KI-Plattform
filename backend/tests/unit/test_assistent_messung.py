@@ -60,3 +60,28 @@ def test_kostenzusammenfassung_und_promptanteil():
 
 def test_kosten_ohne_angaben():
     assert "keine Angaben" in M.kosten_zusammenfassung({}, [("a", {})])[0]
+
+
+def test_operator_zusammenfassung():
+    """Päckchen AF: erkannt gegen Soll; `[]` heißt „keiner erwartet“."""
+    zuege = [
+        ("O1", {"nr": 1, "operator": {"operatoren": ["erläutern"]}, "operator_soll": ["erläutern"]}),
+        ("S7", {"nr": 1, "operator": None, "operator_soll": []}),
+        ("S6", {"nr": 2, "operator": None, "operator_soll": ["begründen"]}),
+        ("R2", {"nr": 1, "operator": None}),
+    ]
+    assert M.operator_zusammenfassung(zuege) == [
+        "- **Operator-Abschnitt:** in 1 Zügen",
+        "- **Operator erkannt wie Soll:** 2 von 3 — abweichend: S6 Zug 2",
+    ]
+    assert M.operator_zusammenfassung([("R2", {"nr": 1})]) == []
+
+
+def test_operator_soll_wird_text(tmp_path):
+    datei = tmp_path / "s.yaml"
+    datei.write_text("assistent:\n  name: N\n  prompt: config/prompts/nw_aufgaben_assistent.md\n"
+                     "  operator_faecher: [biologie]\nfaelle:\n- id: A\n  titel: T\n  stufe: 7\n"
+                     "  zuege:\n  - schueler: x\n    operator: [erläutern]\n", encoding="utf-8")
+    profil, faelle = M.profil_laden(datei)
+    assert profil["operator_faecher"] == ["biologie"]
+    assert faelle[0]["zuege"][0]["operator"] == ["erläutern"]

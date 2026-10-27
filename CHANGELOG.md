@@ -16,6 +16,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Klasse im Systemtext, bei *bewerten*/*beurteilen* mit Abgrenzung. Folgenachrichten behalten den Operator
   der Aufgabe davor.
 
+### Geändert
+
+- **Assistent für naturwissenschaftliche Aufgaben:** neuer Prompt. Er prüft eine vorgelegte Antwort Merkmal für
+  Merkmal gegen die Definition des Operators und schlägt Operatoren nicht mehr selbst nach.
+
 ### Entfernt
 
 - **Chat-Werkzeug `get_operatoren`.** Operatorenlisten liefert `list_context_nodes`.

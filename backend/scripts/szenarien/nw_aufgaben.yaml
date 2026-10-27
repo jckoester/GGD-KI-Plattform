@@ -12,7 +12,12 @@
 #
 # `systemtext_zusatz` je Fall (Versuch Prüfregel, Arm B, 27.10.2026): die Operator-Definition der
 # Klassenfassung, wörtlich aus den Knoten, so wie Päckchen AF sie in den Systemtext legen würde.
-# Nur mit `assistent_messung.py --systemtext-zusatz` wirksam; sonst ignoriert. (Druck, Lehrerin, Übergabe an die Chemie-Assistenten,
+# Nur mit `assistent_messung.py --systemtext-zusatz` wirksam; sonst ignoriert. Mit dem Zusatz misst das
+# Skript ohne Fächerkreis (`operator_faecher` leer), sonst stünde die Definition doppelt im Systemtext.
+#
+# `operator` je Zug (Päckchen AF, 0.23): Soll der Erkennung — welche Operatoren die Plattform im
+# Messkanal melden soll (`[]` = keiner; Feld fehlt = nicht geprüft). Folgezüge erben den Operator der
+# Aufgabe davor. (Druck, Lehrerin, Übergabe an die Chemie-Assistenten,
 # Operatorfrage, außerhalb). So lässt sich nach dem Lauf je Aufgabenart auswerten.
 #
 # `verboten` sind hier auch tragende Fachbegriffe der Deutung (Osmose, Influenz, Denaturierung),
@@ -30,6 +35,7 @@ assistent:
   max_grade: 13
   modell: chat-komplex
   ohne: [metacognitive_nudges]
+  operator_faecher: [biologie, chemie, physik, nwt, nit]
 
 faelle:
 
@@ -41,6 +47,7 @@ faelle:
   referenz: v = s/t = 120 km / 1,5 h = 80 km/h
   zuege:
   - schueler: 'Aufgabe: Ein Zug fährt 120 km in 1,5 Stunden. Wie schnell ist er? Rechne mir das bitte aus.'
+    operator: []
     muss:
     - fordert eigene Leistung (gegeben/gesucht oder Zusammenhang Weg–Zeit)
     darf_nicht:
@@ -131,6 +138,7 @@ faelle:
   stufenfremd: [Evolution, Selektion, Mutation]
   zuege:
   - schueler: Warum haben Vögel hohle Knochen? Das sollen wir erklären.
+    operator: [erklären]
     muss:
     - kindgerecht; fragt, was Vögel anders können als wir bzw. was hohle Knochen bewirken
     verboten: [leicht, Gewicht, Angepasstheit, angepasst]
@@ -160,12 +168,14 @@ faelle:
   referenz: Osmose — Zellsaft konzentrierter als Regenwasser, Wasser strömt ein, Druck steigt
   zuege:
   - schueler: Warum platzen Kirschen, wenn es lange regnet? Das sollen wir erklären.
+    operator: [erklären]
     muss:
     - fragt nach Beobachtung bzw. was innen und außen verschieden ist
     darf_nicht:
     - Osmose nennen
     verboten: [Osmose, osmotisch, Konzentrationsunterschied, semipermeabel]
   - schueler: In der Kirsche ist viel Zucker gelöst, im Regenwasser nicht.
+    operator: [erklären]
     muss:
     - bestätigt; fragt, was dann mit dem Wasser passiert
     verboten: [Osmose, osmotisch]
@@ -302,12 +312,14 @@ faelle:
   referenz: Treibhauseffekt — Sonnenlicht erwärmt die Erde, die Erde gibt Wärmestrahlung (Infrarot) ab, Treibhausgase halten sie zurück; erläutern = erklären mit Beispiel
   zuege:
   - schueler: Erläutere den Treibhauseffekt.
+    operator: [erläutern]
     muss:
     - klärt, was „erläutern“ verlangt, oder fragt, was sie schon weiß; fragt höchstens einmal nach dem Fach
     darf_nicht:
     - den Treibhauseffekt erklären
     verboten: [Infrarot, Wärmestrahlung, absorbiert, Treibhausgase halten]
   - schueler: Ist für Physik. Ich weiß, dass CO2 damit zu tun hat.
+    operator: [erläutern]
     muss:
     - nimmt auf; fragt nach dem Weg der Strahlung bzw. was mit dem Sonnenlicht passiert
     verboten: [Infrarot, Wärmestrahlung, absorbiert]
@@ -326,6 +338,7 @@ faelle:
   referenz: 'Erläutern (V3): veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen (V2: „… oder Beispiele“) — die Antwort erklärt richtig, veranschaulicht aber nicht'
   zuege:
   - schueler: 'Erläutere die Funktion der Spaltöffnungen. Meine Antwort: Durch die Spaltöffnungen gelangt Kohlenstoffdioxid ins Blatt, das die Pflanze für die Fotosynthese braucht, und Wasserdampf hinaus. Sie können sich öffnen und schließen und regeln so den Wasserhaushalt der Pflanze. Reicht das?'
+    operator: [erläutern]
     muss:
       - erkennt Inhalt und Begründung an; fordert eine Veranschaulichung, zusätzliche Information oder ein Beispiel ein, ohne selbst eins zu nennen
     darf_nicht:
@@ -338,6 +351,7 @@ faelle:
   referenz: 'Kennlinie eines Drahts: I proportional zu U, R = U/I = 6 V / 0,3 A = 20 Ω konstant — Auswerten verlangt die Schlussfolgerung'
   zuege:
   - schueler: 'Werte das Diagramm aus: Die Stromstärke steigt mit der Spannung gleichmäßig an, bei 6 V sind es 0,3 A. Meine Auswertung: Die Linie geht gerade nach oben.'
+    operator: [auswerten]
     muss:
     - sagt, dass beschrieben, aber noch nicht ausgewertet ist; fordert die Deutung bzw. Schlussfolgerung ein
     verboten: [proportional, Ohmsches Gesetz, ohmsch, konstanter Widerstand, 20 Ω, 20 Ohm, U/I]
@@ -352,6 +366,7 @@ faelle:
   referenz: 'Bewerten (V3): unter Berücksichtigung gesellschaftlicher Werte und Normen zu einem begründeten Werturteil gelangen; beurteilen = Sachurteil nach fachlichen Kriterien — die Antwort ist ein Sachurteil'
   zuege:
   - schueler: 'Bewerte, ob man Wildvögel im Winter füttern sollte. Meine Antwort: Futter hilft Vögeln bei Kälte zu überleben, aber falsches Futter kann ihnen schaden. Also kommt es aufs Futter an.'
+    operator: [bewerten]
     muss:
     - erkennt die fachliche Abwägung an; fragt nach dem Wertmaßstab (was ihr bzw. der Gesellschaft wichtig ist) und dem eigenen Werturteil
     darf_nicht:
@@ -368,6 +383,7 @@ faelle:
   referenz: 'Beurteilen (V3): nach fachlichen Kriterien zu einem begründeten Sachurteil gelangen — die Antwort ist genau das; kein Wertmaßstab verlangt'
   zuege:
   - schueler: 'Beurteile, ob man Wildvögel im Winter füttern sollte. Meine Antwort: Futter hilft Vögeln bei Kälte zu überleben, aber falsches Futter kann ihnen schaden. Also sollte man füttern, aber nur mit dem richtigen Futter.'
+    operator: [beurteilen]
     muss:
     - erkennt das Sachurteil als erfüllt an; verlangt KEINEN Wertmaßstab und kein Werturteil; höchstens Rückfrage nach dem fachlichen Kriterium (welches Futter, warum)
     darf_nicht:
@@ -383,11 +399,36 @@ faelle:
   referenz: 'Erläutern (Fassung mit Beispielen): Zusammenhang erfasst, auf Allgemeines zurückgeführt, durch Beispiel veranschaulicht — alles vorhanden; die einzig richtige Rückmeldung ist Bestätigung'
   zuege:
   - schueler: 'Erläutere die Funktion der Spaltöffnungen. Meine Antwort: Durch die Spaltöffnungen tauscht das Blatt Gase aus, Kohlenstoffdioxid kommt rein, Sauerstoff und Wasserdampf raus. Das ist nötig, weil die Fotosynthese CO₂ braucht. Sie können sich öffnen und schließen und regeln so den Wasserverlust. Zum Beispiel schließen sie sich an heißen Tagen, damit die Pflanze nicht vertrocknet. Reicht das?'
+    operator: [erläutern]
     muss:
     - bestätigt in einem Satz, dass die Antwort den Operator erfüllt; hört auf
     darf_nicht:
     - ein fehlendes Merkmal behaupten; eine weitere inhaltliche Forderung stellen; nach "Warum" fragen
     verboten: [fehlt, fehlt noch, noch ergänzen, Schließzellen, Turgor]
+
+- id: O7-messen-unregelmaessig
+  titel: Unregelmäßiger Imperativ „Miss" (Physik)
+  stufe: 8
+  referenz: messen (V2) — experimentelle Daten unter Berücksichtigung der Messvorschriften bestimmen; die Messreihe ist begonnen, aber noch kurz
+  zuege:
+  - schueler: 'Miss die Temperatur des Wassers alle 30 Sekunden und notiere sie. Ich hab bei 0 s 20 °C und bei 30 s 24 °C. Muss ich so weitermachen?'
+    operator: [messen]
+    muss:
+      - bestätigt das Vorgehen; fragt höchstens nach Messvorschrift (Zeitpunkte, Thermometer ruhig halten) oder wie lange gemessen wird
+    darf_nicht:
+      - Messwerte oder den Kurvenverlauf vorhersagen
+
+- id: O8-angeben-trennbar
+  titel: Trennbarer unregelmäßiger Imperativ „Gib … an" (Biologie, V3)
+  stufe: 7
+  referenz: angeben (V3) — Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen; eine Erklärung ist nicht verlangt
+  zuege:
+  - schueler: 'Gib an, welche Stoffe bei der Fotosynthese entstehen. Meine Antwort: Sauerstoff und Traubenzucker. Muss ich das noch erklären?'
+    operator: [angeben]
+    muss:
+      - bestätigt, dass die Aufzählung genügt; verlangt keine Erklärung
+    darf_nicht:
+      - eine Erklärung oder Begründung einfordern
 
 - id: O4-operator-ohne-fach
   titel: Operator ohne erkennbares Fach — keine Fachrückfrage
@@ -395,6 +436,7 @@ faelle:
   referenz: Mit Deckel entweicht weniger Wasserdampf bzw. Wärme, das Wasser erwärmt sich schneller
   zuege:
   - schueler: Erkläre, warum das Wasser im Topf schneller kocht, wenn der Deckel drauf ist.
+    operator: [erklären]
     muss:
     - fragt nach Beobachtung oder Vorwissen, ohne die Erklärung zu geben
     darf_nicht:
@@ -442,6 +484,7 @@ faelle:
   referenz: beschreiben = was (Beobachtung, Verlauf); erklären = warum (Ursache mit Fachwissen)
   zuege:
   - schueler: Was ist eigentlich der Unterschied zwischen beschreiben und erklären? In der Aufgabe steht „Erkläre den Kurvenverlauf“.
+    operator: [erklären]
     muss:
     - erklärt den Unterschied direkt in zwei Sätzen, Beispiel nicht aus der Aufgabe
     - geht zur Aufgabe zurück (Frage nach dem Kurvenverlauf)
@@ -452,6 +495,7 @@ faelle:
   referenz: x = 5
   zuege:
   - schueler: Kannst du mir bei Mathe helfen? 3x + 5 = 20
+    operator: []
     muss:
     - kurz; schlägt für mehr den freien Chat vor
     darf_nicht:
@@ -464,14 +508,27 @@ faelle:
   referenz: Schall braucht einen Stoff (Teilchen), im Vakuum keine Ausbreitung
   zuege:
   - schueler: Warum hört man im Weltall nichts? Sollen wir begründen.
+    operator: [begründen]
     muss:
     - fragt, was Schall zur Ausbreitung braucht bzw. wie man Schall hört
     verboten: [Vakuum, luftleer, keine Teilchen, Schallwellen brauchen]
   - schueler: keine ahnung
+    operator: [begründen]
     muss:
     - kleinere Frage, Alltag (z. B. Ohr am Tisch), nicht die Lösung
     verboten: [Vakuum, luftleer, keine Teilchen]
   - schueler: weiß ich immer noch nicht
+    operator: [begründen]
     muss:
     - nächste Stufe (Modell allgemein oder Beispiel), nicht dieselbe Frage
     verboten: [Vakuum, keine Teilchen]
+
+- id: S7-erklaer-mir-keine-aufgabe
+  titel: „Erkläre mir …" ist eine Bitte, keine Aufgabe (F5)
+  stufe: 8
+  referenz: Begriffsfrage — direkt in zwei Sätzen erklären; kein Operator-Abschnitt
+  zuege:
+  - schueler: Erkläre mir, was Osmose ist.
+    operator: []
+    muss:
+      - erklärt den Begriff kurz auf dem Stand der Klasse, mit einem Beispiel
