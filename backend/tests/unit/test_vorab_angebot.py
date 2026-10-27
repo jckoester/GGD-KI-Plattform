@@ -129,7 +129,18 @@ def test_messkanal_ausserhalb_der_produktion():
         "nachgeschlagen": ["n-1"],
         "suchanfragen": ["Elektronegativität"],
         "sicher_gruppe": [],
+        "aufzaehlungen": [],
     }
+
+
+def test_messkanal_traegt_die_aufzaehlungen():
+    """Nachgeschlagene Operatoren (26.10.2026): Filter und Umfang, nicht der Inhalt."""
+    aufruf = {"titel": "erklären", "content_type": "operator", "subject": None, "grade": None,
+              "gesamt": 37, "geliefert": 37}
+    with patch("app.chat.router.settings") as mock_settings:
+        mock_settings.environment = "development"
+        ereignis = _vorab_debug_ereignis(ANGEBOT, [], [], (), [aufruf])
+    assert json.loads(ereignis.split("\n", 1)[1].removeprefix("data: "))["aufzaehlungen"] == [aufruf]
 
 
 def test_messkanal_nie_in_der_produktion():

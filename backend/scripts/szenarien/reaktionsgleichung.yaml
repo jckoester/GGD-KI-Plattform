@@ -1,4 +1,4 @@
-# Messung „Hilfe Reaktionsgleichungen" (Versuch: EIN Assistent für alle Stufen)
+# Messung „Assistent für Reaktionsgleichungen" (Versuch: EIN Assistent für alle Stufen)
 # Plan: Plaene/Reaktionsgleichungs-Assistent-Plan.md, Entscheidung Jan 25.10.2026 (F1: erst messen, dann
 # gegebenenfalls in drei Assistenten aufspalten). Aufbau wie stoechiometrie.yaml, dazu je Fall:
 #
@@ -18,7 +18,7 @@
 # ist das kein Fehler des Assistenten — im Protokoll als „Zug passt nicht" vermerken.
 
 assistent:
-  name: Hilfe Reaktionsgleichungen
+  name: Reaktionsgleichungen
   beschreibung: Begleitet beim Aufstellen und Ausgleichen von Reaktionsgleichungen, von der Wortgleichung bis zur Redoxgleichung.
   fach: chemie
   prompt: config/prompts/reaktionsgleichung_assistent.md
@@ -221,7 +221,7 @@ faelle:
   zuege:
   - schueler: 2 H2 + O2 -> 2 H2O hab ich schon. Wie viel Gramm Wasser entstehen aus 4 g Wasserstoff?
     muss:
-    - verweist in einem Satz auf die Rechenhilfe Stöchiometrie (Auswahl oder /)
+    - verweist in einem Satz auf den Assistenten für stöchiometrische Berechnungen (Auswahl oder /)
     darf_nicht:
     - rechnen oder Ergebnis nennen
     verboten: [36, 2 mol, 2,0 mol, 18 g/mol]

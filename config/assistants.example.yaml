@@ -1,6 +1,6 @@
-# Beispiel-Assistenten für die GGD-KI-Plattform
-# In der Produktion werden Assistenten über die Admin-UI angelegt.
-# Diese Datei dient als Referenz und Seed für die Entwicklungsumgebung.
+# Assistenten, die mit der GGD-KI-Plattform ausgeliefert werden — Seed für Entwicklung und
+# Produktion: `cd backend && python scripts/seed_assistants.py` (siehe dort; idempotent nach Name).
+# Eigene Assistenten entstehen im Editor. Eine lokale `config/assistants.yaml` hat Vorrang.
 
 assistants:
 
@@ -42,3 +42,148 @@ assistants:
     tags:
       - planung
       - stundenentwurf
+
+  # ── Schüler-Assistenten Chemie (gemessen, Pläne Stoechiometrie- und Reaktionsgleichungs-Assistent) ──
+  #
+  # ⚠️ **Modell `chat-komplex` fest.** Mit `chat-standard` hielt „nichts vorsagen" nicht (Messungen
+  # 23.–26.10.2026). Für Schüler:innen ist es nicht von selbst freigeschaltet: unter `/settings/models`
+  # für die Stufen 8–13 freischalten, sonst lehnt der Proxy ab.
+  #
+  # Auslöser-Beispiele: typische ERSTE Nachrichten in Schülersprache. Die ersten Züge der
+  # Messszenarien (backend/scripts/szenarien/) stehen bewusst NICHT hier — sie sind der
+  # zurückgehaltene Prüfsatz für den Vorschlag (C1, Schritt 0/5).
+
+  - name: stöchiometrische Berechnungen
+    description: >
+      Begleitet Schüler:innen Schritt für Schritt durch stöchiometrische Rechnungen
+      (Masse, Stoffmenge, Volumen, Konzentration, Teilchenzahl) — gerechnet wird von der
+      Schüler:in.
+    audience: student
+    scope: all_students
+    status: active
+    subject: chemie
+    min_grade: 8
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/stoechiometrie_assistent.md
+    documents:
+      - config/prompts/stoechiometrie_pse_schulwerte.md
+    tags: [chemie, stöchiometrie]
+    fallbacks: [naturwissenschaftliche Aufgaben]
+    suggest: specific
+    suggestion_text: >-
+      Für Rechenaufgaben mit Massen, Stoffmengen und Volumina gibt es einen Assistenten, der
+      dich Schritt für Schritt begleitet – rechnen tust du selbst.
+    trigger_examples:
+      - wie viel gramm wasser entstehen wenn 8 g wasserstoff verbrennen
+      - Ich muss ausrechnen wie viel mol in 20 g Natriumhydroxid sind
+      - Berechne die Masse an Kohlenstoffdioxid, die bei der Verbrennung von 12 g Kohlenstoff entsteht
+      - kannst du mir bei der stoffmenge helfen, ich versteh nicht wie man bei der aufgabe von gramm auf mol kommt
+      - Welches Volumen Wasserstoff entsteht, wenn 6,5 g Zink mit Salzsäure reagieren?
+      - 'aufgabe: 2 g natriumchlorid in 250 ml wasser, welche konzentration hat die lösung'
+      - Wie viele Teilchen sind in 5 g Eisen?
+      - ich hab 0,3 mol raus aber die lösung sagt was anderes, wie rechnet man die masse vom produkt aus
+      - Wie viel Gramm Kupferoxid braucht man, um 10 g Kupfer herzustellen?
+      - Massenanteil berechnen hilfe, 15 g Zucker in 135 g Wasser
+      - welcher stoff ist im überschuss wenn 5 g magnesium und 5 g sauerstoff reagieren
+      - 'Ausbeute ausrechnen: theoretisch 20 g, rausgekommen sind 16 g'
+    trigger_counterexamples:
+      - Was ist eigentlich ein Mol?
+      - Stell die Reaktionsgleichung für die Verbrennung von Methan auf
+      - 'Gleich mir die Gleichung aus: Al + O2 -> Al2O3'
+      - Erklär mir den Unterschied zwischen Atom und Molekül
+      - Warum reagiert Natrium so heftig mit Wasser?
+      - Wie berechne ich die Dichte von einem Würfel?
+      - Wie rechnet man Prozent aus?
+      - Lös mir die Gleichung 3x + 5 = 20
+
+  - name: Reaktionsgleichungen
+    description: >
+      Begleitet Schüler:innen beim Aufstellen und Ausgleichen von Reaktionsgleichungen, von
+      der Wortgleichung bis zur Redoxgleichung mit Teilgleichungen; stufengerecht über die
+      Klassenstufe und die Fassungen der Fachbegriffe.
+    audience: student
+    scope: all_students
+    status: active
+    subject: chemie
+    min_grade: 8
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/reaktionsgleichung_assistent.md
+    tags: [chemie, reaktionsgleichungen]
+    fallbacks: [naturwissenschaftliche Aufgaben]
+    suggest: specific
+    suggestion_text: >-
+      Für das Aufstellen und Ausgleichen von Reaktionsgleichungen gibt es einen Assistenten,
+      der dich Schritt für Schritt begleitet – die Gleichung schreibst du selbst.
+    trigger_examples:
+      - wie stell ich die reaktionsgleichung für die verbrennung von propan auf
+      - Eisen und Schwefel reagieren zu Eisensulfid, wie schreib ich das als Formelgleichung
+      - 'Gleich die Gleichung aus: Na + Cl2 -> NaCl'
+      - ich krieg die gleichung für kalium mit wasser nicht ausgeglichen
+      - Welche Formel hat Calciumchlorid und wie lautet die Gleichung, wenn Calcium mit Chlor reagiert?
+      - Wir sollen die Ionengleichung für die Fällung von Bariumsulfat aufschreiben
+      - Oxidation und Reduktion als Teilgleichungen für Zink in Kupfersulfatlösung
+      - Bestimme die Oxidationszahlen in KMnO4
+      - Redoxgleichung Dichromat mit Ethanol in saurer Lösung aufstellen
+      - Wie sieht die Gleichung für die Neutralisation von Schwefelsäure mit Natronlauge aus?
+      - was entsteht bei der elektrolyse von kupferchlorid, gleichungen an den elektroden
+      - 'Ist das richtig ausgeglichen: 2 Fe + 3 O2 -> 2 Fe2O3'
+    trigger_counterexamples:
+      - Wie viel Gramm Wasser entstehen aus 10 g Wasserstoff?
+      - Berechne die Stoffmenge von 50 g Calciumcarbonat
+      - Was ist eine chemische Reaktion?
+      - Was ist der Unterschied zwischen Oxidation und Reduktion?
+      - Erklär mir den Mechanismus der elektrophilen Addition
+      - Wie funktioniert eine Batterie im Handy?
+      - Warum löst sich Kochsalz in Wasser?
+      - Was macht ein Katalysator?
+
+  # ── Rückfall-Assistent Naturwissenschaften (Landkarte: Rückfallebene; Messung 26./27.10.2026) ──
+  # Fachübergreifend (kein Fach), Kl. 5–13 (Jan: Biologie beginnt in Klasse 5). Erscheint im
+  # Vorschlag unter einem spezifischen Treffer bzw. für Aufgaben ohne spezifischen Assistenten.
+
+  - name: naturwissenschaftliche Aufgaben
+    description: >
+      Begleitet Schüler:innen bei Aufgaben aus Biologie, Chemie, Physik und NwT — rechnen,
+      erklären, Versuche und Diagramme auswerten, Experimente planen, beurteilen. Verweist
+      bei Stöchiometrie und Reaktionsgleichungen auf die beiden Chemie-Assistenten.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/nw_aufgaben_assistent.md
+    tags: [biologie, chemie, physik, nwt]
+    suggest: fallback
+    suggestion_text: >-
+      Für Aufgaben aus Biologie, Chemie, Physik und NwT gibt es einen Assistenten, der dich
+      Schritt für Schritt begleitet – die Lösung erarbeitest du selbst.
+    trigger_examples:
+      - Wie berechne ich die Beschleunigung, wenn ein Auto in 5 s von 0 auf 20 m/s kommt?
+      - erklär mal warum ein eisberg schwimmt, das sollen wir begründen
+      - Ich muss das Diagramm zur Fotosynthese auswerten, keine Ahnung wie
+      - wir haben einen versuch mit kressesamen gemacht, wie schreib ich die auswertung
+      - Wie plant man ein Experiment, ob die Temperatur die Gärung von Hefe beeinflusst?
+      - 'Aufgabe: Ein Körper mit 3 kg wird 2 m hochgehoben. Berechne die Lageenergie'
+      - Warum leuchtet eine Lampe heller, wenn man mehr Spannung anlegt? Erkläre
+      - Stelle eine Hypothese auf, warum Fische im warmen Wasser schlechter Sauerstoff bekommen
+      - Beurteile, ob Plastikflaschen oder Glasflaschen besser für die Umwelt sind
+      - ich soll beschreiben was im versuch passiert ist, was ist der unterschied zu erklären
+      - wie rechnet man den druck aus, kraft 200 N auf 0,5 m²
+      - Erläutere den Weg des Blutes durch den Körper
+      - Ich versteh die Tabelle bei der Aufgabe zum ohmschen Gesetz nicht
+      - Wie mache ich aus den Messwerten vom Pendelversuch ein Diagramm und was folgt daraus?
+    trigger_counterexamples:
+      - Kannst du mir bei der Gedichtanalyse helfen?
+      - Wann war der Dreißigjährige Krieg?
+      - Löse die Gleichung 2x - 4 = 10
+      - Wie schreibe ich eine Erörterung?
+      - Übersetz mir den Satz ins Englische
+      - Wann ist die nächste Chemiearbeit?
+      - Was ist eigentlich ein Atom?
+      - Hilf mir bei meinem Referat über Fußball

@@ -51,6 +51,18 @@ def stufen_hinweis(stufe: int | None) -> str:
     return f"Die fragende Person ist in Klasse {stufe}. {STUFEN_REGEL}"
 
 
+def fach_hinweis(fach: str | None) -> str:
+    """Die eine Zeile zum Fach der Konversation — leer ohne Fach.
+
+    Seit 26.10.2026 (Assistent für naturwissenschaftliche Aufgaben): Ein Assistent, der
+    Operatoren oder Fachbegriffe nachschlägt, gibt das Fach nur mit, wenn die Plattform es
+    ihm sagt — sonst sucht er fachübergreifend. Gilt für alle Rollen; das Fach ist keine
+    pädagogische Einschränkung wie die Klassenstufe, sondern eine Angabe."""
+    if not fach:
+        return ""
+    return f"Diese Konversation gehört zum Fach {fach}."
+
+
 def compose_system_content(
     pedagogy: PedagogyConfig,
     *,
@@ -60,11 +72,12 @@ def compose_system_content(
     disabled_augmentations: list[str] | None = None,
     stufe: int | None = None,
     bezug: str | None = None,
+    fach: str | None = None,
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
     Reihenfolge: universelle Basis · [Vorrang des Wissensspeichers] ·
-    Zielgruppen-Erweiterung · [Klassenstufe — nur Schüler-Behandlung] · [Bezugsstunde] ·
+    Zielgruppen-Erweiterung · [Klassenstufe — nur Schüler-Behandlung] · [Fach] · [Bezugsstunde] ·
     [Wissens-Kontext + Assistenten-Prompt] · [Lernverhalten-Augmentierungen — nur
     Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
@@ -91,6 +104,9 @@ def compose_system_content(
         hinweis = stufen_hinweis(stufe)
         if hinweis:
             parts.append(hinweis)
+
+    if fach_zeile := fach_hinweis(fach):
+        parts.append(fach_zeile)
 
     if bezug:
         parts.append(bezug.strip())

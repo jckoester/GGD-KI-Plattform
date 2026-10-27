@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Messung eines Schüler-Assistenten mit festen Szenarien (Muster: Rechenhilfe Stöchiometrie).
+"""Messung eines Schüler-Assistenten mit festen Szenarien (Muster: Assistent für stöchiometrische Berechnungen).
 
     python scripts/assistent_messung.py --szenarien scripts/szenarien/reaktionsgleichung.yaml --selbsttest
     python scripts/assistent_messung.py --szenarien scripts/szenarien/reaktionsgleichung.yaml \
@@ -249,7 +249,9 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
     prompt = (prompt_datei or profil["prompt"]).read_text(encoding="utf-8").strip()
     ohne = profil["ohne"] if ohne is None else ohne
     name = profil["name"]
-    chemie = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", profil["fach"])
+    # `fach: null` im Kopf = fachübergreifend (Rückfall-Assistenten).
+    chemie = (_eins(conn, "SELECT id FROM subjects WHERE slug = %s", profil["fach"])
+              if profil["fach"] else None)
     werte = dict(system_prompt=prompt, subject_id=chemie, audience="student", scope="all_students",
                  status="active", min_grade=profil["min_grade"], max_grade=profil["max_grade"],
                  model=profil["modell"], tool_groups="[]",
@@ -364,6 +366,8 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                 "werkzeuge": [w.get("tool") for w in ergebnis["werkzeuge"] if w.get("tool")],
                 "angebot": [a["titel"] for a in (ergebnis.get("vorab_debug") or {}).get("angebot", [])],
                 "suchanfragen": (ergebnis.get("vorab_debug") or {}).get("suchanfragen", []),
+                "aufzaehlungen": (ergebnis.get("vorab_debug") or {}).get("aufzaehlungen", []),
+                "werkzeug_soll": zug.get("werkzeug"),
                 "knoten": knoten_der_antwort(conn, konversation),
                 "vorgriffe": vorgriffe(ergebnis["antwort"], zug.get("verboten")),
                 "stufenvorgriffe": vorgriffe(ergebnis["antwort"], fall.get("stufenfremd")),
@@ -391,7 +395,7 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     stufen = f"Kl. {kopf['min_grade'] or '?'}–{kopf['max_grade'] or '?'}"
     t = [f"# {name} — Lauf {kopf['lauf']}", "",
          f"- **Datum:** {kopf['datum']}", f"- **Modell:** {kopf['modell']}",
-         f"- **Assistent:** „{name}“, ID {kopf['assistent']} ({kopf.get('fach', 'chemie')}, Schüler:innen, {stufen}, ohne Wissensbereich, "
+         f"- **Assistent:** „{name}“, ID {kopf['assistent']} ({kopf.get('fach') or 'fachübergreifend'}, Schüler:innen, {stufen}, ohne Wissensbereich, "
          "ohne Fähigkeiten, " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
                                   else "alle Lernverhalten-Augmentierungen an)"),
          f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
@@ -428,6 +432,14 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
                          + (f" ({k['status']})" if k.get("status") not in (None, "vollstaendig") else ""))
             t.append(f"- **Werkzeuge:** {', '.join(z['werkzeuge']) or '—'}"
                      + (f" (Suche: {'; '.join(z['suchanfragen'])})" if z["suchanfragen"] else ""))
+            for a in z.get("aufzaehlungen") or []:
+                t.append(f"  - `list_context_nodes`: titel={a.get('titel')!r}, content_type={a.get('content_type')!r}, "
+                         f"subject={a.get('subject')!r}, grade={a.get('grade')!r} → gesamt {a.get('gesamt')}, "
+                         f"geliefert {a.get('geliefert')}" + (f", Hinweis: {a['hinweis']}" if a.get("hinweis") else ""))
+            if z.get("werkzeug_soll"):
+                ok = z["werkzeug_soll"] in z["werkzeuge"]
+                t.append(f"- {'✓' if ok else '⚠️'} **Soll-Werkzeug `{z['werkzeug_soll']}`:** "
+                         f"{'aufgerufen' if ok else 'NICHT aufgerufen'}")
             t.append(f"- **Angeboten:** {', '.join(z['angebot']) or '—'} · **Eingesetzt:** {', '.join(z['knoten']) or '—'}")
             if z.get("fehler"):
                 t.append(f"- ⚠️ **Fehler im Strom:** {z['fehler']}")
@@ -462,8 +474,33 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     t.append(f"- **Stufenvorgriffe:** {len(stufe)} Züge"
              + ("" if not stufe else " — " + "; ".join(
                  f"{i} Zug {z['nr']}: {', '.join(v['wert'] for v in z['stufenvorgriffe'])}" for i, z in stufe)))
+    t += werkzeug_zusammenfassung(zuege)
     t += kosten_zusammenfassung(kopf, zuege)
     return "\n".join(t) + "\n"
+
+
+def werkzeug_zusammenfassung(zuege: list[tuple[str, dict]]) -> list[str]:
+    """Soll-Werkzeuge (Feld `werkzeug` je Zug) — „Operator nachgeschlagen: n von m“."""
+    soll = [(i, z) for i, z in zuege if z.get("werkzeug_soll")]
+    if not soll:
+        return []
+    zeilen = []
+    for name in sorted({z["werkzeug_soll"] for _, z in soll}):
+        mit = [(i, z) for i, z in soll if z["werkzeug_soll"] == name]
+        ok = [(i, z) for i, z in mit if name in z["werkzeuge"]]
+        fehlt = [f"{i} Zug {z['nr']}" for i, z in mit if name not in z["werkzeuge"]]
+        etikett = "Operator nachgeschlagen" if name == "list_context_nodes" else f"`{name}` aufgerufen"
+        zeilen.append(f"- **{etikett}:** {len(ok)} von {len(mit)} Soll-Zügen"
+                      + (f" — fehlt: {'; '.join(fehlt)}" if fehlt else ""))
+    aufrufe = [a for _, z in zuege for a in z.get("aufzaehlungen") or []]
+    if aufrufe:
+        mit_fach = [a for a in aufrufe if a.get("subject")]
+        gesamt = [a["gesamt"] for a in aufrufe if isinstance(a.get("gesamt"), int)]
+        zeilen.append(f"- **`list_context_nodes`-Aufrufe:** {len(aufrufe)}, davon mit `subject` {len(mit_fach)}"
+                      + (f" ({', '.join(sorted({str(a['subject']) for a in mit_fach}))})" if mit_fach else "")
+                      + (f"; Treffer je Aufruf Mittel {round(sum(gesamt) / len(gesamt))}, größter {max(gesamt)}"
+                         if gesamt else ""))
+    return zeilen
 
 
 def kosten_zusammenfassung(kopf: dict, zuege: list[tuple[str, dict]]) -> list[str]:

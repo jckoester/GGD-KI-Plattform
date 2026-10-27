@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Messung „Rechenhilfe Stöchiometrie" (Plan `Plaene/Stoechiometrie-Assistent-Plan.md`).
+"""Messung „Assistent für stöchiometrische Berechnungen" (Plan `Plaene/Stoechiometrie-Assistent-Plan.md`).
 
     python scripts/stoechiometrie_messung.py --selbsttest
     python scripts/stoechiometrie_messung.py --lauf 1 --ziel "<Vault>/Plaene/Messungen-Stoechiometrie"

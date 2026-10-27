@@ -168,6 +168,25 @@ class TestKlassenstufeImSystemkontext:
         assert inhalt.index("Klasse 9") < inhalt.index("Relevante Lerninhalte")
 
 
+class TestFachImSystemkontext:
+    """Die Zeile zum Fach der Konversation (26.10.2026, Assistent für naturwissenschaftliche
+    Aufgaben: `subject` beim Nachschlagen nur, wenn die Plattform das Fach nennt)."""
+
+    _inhalt = TestKlassenstufeImSystemkontext._inhalt
+
+    def test_fach_steht_drin_nach_der_stufe(self):
+        inhalt = self._inhalt(stufe=9, fach="Physik")
+        assert "Diese Konversation gehört zum Fach Physik." in inhalt
+        assert inhalt.index("Klasse 9") < inhalt.index("Fach Physik")
+
+    def test_ohne_fach_kein_satz(self):
+        assert "zum Fach" not in self._inhalt(stufe=9, fach=None)
+
+    def test_fach_auch_fuer_lehrkraefte(self):
+        """Anders als die Stufe ist das Fach eine Angabe, keine Zurückhaltung."""
+        assert "zum Fach Chemie" in self._inhalt(student_treatment=False, fach="Chemie")
+
+
 class TestBezugsstunde:
     """Die Zeile zum Stundenbezug (0.15, Päckchen A Schritt 2) — für jede Behandlung, vor dem
     Kontext und vor dem Assistenten-Prompt: Sie gilt für die ganze Unterhaltung."""

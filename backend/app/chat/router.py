@@ -362,7 +362,7 @@ _SEARCH_CONTEXT_NODES_TOOL = {
 
 def _vorab_debug_ereignis(
     angebot: list[Angebot], werkzeug_bausteine: list[Baustein], suchanfragen: list[str],
-    sicher_gruppe: list[Baustein] = (),
+    sicher_gruppe: list[Baustein] = (), aufzaehlungen: list[dict] = (),
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -389,6 +389,10 @@ def _vorab_debug_ereignis(
         "suchanfragen": suchanfragen,
         # 0.20 (AC, F2 a): sicher nur, weil die Unterrichtsgruppe den Begriff hatte.
         "sicher_gruppe": [{"node_id": b.node_id, "titel": b.titel} for b in sicher_gruppe],
+        # 26.10.2026 (Assistent für naturwissenschaftliche Aufgaben): Aufrufe von
+        # `list_context_nodes` mit Filtern und Umfang — schlägt das Modell den Operator nach,
+        # mit oder ohne Fach, und wie groß ist die Antwort?
+        "aufzaehlungen": list(aufzaehlungen),
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -785,6 +789,9 @@ _LIST_CONTEXT_NODES_TOOL = {
             "unabhängig von Ähnlichkeit. Nimm dieses Werkzeug für jede Frage nach "
             "Vollständigkeit oder Anzahl: 'Welche … gibt es?', 'In welchen Fächern "
             "kommt … vor?', 'Wie viele …?', 'Liste alle …'.\n"
+            "Ebenso für das Nachschlagen eines bestimmten Bausteins nach Namen, z. B. der "
+            "Definition eines Operators: 'titel' und 'content_type' setzen, 'subject' "
+            "weglassen, wenn das Fach nicht feststeht.\n"
             "Abgrenzung zu search_context_nodes: Dort suchst du nach Bedeutung und "
             "bekommst die nächstliegenden Treffer; hier filterst du nach Feldern und "
             "bekommst eine vollständige, gezählte Liste.\n"
@@ -989,6 +996,15 @@ _GET_OPERATOREN_TOOL = {
         "parameters": {"type": "object", "properties": {}},
     },
 }
+
+
+async def _fach_name(db: AsyncSession, conversation_id: UUID | None) -> Optional[str]:
+    """Name des Konversationsfachs für die Zeile im Systemtext (`fach_hinweis`)."""
+    subject_id = await subject_of_conversation(db, conversation_id)
+    if subject_id is None:
+        return None
+    subject = await db.get(Subject, subject_id)
+    return subject.name if subject is not None else None
 
 
 async def subject_of_conversation(
@@ -2187,6 +2203,7 @@ async def chat(
             pedagogy,
             student_treatment=student_treatment,
             stufe=await stufe_der_person(db, conversation_id, current_user.grade),
+            fach=await _fach_name(db, conversation_id),
             bezug=await bezugszeile(
                 db, conversation_stunde_id, current_user,
                 mit_lesewerkzeug=mit_stundenwerkzeugen(active_assistant),
@@ -2384,6 +2401,8 @@ async def chat(
         _werkzeug_bausteine: list = []
         # Die Suchanfragen des Modells — nur für den Messkanal `vorab_debug` (0.16).
         _suchanfragen: list[str] = []
+        # … und die Aufrufe von `list_context_nodes` (Filter + Umfang), ebenso nur dort.
+        _aufzaehlungen: list[dict] = []
         cost_usd: Optional[float] = None
         # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
         # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
@@ -2562,6 +2581,12 @@ async def chat(
                         stunde_node_id=conversation_stunde_id,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
+                    if _tc_name == "list_context_nodes":
+                        _aufzaehlungen.append({
+                            **{k: args.get(k) for k in ("titel", "content_type", "subject", "grade")},
+                            **({k: tool_result.get(k) for k in ("gesamt", "geliefert", "hinweis")}
+                               if isinstance(tool_result, dict) else {}),
+                        })
                     if tool.writes and not (isinstance(tool_result, dict) and tool_result.get("error")):
                         if _tc_name not in _wirkende_werkzeuge:
                             _wirkende_werkzeuge.append(_tc_name)
@@ -2811,6 +2836,7 @@ async def chat(
         _debug = _vorab_debug_ereignis(
             kontext.angebot, _werkzeug_bausteine, _suchanfragen,
             [b for b in kontext.bausteine if b.grund == "gruppe"],
+            _aufzaehlungen,
         )
         if _debug:
             yield _debug

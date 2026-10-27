@@ -31,6 +31,7 @@ from app.config import settings
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.db.models import Assistant, AssistantDocument, Conversation
 from app.pedagogy.compose import compose_system_content, is_student_treatment
+from app.chat.router import _fach_name
 from app.pedagogy.config import load_pedagogy
 
 
@@ -66,6 +67,7 @@ async def main(datei: Path, fall_id: str, konto: str) -> None:
                           pedagogy,
                           student_treatment=is_student_treatment(assistent.audience, True),
                           stufe=await stufe_der_person(db, konv.id, str(fall["stufe"])),
+                          fach=await _fach_name(db, konv.id),
                           bezug=None,
                           context_str=kontext.text,
                           assistant_system_prompt=assistent.system_prompt,

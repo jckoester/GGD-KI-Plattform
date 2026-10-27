@@ -3,7 +3,21 @@
 Assistenten aus config/assistants.yaml (oder assistants.example.yaml) in die DB anlegen.
 
 Idempotent anhand des Namens: Existiert bereits ein Assistent gleichen Namens,
-wird er übersprungen.
+wird er übersprungen — mit **zwei** Ausnahmen: Hat er noch keine Auslöser-Beispiele und
+nennt der Eintrag welche, werden sie nachgetragen, samt `suggest` und `suggestion_text`
+(Päckchen C1, 26.10.2026); hat er noch keine Rückfälle (`fallbacks`), ebenso diese
+(27.10.2026). So bekommt auch ein schon von Hand angelegter Assistent seine
+Beispiele; eigene Beispiele werden nie überschrieben.
+
+Felder je Eintrag (alle außer `name` und Prompt optional):
+`description`, `system_prompt` | `system_prompt_file`, `model`, `audience`, `scope`,
+`status`, `visibility`, `tool_groups`, `tags`, `icon`, `sort_order`, `subject` (Slug),
+`min_grade`, `max_grade`, `disabled_augmentations`, `documents` (Dateien wie
+`system_prompt_file`; als Dokument des Assistenten angehängt), `suggest`, `suggestion_text`,
+`trigger_examples`, `trigger_counterexamples`, `fallbacks` (Namen anderer Assistenten).
+
+Nach dem Anlegen werden die Beispiele eingebettet; scheitert das, holt es der nächtliche
+`embedding_backfill.py` nach.
 
 Verwendung (aus backend/):
     python scripts/seed_assistants.py
@@ -25,8 +39,9 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.assistants import ausloeser
 from app.config import settings
-from app.db.models import Assistant
+from app.db.models import Assistant, AssistantDocument, AssistantTriggerExample, Subject
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,35 +63,65 @@ def _default_config() -> Path:
     return _cfg_base / "assistants.yaml"
 
 
+def _datei(rel: str) -> Path:
+    """Pfad relativ zum Repo-Root (lokal) bzw. zu /app/ (Docker)."""
+    pfad = _SCRIPT_DIR.parent.parent / rel
+    if not pfad.exists():
+        pfad = _SCRIPT_DIR.parent / rel
+    if not pfad.exists():
+        raise FileNotFoundError(f"Datei nicht gefunden: {rel}")
+    return pfad
+
+
 def _resolve_system_prompt(entry: dict, config_path: Path) -> str:
     if "system_prompt" in entry:
         return entry["system_prompt"]
     if "system_prompt_file" in entry:
-        # Pfad relativ zum Repo-Root (eine Ebene über backend/)
-        repo_root = _SCRIPT_DIR.parent.parent
-        prompt_path = repo_root / entry["system_prompt_file"]
-        if not prompt_path.exists():
-            # Docker: Pfad relativ zu /app/
-            prompt_path = _SCRIPT_DIR.parent / entry["system_prompt_file"]
-        if not prompt_path.exists():
-            raise FileNotFoundError(f"system_prompt_file nicht gefunden: {entry['system_prompt_file']}")
-        return prompt_path.read_text(encoding="utf-8").strip()
+        return _datei(entry["system_prompt_file"]).read_text(encoding="utf-8").strip()
     raise ValueError(f"Assistent '{entry.get('name')}': weder system_prompt noch system_prompt_file angegeben")
 
 
-async def seed(config_path: Path, dry_run: bool = False) -> None:
+def _listen(entry: dict) -> dict[str, list[str]]:
+    """Beide Beispiel-Listen, bereinigt wie über die API (wirft AusloeserFehler)."""
+    return {
+        ausloeser.BEISPIEL: ausloeser.bereinige(entry.get("trigger_examples"), ausloeser.BEISPIEL),
+        ausloeser.GEGENBEISPIEL: ausloeser.bereinige(
+            entry.get("trigger_counterexamples"), ausloeser.GEGENBEISPIEL
+        ),
+    }
+
+
+async def _hat_beispiele(db, assistant_id: int) -> bool:
+    return (await db.execute(
+        select(AssistantTriggerExample.id).where(AssistantTriggerExample.assistant_id == assistant_id).limit(1)
+    )).first() is not None
+
+
+async def _setze_beispiele(db, assistant_id: int, listen: dict[str, list[str]]) -> int:
+    neu = 0
+    for art, texte in listen.items():
+        neu += await ausloeser.setze(db, assistant_id, art, texte)
+    return neu
+
+
+async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -> dict:
+    """Legt an bzw. trägt Beispiele nach. ``session_factory`` für Tests; sonst die Konfiguration."""
     with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     entries = data.get("assistants", [])
     if not entries:
         logger.info("Keine Assistenten in %s gefunden.", config_path)
-        return
+        return {"angelegt": 0, "nachgetragen": 0, "uebersprungen": 0, "fehler": 0}
 
-    engine = create_async_engine(settings.database_url)
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    engine = None
+    if session_factory is None:
+        engine = create_async_engine(settings.database_url)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    inserted = skipped = errors = 0
+    inserted = skipped = errors = nachgetragen = 0
+    einzubetten: list[int] = []
+    rueckfaelle: list[tuple[int, list[str]]] = []
     async with session_factory() as db:
         for entry in entries:
             name = (entry.get("name") or "").strip()
@@ -85,14 +130,51 @@ async def seed(config_path: Path, dry_run: bool = False) -> None:
                 errors += 1
                 continue
 
+            try:
+                listen = _listen(entry)
+            except ausloeser.AusloeserFehler as e:
+                logger.error("  ERROR %s: %s", name, e)
+                errors += 1
+                continue
+
             existing = (await db.execute(select(Assistant).where(Assistant.name == name))).scalar_one_or_none()
+            if existing and entry.get("fallbacks") and not existing.fallbacks:
+                # Rückfälle wie Beispiele: nur nachtragen, wenn noch keine gesetzt sind.
+                if dry_run:
+                    logger.info("  DRY   %s → würde Rückfälle nachtragen", name)
+                else:
+                    rueckfaelle.append((existing.id, [str(n) for n in entry["fallbacks"]]))
+                    logger.info("  NACH  %s (id=%d): Rückfälle %s", name, existing.id,
+                                ", ".join(map(str, entry["fallbacks"])))
             if existing:
-                logger.info("  SKIP  %s (bereits vorhanden, id=%d)", name, existing.id)
-                skipped += 1
+                if listen[ausloeser.BEISPIEL] and not await _hat_beispiele(db, existing.id):
+                    if dry_run:
+                        logger.info("  DRY   %s → würde Beispiele nachtragen", name)
+                    else:
+                        await _setze_beispiele(db, existing.id, listen)
+                        if existing.suggest == "never" and entry.get("suggest"):
+                            existing.suggest = entry["suggest"]
+                        if not existing.suggestion_text and entry.get("suggestion_text"):
+                            existing.suggestion_text = entry["suggestion_text"].strip()
+                        einzubetten.append(existing.id)
+                        logger.info("  NACH  %s (id=%d): %d Beispiele, %d Gegenbeispiele nachgetragen", name,
+                                    existing.id, len(listen[ausloeser.BEISPIEL]), len(listen[ausloeser.GEGENBEISPIEL]))
+                    nachgetragen += 1
+                else:
+                    logger.info("  SKIP  %s (bereits vorhanden, id=%d)", name, existing.id)
+                    skipped += 1
                 continue
 
             try:
                 system_prompt = _resolve_system_prompt(entry, config_path)
+                dokumente = [(rel, _datei(rel)) for rel in entry.get("documents") or []]
+                subject_id = None
+                if entry.get("subject"):
+                    subject_id = (await db.execute(
+                        select(Subject.id).where(Subject.slug == entry["subject"])
+                    )).scalar_one_or_none()
+                    if subject_id is None:
+                        raise ValueError(f"Fach '{entry['subject']}' nicht gefunden")
             except (FileNotFoundError, ValueError) as e:
                 logger.error("  ERROR %s: %s", name, e)
                 errors += 1
@@ -104,8 +186,7 @@ async def seed(config_path: Path, dry_run: bool = False) -> None:
                 continue
 
             now = datetime.now(timezone.utc)
-            db.add(
-                Assistant(
+            assistant = Assistant(
                     name=name,
                     description=(entry.get("description") or "").strip() or None,
                     system_prompt=system_prompt,
@@ -115,26 +196,65 @@ async def seed(config_path: Path, dry_run: bool = False) -> None:
                     audience=entry.get("audience", "teacher"),
                     scope=entry.get("scope", "teachers"),
                     status=entry.get("status", "active"),
-                    visibility="public",
+                    visibility=entry.get("visibility", "public"),
                     tool_groups=entry.get("tool_groups", []),
                     tags=entry.get("tags") or [],
                     icon=entry.get("icon"),
                     sort_order=int(entry.get("sort_order", 0)),
+                    subject_id=subject_id,
+                    min_grade=entry.get("min_grade"),
+                    max_grade=entry.get("max_grade"),
+                    disabled_augmentations=entry.get("disabled_augmentations") or [],
+                    image_kinds=[],
+                    suggest=entry.get("suggest") or "never",
+                    suggestion_text=(entry.get("suggestion_text") or "").strip() or None,
+                    fallbacks=[],
                     created_by="__seed__",
                     creator_role="admin",
                     created_at=now,
                     updated_at=now,
-                )
             )
-            logger.info("  OK    %s", name)
+            db.add(assistant)
+            await db.flush()
+            for rel, pfad in dokumente:
+                inhalt = pfad.read_text(encoding="utf-8")
+                db.add(AssistantDocument(
+                    assistant_id=assistant.id, filename=pfad.name,
+                    mime_type="text/markdown" if pfad.suffix == ".md" else "text/plain",
+                    size_bytes=len(inhalt.encode("utf-8")), content=inhalt,
+                ))
+            if await _setze_beispiele(db, assistant.id, listen):
+                einzubetten.append(assistant.id)
+            if entry.get("fallbacks"):
+                rueckfaelle.append((assistant.id, [str(n) for n in entry["fallbacks"]]))
+            logger.info("  OK    %s%s", name, f" (+{len(dokumente)} Dokument(e))" if dokumente else "")
             inserted += 1
+
+        # Rückfälle erst jetzt: Sie dürfen auf Assistenten derselben Datei zeigen.
+        for assistant_id, namen in rueckfaelle:
+            ids = []
+            for n in namen:
+                treffer = list((await db.execute(select(Assistant.id).where(Assistant.name == n))).scalars())
+                if len(treffer) == 1 and treffer[0] != assistant_id:
+                    ids.append(treffer[0])
+                else:
+                    logger.warning("  Rückfall '%s' übergangen (%s)", n,
+                                   "nicht vorhanden" if not treffer else "nicht eindeutig")
+            (await db.get(Assistant, assistant_id)).fallbacks = ids
 
         if not dry_run:
             await db.commit()
+            if einzubetten:
+                stand = await ausloeser.einbetten(db, einzubetten)
+                logger.info("Beispiele eingebettet: %d ok, %d offen (holt der nächtliche Lauf nach)",
+                            stand.ok, stand.fehler)
 
-    await engine.dispose()
+    if engine is not None:
+        await engine.dispose()
     action = "würde anlegen" if dry_run else "angelegt"
-    logger.info("Fertig: %d %s, %d übersprungen, %d Fehler.", inserted, action, skipped, errors)
+    logger.info("Fertig: %d %s, %d mit nachgetragenen Beispielen, %d übersprungen, %d Fehler.",
+                inserted, action, nachgetragen, skipped, errors)
+    return {"angelegt": inserted, "nachgetragen": nachgetragen, "uebersprungen": skipped, "fehler": errors}
 
 
 def main() -> None:

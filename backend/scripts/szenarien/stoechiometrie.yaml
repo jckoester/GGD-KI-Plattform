@@ -1,4 +1,4 @@
-# Messung „Rechenhilfe Stöchiometrie" (Schüler-Assistent, Plan: Plaene/Stoechiometrie-Assistent-Plan.md)
+# Messung „Assistent für stöchiometrische Berechnungen" (Schüler-Assistent, Plan: Plaene/Stoechiometrie-Assistent-Plan.md)
 #
 # Prompt: config/prompts/stoechiometrie_assistent.md (v3, 23.10.2026) · Zielgruppe student · Fach Chemie
 # · kein Wissensbereich (retrieval_scope leer) · student_augmentations an, AUSSER metacognitive_nudges (v3).
@@ -28,7 +28,7 @@
 
 # Einrichtung (seit 26.10.2026 hier statt im Skript; gelesen von assistent_messung.py):
 assistent:
-  name: Rechenhilfe Stöchiometrie
+  name: stöchiometrische Berechnungen
   beschreibung: Begleitet stöchiometrische Rechnungen Schritt für Schritt.
   fach: chemie
   prompt: config/prompts/stoechiometrie_assistent.md

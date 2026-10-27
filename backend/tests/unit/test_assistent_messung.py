@@ -10,7 +10,7 @@ M = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(M)
 
 SZENARIEN = sorted((_SKRIPTE / "szenarien").glob("*.yaml"))
-MIT_KOPF = [p for p in SZENARIEN if p.name in ("stoechiometrie.yaml", "reaktionsgleichung.yaml")]
+MIT_KOPF = [p for p in SZENARIEN if p.name in ("stoechiometrie.yaml", "reaktionsgleichung.yaml", "nw_aufgaben.yaml")]
 
 
 @pytest.mark.parametrize("datei", MIT_KOPF, ids=lambda p: p.name)

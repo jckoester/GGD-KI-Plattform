@@ -406,7 +406,7 @@
             value: "specific",
             label: "Für eine bestimmte Aufgabe",
             hinweis:
-                "Eng umrissen, mit festem Ablauf — etwa eine Rechenhilfe Stöchiometrie. Wird angeboten, wenn eine Nachricht zu den Beispielen passt.",
+                "Eng umrissen, mit festem Ablauf — etwa für stöchiometrische Berechnungen. Wird angeboten, wenn eine Nachricht zu den Beispielen passt.",
         },
         {
             value: "fallback",

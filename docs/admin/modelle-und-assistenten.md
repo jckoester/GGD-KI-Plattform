@@ -237,6 +237,22 @@ und legt alle darin definierten Assistenten an, sofern noch kein Assistent
 gleichen Namens existiert. Mit `--dry-run` kann man vorab prüfen, was angelegt
 würde.
 
+Ausgeliefert werden neben den Planungsassistenten drei **Schüler-Assistenten**, benannt im
+Schema „Assistent für …“: „stöchiometrische Berechnungen“ (mit dem Periodensystem der
+Schulwerte als Dokument) und „Reaktionsgleichungen“ für Chemie, Kl. 8–13, sowie
+„naturwissenschaftliche Aufgaben“, fachübergreifend für Kl. 5–13 und Rückfall der beiden. Alle
+tragen Auslöser-Beispiele für den Vorschlag im Chat.
+
+- ⚠️ **Alle drei sind fest an `chat-komplex` gebunden** — mit dem Standardmodell sagen sie zu oft
+  vor. Für Schüler:innen ist es nicht von selbst freigeschaltet: unter `/settings/models` für
+  die Stufen 5–13 freischalten, sonst lehnt der Proxy die Anfragen ab. Kosten rund 0,008 USD
+  je Antwort.
+- **Schon von Hand angelegt?** Ein Assistent gleichen Namens wird nicht verändert. Hat er noch
+  keine Auslöser-Beispiele, trägt das Skript nur diese nach (samt Vorschlagsart und -text), ebenso fehlende Rückfälle.
+- ⚠️ **Eine eigene `config/assistants.yaml` hat Vorrang** vor der mitgelieferten
+  `assistants.example.yaml`. Wer eine eigene führt, übernimmt neue Einträge von dort oder ruft
+  das Skript mit `--config config/assistants.example.yaml` auf.
+
 Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodell
 (`CHAT_DEFAULT_MODEL`). Nur wenn er an ein **bestimmtes** Modell gebunden sein soll:
 

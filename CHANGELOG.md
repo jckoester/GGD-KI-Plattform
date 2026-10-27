@@ -11,11 +11,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Chat, der selbst noch folgt): Beispiele und Gegenbeispiele typischer erster Nachrichten mit
   Embedding, dazu `suggest`, `suggestion_text` und Rückfall-Assistenten; über API und YAML
   (Rückfälle dort mit Namen). Migration 0090.
+- **Drei Schüler-Assistenten werden mitgeliefert:** „Assistent für stöchiometrische Berechnungen“
+  und „… für Reaktionsgleichungen“ (Chemie, Kl. 8–13) sowie „… für naturwissenschaftliche Aufgaben“
+  (fachübergreifend, Kl. 5–13, Rückfall der beiden), alle mit `chat-komplex` und Auslöser-Beispielen.
+  Einrichten mit `scripts/seed_assistants.py`; `chat-komplex` für Schüler:innen freischalten.
+- **Seed der Assistenten** kennt jetzt Fach, Klassenstufen, abgeschaltete Augmentierungen,
+  Dokumente, Vorschlagsfelder und Beispiele; bei vorhandenen Assistenten trägt er nur fehlende
+  Beispiele und Rückfälle nach.
 - **Assistenten-Editor:** Abschnitt „Vorschlag im Chat“ mit Art des Vorschlags, Auslöser-Beispielen
   und Gegenbeispielen (eine Nachricht je Zeile, Zähler und Hinweise).
 
 ### Geändert
 
+- **Systemtext nennt das Fach der Konversation**, wenn sie eines hat („Diese Konversation gehört zum
+  Fach Physik.“) — neben der Klassenstufe, für alle Rollen.
 - **Assistenten: Klassenstufen wirken.** Ein Assistent mit Klassenstufen (etwa 8–13) erscheint
   Schüler:innen anderer Stufen weder in der Übersicht noch in der Auswahl, und der Chat
   lehnt ihn ab. Lehrkräfte sehen alle Stufen; ist die Stufe einer Schüler:in unbekannt, wird
