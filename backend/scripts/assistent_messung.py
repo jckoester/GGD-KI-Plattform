@@ -346,10 +346,30 @@ def prompt_tokens(text: str) -> int | None:
 
 
 def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis: str,
-                      modell: str | None = None) -> dict:
+                      modell: str | None = None, vorlauf: list[str] | None = None) -> dict:
+    """``vorlauf``: Schülernachrichten, die **im Standard-Chat** (ohne Assistent) vorausgehen; ab dem
+    ersten Zug des Falls übernimmt der Assistent dieselbe Konversation (Wechsel nach ADR-005 — der
+    Versuch zu C1 Schritt 6). Vorlauf-Züge stehen im Protokoll, zählen aber nicht mit."""
     token = jwt.issue(pseudonym=schueler, roles=["student"], grade=str(fall["stufe"]))[0]
     zuege, verlauf, konversation = [], [], None
     with httpx.Client(base_url=basis, timeout=300.0, headers={"Cookie": f"session={token}"}) as client:
+        for nr, text in enumerate(vorlauf or [], start=1):
+            try:
+                ergebnis = chat_probe.frage_stellen(client, text, assistent=None, gruppe=None,
+                                                    verlauf=verlauf, konversation=konversation)
+            except (httpx.HTTPError, SystemExit) as fehler:
+                zuege.append({"nr": f"V{nr}", "vorlauf": True, "schueler": text,
+                              "abbruch": f"{type(fehler).__name__}: {fehler}"})
+                return {"id": fall["id"], "titel": fall["titel"], "stufe": fall["stufe"],
+                        "referenz": fall.get("referenz"), "konversation": konversation, "zuege": zuege}
+            konversation = ergebnis["konversation"]
+            verlauf += [{"role": "user", "content": text}, {"role": "assistant", "content": ergebnis["antwort"]}]
+            zuege.append({"nr": f"V{nr}", "vorlauf": True, "schueler": text, "antwort": ergebnis["antwort"],
+                          "modell": ergebnis["modell"], "fehler": ergebnis["fehler"], "werkzeuge": [],
+                          "angebot": [], "suchanfragen": [], "aufzaehlungen": [], "knoten": [],
+                          "vorgriffe": [], "stufenvorgriffe": [], "saetze": 0, "muss": [], "darf_nicht": [],
+                          **{k: ergebnis[k] for k in ("woerter", "fragezeichen", "ueberschriften", "listenpunkte")}})
+            print(f"  {fall['id']} Vorlauf {nr}: {ergebnis['woerter']} Wörter ({ergebnis['modell']})", flush=True)
         for nr, zug in enumerate(fall["zuege"], start=1):
             try:
                 ergebnis = chat_probe.frage_stellen(client, zug["schueler"], assistent=kennung, gruppe=None,
@@ -401,6 +421,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
          f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
          + (f" · etwa {kopf['prompt_tokens']} Tokens (o200k_base)" if kopf.get("prompt_tokens") else ""),
          f"- **Importstand:** {kopf['import']}",
+         *(["- **Vorlauf im Standard-Chat** (danach Wechsel zum Assistenten in derselben Konversation): "
+            + " · ".join(f"„{v}“" for v in kopf["vorlauf"])] if kopf.get("vorlauf") else []),
          "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; Chat über den "
          "Assistenten (Fach Chemie aus dem Assistenten)",
          "", "Automatisch: **Vorgriff** (verbotene Werte, normalisiert; Treffer mit Satz), **Stufenvorgriff** "
@@ -410,7 +432,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
         t += ["---", "", f"## {f['id']} — {f['titel']} (Kl. {f['stufe']})", "",
               f"*Referenz:* {f['referenz'] or '—'}", ""]
         for z in f["zuege"]:
-            t += [f"### Zug {z['nr']}", "", f"**Schüler:in:** {z['schueler']}", ""]
+            t += [f"### {'Vorlauf (Standard-Chat) ' if z.get('vorlauf') else 'Zug '}{z['nr']}", "",
+                  f"**Schüler:in:** {z['schueler']}", ""]
             if "abbruch" in z:
                 t += [f"⚠️ abgebrochen — {z['abbruch']}", ""]
                 continue
@@ -449,7 +472,7 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
                 t.append("- [ ] Zug passt nicht (Assistent hatte etwas anderes gefragt)")
                 t.append("")
     t += ["---", "", "## Zusammenfassung (automatisch, ohne Bewertung der Kriterien)", ""]
-    zuege = [(f["id"], z) for f in faelle for z in f["zuege"] if "antwort" in z]
+    zuege = [(f["id"], z) for f in faelle for z in f["zuege"] if "antwort" in z and not z.get("vorlauf")]
     mit_vorgriff = [(i, z) for i, z in zuege if z["vorgriffe"]]
     t.append(f"- **Züge:** {len(zuege)} beantwortet, {sum(1 for f in faelle for z in f['zuege'] if 'abbruch' in z)} abgebrochen")
     t.append(f"- **Vorgriffe:** {len(mit_vorgriff)} Züge"
@@ -542,12 +565,17 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     p.add_argument("--modell", default=None,
                    help="Modell-Alias je Anfrage (z. B. chat-komplex); ohne = Modell des Assistenten bzw. Standard")
     p.add_argument("--prompt", type=Path, default=None, help="Promptvariante statt der im Kopf (Experiment)")
+    p.add_argument("--vorlauf", type=Path, default=None,
+                   help="YAML-Liste von Schülernachrichten, die im Standard-Chat vorausgehen; danach Wechsel "
+                        "zum Assistenten in derselben Konversation (C1 Schritt 6)")
     p.add_argument("--ohne-augmentierung", action="append", default=None, dest="ohne",
                    help="abgeschaltete Lernverhalten-Augmentierungen statt der Einrichtung im Kopf; "
                         "mehrfach möglich, „keine“ = alle an")
     args = p.parse_args()
 
     profil, faelle = profil_laden(args.szenarien)
+    vorlauf = ([str(t) for t in yaml.safe_load(args.vorlauf.read_text(encoding="utf-8"))]
+               if args.vorlauf else None)
     if not selbsttest(faelle):
         raise SystemExit(1)
     if args.selbsttest:
@@ -575,7 +603,8 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     ergebnisse = []
     try:
         for fall in faelle:
-            ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell))
+            ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell,
+                                                vorlauf))
         # Vor dem Löschen: Kosten trägt das Backend im Hintergrund nach.
         for f in ergebnisse:
             if f["konversation"]:
@@ -599,7 +628,7 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
             "prompt_datei": str((args.prompt or profil["prompt"]).resolve().relative_to(REPO))
             if (args.prompt or profil["prompt"]).resolve().is_relative_to(REPO) else str(args.prompt),
             "prompt": prompt_stand(profil["prompt"], args.prompt), "prompt_tokens": prompt_tokens(prompt_text),
-            "ohne": args.ohne, "import": args.importstand}
+            "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf}
     text = protokoll(kopf, ergebnisse)
     if args.ziel:
         args.ziel.mkdir(parents=True, exist_ok=True)
