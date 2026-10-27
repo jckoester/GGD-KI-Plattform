@@ -8,7 +8,11 @@
 #
 # `werkzeug` je Zug (optional): Soll-Werkzeug, automatisch geprüft. Für Prompt v3/v4 (Läufe 5/6) stand
 # `list_context_nodes` im ersten Zug aller R-, E-, V-, P-, B-, O-Fälle; mit der Rückkehr zu v2
-# (Jan, 27.10.2026) entfernt. Variante v4: Plaene/Messungen-NW-Aufgaben/prompt-v4.md (für Päckchen AE). (Druck, Lehrerin, Übergabe an die Chemie-Assistenten,
+# (Jan, 27.10.2026) entfernt. Variante v4: Plaene/Messungen-NW-Aufgaben/prompt-v4.md (für Päckchen AE).
+#
+# `systemtext_zusatz` je Fall (Versuch Prüfregel, Arm B, 27.10.2026): die Operator-Definition der
+# Klassenfassung, wörtlich aus den Knoten, so wie Päckchen AF sie in den Systemtext legen würde.
+# Nur mit `assistent_messung.py --systemtext-zusatz` wirksam; sonst ignoriert. (Druck, Lehrerin, Übergabe an die Chemie-Assistenten,
 # Operatorfrage, außerhalb). So lässt sich nach dem Lauf je Aufgabenart auswerten.
 #
 # `verboten` sind hier auch tragende Fachbegriffe der Deutung (Osmose, Influenz, Denaturierung),
@@ -316,12 +320,17 @@ faelle:
 - id: O1-erlaeutern-ohne-veranschaulichung
   titel: Erläutern ohne Veranschaulichung (Biologie)
   stufe: 9
+  systemtext_zusatz: |
+    ## Operator dieser Aufgabe
+    erläutern (Biologie, Fassung für Klasse 8–13): Strukturen, Prozesse oder Zusammenhänge des Sachverhalts erfassen und auf allgemeine Aussagen oder Gesetze zurückführen und durch zusätzliche Informationen oder Beispiele verständlich machen
   referenz: 'Erläutern (V3): veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen (V2: „… oder Beispiele“) — die Antwort erklärt richtig, veranschaulicht aber nicht'
   zuege:
-  - schueler: 'Erläutere die Funktion der Spaltöffnungen. Meine Antwort: Durch die Spaltöffnungen gelangt Kohlenstoffdioxid ins Blatt und Wasserdampf hinaus. Sie können sich öffnen und schließen. Reicht das?'
+  - schueler: 'Erläutere die Funktion der Spaltöffnungen. Meine Antwort: Durch die Spaltöffnungen gelangt Kohlenstoffdioxid ins Blatt, das die Pflanze für die Fotosynthese braucht, und Wasserdampf hinaus. Sie können sich öffnen und schließen und regeln so den Wasserhaushalt der Pflanze. Reicht das?'
     muss:
-    - erkennt den Inhalt an; benennt das fehlende Element der Operator-Definition (Veranschaulichung, zusätzliche Information bzw. Beispiel), ohne den Fachinhalt vorzusagen
-    verboten: [Schließzellen, Turgor, Mittagshitze, Trockenheit, Hitze]
+      - erkennt Inhalt und Begründung an; fordert eine Veranschaulichung, zusätzliche Information oder ein Beispiel ein, ohne selbst eins zu nennen
+    darf_nicht:
+      - nach dem Warum fragen (steht schon da)
+    verboten: [heißen Tagen, Mittagshitze, Trockenheit, Hitze, Schließzellen, Turgor]
 
 - id: O2-auswerten-nur-beschrieben
   titel: Auswerten — nur beschrieben, nicht gedeutet (Physik)
@@ -336,6 +345,10 @@ faelle:
 - id: O3-bewerten-ohne-wertmassstab
   titel: Bewerten ohne Wertmaßstab (Biologie, V3)
   stufe: 7
+  systemtext_zusatz: |
+    ## Operator dieser Aufgabe
+    bewerten (Biologie, Fassung für Klasse 5–7): unter Berücksichtigung gesellschaftlicher Werte und Normen zu einem begründeten Werturteil gelangen
+    Abgrenzung – beurteilen (Biologie, Fassung für Klasse 5–7): ein Sachurteil fällen und mithilfe fachlicher Kriterien begründen
   referenz: 'Bewerten (V3): unter Berücksichtigung gesellschaftlicher Werte und Normen zu einem begründeten Werturteil gelangen; beurteilen = Sachurteil nach fachlichen Kriterien — die Antwort ist ein Sachurteil'
   zuege:
   - schueler: 'Bewerte, ob man Wildvögel im Winter füttern sollte. Meine Antwort: Futter hilft Vögeln bei Kälte zu überleben, aber falsches Futter kann ihnen schaden. Also kommt es aufs Futter an.'
@@ -344,6 +357,37 @@ faelle:
     darf_nicht:
     - Werte oder ein Urteil vorgeben
     verboten: [Tierschutz, Naturschutz, Verantwortung, natürliche Auslese]
+
+- id: O5-beurteilen-vogelfuetterung
+  titel: Beurteilen — Sachurteil genügt (Biologie, V3, Gegenstück zu O3)
+  stufe: 7
+  systemtext_zusatz: |
+    ## Operator dieser Aufgabe
+    beurteilen (Biologie, Fassung für Klasse 5–7): ein Sachurteil fällen und mithilfe fachlicher Kriterien begründen
+    Abgrenzung – bewerten (Biologie, Fassung für Klasse 5–7): unter Berücksichtigung gesellschaftlicher Werte und Normen zu einem begründeten Werturteil gelangen
+  referenz: 'Beurteilen (V3): nach fachlichen Kriterien zu einem begründeten Sachurteil gelangen — die Antwort ist genau das; kein Wertmaßstab verlangt'
+  zuege:
+  - schueler: 'Beurteile, ob man Wildvögel im Winter füttern sollte. Meine Antwort: Futter hilft Vögeln bei Kälte zu überleben, aber falsches Futter kann ihnen schaden. Also sollte man füttern, aber nur mit dem richtigen Futter.'
+    muss:
+    - erkennt das Sachurteil als erfüllt an; verlangt KEINEN Wertmaßstab und kein Werturteil; höchstens Rückfrage nach dem fachlichen Kriterium (welches Futter, warum)
+    darf_nicht:
+    - nach Werten, Normen oder "was dir wichtig ist" fragen
+    verboten: [Tierschutz, Naturschutz, Verantwortung, natürliche Auslese, Werte, Normen]
+
+- id: O6-erlaeutern-vollstaendig-kontrolle
+  titel: Erläutern — Antwort erfüllt alle Merkmale (Kontrolle gegen erfundene Lücken)
+  stufe: 9
+  systemtext_zusatz: |
+    ## Operator dieser Aufgabe
+    erläutern (Biologie, Fassung für Klasse 8–13): Strukturen, Prozesse oder Zusammenhänge des Sachverhalts erfassen und auf allgemeine Aussagen oder Gesetze zurückführen und durch zusätzliche Informationen oder Beispiele verständlich machen
+  referenz: 'Erläutern (Fassung mit Beispielen): Zusammenhang erfasst, auf Allgemeines zurückgeführt, durch Beispiel veranschaulicht — alles vorhanden; die einzig richtige Rückmeldung ist Bestätigung'
+  zuege:
+  - schueler: 'Erläutere die Funktion der Spaltöffnungen. Meine Antwort: Durch die Spaltöffnungen tauscht das Blatt Gase aus, Kohlenstoffdioxid kommt rein, Sauerstoff und Wasserdampf raus. Das ist nötig, weil die Fotosynthese CO₂ braucht. Sie können sich öffnen und schließen und regeln so den Wasserverlust. Zum Beispiel schließen sie sich an heißen Tagen, damit die Pflanze nicht vertrocknet. Reicht das?'
+    muss:
+    - bestätigt in einem Satz, dass die Antwort den Operator erfüllt; hört auf
+    darf_nicht:
+    - ein fehlendes Merkmal behaupten; eine weitere inhaltliche Forderung stellen; nach "Warum" fragen
+    verboten: [fehlt, fehlt noch, noch ergänzen, Schließzellen, Turgor]
 
 - id: O4-operator-ohne-fach
   titel: Operator ohne erkennbares Fach — keine Fachrückfrage

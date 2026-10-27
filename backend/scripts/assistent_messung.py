@@ -421,6 +421,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
          f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
          + (f" · etwa {kopf['prompt_tokens']} Tokens (o200k_base)" if kopf.get("prompt_tokens") else ""),
          f"- **Importstand:** {kopf['import']}",
+         *(["- **Systemtext-Zusatz je Fall** (Feld `systemtext_zusatz`, an den Prompt des Assistenten gehängt)"]
+           if kopf.get("systemtext_zusatz") else []),
          *(["- **Vorlauf im Standard-Chat** (danach Wechsel zum Assistenten in derselben Konversation): "
             + " · ".join(f"„{v}“" for v in kopf["vorlauf"])] if kopf.get("vorlauf") else []),
          "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; Chat über den "
@@ -565,6 +567,9 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     p.add_argument("--modell", default=None,
                    help="Modell-Alias je Anfrage (z. B. chat-komplex); ohne = Modell des Assistenten bzw. Standard")
     p.add_argument("--prompt", type=Path, default=None, help="Promptvariante statt der im Kopf (Experiment)")
+    p.add_argument("--systemtext-zusatz", action="store_true", dest="systemtext_zusatz",
+                   help="Feld `systemtext_zusatz` eines Falls an den Prompt des Assistenten hängen (nur für "
+                        "diesen Fall) — Versuch Prüfregel Arm B: Operator-Definition im Systemtext")
     p.add_argument("--vorlauf", type=Path, default=None,
                    help="YAML-Liste von Schülernachrichten, die im Standard-Chat vorausgehen; danach Wechsel "
                         "zum Assistenten in derselben Konversation (C1 Schritt 6)")
@@ -601,8 +606,17 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
           f"ohne {args.ohne or '—'}, {len(faelle)} Fälle\n")
 
     ergebnisse = []
+    grundprompt = (args.prompt or profil["prompt"]).read_text(encoding="utf-8").strip()
     try:
         for fall in faelle:
+            # Arm B des Versuchs Prüfregel: Die Konversation übernimmt den Prompt beim Anlegen
+            # (Schnappschuss) — der Zusatz gilt also genau für diesen Fall.
+            if args.systemtext_zusatz:
+                zusatz = (fall.get("systemtext_zusatz") or "").strip()
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE assistants SET system_prompt = %s WHERE id = %s",
+                                (grundprompt + ("\n\n" + zusatz if zusatz else ""), kennung))
+                conn.commit()
             ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell,
                                                 vorlauf))
         # Vor dem Löschen: Kosten trägt das Backend im Hintergrund nach.
@@ -612,6 +626,10 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
                 for z, k in zip([z for z in f["zuege"] if "antwort" in z], je_zug):
                     z["kosten"] = k
     finally:
+        if args.systemtext_zusatz:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE assistants SET system_prompt = %s WHERE id = %s", (grundprompt, kennung))
+            conn.commit()
         if not args.behalten:
             with conn.cursor() as cur:
                 for f in ergebnisse:
@@ -628,7 +646,8 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
             "prompt_datei": str((args.prompt or profil["prompt"]).resolve().relative_to(REPO))
             if (args.prompt or profil["prompt"]).resolve().is_relative_to(REPO) else str(args.prompt),
             "prompt": prompt_stand(profil["prompt"], args.prompt), "prompt_tokens": prompt_tokens(prompt_text),
-            "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf}
+            "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf,
+            "systemtext_zusatz": bool(args.systemtext_zusatz)}
     text = protokoll(kopf, ergebnisse)
     if args.ziel:
         args.ziel.mkdir(parents=True, exist_ok=True)
