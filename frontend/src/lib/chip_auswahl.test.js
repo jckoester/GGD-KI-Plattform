@@ -1,25 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { anzeige, hinzu, naechsterFokus, vorschlaege, weg } from "./fach_mehrfachauswahl.js";
+import { anzeige, faecherAlsEintraege, hinzu, naechsterFokus, vorschlaege, weg } from "./chip_auswahl.js";
 
-const FAECHER = [
+const FAECHER = faecherAlsEintraege([
   { slug: "geschichte", name: "Geschichte" },
   { slug: "chemie", name: "Chemie", color: "#f00" },
   { slug: "physik", name: "Physik" },
   { slug: "nwt", name: "NwT" },
-];
+]);
 
 describe("vorschlaege", () => {
   it("ohne Eingabe alle nicht gewählten", () => {
-    expect(vorschlaege(FAECHER, ["physik"], "").map((f) => f.slug)).toEqual(["geschichte", "chemie", "nwt"]);
+    expect(vorschlaege(FAECHER, ["physik"], "").map((f) => f.wert)).toEqual(["geschichte", "chemie", "nwt"]);
   });
   it("Wortanfang vor Wortmitte", () => {
-    expect(vorschlaege(FAECHER, [], "ch").map((f) => f.slug)).toEqual(["chemie", "geschichte"]);
+    expect(vorschlaege(FAECHER, [], "ch").map((f) => f.wert)).toEqual(["chemie", "geschichte"]);
   });
-  it("findet auch über den Slug, ohne Groß/Klein", () => {
-    expect(vorschlaege(FAECHER, [], "NWT").map((f) => f.slug)).toEqual(["nwt"]);
+  it("findet auch über den Wert, ohne Groß/Klein", () => {
+    expect(vorschlaege(FAECHER, [], "NWT").map((f) => f.wert)).toEqual(["nwt"]);
   });
   it("Gewähltes wird nicht noch einmal vorgeschlagen", () => {
     expect(vorschlaege(FAECHER, ["chemie"], "chem")).toEqual([]);
+  });
+  it("Zahlen als Wert (Assistenten-IDs)", () => {
+    const a = [{ wert: 18, name: "naturwissenschaftliche Aufgaben" }, { wert: 21, name: "Mathe-Aufgaben" }];
+    expect(vorschlaege(a, [18], "").map((e) => e.wert)).toEqual([21]);
+    expect(vorschlaege(a, [], "natur").map((e) => e.wert)).toEqual([18]);
   });
 });
 
@@ -32,11 +37,12 @@ describe("hinzu und weg", () => {
 });
 
 describe("anzeige", () => {
-  it("bekanntes Fach mit Namen und Farbe", () => {
+  it("bekannter Eintrag mit Namen und Farbe", () => {
     expect(anzeige(FAECHER, "chemie")).toEqual({ name: "Chemie", color: "#f00", bekannt: true });
   });
-  it("unbekannter Slug bleibt sichtbar", () => {
+  it("unbekannter Wert bleibt sichtbar", () => {
     expect(anzeige(FAECHER, "nit")).toEqual({ name: "nit", color: null, bekannt: false });
+    expect(anzeige([], 42)).toEqual({ name: "42", color: null, bekannt: false });
   });
 });
 

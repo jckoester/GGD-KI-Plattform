@@ -184,7 +184,9 @@ async def _kandidaten(
     """Sichtbare Assistenten mit Vorschlag und Beispielen, je mit bestem Beispiel und
     Gegenbeispiel. Dazu der Abstand des aktuellen Assistenten (oder ``None``)."""
     sichtbar = (await db.execute(
-        sa.select(Assistant).where(sichtbar_klausel(zugang), Assistant.suggest != "never")
+        # „Versteckt“ heißt: nur über Link und Einstiege (0.22) — nie im Vorschlag.
+        sa.select(Assistant).where(sichtbar_klausel(zugang), Assistant.suggest != "never",
+                                   Assistant.visibility != "hidden")
     )).scalars().all()
     ids = [a.id for a in sichtbar if a.id != aktuell_id]
     abfrage_ids = ids + ([aktuell_id] if aktuell_id is not None else [])

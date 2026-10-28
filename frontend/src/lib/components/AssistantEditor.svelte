@@ -25,11 +25,13 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
-    import FachMehrfachauswahl from "$lib/components/FachMehrfachauswahl.svelte";
+    import ChipAuswahl from "$lib/components/ChipAuswahl.svelte";
+    import { faecherAlsEintraege } from "$lib/chip_auswahl.js";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import {
         getModels,
         getSubjects,
+        getAdminAssistants,
         getMyGroups,
         getAllGroups,
         getMyAssistant,
@@ -103,6 +105,10 @@
     );
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
     let imageKinds = $state([]); // konfigurierte Bildarten (Modell + Formate)
+    // Rückfall-Assistenten für das Feld „Darunter anbieten“ (C2, nur Admins).
+    let rueckfallAssistenten = $state([]);
+    const VORSCHLAGSTEXT_MAX = 300; // wie SUGGESTION_TEXT_MAX im Backend
+    const RUECKFAELLE_MAX = 3; // wie MAX_FALLBACKS im Backend
     // false = Proxy war nicht erreichbar. Dann NICHT warnen: Eine Falschwarnung bei
     // jedem Speichern wird weggeklickt — und mit ihr die echten.
     let imageKindsFreigabeBekannt = $state(true);
@@ -469,6 +475,8 @@
             image_kinds: [],
             operator_faecher: [],
             suggest: "never",
+            suggestion_text: "",
+            fallbacks: [],
             trigger_examples: "",
             trigger_counterexamples: "",
             status: "draft",
@@ -542,6 +550,8 @@
             image_kinds: a.image_kinds ?? [],
             operator_faecher: a.operator_faecher ?? [],
             suggest: a.suggest || "never",
+            suggestion_text: a.suggestion_text ?? "",
+            fallbacks: a.fallbacks ?? [],
             // Ein Eintrag je Zeile; zurück zur Liste erst in `buildPayload`.
             trigger_examples: listeZuZeilen(a.trigger_examples),
             trigger_counterexamples: listeZuZeilen(a.trigger_counterexamples),
@@ -588,6 +598,7 @@
             // Greift nur in der Schüler-Behandlung; bei Lehrkraft-Zielgruppe ohne Wirkung.
             disabled_augmentations: form.disabled_augmentations,
             suggest: form.suggest,
+            suggestion_text: form.suggestion_text.trim() || null,
             trigger_examples: zeilenZuListe(form.trigger_examples),
             trigger_counterexamples: zeilenZuListe(form.trigger_counterexamples),
         };
@@ -598,6 +609,8 @@
             p.image_kinds = form.image_kinds;
             // Leer = kein Abschnitt „Operator dieser Aufgabe" (Päckchen AF).
             p.operator_faecher = form.operator_faecher;
+            // Rückfälle unter einem Vorschlag (C2) — IDs, deshalb nur, wer alle sieht.
+            p.fallbacks = form.fallbacks;
         }
         return p;
     }
@@ -628,6 +641,16 @@
                 augmentations = (await getAugmentations()).augmentations ?? [];
             } catch {
                 augmentations = []; // Editor bleibt nutzbar, Abschnitt entfällt
+            }
+
+            // 3b'. Rückfall-Assistenten (C2): nur Admins wählen sie, sie sehen alle.
+            if (isAdmin) {
+                try {
+                    const liste = await getAdminAssistants({ status: "active", limit: 500 });
+                    rueckfallAssistenten = (liste.items ?? []).filter((x) => x.suggest === "fallback");
+                } catch {
+                    rueckfallAssistenten = []; // Feld zeigt dann nur die gespeicherten IDs
+                }
             }
 
             // 3c. Bildarten (nur relevant bei aktiver Bildgenerierung)
@@ -1952,6 +1975,63 @@
                                 />
                             {/if}
                         </div>
+                        {#if form.suggest !== "never"}
+                            <div class="space-y-1">
+                                <label
+                                    for="ae-suggestion-text"
+                                    class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                                >
+                                    Satz im Vorschlag
+                                </label>
+                                <input
+                                    id="ae-suggestion-text"
+                                    type="text"
+                                    bind:value={form.suggestion_text}
+                                    maxlength={VORSCHLAGSTEXT_MAX}
+                                    disabled={!canEdit}
+                                    aria-describedby="ae-suggestion-text-hinweis"
+                                    placeholder="Für Rechenaufgaben mit Massen und Stoffmengen gibt es einen Assistenten, der dich begleitet."
+                                    class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                                <p id="ae-suggestion-text-hinweis" class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    Ein Satz für Schüler:innen: wobei der Assistent hilft. Steht im Vorschlag unter
+                                    seinem Namen und hilft der Plattform, ihn zuzuordnen. Leer = Beschreibung.
+                                    {form.suggestion_text.length} / {VORSCHLAGSTEXT_MAX}
+                                </p>
+                            </div>
+                        {/if}
+                        {#if isAdmin && form.suggest === "specific"}
+                            <div class="space-y-1">
+                                <label
+                                    for="ae-fallbacks"
+                                    class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                                >
+                                    Darunter anbieten
+                                </label>
+                                <p id="ae-fallbacks-hinweis" class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    Allgemeine Assistenten, die im Vorschlag unter diesem stehen — etwa
+                                    „naturwissenschaftliche Aufgaben“ unter einem Chemie-Assistenten.
+                                    Höchstens {RUECKFAELLE_MAX}, angeboten werden die mit „Allgemein für ein Gebiet“.
+                                </p>
+                                <ChipAuswahl
+                                    id="ae-fallbacks"
+                                    beschreibung="ae-fallbacks-hinweis"
+                                    eintraege={rueckfallAssistenten
+                                        .filter((x) => x.id !== Number(assistantId))
+                                        .map((x) => ({ wert: x.id, name: x.name }))}
+                                    platzhalter="Rückfall-Assistent hinzufügen…"
+                                    farbpunkt={false}
+                                    bind:gewaehlt={form.fallbacks}
+                                />
+                                {#if form.fallbacks.length > RUECKFAELLE_MAX}
+                                    <WarningBanner
+                                        message={`Höchstens ${RUECKFAELLE_MAX} Rückfall-Assistenten — so wird nicht gespeichert.`}
+                                    />
+                                {/if}
+                            </div>
+                        {/if}
                         <div class="space-y-1">
                             <label
                                 for="ae-trigger-examples"
@@ -2209,10 +2289,11 @@
                                 diesen Fächern. Gedacht für einen Prompt, der Antworten gegen den
                                 Operator prüft. Leer = aus.
                             </p>
-                            <FachMehrfachauswahl
+                            <ChipAuswahl
                                 id="ae-operator-faecher"
                                 beschreibung="ae-operator-faecher-hinweis"
-                                faecher={subjects}
+                                eintraege={faecherAlsEintraege(subjects)}
+                                platzhalter="Fach hinzufügen…"
                                 bind:gewaehlt={form.operator_faecher}
                             />
                         </div>

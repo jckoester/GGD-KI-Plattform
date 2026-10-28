@@ -53,6 +53,7 @@ async def bestand(sitzungen):
         await _assistent(db, "Fern", "specific", [[0.0, 0.0, 1.0]])                 # 1,0
         await _assistent(db, "Nie", "never", [[1.0, 0.0, 0.0]])
         await _assistent(db, "Privat", "specific", [[1.0, 0.0, 0.0]], scope="private")
+        await _assistent(db, "Versteckt", "specific", [[1.0, 0.0, 0.0]], visibility="hidden")
         await _assistent(db, "Altes Modell", "specific", [[1.0, 0.0, 0.0]], modell="anderes-modell")
         await db.commit()
         return {"nw": rueck.id, "stoech": stoech.id}

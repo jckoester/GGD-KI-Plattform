@@ -1,18 +1,20 @@
 <script>
     /**
-     * Mehrere Fächer wählen: gewählte als Chips, darunter ein Suchfeld mit Vorschlägen
-     * (Combobox nach WAI-ARIA). Skaliert auf viele Fächer, anders als eine Checkbox-Liste.
+     * Mehrere Einträge wählen: gewählte als Chips, darunter ein Suchfeld mit Vorschlägen
+     * (Combobox nach WAI-ARIA). Skaliert auf viele Einträge, anders als eine Checkbox-Liste.
+     * Nutzer: Fächer für Operatoren (AF), Rückfall-Assistenten (C2).
      *
      * Props:
-     * - faecher: [{ slug, name, color? }] — die Auswahl
-     * - gewaehlt: Slugs (bindable)
+     * - eintraege: [{ wert, name, color? }] — die Auswahl (Fächer: `faecherAlsEintraege`)
+     * - gewaehlt: Werte (bindable)
      * - id: Kennung des Suchfelds (für das <label for> des Aufrufers)
      * - beschreibung: Kennung eines erklärenden Textes (aria-describedby), optional
      * - platzhalter: Text im leeren Suchfeld
+     * - farbpunkt: Farbpunkt vor dem Namen zeigen (Fächer ja, Assistenten nein)
      *
      * Tastatur: Pfeile wählen einen Vorschlag, Enter übernimmt, Escape schließt die Liste,
      * Backspace im leeren Feld entfernt den letzten Chip. Die Logik steht in
-     * `$lib/fach_mehrfachauswahl.js` (mit Tests).
+     * `$lib/chip_auswahl.js` (mit Tests).
      */
     import { X } from "lucide-svelte";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
@@ -22,14 +24,15 @@
         naechsterFokus,
         vorschlaege,
         weg,
-    } from "$lib/fach_mehrfachauswahl.js";
+    } from "$lib/chip_auswahl.js";
 
     let {
-        faecher = [],
+        eintraege = [],
         gewaehlt = $bindable([]),
         id,
         beschreibung = undefined,
-        platzhalter = "Fach hinzufügen…",
+        platzhalter = "Hinzufügen…",
+        farbpunkt = true,
     } = $props();
 
     let eingabe = $state("");
@@ -37,18 +40,18 @@
     let fokus = $state(-1);
     let feld = $state(null);
 
-    const liste = $derived(vorschlaege(faecher, gewaehlt, eingabe));
+    const liste = $derived(vorschlaege(eintraege, gewaehlt, eingabe));
     const listeId = $derived(`${id}-vorschlaege`);
 
-    function waehle(slug) {
-        gewaehlt = hinzu(gewaehlt, slug);
+    function waehle(wert) {
+        gewaehlt = hinzu(gewaehlt, wert);
         eingabe = "";
         fokus = -1;
         feld?.focus();
     }
 
-    function entferne(slug) {
-        gewaehlt = weg(gewaehlt, slug);
+    function entferne(wert) {
+        gewaehlt = weg(gewaehlt, wert);
         feld?.focus();
     }
 
@@ -63,7 +66,7 @@
             case "Enter":
                 if (offen && fokus >= 0 && liste[fokus]) {
                     e.preventDefault();
-                    waehle(liste[fokus].slug);
+                    waehle(liste[fokus].wert);
                 }
                 break;
             case "Escape":
@@ -87,19 +90,19 @@
            px-2 py-1.5 focus-within:ring-2 focus-within:ring-primary"
 >
     <div class="flex flex-wrap items-center gap-1.5">
-        {#each gewaehlt as slug (slug)}
-            {@const f = anzeige(faecher, slug)}
+        {#each gewaehlt as wert (wert)}
+            {@const f = anzeige(eintraege, wert)}
             <span
                 class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-sm
                        border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
                        {f.bekannt ? 'text-light-tx dark:text-dark-tx' : 'text-light-tx-2 dark:text-dark-tx-2 italic'}"
-                title={f.bekannt ? f.name : `${slug}: Fach gibt es hier (noch) nicht`}
+                title={f.bekannt ? f.name : `${wert}: gibt es hier (noch) nicht`}
             >
-                <SubjectDot color={f.color} />
+                {#if farbpunkt}<SubjectDot color={f.color} />{/if}
                 {f.name}
                 <button
                     type="button"
-                    onclick={() => entferne(slug)}
+                    onclick={() => entferne(wert)}
                     aria-label="{f.name} entfernen"
                     class="rounded-full text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx
                            dark:hover:text-dark-tx focus:outline-none focus:ring-2 focus:ring-primary"
@@ -137,17 +140,17 @@
             class="mt-1.5 max-h-56 overflow-y-auto rounded border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg"
         >
-            {#each liste as f, i (f.slug)}
+            {#each liste as f, i (f.wert)}
                 <li
                     id="{listeId}-{i}"
                     role="option"
                     aria-selected={i === fokus}
-                    onmousedown={(e) => { e.preventDefault(); waehle(f.slug); }}
+                    onmousedown={(e) => { e.preventDefault(); waehle(f.wert); }}
                     class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer
                            text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
                            {i === fokus ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                 >
-                    <SubjectDot color={f.color} />
+                    {#if farbpunkt}<SubjectDot color={f.color} />{/if}
                     {f.name}
                 </li>
             {/each}
