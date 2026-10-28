@@ -64,6 +64,8 @@ from app.context.bausteine import (
 )
 from app.context.bausteine import speichere as bausteine_speichern
 from app.context.operator_abschnitt import Operatorabschnitt, operator_abschnitt
+from app.assistants.bausteine import texte as baustein_texte
+from app.assistants.andere import andere_allgemeine
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.context.vorab_statistik import zaehlen as vorab_zaehlen
 from app.context.filters import Knotenfilter
@@ -2201,6 +2203,15 @@ async def chat(
             # Fehlt der Abschnitt, antwortet der Prompt mit seinen Kurzfassungen — besser als
             # eine abgebrochene Antwort.
             logger.exception("Operator-Abschnitt nicht gebaut (Konversation %s)", conversation_id)
+    # 0.26: Rückfall-Assistenten bekommen die übrigen Rückfälle, die die Schüler:in nutzen darf
+    # (`app/assistants/andere.py` — überbrückt die C2-Grenze im Assistenten).
+    _andere = ""
+    if (student_treatment and active_assistant is not None
+            and getattr(active_assistant, "suggest", None) == "fallback"):
+        try:
+            _andere = await andere_allgemeine(db, await lade_zugang(db, current_user), active_assistant.id)
+        except Exception:
+            logger.exception("Andere allgemeine Assistenten nicht gebaut (Konversation %s)", conversation_id)
     llm_messages.append({
         "role": "system",
         "content": compose_system_content(
@@ -2216,6 +2227,10 @@ async def chat(
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,
             operator_abschnitt=_operator.text if _operator is not None else None,
+            # 0.26: live aus dem Release, nicht aus dem Prompt-Schnappschuss — eine
+            # Nachjustierung soll auch laufende Konversationen erreichen.
+            bausteine=baustein_texte(getattr(active_assistant, "bausteine", None)),
+            andere_assistenten=_andere,
         ),
     })
     if pedagogy.output_format.strip():

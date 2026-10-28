@@ -413,6 +413,12 @@ class Assistant(Base):
         JSONB, nullable=False, server_default=text("'[]'")
     )
 
+    # 0.26 (Alembic 0093): Bausteine aus `app/assistants/bausteine/`, die die Plattform hinter
+    # den Prompt hängt (etwa „Begleiten statt lösen“). Liste von Schlüsseln; leer = keiner.
+    bausteine: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+
     # Pädagogische Lernverhalten-Augmentierungen (pedagogy.yaml), die für diesen
     # Assistenten deaktiviert sind — Liste von Augmentierungs-Keys. Greift nur in der
     # Schüler-Behandlung (Phase 13).

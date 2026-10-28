@@ -1076,6 +1076,14 @@ export async function getAugmentations() {
   return res.json(); // { augmentations: [{ key, label }] }
 }
 
+// Bausteine hinter dem Prompt (0.26), etwa „Begleiten statt lösen“ — für den Editor.
+export async function getBausteine() {
+  const res = await fetch(`${BASE}/pedagogy/bausteine`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { bausteine: [{ key, label, beschreibung }] }
+}
+
 /**
  * Konfigurierte Bildarten samt Freischaltungsstand je Jahrgang.
  * → { bildarten: [{ id, label, beschreibung, modell, formate,

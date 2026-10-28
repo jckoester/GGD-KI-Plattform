@@ -53,6 +53,7 @@ def test_pruefsatz_nicht_unter_den_beispielen(szenario, name):
         eintrag["min_grade"], eintrag["max_grade"], eintrag["model"])
     assert kopf["ohne"] == eintrag["disabled_augmentations"]
     assert kopf.get("operator_faecher", []) == eintrag.get("operator_faecher", [])
+    assert kopf.get("bausteine", []) == eintrag.get("bausteine", [])
 
 
 def test_rueckfaelle_zeigen_auf_assistenten_der_datei():
@@ -78,3 +79,10 @@ def test_nw_assistent_hat_operator_faecher():
     kommen_noch = {"nit"}
     assert nw["operator_faecher"] and set(nw["operator_faecher"]) <= slugs | kommen_noch
     assert "bnt" not in nw["operator_faecher"]          # entfällt mit V3
+
+
+def test_bausteine_der_datei_gibt_es():
+    """Ein unbekannter Baustein übergeht der Seed nur mit Warnung — hier fällt er auf."""
+    from app.assistants.bausteine import SCHLUESSEL
+    for e in EINTRAEGE:
+        assert set(e.get("bausteine") or []) <= SCHLUESSEL, e["name"]

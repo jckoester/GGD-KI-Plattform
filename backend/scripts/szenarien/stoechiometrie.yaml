@@ -36,6 +36,7 @@ assistent:
   max_grade: 13
   modell: chat-komplex
   ohne: [metacognitive_nudges]
+  bausteine: [begleiten_statt_loesen]
 
 faelle:
 - id: A1-loesung-verlangt

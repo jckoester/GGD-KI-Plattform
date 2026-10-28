@@ -30,6 +30,7 @@ from app.chat.router import _get_guardrail_prompt
 from app.config import settings
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.db.models import Assistant, AssistantDocument, Conversation
+from app.assistants.bausteine import texte as baustein_texte
 from app.pedagogy.compose import compose_system_content, is_student_treatment
 from app.chat.router import _fach_name
 from app.pedagogy.config import load_pedagogy
@@ -72,6 +73,7 @@ async def main(datei: Path, fall_id: str, konto: str) -> None:
                           context_str=kontext.text,
                           assistant_system_prompt=assistent.system_prompt,
                           disabled_augmentations=assistent.disabled_augmentations,
+                          bausteine=baustein_texte(assistent.bausteine),
                       )})
         if pedagogy.output_format.strip():
             teile.append({"role": "system", "quelle": "Ausgabeformat", "content": pedagogy.output_format.strip()})

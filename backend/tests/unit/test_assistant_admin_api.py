@@ -187,6 +187,7 @@ class TestAssistantResponse:
             # konstruiertes ORM-Objekt hätte hier None.
             image_kinds=[],
             operator_faecher=[],
+            bausteine=[],
             # Ebenso die Vorschlagsfelder (0090).
             suggest="never",
             fallbacks=[],
@@ -803,6 +804,7 @@ class TestFaehigkeitenImRoundTrip:
             tool_groups=["image_generation", "planning"],
             image_kinds=["standard"],
             operator_faecher=[],
+            bausteine=[],
             suggest="never",
             suggestion_text=None,
         )

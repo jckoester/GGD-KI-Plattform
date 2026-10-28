@@ -12,6 +12,7 @@ from sqlalchemy import and_, or_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.assistants import ausloeser
+from app.assistants.bausteine import SCHLUESSEL as BAUSTEIN_SCHLUESSEL
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.config import settings
@@ -137,6 +138,8 @@ class AssistantCreate(BaseModel):
     image_kinds: list[str] = []
     # Päckchen AF: Fach-Slugs für den Abschnitt „Operator dieser Aufgabe“; leer = aus.
     operator_faecher: list[str] = []
+    # 0.26: Bausteine hinter dem Prompt (`app/assistants/bausteine/`); leer = keiner.
+    bausteine: list[str] = []
     # Vorschlag im Chat (Päckchen C1, F4/F5) — ausgewertet erst mit C2.
     suggest: str = "never"
     suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
@@ -171,6 +174,7 @@ class AssistantUpdate(BaseModel):
     disabled_augmentations: Optional[list[str]] = None
     image_kinds: Optional[list[str]] = None
     operator_faecher: Optional[list[str]] = None
+    bausteine: Optional[list[str]] = None
     suggest: Optional[str] = None
     suggestion_text: Optional[str] = Field(default=None, max_length=SUGGESTION_TEXT_MAX)
     fallbacks: Optional[list[int]] = None
@@ -214,6 +218,7 @@ class AssistantResponse(BaseModel):
     disabled_augmentations: list[str] = []
     image_kinds: list[str] = []
     operator_faecher: list[str] = []
+    bausteine: list[str] = []
     documents: list[AssistantDocumentOut] = []
     suggest: str = "never"
     suggestion_text: Optional[str] = None
@@ -315,6 +320,7 @@ def _assistant_to_yaml(
             "tool_groups": list(assistant.tool_groups or []) or None,
             "image_kinds": list(assistant.image_kinds or []) or None,
             "operator_faecher": list(assistant.operator_faecher or []) or None,
+            "bausteine": list(assistant.bausteine or []) or None,
         },
     }
     # None-Werte aus config entfernen
@@ -584,6 +590,15 @@ async def _gepruefte_operator_faecher(db: AsyncSession, slugs: list[str]) -> lis
             raise HTTPException(
                 status_code=422, detail=f"Fach nicht gefunden: {', '.join(fehlen)}"
             )
+    return eindeutig
+
+
+def _gepruefte_bausteine(schluessel: list[str]) -> list[str]:
+    """Ohne Dubletten; jeden Baustein muss es geben (`app/assistants/bausteine/`)."""
+    eindeutig = list(dict.fromkeys(s.strip() for s in schluessel if s and s.strip()))
+    fehlen = [s for s in eindeutig if s not in BAUSTEIN_SCHLUESSEL]
+    if fehlen:
+        raise HTTPException(status_code=422, detail=f"Baustein nicht gefunden: {', '.join(fehlen)}")
     return eindeutig
 
 
@@ -964,6 +979,7 @@ async def create_assistant(
         disabled_augmentations=request.disabled_augmentations,
         image_kinds=request.image_kinds,
         operator_faecher=operator_faecher,
+        bausteine=_gepruefte_bausteine(request.bausteine),
         suggest=request.suggest,
         suggestion_text=(request.suggestion_text or "").strip() or None,
         fallbacks=fallbacks,
@@ -1019,6 +1035,8 @@ async def update_assistant(
         update_data["operator_faecher"] = await _gepruefte_operator_faecher(
             db, update_data["operator_faecher"] or []
         )
+    if "bausteine" in update_data:
+        update_data["bausteine"] = _gepruefte_bausteine(update_data["bausteine"] or [])
     if "suggestion_text" in update_data:
         update_data["suggestion_text"] = (update_data["suggestion_text"] or "").strip() or None
     # `null` hieße hier „Spalte leeren“, und `suggest` ist NOT NULL.
@@ -1474,6 +1492,10 @@ async def import_assistant(
         set((await db.execute(select(Subject.slug).where(Subject.slug.in_(wunsch)))).scalars())
         if wunsch else set(),
         "Fächer für Operatoren", hinweise,
+    )
+    wunsch_b = [str(s).strip() for s in data["config"].get("bausteine") or []]
+    fields["bausteine"] = _uebernimm_bekannte(
+        list(dict.fromkeys(wunsch_b)), set(BAUSTEIN_SCHLUESSEL), "Bausteine", hinweise,
     )
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"

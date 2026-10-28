@@ -74,12 +74,15 @@ def compose_system_content(
     bezug: str | None = None,
     fach: str | None = None,
     operator_abschnitt: str | None = None,
+    bausteine: str | None = None,
+    andere_assistenten: str | None = None,
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
     Reihenfolge: universelle Basis · [Vorrang des Wissensspeichers] ·
     Zielgruppen-Erweiterung · [Klassenstufe — nur Schüler-Behandlung] · [Fach] · [Bezugsstunde] ·
-    [Wissens-Kontext + Assistenten-Prompt] · [Operator dieser Aufgabe] ·
+    [Wissens-Kontext + Assistenten-Prompt] · [Bausteine] · [Andere allgemeine Assistenten] ·
+    [Operator dieser Aufgabe] ·
     [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
 
@@ -120,6 +123,13 @@ def compose_system_content(
         parts.append(ctx)
     elif prompt:
         parts.append(prompt)
+
+    # 0.26: Bausteine („Begleiten statt lösen“) gehören zum Prompt und stehen direkt dahinter;
+    # die Liste der anderen Rückfall-Assistenten danach — der Baustein sagt, was mit ihr zu tun ist.
+    if bausteine and bausteine.strip():
+        parts.append(bausteine.strip())
+    if andere_assistenten and andere_assistenten.strip():
+        parts.append(andere_assistenten.strip())
 
     # Päckchen AF: **hinter** dem Assistenten-Prompt — an dieser Stelle stand der Abschnitt im
     # Prüfregel-Versuch (Läufe 14–18, Zusatz am Prompt). Eine andere Stelle wäre eine andere,

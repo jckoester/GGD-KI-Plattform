@@ -58,6 +58,7 @@
         deleteContextAnchor,
         searchContextNodesLegacy,
         getAugmentations,
+        getBausteine,
         getImageKinds,
     } from "$lib/api.js";
     import { SCOPE_ANCHOR_CONTENT_TYPES } from "$lib/taxonomy.js";
@@ -104,6 +105,10 @@
         isAdmin ? subjects : eigeneFaecher(subjects, groups, savedForm.subject_id),
     );
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
+    let bausteine = $state([]); // [{ key, label, beschreibung }] — hinter dem Prompt (0.26)
+    const angehaengteBausteine = $derived(
+        bausteine.filter((b) => form.bausteine.includes(b.key)).map((b) => `„${b.label}“`),
+    );
     let imageKinds = $state([]); // konfigurierte Bildarten (Modell + Formate)
     // Rückfall-Assistenten für das Feld „Darunter anbieten“ (C2, nur Admins).
     let rueckfallAssistenten = $state([]);
@@ -474,6 +479,7 @@
             disabled_augmentations: [],
             image_kinds: [],
             operator_faecher: [],
+            bausteine: [],
             suggest: "never",
             suggestion_text: "",
             fallbacks: [],
@@ -549,6 +555,7 @@
             disabled_augmentations: a.disabled_augmentations ?? [],
             image_kinds: a.image_kinds ?? [],
             operator_faecher: a.operator_faecher ?? [],
+            bausteine: a.bausteine ?? [],
             suggest: a.suggest || "never",
             suggestion_text: a.suggestion_text ?? "",
             fallbacks: a.fallbacks ?? [],
@@ -609,6 +616,8 @@
             p.image_kinds = form.image_kinds;
             // Leer = kein Abschnitt „Operator dieser Aufgabe" (Päckchen AF).
             p.operator_faecher = form.operator_faecher;
+            // Bausteine hinter dem Prompt (0.26) — gemessene Blöcke, nur Admins wählen sie.
+            p.bausteine = form.bausteine;
             // Rückfälle unter einem Vorschlag (C2) — IDs, deshalb nur, wer alle sieht.
             p.fallbacks = form.fallbacks;
         }
@@ -641,6 +650,12 @@
                 augmentations = (await getAugmentations()).augmentations ?? [];
             } catch {
                 augmentations = []; // Editor bleibt nutzbar, Abschnitt entfällt
+            }
+            // Auch für Lehrkräfte: Die Lesezeile unter dem Prompt nennt, was angehängt wird.
+            try {
+                bausteine = (await getBausteine()).bausteine ?? [];
+            } catch {
+                bausteine = [];
             }
 
             // 3b'. Rückfall-Assistenten (C2): nur Admins wählen sie, sie sehen alle.
@@ -1395,6 +1410,11 @@
                      bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                      px-3 py-2 resize-none font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         ></textarea>
+                        {#if angehaengteBausteine.length > 0}
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Dahinter hängt die Plattform: {angehaengteBausteine.join(", ")}.
+                            </p>
+                        {/if}
                     </div>
 
                     <!-- Modell & Parameter -->
@@ -2297,6 +2317,41 @@
                                 bind:gewaehlt={form.operator_faecher}
                             />
                         </div>
+
+                        {#if bausteine.length > 0}
+                            <div class="space-y-2">
+                                <span class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                                    Bausteine hinter dem Prompt
+                                </span>
+                                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    Gemessene Textblöcke, die die Plattform an den System-Prompt
+                                    anhängt. Sie kommen mit jedem Update in der aktuellen Fassung;
+                                    der Prompt enthält dann nur, was diesen Assistenten ausmacht.
+                                </p>
+                                {#each bausteine as b (b.key)}
+                                    <label
+                                        class="flex items-start gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={form.bausteine.includes(b.key)}
+                                            disabled={!canEdit}
+                                            onchange={(e) =>
+                                                (form.bausteine = e.currentTarget.checked
+                                                    ? [...form.bausteine.filter((k) => k !== b.key), b.key]
+                                                    : form.bausteine.filter((k) => k !== b.key))}
+                                            class="mt-0.5 rounded border-light-ui-3 dark:border-dark-ui-3"
+                                        />
+                                        <span>
+                                            {b.label}
+                                            <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                                {b.beschreibung}
+                                            </span>
+                                        </span>
+                                    </label>
+                                {/each}
+                            </div>
+                        {/if}
                     {/if}
 
                     <!-- Status-Anzeige (nur bei bestehendem Assistenten) -->

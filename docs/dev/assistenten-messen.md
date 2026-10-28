@@ -77,84 +77,88 @@ Suchanfragen und die Aufrufe von `list_context_nodes` (Filter, `gesamt`, `gelief
 ## Rahmen für Tätigkeits-Assistenten (0.26)
 
 Die zwölf allgemeinen Assistenten (Plan „Rückfall-Assistenten“, Landkarte vom 28.10.2026) teilen
-einen Rahmen, den v5d (naturwissenschaftliche Aufgaben) und der Assistent für Stöchiometrie
-erprobt haben. Er ist eine **Checkliste, keine Include-Datei**: Jeder Prompt bleibt ein
-vollständiger Text, den die Schule im Editor lesen und ändern kann. Was hier als Wortlaut steht,
-ist gemessen und wird übernommen; angepasst wird nur, was in *Kursiv* steht.
+die Regeln, die v5d (naturwissenschaftliche Aufgaben) und der Assistent für Stöchiometrie erprobt
+haben. Sie stehen **einmal**, im Baustein `begleiten_statt_loesen`
+(`backend/app/assistants/bausteine/`). Der Assistent wählt ihn über das Feld `bausteine`
+(Migration 0093, im Editor nur für Admins), und die Plattform hängt ihn hinter den Prompt. Die
+Prompt-Datei enthält nur, was die Tätigkeit ausmacht.
 
-### Was nicht in den Prompt gehört
+⚠️ **Der Baustein kommt mit dem Release, die Schule pflegt ihn nicht** (Plan F10). Das weicht
+bewusst vom Muster `config/` ab: `pedagogy.yaml` ist eine Instanzdatei und wird nie
+überschrieben, eine Nachjustierung käme dort nicht an. Der Text gilt live, auch in laufenden
+Konversationen; der Prompt dagegen ist ein Schnappschuss.
 
-Die Plattform setzt es selbst davor oder dahinter. Ein zweites Mal im Prompt kostet Tokens und
-kann dem Original widersprechen:
+### Reihenfolge im Systemtext
 
-- die Anrede „du“, Krise und Versuche für zu Hause (`pedagogy.yaml`: `universal_base`,
-  `student_extension`, Sicherheitsanker);
-- die Zeile mit der Klassenstufe und die Fassungen der Begriffe (Stufen über die Plattform, siehe
-  oben);
-- der Lesehinweis vor dem Wissensspeicher (`kontext_hinweis`);
-- die Definition des Operators: Sie steht im Abschnitt „Operator dieser Aufgabe“, wenn der Assistent
-  `operator_faecher` hat (AF, 0.23);
-- eine Stoffverteilung und ein Lehrplan.
+Präambeln · Klassenstufe · Fach · Bezug · Kontext + **Prompt** · **Bausteine** ·
+**Andere allgemeine Assistenten** · Operator dieser Aufgabe · Augmentierungen
+(`compose_system_content`).
 
-### Abschnitte, in dieser Reihenfolge
+**Andere allgemeine Assistenten** (`app/assistants/andere.py`) bekommt nur ein Assistent mit
+`suggest: fallback` im Chat einer Schüler:in: die übrigen Rückfälle, die sie nutzen darf, je mit
+Name und `suggestion_text`. Das ist derselbe Satz wie im Vorschlagsdialog. Ein Nachbar, den es noch nicht gibt, fehlt also einfach in der Liste; der Prompt verweist nicht ins Leere. Der Baustein sagt,
+was das Modell damit tut. Steht keiner darin, verweist es auf niemanden; sonst erfände es bei
+leerer Liste einen Assistenten.
 
-| # | Abschnitt | Gemeinsam | Je Tätigkeit |
-|---|---|---|---|
-| 1 | Rolle (ohne Überschrift) | „Du begleitest Schüler:innen Schritt für Schritt … Du bist dabei wie eine geduldige Mitschülerin, die die Aufgabe schon kann, aber nicht vorsagt: freundlich, kurz, auf Augenhöhe.“ | *Tätigkeit in einem Satz; wer was erarbeitet* |
-| 2 | Vor jeder Antwort: selbst lösen | Selbst lösen, nie zeigen, nur zum Beurteilen; fehlt etwas, danach fragen | *Rechnen: selbst rechnen. Texte: selbst lesen und prüfen, keine Musterlösung im Kopf, nach der ihr Text umgebaut wird* |
-| 3 | Antwort gegen den Operator prüfen | Wortlaut v5d, Punkte 1–4 plus „Diese Prüfung läuft im Stillen …“ | *Nur mit `operator_faecher`. Beispiele für die Übersetzung in Merkmale aus dem eigenen Gebiet* |
-| 4 | Zuerst: Was verlangt die Aufgabe? | Kurzfassungen dienen nur dem Erkennen; Maßstab ist der Abschnitt „Operator dieser Aufgabe“; die Definition erwähnst du nicht | *Die Operatoren der Tätigkeit; Weg je Aufgabenart* |
-| 5 | Grundsatz: Weg vor Ergebnis | drei Stufen Weg → Mittel → Ausführung, immer nach der aktuellen Stufe fragen | *Beispielfragen aus dem Gebiet* |
-| 6 | Schema jeder Antwort | Rückmeldung · höchstens ein Hinweis · genau eine Frage als letzter Satz, danach nichts mehr | — |
-| 7 | Was von der Schüler:in kommt | Ergebnis, Wert, tragender Begriff kommt von ihr zuerst; Bitten und Zeitdruck ändern nichts; Absatz „Wer mit dir schreibt, weiß die Plattform …“ (Wortlaut v5d) | *Was „die Lösung“ hier ist: Zahl, Deutung, Argument, umformulierter Satz, Code* |
-| 8 | Wenn sie nicht weiterkommt: Hilfe in Stufen | anders fragen → Mittel allgemein nennen → Beispiel aus anderem Zusammenhang | *was „Mittel“ und „anderer Zusammenhang“ hier heißen* |
-| 9 | Fehler | erst was stimmt, dann der Haken als Frage; richtigen Wert nicht nennen; nicht über die Ursache spekulieren | *Prüffragen und häufige Stolperstellen* |
-| 10 | Richtiges | ein Satz, konkret, dann die nächste Frage; kein Nachrechnen, keine eigene Fassung daneben; andere richtige Wege sind richtig | *was „sinnvoll gerundet“ bzw. „anders, aber richtig“ hier heißt* |
-| 11 | Schulische Vorlage | Methodenblatt-Klausel bzw. Planungs-Klausel (unten) | *welche Vorlage, welches allgemeine Schema* |
-| 12 | Nachbarn | Hinweis auf einen anderen Assistenten als erster Satz, dann trotzdem der erste Schritt | *die Nachbarn der Landkarte, je mit einem Halbsatz* |
-| 13 | Ton | Kurze Sätze, keine Fachsprache über der Klasse; Wissensspeicher nie als Quelle nennen; Anerkennung konkret; bei Frust ein Satz Mut und ein kleinerer Schritt; kein „musst du“, keine Moral | — |
-| 14 | Begriffsfragen und Abschluss | Begriff in zwei Sätzen mit Beispiel **nicht aus der Aufgabe**, zurück zur Aufgabe; gelöst → ein Satz, aufhören; Zusammenfassung oder Übung nur auf Nachfrage | — |
-| 15 | Schreibweise | — | *Rechnen: Größen, Dezimalkomma, mhchem. Texte: Zitate aus ihrem Text in Anführungszeichen, keine Listen* |
-| 16 | Bevor du sendest | Merkmale aufgezählt? Eigenes Beispiel oder Kriterium genannt? Lösungsbestandteil, auch in der Frage? Mehr als eine Frage? „Wissensspeicher“ im Text? | *dazu zwei oder drei Paare „Nicht: … Sondern: …“ aus dem Gebiet* |
+⚠️ Die Liste überbrückt die heutige C2-Grenze: `im_assistenten` bietet nur spezifische
+Assistenten an. Bietet C2 Rückfälle in der Assistenten-Konversation an, entfällt sie, sonst
+steht der Hinweis doppelt.
 
-**Feedback statt Lösung** gilt für die Assistenten, die einen Text der Schüler:in vor sich haben:
-Überarbeiten, Grammatik und Rechtschreibung, Programmieren. Abschnitt 7 heißt dort: *Du schreibst
-ihren Text nicht um, auch nicht einen Satz „als Beispiel“, und korrigierst keinen Fehler selbst. Du
-zeigst, wo etwas nicht passt, und sie bessert es.* Abschnitt 10: *Ihre Fassung ist richtig, wenn sie
-trägt, nicht wenn sie deiner gleicht.*
+### Was in die Prompt-Datei gehört
+
+| Abschnitt | Inhalt |
+|---|---|
+| Rolle (ohne Überschrift) | „Du bist der Assistent für *Name*: …“, wer was erarbeitet; der Satz von der geduldigen Mitschülerin |
+| Vor jeder Antwort | Rechnen: selbst rechnen. Versuche, Texte: was ein tragfähiger Schritt mindestens enthält, ohne fertige Lösung im Kopf (lässt `chat-standard` eine Chance) |
+| Was verlangt die Aufgabe? | Operatoren der Tätigkeit als Kurzfassung zum Erkennen; zwei oder drei Beispiele, wie Merkmale hier heißen; der Weg je Aufgabenart; die drei Stufen mit Beispielfragen |
+| Was hier die Lösung ausmacht | was zuerst von der Schüler:in kommt (Zahl, Deutung, Argument, umformulierter Satz, Code); was Mittel (Stufe 2) und Beispiel (Stufe 3) der Hilfe hier sind |
+| Fehler | Prüffragen und häufige Stolperstellen |
+| Sicherheit | nur wo die Tätigkeit Gefahren kennt (Versuche): fester Schritt im Weg und **die einzige Stelle, an der vorgesagt wird** — sofort, klar, mit Grund und Schutzmaßnahme. Der Baustein lässt diese Ausnahme durch |
+| Richtiges | was hier „anders, aber richtig“ und „sinnvoll gerundet“ heißt |
+| Methodenblatt der Schule | nur bei Tätigkeiten mit Methoden- oder Operatorenblatt; Klausel unten |
+| Schreibweise | Rechnen und Versuche: Größen, Dezimalkomma, mhchem, Grad Celsius als `^\circ\mathrm{C}` (° in `\mathrm` rendert KaTeX nicht verlässlich). Texte: Zitate aus ihrem Text in Anführungszeichen |
+| Beispiele | zwei oder drei Paare „Nicht: … Sondern: …“ |
+
+**Nicht** in die Prompt-Datei gehören: was der Baustein regelt (Schema, Vorsagen, Lehrkraft-
+Behauptung, Hilfe in Stufen, Operator-Prüfung, Fehler und Richtiges allgemein, andere
+Assistenten, Begriffsfragen und fremde Anliegen, Ton, Bevor du sendest), Namen anderer
+Assistenten, die Anrede, Krise und Versuche zu Hause (`pedagogy.yaml`), Klassenstufe und
+Fassungen der Begriffe (Plattform), der Lesehinweis vor dem Wissensspeicher, eine Stoffverteilung.
+
+**Feedback statt Lösung** (Überarbeiten, Grammatik und Rechtschreibung, Programmieren): Unter
+„Was hier die Lösung ausmacht“ steht dort, dass der Assistent ihren Text oder Code nicht
+umschreibt, auch keinen Satz „als Beispiel“, und keinen Fehler selbst korrigiert. Unter
+„Richtiges“ steht: Ihre Fassung ist richtig, wenn sie trägt, nicht wenn sie deiner gleicht.
 
 ### Klausel: schulische Vorlage (Entscheidung 3)
 
-Für Assistenten, deren Tätigkeit ein Methoden- oder Operatorenblatt der Schule betrifft
-(Versuche, Analysieren, Argumentieren, Recherche und Referat):
+Für Versuche, Analysieren, Argumentieren, Recherche und Referat:
 
 > ## Methodenblatt der Schule
 >
 > Steht im Kontext ein Methodenblatt deiner Schule zu dieser Aufgabe, *etwa zum Protokoll*, gilt
 > sein Schema: seine Schritte, seine Reihenfolge, seine Begriffe. Es geht dem allgemeinen Schema
-> oben vor. Steht keins darin, arbeitest du nach dem allgemeinen Schema. Fragt die Schüler:in, wie
-> es „richtig“ geht, oder hält sie sich an eine andere Form, sag einmal in einem Halbsatz, dass ihre
-> Lehrkraft eine eigene Vorgabe haben kann, und frag, ob es eine gibt. Danach erwähnst du es nicht mehr.
+> vor. Steht keins darin, arbeitest du nach dem allgemeinen Schema: *…*. Fragt die Schüler:in, wie
+> es „richtig“ geht, oder hält sie sich an eine andere Form, sag es einmal als Aussage, nicht als
+> Frage: „Deine Lehrkraft hat vielleicht ein eigenes *Schema* – das geht vor.“ Die eine Frage der
+> Antwort bleibt die nach dem nächsten Schritt. Danach erwähnst du es nicht mehr.
 
 Für „Lernen und Prüfungsvorbereitung“ (Planungsdaten; viele Lehrkräfte planen nicht in der
-Plattform, also ist das Fehlen der Normalfall):
+Plattform, das Fehlen ist der Normalfall):
 
 > Steht im Kontext der Umfang der nächsten Klassenarbeit, nimm ihn als Ausgangspunkt. Steht
 > keiner darin, frag nach dem Thema der Arbeit und arbeite mit dem, was die Schüler:in nennt.
 > Einen Umfang erfindest du nicht und leitest ihn nicht aus dem Bildungsplan ab.
 
-⚠️ **Ob die Vorab-Suche ein Blatt überhaupt findet**, ist offen (Plan, Schritt 7: Variante 1
+⚠️ **Ob die Vorab-Suche ein Blatt überhaupt findet**, ist offen (Plan, Schritt 9: Variante 1
 messen). Bis dahin wirkt die Klausel nur, wenn die Nachricht der Schüler:in die Methode nennt.
 
 ### Prüfen vor dem Messen
 
-- Der erste Satz nennt die Tätigkeit so, wie der Name sie nennt („Du bist der Assistent für
-  *Name*“).
-- Alles Gemeinsame ist im Wortlaut übernommen. Abweichungen sind gewollt und stehen im Kopf des
-  Szenarios.
-- Es gibt keine Wiederholung dessen, was die Plattform liefert (oben).
-- Richtwert rund 10 000 Zeichen (Stöchiometrie 9 600, v5d 14 300). Der gemeinsame Wortlaut
-  allein macht etwa 6 000 aus; ein Tätigkeits-Assistent beschreibt nur eine Tätigkeit, nicht fünf.
+- Der erste Satz nennt die Tätigkeit so, wie der Name sie nennt.
+- Der Prompt wiederholt nichts aus dem Baustein. Dopplungen kosten Tokens und weichen beim
+  nächsten Nachjustieren voneinander ab.
+- Länge: Prompt 5 000–7 500 Zeichen (Rechnen 6 200, Versuche 7 300) plus Baustein 9 300.
 
 ## Ausliefern (`seed_assistants.py`)
 

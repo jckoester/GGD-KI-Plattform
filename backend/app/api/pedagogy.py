@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
+from app.assistants import bausteine as bausteine_
 from app.pedagogy.config import list_augmentations
 
 router = APIRouter(prefix="/pedagogy", tags=["pedagogy"])
@@ -29,3 +30,21 @@ async def get_augmentations(
     _: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
 ) -> AugmentationsResponse:
     return AugmentationsResponse(augmentations=list_augmentations())
+
+
+class BausteinItem(BaseModel):
+    key: str
+    label: str
+    beschreibung: str
+
+
+class BausteineResponse(BaseModel):
+    bausteine: list[BausteinItem]
+
+
+@router.get("/bausteine", response_model=BausteineResponse)
+async def get_bausteine(
+    _: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+) -> BausteineResponse:
+    """Bausteine hinter dem Prompt (0.26) — für die Auswahl im Editor."""
+    return BausteineResponse(bausteine=bausteine_.liste())

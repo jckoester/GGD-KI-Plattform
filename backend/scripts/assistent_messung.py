@@ -86,6 +86,8 @@ def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
         "ohne": list(kopf.get("ohne", VORGABE_OHNE)),
         # Päckchen AF: Fächerkreis für den Abschnitt „Operator dieser Aufgabe" (leer = aus).
         "operator_faecher": [str(f) for f in kopf.get("operator_faecher") or []],
+        # 0.26: Bausteine hinter dem Prompt (`app/assistants/bausteine/`).
+        "bausteine": [str(b) for b in kopf.get("bausteine") or []],
     }
     # YAML liest `36` als Zahl — Prüfwerte sind immer Text.
     for fall in daten["faelle"]:
@@ -264,17 +266,18 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
                  # Nur Fächer, die es hier gibt — wie der Seed (`nit` kommt erst 2027/28).
                  operator_faecher=json.dumps([
                      f for f in (profil["operator_faecher"] if operator_faecher is None else operator_faecher)
-                     if _eins(conn, "SELECT 1 FROM subjects WHERE slug = %s", f)]))
+                     if _eins(conn, "SELECT 1 FROM subjects WHERE slug = %s", f)]),
+                 bausteine=json.dumps(profil.get("bausteine") or []))
     kennung = _eins(conn, "SELECT id FROM assistants WHERE name = %s", name)
     with conn.cursor() as cur:
         if kennung is None:
             cur.execute(
                 "INSERT INTO assistants (name, description, system_prompt, subject_id, audience, scope, status, "
-                "min_grade, max_grade, model, tool_groups, disabled_augmentations, operator_faecher, visibility, "
+                "min_grade, max_grade, model, tool_groups, disabled_augmentations, operator_faecher, bausteine, visibility, "
                 "tags, created_by, creator_role, created_at, updated_at) VALUES "
                 "(%(name)s, %(beschreibung)s, %(system_prompt)s, %(subject_id)s, %(audience)s, %(scope)s, "
                 "%(status)s, %(min_grade)s, %(max_grade)s, %(model)s, %(tool_groups)s::jsonb, "
-                "%(disabled_augmentations)s::text[], %(operator_faecher)s::jsonb, 'public', '{}'::text[], "
+                "%(disabled_augmentations)s::text[], %(operator_faecher)s::jsonb, %(bausteine)s::jsonb, 'public', '{}'::text[], "
                 "'__messung__', 'admin', now(), now()) "
                 "RETURNING id",
                 werte | {"name": name, "beschreibung": profil["beschreibung"]},
@@ -286,7 +289,8 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
                 "audience = %(audience)s, scope = %(scope)s, status = %(status)s, min_grade = %(min_grade)s, "
                 "max_grade = %(max_grade)s, model = %(model)s, tool_groups = %(tool_groups)s::jsonb, "
                 "disabled_augmentations = %(disabled_augmentations)s::text[], "
-                "operator_faecher = %(operator_faecher)s::jsonb, updated_at = now() WHERE id = %(id)s",
+                "operator_faecher = %(operator_faecher)s::jsonb, bausteine = %(bausteine)s::jsonb, "
+                "updated_at = now() WHERE id = %(id)s",
                 werte | {"id": kennung},
             )
     # Anker leeren: „Wissensbereich leer" (Plan, Einrichtung).

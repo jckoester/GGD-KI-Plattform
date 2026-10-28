@@ -67,6 +67,9 @@ assistants:
     model: chat-komplex
     disabled_augmentations: [metacognitive_nudges]
     system_prompt_file: config/prompts/stoechiometrie_assistent.md
+    # 0.26: Schema, Hilfe in Stufen, Operator-Prüfung usw. kommen aus dem Baustein; der Prompt
+    # enthält nur, was diesen Assistenten ausmacht (app/assistants/bausteine/).
+    bausteine: [begleiten_statt_loesen]
     documents:
       - config/prompts/stoechiometrie_pse_schulwerte.md
     tags: [chemie, stöchiometrie]
@@ -112,6 +115,9 @@ assistants:
     model: chat-komplex
     disabled_augmentations: [metacognitive_nudges]
     system_prompt_file: config/prompts/reaktionsgleichung_assistent.md
+    # 0.26: Schema, Hilfe in Stufen, Operator-Prüfung usw. kommen aus dem Baustein; der Prompt
+    # enthält nur, was diesen Assistenten ausmacht (app/assistants/bausteine/).
+    bausteine: [begleiten_statt_loesen]
     tags: [chemie, reaktionsgleichungen]
     fallbacks: [naturwissenschaftliche Aufgaben]
     suggest: specific

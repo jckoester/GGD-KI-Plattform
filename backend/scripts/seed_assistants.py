@@ -15,7 +15,7 @@ Felder je Eintrag (alle außer `name` und Prompt optional):
 `min_grade`, `max_grade`, `disabled_augmentations`, `documents` (Dateien wie
 `system_prompt_file`; als Dokument des Assistenten angehängt), `suggest`, `suggestion_text`,
 `trigger_examples`, `trigger_counterexamples`, `fallbacks` (Namen anderer Assistenten),
-`operator_faecher` (Fach-Slugs).
+`operator_faecher` (Fach-Slugs), `bausteine` (Schlüssel aus `app/assistants/bausteine/`; nur beim Anlegen).
 
 Nach dem Anlegen werden die Beispiele eingebettet; scheitert das, holt es der nächtliche
 `embedding_backfill.py` nach.
@@ -41,6 +41,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.assistants import ausloeser
+from app.assistants.bausteine import SCHLUESSEL as BAUSTEIN_SCHLUESSEL
 from app.config import settings
 from app.db.models import Assistant, AssistantDocument, AssistantTriggerExample, Subject
 
@@ -70,6 +71,19 @@ async def _operator_faecher(db: AsyncSession, entry: dict) -> list[str]:
     if fehlen:
         logger.warning("  Fach für Operatoren übergangen (nicht vorhanden): %s", ", ".join(fehlen))
     return [s for s in slugs if s in vorhanden]
+
+
+def _bausteine(entry: dict) -> list[str]:
+    """`bausteine` des Eintrags, soweit es sie gibt (`app/assistants/bausteine/`).
+
+    **Nur beim Anlegen**, nie nachgetragen: Ein Baustein gehört zum Prompt, und den fasst der
+    Seed bei einem vorhandenen Assistenten nicht an (Entscheidung 2 der Landkarte) — ein
+    nachgetragener Baustein stünde neben einem Prompt, der dasselbe schon enthält."""
+    gewaehlt = list(dict.fromkeys(str(s).strip() for s in entry.get("bausteine") or []))
+    fehlen = [s for s in gewaehlt if s not in BAUSTEIN_SCHLUESSEL]
+    if fehlen:
+        logger.warning("  Baustein übergangen (unbekannt): %s", ", ".join(fehlen))
+    return [s for s in gewaehlt if s in BAUSTEIN_SCHLUESSEL]
 
 
 def _default_config() -> Path:
@@ -233,6 +247,7 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
                     disabled_augmentations=entry.get("disabled_augmentations") or [],
                     image_kinds=[],
                     operator_faecher=operator_faecher,
+                    bausteine=_bausteine(entry),
                     suggest=entry.get("suggest") or "never",
                     suggestion_text=(entry.get("suggestion_text") or "").strip() or None,
                     fallbacks=[],
