@@ -104,5 +104,27 @@ misst nur Embeddings (Bruchteile eines Cents): je Prüftext das beste Beispiel u
 Gegenbeispiel je Kandidat, tastet die Schwellen für spezifische und Rückfall-Assistenten (mit und
 ohne Gegenbeispiel-Regel) gegen das Kriterium K1–K5 im Kopf des Prüfsatzes ab und meldet
 Fast-Dubletten (< 0,20 zu einem eingebetteten Text). **Stand 27.10.2026:** spezifisch nur in einem
-Fenster von 0,01 erfüllt, Rückfall gar nicht — der Vorschlag (Päckchen C2) wird Embeddings als
-Vorfilter und einen Klassifikator-Aufruf im Band kombinieren.
+Fenster von 0,01 erfüllt, Rückfall gar nicht — der Vorschlag (Päckchen C2) kombiniert deshalb
+Embeddings als Vorfilter und einen Klassifikator-Aufruf im Band.
+
+### Vorschlag im Chat (0.24): Ablauf und Messung
+
+`app/assistants/vorschlag.py` entscheidet die Optionen; der Chat-Router startet ihn als Task
+neben der Antwort (eigene Sitzung, Vektor der Vorab-Suche aus `Kontext.vektor`) und schickt
+nach `message` höchstens `VORSCHLAG_NACHLAUF` = 10 s später das Ereignis `vorschlag`. Die
+Oberfläche gibt die Eingabe bei `message` frei. Ruheregel: `conversations.vorgeschlagen`
+(beim Anzeigen gefüllt, bei einem Wechsel geleert) — sie **filtert das Ergebnis, nicht die
+Kandidaten**, sonst wählt der Klassifikator den Nachbarn des schon Angebotenen.
+
+```bash
+# Klassifikator allein (Prompt und Auswertung aus dem Dienst), über das Systemkonto:
+venv/bin/python scripts/assistent_vorschlag_klassifikator.py --modell system-vorschlag --aufwand none \
+    --ziel "<Vault>/Plaene/Messungen-Vorschlag" --lauf k1
+# Im echten Chat (K1–K7), Backend mit VORSCHLAG_MODEL gestartet:
+venv/bin/python scripts/assistent_vorschlag_chatmessung.py --basis http://localhost:8001 \
+    --konto <pseudonym-anfang> --ziel "<Vault>/Plaene/Messungen-Vorschlag" --lauf chat-1
+```
+
+⚠️ **Denkmodelle taugen nicht als Klassifikator:** Mit `max_tokens` 200 verbrauchte die Denkphase
+die Grenze, die Antwort war leer; `chat-komplex` brauchte 19–60 s. Stand 28.10.2026: K1–K7 im
+Chat erfüllt (`vorschlag-chat-1`), Vorschlag im Median 0,0 s nach der Antwort.

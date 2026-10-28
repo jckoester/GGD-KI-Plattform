@@ -66,6 +66,23 @@ Geht Ihre Aufgabe eher in das Gebiet eines anderen Assistenten — etwa eine Rec
 Assistenten für Reaktionsgleichungen —, sagt er es Ihnen; wechseln können Sie mit **`/`**
 im Eingabefeld, ohne den Chat zu verlieren.
 
+### Vorschlag im Chat
+
+Schreiben Sie eine Aufgabe in den normalen Chat, für die es einen passenden Assistenten gibt,
+erscheint unter der Antwort ein kleiner Kasten: *„Für diese Aufgabe gibt es einen Assistenten,
+der dich Schritt für Schritt begleitet“* — mit einem oder zwei Assistenten zur Wahl.
+
+- **Sie wählen einen Assistenten:** Er beantwortet dieselbe Nachricht noch einmal, auf seine Art.
+  Der Chat bleibt derselbe; die erste Antwort wird ausgeblendet.
+- **Hier bleiben:** Der Kasten verschwindet. Denselben Assistenten schlägt der Chat in diesem
+  Gespräch nicht noch einmal vor — außer Sie wechseln zwischendurch zu einem anderen.
+- **In einem Assistenten** erscheint der Kasten, wenn Ihre Nachricht besser zu einem anderen
+  passt, oder als *„Assistent beenden und weiter chatten“*, wenn sie gar nicht zu ihm gehört.
+  Dann antwortet der normale Chat.
+
+Weiterschreiben können Sie jederzeit; der Kasten verschwindet dann. Fragen nach einem Begriff
+(„Was ist ein Mol?“) beantwortet der normale Chat selbst — dafür gibt es keinen Vorschlag.
+
 ## Eigene Assistenten erstellen
 
 Das Anlegen von Assistenten ist Lehrkräften und Administratoren vorbehalten. Wenn Sie eine Idee für einen nützlichen Assistenten haben, sprechen Sie Ihre Lehrkraft oder den IT-Verantwortlichen an.
@@ -99,8 +116,10 @@ Assistenten von sich aus anbieten darf — für eine bestimmte Aufgabe oder allg
 Gebiet. Dazu tragen Sie **Auslöser-Beispiele** ein: typische erste Nachrichten in
 Schülersprache, eine je Zeile, am besten 5 bis 15. **Gegenbeispiele** sind Nachrichten, die
 ähnlich klingen, aber nicht hierher gehören. Ohne Beispiele wird nichts vorgeschlagen, und
-versteckte Assistenten nie. *Der Vorschlag selbst folgt in einer späteren Version; die
-Beispiele können Sie schon jetzt pflegen.*
+versteckte Assistenten nie. Der **Satz im Vorschlag** steht unter dem Namen des Assistenten
+und sagt Schüler:innen in einem Satz, wobei er hilft; er hilft auch der Plattform beim
+Zuordnen. Leer gilt die Beschreibung. Vorgeschlagen wird zunächst nur Schüler:innen; wie es
+aussieht, sehen Sie im Vorschaumodus.
 
 **Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange Ihr Entwurf eingereicht ist, können Sie ihn nicht ändern —

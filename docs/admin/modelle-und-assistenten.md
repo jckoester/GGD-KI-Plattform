@@ -259,10 +259,29 @@ für die ein Assistent passt, und Gegenbeispiele, die ähnlich klingen, aber nic
 Sie werden beim Speichern eingebettet (dasselbe Embedding-Modell wie die Suche im
 Wissensspeicher, über den Proxy; die Kosten trägt das Systemkonto). Was dabei scheitert, holt
 der nächtliche `embedding_backfill.py` nach — auch nach einem Wechsel des Embedding-Modells, ohne
-Umstellen einer Spalte. Der **Vorschlag im Chat** selbst kommt mit einer späteren Version; die
-Beispiele lassen sich schon pflegen. Eine erste Messung (27.10.2026) zeigt: Für eng umrissene
-Assistenten trennen die Beispiele gut von ihren Nachbarn, für breite Rückfall-Assistenten nicht
-von Alltagssätzen — der Vorschlag wird deshalb zusätzlich ein kurzes Modell fragen.
+Umstellen einer Spalte.
+
+**Vorschlag im Chat** (seit 0.24): Tippt eine Schüler:in eine Aufgabe in den normalen Chat, für
+die es einen Assistenten gibt, bietet der Chat ihn unter der Antwort an. In zwei Stufen:
+
+1. Die Auslöser-Beispiele filtern vor — nur wer der Nachricht nahe genug liegt, ist Kandidat.
+2. Über die Kandidaten entscheidet ein kurzer Modellaufruf (`VORSCHLAG_MODEL`, empfohlen der Alias
+   `system-vorschlag`, ein **schnelles Modell ohne Denkphase** wie Mistral-Small-24B). Er läuft über
+   den Systemschlüssel; die Kosten erscheinen in `/budget` und `/statistics/costs` als **System**.
+   Gemessen: rund 0,00005 USD je Schülernachricht.
+
+Leer = kein Vorschlag. Vorgeschlagen wird nur Schüler:innen, nicht in der Vorschau und nicht in
+Chats mit Stundenbezug; versteckte Assistenten nie. Jeder Assistent höchstens einmal je
+Konversation — bis die Schüler:in wechselt. Kommt der Modellaufruf nicht innerhalb von 10 s nach
+der Antwort, entfällt der Vorschlag still; die Antwort wartet nie darauf.
+
+Im Editor (Abschnitt „Vorschlag im Chat“):
+
+- **Satz im Vorschlag** — ein Satz für Schüler:innen; steht unter dem Namen und geht in den
+  Modellaufruf ein. Leer = Beschreibung.
+- **Darunter anbieten** (nur Admins, bei „Für eine bestimmte Aufgabe“) — allgemeine Assistenten,
+  die im Vorschlag unter diesem stehen, höchstens 3. Die drei ausgelieferten Schüler-Assistenten
+  bringen das mit (beide Chemie-Assistenten → naturwissenschaftliche Aufgaben).
 
 Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodell
 (`CHAT_DEFAULT_MODEL`). Nur wenn er an ein **bestimmtes** Modell gebunden sein soll:

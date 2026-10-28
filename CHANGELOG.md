@@ -7,11 +7,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Assistenten-Vorschlag im Chat (in Arbeit):** Einstellung `VORSCHLAG_MODEL` und Alias `system-vorschlag` in den
-  Beispielkonfigurationen von LiteLLM (ein schnelles Modell ohne Denkphase, über den Systemschlüssel). SSE-Ereignis
-  `vorschlag` nach `message`; `ChatRequest.assistent_beenden`; Ruheregel je Konversation (Migration 0092).
-  Im Chat erscheint der Vorschlag unter der Antwort (Annehmen, Beenden, Hier bleiben). Im Editor: „Satz im
-  Vorschlag“ und, für Admins, „Darunter anbieten“ (Rückfall-Assistenten).
+- **Assistenten-Vorschlag im Chat:** Schreibt eine Schüler:in eine Aufgabe in den normalen Chat, für die es einen
+  Assistenten gibt, erscheint unter der Antwort ein Vorschlag (Annehmen beantwortet dieselbe Nachricht neu, „Hier
+  bleiben“); in einem Assistenten auch „Assistent beenden und weiter chatten“. Jeder Assistent höchstens einmal je
+  Konversation, bis gewechselt wird. Einstellung `VORSCHLAG_MODEL` (Alias `system-vorschlag`, über den
+  Systemschlüssel); Migration 0092.
+- **Assistenten-Editor:** „Satz im Vorschlag“ und, für Admins, „Darunter anbieten“ (Rückfall-Assistenten).
 
 ## [0.23.0] – 2026-10-27
 

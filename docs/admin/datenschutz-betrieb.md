@@ -39,6 +39,14 @@ solange `SCHOOL_SECRET` unverändert ist.
 | Gewähltes Modell | Klasse / Jahrgang |
 | | IP-Adresse der Nutzerin |
 
+**Assistenten-Vorschlag (seit 0.24):** Für den Klassifikator (`VORSCHLAG_MODEL`) geht die
+Schülernachricht ein zweites Mal an einen Anbieter — über den Proxy, mit dem **Systemschlüssel**
+statt des persönlichen Virtual Keys, also ohne Pseudonym —, dazu Name, Vorschlagstext und drei
+Auslöser-Beispiele je Kandidat. Gespeichert wird nur `conversations.vorgeschlagen` (IDs der schon
+angebotenen Assistenten), gelöscht mit der Konversation. Für das Verarbeitungsverzeichnis: derselbe
+Empfängerkreis wie beim Chat, zusätzlich der Anbieter des Klassifikator-Modells, falls er ein
+anderer ist.
+
 ## PII-Eingabewarnung (Datensparsamkeit)
 
 Zusätzlich zur Pseudonymisierung warnt die Plattform Nutzer:innen, **bevor** sie
