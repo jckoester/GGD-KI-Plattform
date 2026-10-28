@@ -167,3 +167,15 @@ in_assistent:
 - {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
    text: "Gleich mir mal die Gleichung Al + O2 -> Al2O3 aus"}
 - {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: beenden, text: "Wer war eigentlich Napoleon?"}
+# ── Neue, fernere K5-Texte (Päckchen C2, Schritt 1, 28.10.2026) ──────────────
+# C1 fand vier Prüftexte als Fast-Dubletten von Seed-Texten; diese sind frei formuliert.
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "hä warum muss ich da durch die molare masse teilen"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   text: "neue Aufgabe: Natrium reagiert mit Chlor, stell dafür die Formelgleichung auf"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: beenden, text: "Was bedeutet eigentlich das Wort Metapher?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "warum steht bei O2 die 2 klein unten und nicht groß davor?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   text: "jetzt soll ich noch ausrechnen wie viel gramm kupferoxid aus 6 g kupfer werden"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: beenden, text: "Hilf mir bei meinem Bewerbungsschreiben fürs Praktikum"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "Muss ich das Ergebnis eigentlich runden?"}
+- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: beenden, text: "Wie viele Vokabeln sollte ich pro Tag lernen?"}
