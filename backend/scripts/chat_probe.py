@@ -75,6 +75,12 @@ def frage_stellen(
     ereignisse: dict[str, int] = {}
     fehler: str | None = None
     vorab_debug: dict | None = None
+    # Assistenten-Vorschlag (C2, 0.24): Optionen und wann sie kamen — relativ zum Ende der
+    # Antwort (`message`), daran hängt K6.
+    vorschlag: list | None = None
+    t_message = t_vorschlag = None
+    import time as _zeit
+    beginn = _zeit.monotonic()
 
     with client.stream("POST", "/chat", json=rumpf) as strom:
         if strom.status_code != 200:
@@ -96,6 +102,11 @@ def frage_stellen(
             nutzlast = zeile[6:]
             if name == "tool_status":
                 werkzeuge.append(json.loads(nutzlast))
+            elif name == "message":
+                t_message = _zeit.monotonic() - beginn
+            elif name == "vorschlag":
+                t_vorschlag = _zeit.monotonic() - beginn
+                vorschlag = json.loads(nutzlast).get("optionen") or []
             elif name == "vorab_debug":
                 # Messkanal der Vorab-Suche (0.16): Angebot, Nachgeschlagenes, Suchanfragen —
                 # nur außerhalb der Produktion gesendet, sonst bleibt es `None`.
@@ -120,6 +131,10 @@ def frage_stellen(
         "antwort": antwort,
         "fehler": fehler,
         "vorab_debug": vorab_debug,
+        "vorschlag": vorschlag,
+        "t_message": t_message,
+        "t_vorschlag": t_vorschlag,
+        "t_ende": _zeit.monotonic() - beginn,
         # Die Kennzahlen aus dem Messplan (N8): Kürze und Rückfragen sind das, was die
         # neue Präambel ändern soll — sie hier mitzuzählen erspart das Nachzählen von
         # Hand und macht zwei Läufe vergleichbar.
