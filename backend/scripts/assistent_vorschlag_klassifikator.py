@@ -31,7 +31,6 @@ import argparse
 import asyncio
 import importlib.util
 import json
-import re
 import statistics
 import sys
 import time
@@ -57,23 +56,11 @@ def args_aufwand():
     return _AUFWAND["wert"]
 BEISPIELE_IM_PROMPT = 3
 
-SYSTEM = """Du ordnest die Nachricht einer Schülerin oder eines Schülers Assistenten einer Schulplattform zu.
-Ein Assistent passt nur, wenn die Nachricht eine **Aufgabe aus seinem Gebiet** ist, bei der er begleiten kann —
-nicht schon, wenn ein Fachwort darin vorkommt.
+# Prompt und Auswertung der Antwort kommen aus dem Dienst — gemessen wird, was ausgeliefert wird.
+from app.assistants.vorschlag import SYSTEM, Kandidat  # noqa: E402
+from app.assistants.vorschlag import lies_antwort  # noqa: E402,F401  (Unit-Test)
+from app.assistants.vorschlag import prompt_kandidaten as _prompt_dienst  # noqa: E402
 
-Keinen Assistenten wählst du bei:
-- einer Frage nach einem Begriff oder einer Erklärung („Was ist ein Mol?“) — die beantwortet der normale Chat,
-- Alltag, Organisatorischem, Small Talk,
-- einer Aufgabe aus einem anderen Gebiet (etwa Mathematik ohne naturwissenschaftlichen Bezug),
-- Referaten, Präsentationen, Gliederungen und dem Schreiben von Texten — auch wenn das Thema naturwissenschaftlich
-  ist: Entscheidend ist die Art der Aufgabe, nicht ihr Thema.
-
-Spezifische Assistenten haben eine eng umrissene Aufgabe; wähle sie nur, wenn genau diese Aufgabe gestellt ist.
-Rückfall-Assistenten decken ein ganzes Gebiet ab; wähle einen, wenn die Aufgabe in sein Gebiet fällt, auch wenn
-kein spezifischer passt.
-
-Antworte nur mit JSON, ohne Erklärung: {"spezifisch": [Kennungen], "rueckfall": [Kennungen]} — leere Listen,
-wenn keiner passt."""
 
 
 # ── Reine Funktionen (Unit-Test: tests/unit/test_assistent_vorschlag_klassifikator.py) ──
@@ -85,35 +72,10 @@ def im_band(abstaende: dict, band: float = BAND) -> list[str]:
 
 
 def prompt_kandidaten(kandidaten: list[dict]) -> str:
-    """Kandidatenliste für den Nutzerteil des Prompts."""
-    zeilen = []
-    for k in kandidaten:
-        zeilen.append(f"- Kennung {k['id']} · {'spezifisch' if k['art'] == 'specific' else 'Rückfall'} · "
-                      f"„Assistent für {k['name']}“: {k['text']}")
-        zeilen += [f"    Beispiel: {b}" for b in k["beispiele"]]
-    return "\n".join(zeilen)
-
-
-def lies_antwort(roh: str, erlaubt: dict[int, str]) -> tuple[list[int], list[int]]:
-    """JSON aus der Modellantwort — auch in Codeblock oder mit Text drumherum. Nur erlaubte
-    Kennungen, je Liste ohne Dubletten. Unlesbares heißt „keiner“."""
-    m = re.search(r"\{.*\}", roh or "", re.S)
-    try:
-        daten = json.loads(m.group(0)) if m else {}
-    except json.JSONDecodeError:
-        daten = {}
-
-    def ids(feld, art):
-        aus = []
-        for x in daten.get(feld) or []:
-            try:
-                i = int(x)
-            except (TypeError, ValueError):
-                continue
-            if erlaubt.get(i) == art and i not in aus:
-                aus.append(i)
-        return aus
-    return ids("spezifisch", "specific"), ids("rueckfall", "fallback")
+    """Wie im Dienst (`app.assistants.vorschlag.prompt_kandidaten`), aus den Dicts des Skripts."""
+    return _prompt_dienst([Kandidat(id=k["id"], name=k["name"], art=k["art"], text=k["text"], subject_id=None,
+                                    fallbacks=(), abstand=0.0, gegen=float("inf"), beispiele=tuple(k["beispiele"]))
+                           for k in kandidaten])
 
 
 def auswahl(spez: list[int], rueck: list[int], fallbacks: dict[int, list[int]], erlaubt: dict[int, str]

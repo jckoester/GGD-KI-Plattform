@@ -67,6 +67,13 @@ model_list:
       model: gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
+  # Klassifikator des Assistenten-Vorschlags im Chat (VORSCHLAG_MODEL, 0.24) — schnell, ohne
+  # Denkphase. Läuft über den Systemschlüssel, nicht über die Nutzer:innen.
+  - model_name: system-vorschlag
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
   # Klassifikator des Jugendschutz-Guardrails (siehe unten). Läuft bei JEDER Antwort.
   - model_name: system-moderation
     litellm_params:

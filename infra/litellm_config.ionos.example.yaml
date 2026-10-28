@@ -249,6 +249,19 @@ model_list:
       input_cost_per_token: 1.0e-07        # 0,10 €/M
       output_cost_per_token: 3.0e-07        # 0,30 €/M
 
+  # Klassifikator des Assistenten-Vorschlags im Chat (VORSCHLAG_MODEL, 0.24). Ein schnelles Modell
+  # ohne Denkphase: Gemessen trafen Mistral Small 24B, Llama 3.3 70B und Mistral Large die Auswahl
+  # gleich gut; Denkmodelle (gpt-oss, Qwen3.5) brauchten 4–60 s. Läuft über den Systemschlüssel.
+  - model_name: system-vorschlag
+    litellm_params:
+      model: openai/mistralai/Mistral-Small-24B-Instruct
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: false        # liefert nur JSON
+      input_cost_per_token: 1.0e-07        # 0,10 €/M
+      output_cost_per_token: 3.0e-07        # 0,30 €/M
+
   # ══ Weitere Modalitäten ═════════════════════════════════════════════════════════════
 
   # Embeddings des Kontextspeichers. BGE-M3 ist mehrsprachig und für Deutsch geeignet.

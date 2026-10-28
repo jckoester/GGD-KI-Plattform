@@ -172,6 +172,7 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `ASSISTANT_CONTEXT_LIMIT` | Wissensknoten, die die Suche eines Assistenten liefert. **Nicht** die Trefferzahl im Vorschlagsfenster — die stellt jede Nutzer:in im Profil ein (Vorgabe 8). Hier geht es um Kosten und Trefferabdeckung: Jeder Treffer wiegt grob 75–100 Token | `20` |
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel. Leer = keine Titel. **Muss in JEDER Team-Allowlist stehen** — der Aufruf läuft über den Virtual Key der Nutzer:innen | `system-titel` |
 | `BEGRIFFE_MODEL` | Modell, das die Fachbegriffe eines Stundenentwurfs aus seinen Phasentexten vorschlägt. Leer = keine Vorschläge. **Muss in der Allowlist der Lehrkräfte stehen** — der Aufruf läuft über deren Virtual Key | `system-begriffe` |
+| `VORSCHLAG_MODEL` | Klassifikator, der Schüler:innen im Chat einen passenden Assistenten vorschlägt (0.24). Leer = kein Vorschlag. Ein **schnelles Modell ohne Denkphase** — Denkmodelle brauchen zu lange. Der Aufruf läuft über den Systemschlüssel, nicht über die Nutzer:innen | `system-vorschlag` |
 | `MODEL_PICKER_HIDDEN_PREFIXES` | Präfixe, die nicht im Chat-Modellwähler erscheinen. Rein kosmetisch, Freigaben bleiben unberührt | `["system-","embedding-","bild-"]` |
 
 ### Embeddings (Kontextspeicher / semantische Suche)

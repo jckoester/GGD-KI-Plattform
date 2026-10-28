@@ -123,6 +123,7 @@ OPENAI_API_KEY=…            # bzw. IONOS_API_KEY / MISTRAL_API_KEY / ANTHROPIC
 CHAT_DEFAULT_MODEL=chat-standard
 TITLE_MODEL=system-titel
 BEGRIFFE_MODEL=system-begriffe
+VORSCHLAG_MODEL=system-vorschlag
 EMBEDDING_MODEL=embedding-standard
 EMBEDDING_DIMENSIONS=1536   # muss zur Vektorbreite des gewählten Modells passen
 ```

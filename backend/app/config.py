@@ -146,6 +146,11 @@ class Settings(BaseSettings):
     # Leer = keine Vorschläge. Der Aufruf läuft über den Virtual Key der Lehrkraft — das
     # Modell muss in der Allowlist der Lehrkräfte stehen (nur dort; Schüler:innen rufen es nie).
     begriffe_model: str = ""
+    # Klassifikator des Assistenten-Vorschlags im Chat (Päckchen C2), Alias `system-vorschlag`.
+    # Leer = kein Vorschlag. Läuft über das **Systemkonto** (C2 F1): Der Vorschlag ist eine
+    # Leistung der Plattform, keine Anfrage der Schüler:in. Gemessen (28.10.2026): ein schnelles
+    # Modell ohne Denkphase (Mistral-Small-24B); Denkmodelle brauchten 4–60 s.
+    vorschlag_model: str = ""
     # Präfixe, deren Modelle NICHT im Chat-Modellwähler erscheinen: interne Modelle
     # (Titelgenerierung, Moderations-Klassifikator) und andere Modalitäten. Rein kosmetisch —
     # die Team-Allowlist bleibt unberührt, `system-titel` muss dort sogar stehen bleiben
