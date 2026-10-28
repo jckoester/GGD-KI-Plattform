@@ -86,9 +86,10 @@ haben. Sie stehen **einmal**, in zwei Bausteinen (`backend/app/assistants/bauste
 - `grundton`: Lehrkraft-Behauptung, andere Assistenten, Begriffsfragen und fremde Anliegen,
   Ton. Für alle Schüler-Assistenten.
 
-Getrennt, weil nicht jeder eine Aufgabe begleitet. „Lernen und Prüfungsvorbereitung“ fragt ab
-und stellt Übungen; dort widerspräche „keine Anschlussaufgabe“ der Hauptarbeit. Er bekommt nur
-den Grundton und trägt sein Antwortschema im Prompt. Der Assistent wählt die Bausteine über das
+Getrennt, damit ein Assistent, der keine Aufgabe begleitet, nur den Grundton tragen kann.
+Übungsreihen und Abfragen (Lernen, Grammatik) lässt „Begleiten statt lösen“ selbst zu: Sieht der
+Prompt sie vor, ist die nächste Übungsfrage die eine Frage der Antwort. Zurzeit tragen alle
+zwölf beide Bausteine. Der Assistent wählt die Bausteine über das
 Feld `bausteine` (Migration 0093, im Editor nur für Admins), und die Plattform hängt sie hinter
 den Prompt. Die Prompt-Datei enthält nur, was die Tätigkeit ausmacht.
 

@@ -12,7 +12,7 @@ Je nach Aufgabe ist der Weg ein anderer:
 - **Planen:** Was soll herausgefunden werden (Frage oder Hypothese)? → Was wird verändert (unabhängige Variable), was gemessen oder beobachtet (abhängige Variable), was bleibt gleich (Kontrollvariablen)? → Womit wird verglichen (Kontroll- oder Vergleichsansatz)? → Material und Ablauf → **Sicherheit:** Läuft der Versuch in der Schule oder zu Hause? Was kann dabei gefährlich sein, was schützt davor? → Wie oft wiederholen?
 - **Hypothese:** Welche Frage? → eine Vermutung „Wenn …, dann …“ → begründet aus dem Fachwissen → wie ließe sie sich prüfen?
 - **Beobachten und beschreiben:** nur, was man wahrnimmt oder misst – genau, mit Mengen und Zeiten, ohne „weil“.
-- **Auswerten** – eigener Versuch oder ein fertiges Diagramm, eine fertige Tabelle aus der Aufgabe: Messwerte in eine Tabelle (Größe, Einheit im Kopf) → bei Bedarf ein Diagramm (was an welche Achse, Einteilung, Messpunkte, Ausgleichskurve) → Was zeigt sich (Zunahme, Abnahme, Zusammenhang)? → Was heißt das für die Frage oder die Hypothese – bestätigt, widerlegt, unklar?
+- **Auswerten** des eigenen Versuchs: Messwerte in eine Tabelle (Größe, Einheit im Kopf) → bei Bedarf ein Diagramm (was an welche Achse, Einteilung, Messpunkte, Ausgleichskurve) → Was zeigt sich (Zunahme, Abnahme, Zusammenhang)? → Was heißt das für die Frage oder die Hypothese – bestätigt, widerlegt, unklar?
 - **Fehler betrachten:** Was könnte das Ergebnis verfälscht haben – in der Messung, im Aufbau, in der Durchführung? → In welche Richtung? → Wie ließe es sich verbessern?
 - **Protokoll:** nach dem Schema (unten), Abschnitt für Abschnitt.
 

@@ -27,7 +27,8 @@ def test_begleiten_statt_loesen_traegt_die_gemessenen_regeln():
     t = bausteine.text("begleiten_statt_loesen")
     for anker in ("Genau eine Frage", "Hilfe in Stufen", "Diese Prüfung läuft im Stillen",
                   "außer du bist ausdrücklich auf Stufe 2 oder 3",
-                  "Ein Sicherheitshinweis bleibt immer stehen"):
+                  "Ein Sicherheitshinweis bleibt immer stehen",
+                  "Übungsreihen und Abfragen"):
         assert anker in t, anker
 
 

@@ -37,9 +37,9 @@ BAUSTEINE: tuple[Baustein, ...] = (
         "Schema jeder Antwort, nicht vorsagen, Hilfe in Stufen, Prüfung gegen den Operator — "
         "für Schüler-Assistenten, die bei einer Aufgabe begleiten.",
     ),
-    # Getrennt, weil nicht jeder Schüler-Assistent eine Aufgabe begleitet: Wer abfragt und
-    # Übungen stellt (Lernen und Prüfungsvorbereitung), hat ein eigenes Antwortschema, das
-    # „Begleiten statt lösen“ widerspräche (Jan, 28.10.2026, L1).
+    # Getrennt, damit ein Schüler-Assistent, der gar keine Aufgabe begleitet, nur den Grundton
+    # tragen kann (Jan, 28.10.2026, L1). Abfragen und Übungsreihen (Lernen, Grammatik) lässt
+    # „Begleiten statt lösen“ seit Q1 selbst zu; beide tragen deshalb beide Bausteine.
     Baustein(
         "grundton",
         "Grundton",
