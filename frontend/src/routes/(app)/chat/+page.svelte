@@ -14,6 +14,8 @@
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { hatteAnhaenge, istAbbruch, istBearbeitbar, letzteEigeneIndex, wirkungsHinweis } from "$lib/chat_bearbeiten.js";
+    import AssistentVorschlag from "$lib/components/AssistentVorschlag.svelte";
+    import { sichtbar as vorschlagSichtbar, wahl as vorschlagWahl } from "$lib/assistent_vorschlag.js";
     import { kontextStufe } from "$lib/kontext_anzeige.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { mentionAnfrage, ohneMentionFragment } from "$lib/mention.js";
@@ -92,6 +94,41 @@
     let abbruch = null;
     // Letzte Nachricht bearbeiten (0.19): Index der Nachricht, die beim Senden ersetzt wird.
     let bearbeitung = $state(null);
+    // Assistenten-Vorschlag (C2, 0.24): Die Eingabe wird schon bei `message` frei, der Strom
+    // bleibt für einen späten Vorschlag offen. Die Nummer sagt, welcher Strom der jüngste ist —
+    // ein älterer darf weder `isStreaming` zurücksetzen noch einen Vorschlag anhängen.
+    let streamNummer = 0;
+    // Nimmt die nächste Sendung „Assistent beenden“ mit (aus dem Vorschlag).
+    let beendenBeimSenden = false;
+
+    async function vorschlagWaehlen(index, option) {
+        const w = vorschlagWahl(option, messages, availableAssistants);
+        messages[index] = { ...messages[index], vorschlag: null };
+        messages = messages;
+        if (w.beenden) {
+            // Store und `conversationAssistant` folgen beim Start des Stroms (wie beim Wechsel).
+            selectedAssistant = null;
+            beendenBeimSenden = true;
+        } else {
+            selectedAssistant = w.assistent;
+        }
+        if (!w.neuBeantworten) {
+            assistantSwitchHint = w.beenden
+                ? "Assistent beendet. Deine nächste Nachricht geht an den normalen Chat."
+                : `Deine nächste Nachricht geht an den Assistenten für ${w.assistent.name}.`;
+            return;
+        }
+        // Dieselbe Nachricht noch einmal, jetzt an den gewählten Assistenten (C2, F3).
+        bearbeitung = w.index;
+        input = w.text;
+        await performSend();
+    }
+
+    function vorschlagBleiben(index) {
+        messages[index] = { ...messages[index], vorschlag: null };
+        messages = messages;
+        textarea?.focus();
+    }
 
     function bearbeiten(index) {
         bearbeitung = index;
@@ -624,6 +661,9 @@
         isStreaming = true;
         abbruch = new AbortController();
         const signal = abbruch.signal;
+        const meineNummer = ++streamNummer;
+        const assistentBeenden = beendenBeimSenden;
+        beendenBeimSenden = false;
 
         try {
             // Neu: Content je User-Nachricht aufbauen
@@ -665,7 +705,7 @@
                 pendingSubjectId, // subjectId
                 pendingGroupId, // groupId
                 pendingStundeId, // stundeId
-                { signal, ersetztLetzte },
+                { signal, ersetztLetzte, assistentBeenden },
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
@@ -722,10 +762,13 @@
                     };
                     messages = messages;
 
-                    // Assistenten-Referenz für laufende Konversation speichern
-                    if (selectedAssistant) {
+                    // Assistenten-Referenz für laufende Konversation speichern — auch nach
+                    // „Assistent beenden“ (C2): dann ohne Assistenten.
+                    if (selectedAssistant || assistentBeenden) {
                         conversationAssistant = selectedAssistant;
-                        activeConversationAssistantId.set(selectedAssistant.id);
+                        activeConversationAssistantId.set(selectedAssistant?.id ?? null);
+                    }
+                    if (selectedAssistant) {
                         // subject_id aus Assistent übernehmen; group_id bleibt null
                         activeConversationSubjectId.set(
                             selectedAssistant.subject_id ?? null,
@@ -822,6 +865,24 @@
                     };
                     messages = messages;
                     kostenNachschlagen(conversationId);
+                    // C2: Die Antwort ist fertig — Eingabe frei, auch wenn der Strom noch auf
+                    // einen Assistenten-Vorschlag wartet.
+                    if (meineNummer === streamNummer) {
+                        isStreaming = false;
+                        abbruch = null;
+                    }
+                    continue;
+                }
+                // Assistenten-Vorschlag (C2) — nur an den jüngsten Strom; schrieb die
+                // Schüler:in schon weiter, verfällt er.
+                if (item.type === "vorschlag") {
+                    if (meineNummer === streamNummer && item.optionen.length) {
+                        messages[assistantIndex] = {
+                            ...messages[assistantIndex],
+                            vorschlag: item.optionen,
+                        };
+                        messages = messages;
+                    }
                     continue;
                 }
                 // Bausteine der Antwort (0.14) — kommen nach dem Speichern, wie
@@ -891,8 +952,10 @@
                 { role: "error", content: chatFehlertext(err) },
             ];
         } finally {
-            isStreaming = false;
-            abbruch = null;
+            if (meineNummer === streamNummer) {
+                isStreaming = false;
+                abbruch = null;
+            }
             // Konversationen in Sidebar neu laden
             triggerSidebarRefresh();
             refreshBudget(); // neu: Budget-Store aktualisieren
@@ -1443,6 +1506,13 @@
                               )
                             : null}
                     />
+                    {#if vorschlagSichtbar(messages, i, isStreaming)}
+                        <AssistentVorschlag
+                            optionen={message.vorschlag}
+                            onWaehlen={(o) => vorschlagWaehlen(i, o)}
+                            onBleiben={() => vorschlagBleiben(i)}
+                        />
+                    {/if}
                 {/each}
             </div>
         {/if}

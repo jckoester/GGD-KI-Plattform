@@ -363,12 +363,14 @@ export async function* streamChat(
   stundeId = null,
   // 0.19: `signal` (Stopp-Knopf, AbortController) und `ersetztLetzte` (die letzte eigene
   // Nachricht samt Antwort wird durch diese ersetzt).
-  { signal = null, ersetztLetzte = false } = {},
+  // C2 (0.24): `assistentBeenden` — zurück zum Standard-Chat in derselben Konversation.
+  { signal = null, ersetztLetzte = false, assistentBeenden = false } = {},
 ) {
   let res;
   try {
     const body = { messages, conversation_id: conversationId };
     if (ersetztLetzte) body.ersetzt_letzte = true;
+    if (assistentBeenden) body.assistent_beenden = true;
     if (modelId) body.model_id = modelId;
     if (assistantId) body.assistant_id = assistantId;
     if (isTest) body.is_test = true;
@@ -506,6 +508,17 @@ export async function* streamChat(
         try {
           const { message_id } = JSON.parse(payload);
           yield { type: "message", message_id };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
+      // Assistenten-Vorschlag (C2, 0.24) — **nach** `message`: Die Antwort ist schon fertig, die
+      // Eingabe frei; der Server wartet nur noch auf den Klassifikator.
+      if (currentEventType === "vorschlag") {
+        try {
+          const { optionen } = JSON.parse(payload);
+          yield { type: "vorschlag", optionen: optionen ?? [] };
         } catch {}
         currentEventType = null;
         continue;
