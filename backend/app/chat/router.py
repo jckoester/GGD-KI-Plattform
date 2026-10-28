@@ -57,6 +57,7 @@ from app.chat.image_store import (
 from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
+from app.assistants import vorschlag as vorschlag_dienst
 from app.context.bausteine import (
     WERKZEUG, Angebot, Baustein, KontextBaustein, aus_treffern, kontext_der_nachrichten,
     vereinige,
@@ -360,6 +361,36 @@ _SEARCH_CONTEXT_NODES_TOOL = {
 }
 
 
+#: Wie lange der Assistenten-Vorschlag nach dem Ende der Antwort noch fertig werden darf (C2, F5).
+VORSCHLAG_NACHLAUF = 2.0
+
+
+def _vorschlag_moeglich(user: JwtPayload, ist_test: bool, stunde_id) -> bool:
+    """Nur Schüler:innen (F6; Lehrkräfte testen über den Vorschaumodus), keine Vorschau aus
+    dem Editor und kein Stundenbezug."""
+    return "student" in (user.roles or []) and not _ist_lehrkraft(user) and not ist_test and stunde_id is None
+
+
+async def _vorschlag_im_hintergrund(
+    user: JwtPayload, nachricht: str, vektor, aktuell_id: Optional[int], schon: set[int],
+    konversationsfach: Optional[int],
+):
+    """Eigene Sitzung und eigener Client: Der Task läuft neben der Antwort, die die Sitzung
+    des Requests benutzt — zwei Abfragen gleichzeitig auf einer Sitzung scheitern."""
+    async with AsyncSessionLocal() as db, httpx.AsyncClient(
+        timeout=_VORSCHLAG_HTTP_TIMEOUT, verify=settings.litellm_verify_ssl
+    ) as client:
+        zugang = await lade_zugang(db, user)
+        return await vorschlag_dienst.vorschlagen(
+            db, nachricht=nachricht, vektor=vektor, zugang=zugang, aktuell_id=aktuell_id,
+            schon_vorgeschlagen=schon, konversationsfach=konversationsfach, client=client,
+        )
+
+
+#: Obergrenze für den Klassifikator-Aufruf selbst; maßgeblich ist VORSCHLAG_NACHLAUF.
+_VORSCHLAG_HTTP_TIMEOUT = 30.0
+
+
 #: Wie viele Nutzernachrichten der Operator-Abschnitt rückwärts absucht (Päckchen AF, B6).
 _OPERATOR_NACHRICHTEN = 6
 
@@ -368,6 +399,7 @@ def _vorab_debug_ereignis(
     angebot: list[Angebot], werkzeug_bausteine: list[Baustein], suchanfragen: list[str],
     sicher_gruppe: list[Baustein] = (), aufzaehlungen: list[dict] = (),
     operator: Optional[Operatorabschnitt] = None,
+    vorschlag: Optional[dict] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -403,6 +435,9 @@ def _vorab_debug_ereignis(
             {"operatoren": operator.operatoren, "faecher": operator.faecher,
              "fassungen": operator.fassungen} if operator is not None else None
         ),
+        # Päckchen C2: Kandidaten mit Abstand, Band, Klassifikator-Antwort, Dauer, gezeigte Optionen
+        # — oder warum nichts kam. Die Nachricht selbst steht nicht darin.
+        "vorschlag": vorschlag,
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -1884,6 +1919,8 @@ async def chat(
     gruppe_abgeleitet = False  # 0.20, F1 — unten beim Anlegen gesetzt
     conversation_is_test = request.is_test
     title_prompt: str | None = None
+    # Ruheregel des Assistenten-Vorschlags (C2, F4): in dieser Konversation schon angeboten.
+    schon_vorgeschlagen: set[int] = set()
 
     # Für Assistentenwechsel mid-Chat
     active_assistant_id: Optional[int] = None
@@ -1993,6 +2030,7 @@ async def chat(
         conversation_group_id = existing.group_id
         conversation_stunde_id = existing.stunde_node_id
         conversation_is_test = existing.is_test
+        schon_vorgeschlagen = set(existing.vorgeschlagen or [])
         active_assistant: Optional[Assistant] = None
 
         # 2-1: Assistentenwechsel mid-Chat
@@ -2076,6 +2114,16 @@ async def chat(
         jwt_stufe=current_user.grade,
     )
     context_str = kontext.text
+
+    # Assistenten-Vorschlag (Päckchen C2): parallel zur Antwort, mit eigener Sitzung und dem
+    # Vektor der Vorab-Suche. Nur Schüler:innen (F6), keine Vorschau, kein Stundenbezug.
+    _vorschlag_task: Optional[asyncio.Task] = None
+    if (_vorschlag_moeglich(current_user, conversation_is_test, conversation_stunde_id)
+            and kontext.vektor is not None and user_message.strip()):
+        _vorschlag_task = asyncio.create_task(_vorschlag_im_hintergrund(
+            current_user, user_message, kontext.vektor, active_assistant_id,
+            set(schon_vorgeschlagen), kontext.subject_id,
+        ))
 
     llm_messages: list[dict] = []
 
@@ -2777,11 +2825,41 @@ async def chat(
                 gesucht=bool(_suchanfragen), modell=model_used,
             )
 
+        # Assistenten-Vorschlag (C2, F5): Die Antwort ist fertig — höchstens noch
+        # VORSCHLAG_NACHLAUF Sekunden warten, sonst entfällt er still. Erscheint er, zählt er für
+        # die Ruheregel (F4: beim Anzeigen).
+        _vorschlag, _vorschlag_debug = None, None
+        if _vorschlag_task is not None:
+            try:
+                _vorschlag = await asyncio.wait_for(_vorschlag_task, timeout=VORSCHLAG_NACHLAUF)
+                _vorschlag_debug = _vorschlag.debug if _vorschlag else {"optionen": []}
+            except asyncio.TimeoutError:
+                _vorschlag_debug = {"abgebrochen": "Zeitlimit"}
+            except Exception as fehler:          # wirft nie in die Antwort hinein
+                logger.warning("Assistenten-Vorschlag fehlgeschlagen: %s", type(fehler).__name__)
+                _vorschlag_debug = {"abgebrochen": type(fehler).__name__}
+        if _vorschlag is not None and _vorschlag.optionen:
+            _vorschlag_debug["optionen"] = [o.assistant_id for o in _vorschlag.optionen]
+            try:
+                await db.execute(
+                    update(Conversation).where(Conversation.id == conversation_id).values(
+                        vorgeschlagen=sorted(schon_vorgeschlagen | {o.assistant_id for o in _vorschlag.optionen})
+                    )
+                )
+                await db.commit()
+            except Exception:
+                logger.exception("Ruheregel nicht gespeichert (Konversation %s)", conversation_id)
+            yield "event: vorschlag\ndata: " + json.dumps({"optionen": [
+                {"assistant_id": o.assistant_id, "name": o.name, "text": o.text, "art": o.art}
+                for o in _vorschlag.optionen
+            ]}, ensure_ascii=False) + "\n\n"
+
         _debug = _vorab_debug_ereignis(
             kontext.angebot, _werkzeug_bausteine, _suchanfragen,
             [b for b in kontext.bausteine if b.grund == "gruppe"],
             _aufzaehlungen,
             _operator,
+            _vorschlag_debug,
         )
         if _debug:
             yield _debug

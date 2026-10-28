@@ -452,7 +452,7 @@ async def kontext_fuer_frage(
     else:
         text = base
     return Kontext(text=text, bausteine=grund.bausteine, angebot=grund.angebot,
-                   subject_id=grund.subject_id, block_angebot=im_block)
+                   subject_id=grund.subject_id, block_angebot=im_block, vektor=await vektor_task)
 
 
 async def stufe_der_person(

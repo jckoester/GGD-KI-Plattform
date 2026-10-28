@@ -131,6 +131,7 @@ def test_messkanal_ausserhalb_der_produktion():
         "sicher_gruppe": [],
         "aufzaehlungen": [],
         "operator": None,
+        "vorschlag": None,
     }
 
 

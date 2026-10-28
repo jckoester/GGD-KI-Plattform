@@ -23,6 +23,11 @@ aktuellen weg (:data:`BEENDEN`), wird „Assistent beenden“ angeboten.
 **Ruheregel** (F4): Wer in ``schon_vorgeschlagen`` steht, kommt nicht wieder; 0 steht für
 „Assistent beenden“. Der Chat-Flow leert die Menge bei einem angenommenen Wechsel.
 
+⚠️ **Die Ruheregel filtert das Ergebnis, nicht die Kandidaten** (Probe 28.10.2026): Nahm man den
+schon angebotenen Stöchiometrie-Assistenten aus der Liste, blieb dem Klassifikator bei der
+nächsten Stöchiometrie-Aufgabe nur „Reaktionsgleichungen“ — und er wählte es. Wer die Aufgabe
+am besten trifft, muss er sehen; zeigen darf ihn der Dialog dann nicht mehr.
+
 ⚠️ **Schlägt etwas fehl, gibt es keinen Vorschlag** — die Antwort läuft davon unberührt.
 """
 from __future__ import annotations
@@ -174,14 +179,14 @@ def im_assistenten(aktuell: float, kandidaten: dict[int, Kandidat], beenden_erla
 
 
 async def _kandidaten(
-    db: AsyncSession, zugang: Zugang, vektor, ausschliessen: set[int], aktuell_id: int | None
+    db: AsyncSession, zugang: Zugang, vektor, aktuell_id: int | None
 ) -> tuple[dict[int, Kandidat], float | None]:
     """Sichtbare Assistenten mit Vorschlag und Beispielen, je mit bestem Beispiel und
     Gegenbeispiel. Dazu der Abstand des aktuellen Assistenten (oder ``None``)."""
     sichtbar = (await db.execute(
         sa.select(Assistant).where(sichtbar_klausel(zugang), Assistant.suggest != "never")
     )).scalars().all()
-    ids = [a.id for a in sichtbar if a.id not in ausschliessen and a.id != aktuell_id]
+    ids = [a.id for a in sichtbar if a.id != aktuell_id]
     abfrage_ids = ids + ([aktuell_id] if aktuell_id is not None else [])
     if not abfrage_ids:
         return {}, None
@@ -258,15 +263,20 @@ async def vorschlagen(
     """Die Optionen des Dialogs — oder ``None``, wenn nichts vorzuschlagen ist."""
     if vektor is None:
         return None
-    kandidaten, aktuell = await _kandidaten(db, zugang, vektor, schon_vorgeschlagen, aktuell_id)
+    kandidaten, aktuell = await _kandidaten(db, zugang, vektor, aktuell_id)
     debug = {"kandidaten": {k.name: round(k.abstand, 3) for k in kandidaten.values()}}
+
+    def ohne_schon(optionen: list[Option]) -> Vorschlag | None:
+        gezeigt = [o for o in optionen if o.assistant_id not in schon_vorgeschlagen]
+        if len(gezeigt) < len(optionen):
+            debug["ruheregel"] = [o.assistant_id for o in optionen if o.assistant_id in schon_vorgeschlagen]
+        return Vorschlag(gezeigt, debug) if gezeigt else None
 
     if aktuell_id is not None:
         if aktuell is None:          # aktueller Assistent ohne Beispiele: keine Bezugsgröße
             return None
         debug["aktuell"] = round(aktuell, 3)
-        optionen = im_assistenten(aktuell, kandidaten, BEENDEN_KENNUNG not in schon_vorgeschlagen)
-        return Vorschlag(optionen, debug) if optionen else None
+        return ohne_schon(im_assistenten(aktuell, kandidaten, True))
 
     band = sorted((k for k in kandidaten.values() if k.abstand < BAND), key=lambda k: k.abstand)
     debug["band"] = [k.name for k in band]
@@ -276,5 +286,4 @@ async def vorschlagen(
     antwort = await klassifiziere(nachricht, band, modell=settings.vorschlag_model, client=client)
     debug |= {"klassifikator": antwort["roh"][:300], "dauer": round(antwort["dauer"], 2)}
     spez, rueck = lies_antwort(antwort["roh"], {k.id: k.art for k in band})
-    optionen = zusammenstellen(spez, rueck, kandidaten, konversationsfach)
-    return Vorschlag(optionen, debug) if optionen else None
+    return ohne_schon(zusammenstellen(spez, rueck, kandidaten, konversationsfach))

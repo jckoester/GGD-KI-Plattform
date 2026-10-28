@@ -90,11 +90,16 @@ async def test_ohne_kandidat_im_band_kein_aufruf(sitzungen, bestand):
     assert v is None and not k.await_count
 
 
-async def test_ruheregel(sitzungen, bestand):
-    v, k = await _vorschlag(sitzungen, f'{{"spezifisch": [{bestand["stoech"]}], "rueckfall": [{bestand["nw"]}]}}',
+async def test_ruheregel_filtert_das_ergebnis_nicht_die_kandidaten(sitzungen, bestand):
+    """Probe 28.10.2026: Ohne den schon angebotenen Assistenten wählte der Klassifikator den
+    nächstbesten Nachbarn. Er sieht ihn also weiter — gezeigt wird er nicht mehr."""
+    v, k = await _vorschlag(sitzungen, f'{{"spezifisch": [{bestand["stoech"]}], "rueckfall": []}}',
                             schon_vorgeschlagen={bestand["stoech"]})
-    assert _ids(v) == [bestand["nw"]]
-    assert PRAEFIX + "Stöchio" not in [c.name for c in k.await_args.args[1]]
+    assert PRAEFIX + "Stöchio" in [c.name for c in k.await_args.args[1]]
+    assert _ids(v) == [bestand["nw"]]                 # sein Rückfall bleibt
+    v, _ = await _vorschlag(sitzungen, f'{{"spezifisch": [{bestand["stoech"]}], "rueckfall": []}}',
+                            schon_vorgeschlagen={bestand["stoech"], bestand["nw"]})
+    assert v is None
 
 
 async def test_ohne_modell_kein_vorschlag(sitzungen, bestand):
@@ -110,6 +115,9 @@ async def test_in_der_assistenten_konversation_ohne_klassifikator(sitzungen, bes
     # Aktuell NW (~0,14): Stöchio (~0,005) liegt um mehr als die Marge näher → Wechsel.
     v, k = await _vorschlag(sitzungen, aktuell_id=bestand["nw"])
     assert _ids(v) == [bestand["stoech"]] and not k.await_count
+    # Schon angeboten: kein Ausweichen auf den Nächstbesten.
+    v, _ = await _vorschlag(sitzungen, aktuell_id=bestand["nw"], schon_vorgeschlagen={bestand["stoech"]})
+    assert v is None
     # Aktuell Stöchio, Nachricht weit weg von allem → beenden; mit Ruheregel nichts.
     v, _ = await _vorschlag(sitzungen, aktuell_id=bestand["stoech"], vektor=[0.0, 0.0, -1.0])
     assert [o.art for o in v.optionen] == ["beenden"]

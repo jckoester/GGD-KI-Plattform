@@ -85,6 +85,9 @@ class Kontext:
     #: Begriffe, deren Titel die Block-Zeile „In dieser Gruppe bereits eingeführt" nennt (0.20)
     #: — für die Vorab-Statistik (`grund = 'block'`).
     block_angebot: list[str] = field(default_factory=list)
+    #: Vektor der Nachricht (oder ``None``) — der Assistenten-Vorschlag (C2) vergleicht ihn mit
+    #: den Auslöser-Beispielen, statt die Nachricht ein zweites Mal einzubetten.
+    vektor: list | None = None
 
 
 def aus_treffern(treffer: Iterable, herkunft: str) -> list[Baustein]:

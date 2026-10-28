@@ -53,3 +53,16 @@ def test_prompt_nennt_art_und_beispiele():
                  abstand=0.4, gegen=1.0, beispiele=("b1", "b2"))
     assert prompt_kandidaten([k]).splitlines() == [
         "- Kennung 4 · Rückfall · „Assistent für Reaktionsgleichungen“: T", "    Beispiel: b1", "    Beispiel: b2"]
+
+
+def test_vorschlag_nur_fuer_schuelerinnen_ohne_vorschau_und_stundenbezug():
+    from types import SimpleNamespace
+
+    from app.chat.router import _vorschlag_moeglich
+
+    schueler = SimpleNamespace(roles=["student"])
+    assert _vorschlag_moeglich(schueler, False, None)
+    assert not _vorschlag_moeglich(schueler, True, None)                     # Vorschau (Editor)
+    assert not _vorschlag_moeglich(schueler, False, "stunde")                # Stundenbezug
+    assert not _vorschlag_moeglich(SimpleNamespace(roles=["teacher"]), False, None)
+    assert not _vorschlag_moeglich(SimpleNamespace(roles=["student", "teacher"]), False, None)

@@ -594,6 +594,12 @@ class Conversation(Base):
     is_test: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
+    # Ruheregel des Assistenten-Vorschlags (Alembic 0092, Päckchen C2 F4): IDs der in dieser
+    # Konversation schon angebotenen Assistenten, 0 = „Assistent beenden". Gefüllt beim
+    # **Anzeigen**, geleert bei einem angenommenen Wechsel.
+    vorgeschlagen: Mapped[list] = mapped_column(
+        ARRAY(Integer), nullable=False, server_default=text("'{}'")
+    )
     # Ab Phase 11 (ADR-008 Teil 7): Soft-Delete-Marker für geflaggte Konversationen.
     # Eine Konversation mit offenem Flag wird beim Nutzer-Löschwunsch nur ausgeblendet.
     hidden_by_user: Mapped[bool] = mapped_column(
