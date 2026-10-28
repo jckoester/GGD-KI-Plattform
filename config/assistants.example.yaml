@@ -69,7 +69,7 @@ assistants:
     system_prompt_file: config/prompts/stoechiometrie_assistent.md
     # 0.26: Schema, Hilfe in Stufen, Operator-Prüfung usw. kommen aus dem Baustein; der Prompt
     # enthält nur, was diesen Assistenten ausmacht (app/assistants/bausteine/).
-    bausteine: [begleiten_statt_loesen]
+    bausteine: [begleiten_statt_loesen, grundton]
     documents:
       - config/prompts/stoechiometrie_pse_schulwerte.md
     tags: [chemie, stöchiometrie]
@@ -117,7 +117,7 @@ assistants:
     system_prompt_file: config/prompts/reaktionsgleichung_assistent.md
     # 0.26: Schema, Hilfe in Stufen, Operator-Prüfung usw. kommen aus dem Baustein; der Prompt
     # enthält nur, was diesen Assistenten ausmacht (app/assistants/bausteine/).
-    bausteine: [begleiten_statt_loesen]
+    bausteine: [begleiten_statt_loesen, grundton]
     tags: [chemie, reaktionsgleichungen]
     fallbacks: [naturwissenschaftliche Aufgaben]
     suggest: specific

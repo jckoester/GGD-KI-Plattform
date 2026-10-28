@@ -26,7 +26,7 @@ assistent:
   max_grade: 13
   modell: chat-komplex
   ohne: [metacognitive_nudges]
-  bausteine: [begleiten_statt_loesen]
+  bausteine: [begleiten_statt_loesen, grundton]
 
 faelle:
 

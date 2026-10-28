@@ -7,8 +7,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Bausteine für Assistenten:** Feld „Bausteine hinter dem Prompt“ (Admin) mit dem ersten Baustein „Begleiten
-  statt lösen“; er kommt mit dem Release. Migration 0093.
+- **Bausteine für Assistenten:** Feld „Bausteine hinter dem Prompt“ (Admin) mit den Bausteinen „Begleiten statt
+  lösen“ und „Grundton“; sie kommen mit dem Release. Migration 0093.
 - **Rückfall-Assistenten** bekommen im Chat die übrigen Rückfall-Assistenten genannt, die die Schüler:in nutzen darf.
 
 ## [0.25.0] – 2026-10-28

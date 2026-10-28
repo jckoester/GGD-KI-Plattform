@@ -1,7 +1,8 @@
 """Bausteine für Assistenten-Prompts (0.26, Plan „Rückfall-Assistenten“, Schritt 2).
 
 Ein Baustein ist ein gemessener Textblock, den mehrere Assistenten teilen — etwa
-„Begleiten statt lösen“: Schema jeder Antwort, Hilfe in Stufen, Prüfung gegen den Operator.
+„Begleiten statt lösen“ (Schema jeder Antwort, Hilfe in Stufen, Prüfung gegen den Operator)
+und „Grundton“ (Lehrkraft-Behauptung, andere Assistenten, fremde Anliegen, Ton).
 Der Assistent wählt ihn über `assistants.bausteine`; die Plattform hängt ihn hinter den
 Prompt (`app/pedagogy/compose.py`).
 
@@ -33,8 +34,17 @@ BAUSTEINE: tuple[Baustein, ...] = (
     Baustein(
         "begleiten_statt_loesen",
         "Begleiten statt lösen",
-        "Schema jeder Antwort, Hilfe in Stufen, Prüfung gegen den Operator, Verweis auf "
-        "andere Assistenten — für Schüler-Assistenten, die nicht vorsagen.",
+        "Schema jeder Antwort, nicht vorsagen, Hilfe in Stufen, Prüfung gegen den Operator — "
+        "für Schüler-Assistenten, die bei einer Aufgabe begleiten.",
+    ),
+    # Getrennt, weil nicht jeder Schüler-Assistent eine Aufgabe begleitet: Wer abfragt und
+    # Übungen stellt (Lernen und Prüfungsvorbereitung), hat ein eigenes Antwortschema, das
+    # „Begleiten statt lösen“ widerspräche (Jan, 28.10.2026, L1).
+    Baustein(
+        "grundton",
+        "Grundton",
+        "Lehrkraft-Behauptung, andere Assistenten, Begriffsfragen und fremde Anliegen, Ton — "
+        "für alle Schüler-Assistenten.",
     ),
 )
 SCHLUESSEL = frozenset(b.schluessel for b in BAUSTEINE)

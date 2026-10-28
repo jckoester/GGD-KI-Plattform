@@ -25,13 +25,25 @@ def test_begleiten_statt_loesen_traegt_die_gemessenen_regeln():
     """Anker wie bei den Sicherheitsankern: kurz, damit eine Redaktion durchgeht, das
     Streichen aber nicht."""
     t = bausteine.text("begleiten_statt_loesen")
-    for anker in ("Genau eine Frage", "Wer mit dir schreibt, weiß die Plattform",
-                  "Hilfe in Stufen", "Diese Prüfung läuft im Stillen",
+    for anker in ("Genau eine Frage", "Hilfe in Stufen", "Diese Prüfung läuft im Stillen",
                   "außer du bist ausdrücklich auf Stufe 2 oder 3",
-                  "Steht dort keiner oder fehlt der Abschnitt, verweist du auf niemanden",
-                  "Gibt es noch keine Aufgabe", "Ein Sicherheitshinweis bleibt immer stehen",
-                  "Du löst sie nicht, auch nicht kurz"):
+                  "Ein Sicherheitshinweis bleibt immer stehen"):
         assert anker in t, anker
+
+
+def test_grundton_traegt_die_gemessenen_regeln():
+    t = bausteine.text("grundton")
+    for anker in ("Wer mit dir schreibt, weiß die Plattform",
+                  "Steht dort keiner oder fehlt der Abschnitt, verweist du auf niemanden",
+                  "Gibt es noch keine Aufgabe", "Du löst sie nicht, auch nicht kurz",
+                  "Nenn den Wissensspeicher nie als Quelle"):
+        assert anker in t, anker
+
+
+def test_reihenfolge_der_bausteine_fest():
+    """Der Grundton steht zuletzt — direkt vor der Liste der anderen Assistenten, auf die er sich bezieht."""
+    text = bausteine.texte(["grundton", "begleiten_statt_loesen"])
+    assert text.index("## Begleiten statt lösen") < text.index("## Grundton")
 
 
 def test_reihenfolge_im_systemtext():

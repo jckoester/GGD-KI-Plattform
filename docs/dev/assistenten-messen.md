@@ -78,10 +78,19 @@ Suchanfragen und die Aufrufe von `list_context_nodes` (Filter, `gesamt`, `gelief
 
 Die zwölf allgemeinen Assistenten (Plan „Rückfall-Assistenten“, Landkarte vom 28.10.2026) teilen
 die Regeln, die v5d (naturwissenschaftliche Aufgaben) und der Assistent für Stöchiometrie erprobt
-haben. Sie stehen **einmal**, im Baustein `begleiten_statt_loesen`
-(`backend/app/assistants/bausteine/`). Der Assistent wählt ihn über das Feld `bausteine`
-(Migration 0093, im Editor nur für Admins), und die Plattform hängt ihn hinter den Prompt. Die
-Prompt-Datei enthält nur, was die Tätigkeit ausmacht.
+haben. Sie stehen **einmal**, in zwei Bausteinen (`backend/app/assistants/bausteine/`):
+
+- `begleiten_statt_loesen`: Schema jeder Antwort, nicht vorsagen, Hilfe in Stufen,
+  Operator-Prüfung, Fehler und Richtiges, Abschluss, Bevor du sendest. Für Assistenten, die
+  bei einer Aufgabe begleiten.
+- `grundton`: Lehrkraft-Behauptung, andere Assistenten, Begriffsfragen und fremde Anliegen,
+  Ton. Für alle Schüler-Assistenten.
+
+Getrennt, weil nicht jeder eine Aufgabe begleitet. „Lernen und Prüfungsvorbereitung“ fragt ab
+und stellt Übungen; dort widerspräche „keine Anschlussaufgabe“ der Hauptarbeit. Er bekommt nur
+den Grundton und trägt sein Antwortschema im Prompt. Der Assistent wählt die Bausteine über das
+Feld `bausteine` (Migration 0093, im Editor nur für Admins), und die Plattform hängt sie hinter
+den Prompt. Die Prompt-Datei enthält nur, was die Tätigkeit ausmacht.
 
 ⚠️ **Der Baustein kommt mit dem Release, die Schule pflegt ihn nicht** (Plan F10). Das weicht
 bewusst vom Muster `config/` ab: `pedagogy.yaml` ist eine Instanzdatei und wird nie
@@ -90,7 +99,7 @@ Konversationen; der Prompt dagegen ist ein Schnappschuss.
 
 ### Reihenfolge im Systemtext
 
-Präambeln · Klassenstufe · Fach · Bezug · Kontext + **Prompt** · **Bausteine** ·
+Präambeln · Klassenstufe · Fach · Bezug · Kontext + **Prompt** · **Bausteine** (begleiten, dann Grundton) ·
 **Andere allgemeine Assistenten** · Operator dieser Aufgabe · Augmentierungen
 (`compose_system_content`).
 
@@ -158,7 +167,7 @@ messen). Bis dahin wirkt die Klausel nur, wenn die Nachricht der Schüler:in die
 - Der erste Satz nennt die Tätigkeit so, wie der Name sie nennt.
 - Der Prompt wiederholt nichts aus dem Baustein. Dopplungen kosten Tokens und weichen beim
   nächsten Nachjustieren voneinander ab.
-- Länge: Prompt 5 000–7 500 Zeichen (Rechnen 6 200, Versuche 7 300) plus Baustein 9 300.
+- Länge: Prompt 5 000–7 500 Zeichen plus Bausteine (begleiten 7 500, Grundton 2 300).
 
 ## Ausliefern (`seed_assistants.py`)
 
