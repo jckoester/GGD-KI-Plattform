@@ -70,7 +70,7 @@ describe("ruecknahmeWarnung", () => {
 
 describe("eintragFrage", () => {
     it("nennt die Reichweite beim Namen", () => {
-        expect(eintragFrage("tag")).toContain("Alle Ihre Stunden dieses Tages")
+        expect(eintragFrage("tag")).toContain("Alle deine Stunden dieses Tages")
         expect(eintragFrage("gruppe", "9C")).toContain("9C")
     })
 })

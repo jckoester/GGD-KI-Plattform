@@ -336,7 +336,7 @@
   {:else if items.length === 0}
     <div class="text-center py-8">
       <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-        Sie haben noch keine Assistenten erstellt.
+        Du hast noch keine Assistenten erstellt.
       </p>
       <button
         onclick={() => goto("/assistants/my/neu")}

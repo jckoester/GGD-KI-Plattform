@@ -781,7 +781,7 @@
                     Assistenten löschen
                 </h2>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                    Möchten Sie den Assistenten "{deleteTarget.name}" wirklich
+                    Möchtest du den Assistenten "{deleteTarget.name}" wirklich
                     löschen? Diese Aktion kann nicht rückgängig gemacht werden.
                 </p>
             </div>
@@ -837,7 +837,7 @@
                     Einreichung ablehnen
                 </h2>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                    Möchten Sie die Einreichung "{rejectTarget.name}" wirklich ablehnen?
+                    Möchtest du die Einreichung "{rejectTarget.name}" wirklich ablehnen?
                 </p>
                 <p class="text-sm text-light-tx-3 dark:text-dark-tx-3 mt-1">
                     Begründung (optional) — wird der Lehrkraft im Editor angezeigt.

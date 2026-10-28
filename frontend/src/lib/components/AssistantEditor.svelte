@@ -399,7 +399,7 @@
             value: "hidden",
             label: "Versteckt",
             hinweis:
-                "Erscheint in keiner Liste. Wer freigegeben ist, erreicht ihn trotzdem über einen Link oder einen Einstieg auf der Startseite — etwa für einen Assistenten, den Sie im Unterricht gezielt verteilen.",
+                "Erscheint in keiner Liste. Wer freigegeben ist, erreicht ihn trotzdem über einen Link oder einen Einstieg auf der Startseite — etwa für einen Assistenten, den du im Unterricht gezielt verteilst.",
         },
     ];
 
@@ -711,7 +711,7 @@
         // Pflichtfelder prüfen
         if (!form.name.trim() || !form.system_prompt.trim()) {
             error =
-                "Bitte füllen Sie alle Pflichtfelder aus (Name und System-Prompt).";
+                "Bitte füll alle Pflichtfelder aus (Name und System-Prompt).";
             return;
         }
 
@@ -740,7 +740,7 @@
 
     async function submitAssistant() {
         if (dirty) {
-            error = "Bitte zuerst speichern, bevor Sie einreichen.";
+            error = "Bitte zuerst speichern, bevor du einreichst.";
             return;
         }
 
@@ -958,7 +958,7 @@
         if (dirty) {
             await save();
             if (dirty) {
-                error = "Bitte speichern Sie zuerst den Assistenten.";
+                error = "Bitte speichere zuerst den Assistenten.";
                 return;
             }
         }
@@ -2357,7 +2357,7 @@
                         class="flex-1 flex items-center justify-center text-light-tx-2 dark:text-dark-tx-2"
                     >
                         <p>
-                            Speichern Sie den Assistenten zuerst, um den
+                            Speichere den Assistenten zuerst, um den
                             Testchat zu nutzen.
                         </p>
                     </div>
@@ -2369,7 +2369,7 @@
                                 class="flex items-center justify-center h-full text-light-tx-3 dark:text-dark-tx-3"
                             >
                                 <p>
-                                    Stellen Sie dem Assistenten eine Testfrage.
+                                    Stell dem Assistenten eine Testfrage.
                                 </p>
                             </div>
                         {:else}

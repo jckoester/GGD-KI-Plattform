@@ -16,9 +16,9 @@ Schule pflegt sie nicht. Ein Eintrag:
   eintrag: planner               # optional: Navigationseintrag aus config/ui_levels.yaml
   titel: "Fachbegriffe im Stundenentwurf"
   text: >-
-    Kurz, in der Sie-Form, aus Sicht der Nutzer:innen — nicht der Wortlaut des CHANGELOG.
+    Kurz, in der Du-Form (du klein), aus Sicht der Nutzer:innen — nicht der Wortlaut des CHANGELOG.
   link: /help/unterrichtsplanung  # optional, eine Seite der Plattform
-  bis: 2027-01-31                # optional: letzter Tag der Anzeige
+  bis: 2027-01-31                # optional: letzter Tag; ohne endet er 42 Tage nach datum
 ```
 
 Die **`id` nie wiederverwenden**: An ihr hängt „geschlossen". Ein neuer Hinweis mit alter `id`
@@ -38,7 +38,8 @@ Entschieden wird an einer Stelle, `sichtbar()` in `app/neuigkeiten/quelle.py`:
    `neuigkeiten_gelesen`).
 3. Der Hinweis ist nicht älter als das Konto (`pseudonym_audit.created_at`). Wer neu dazukommt,
    wird nicht mit alten Neuigkeiten begrüßt.
-4. `bis` ist nicht überschritten.
+4. Der Hinweis ist nicht abgelaufen: Mit `bis` zählt dieser Tag, sonst endet er 42 Tage nach
+   `datum` (`LAUFZEIT`). Ein `bis` braucht nur, wer kürzer oder länger anzeigen will.
 5. Mit `eintrag`: Der Navigationseintrag liegt in der eigenen Darstellungsstufe. Den Hinweis zum
    Stundenassistenten bekommt also nur, wer die Unterrichtsplanung sieht. Kennt die
    Konfiguration der Schule den Eintrag gar nicht, erscheint der Hinweis trotzdem — lieber einer
@@ -50,7 +51,10 @@ Entschieden wird an einer Stelle, `sichtbar()` in `app/neuigkeiten/quelle.py`:
 - `POST /neuigkeiten/{id}/gelesen` — schließt den Hinweis. Ein zweiter Aufruf ändert nichts;
   eine unbekannte `id` ergibt 404.
 
-Die Startseite (`/welcome`) zeigt die Hinweise oben als `InfoBanner` mit Schließen-Knopf.
+Die Startseite (`/welcome`) zeigt die Hinweise oben als `InfoBanner` mit Schließen-Knopf —
+höchstens zwei offen (`OFFEN` in `lib/neuigkeiten.js`), der Rest unter „Weitere Neuerungen (k)“.
+Ab zwei Hinweisen gibt es „Alle schließen“; es ruft den Endpunkt nacheinander je `id` auf,
+weil gleichzeitige Aufrufe einander die Liste in den Einstellungen überschrieben.
 
 ## Datenschutz
 

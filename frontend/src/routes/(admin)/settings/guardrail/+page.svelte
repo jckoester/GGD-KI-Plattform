@@ -255,7 +255,7 @@
         <WarningBanner
           message={health?.hinweis ??
             "Kein Zustandsbericht verfügbar. Das heißt NICHT, dass alles in Ordnung ist — " +
-            "prüfen Sie, ob `health_file` in der LiteLLM-Konfiguration gesetzt ist."}
+            "prüf, ob `health_file` in der LiteLLM-Konfiguration gesetzt ist."}
         />
       {:else}
         {#if health.stale}

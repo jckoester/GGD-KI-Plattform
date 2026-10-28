@@ -13,19 +13,19 @@ Es gibt zwei Arten:
 
 ## Was passiert, wenn eine Anfrage blockiert wird?
 
-Wenn Ihre Anfrage oder die Antwort der KI eine technische Sperre auslöst, erscheint eine Fehlermeldung im Chat. Die Nachricht wird nicht weitergeleitet bzw. die Antwort wird nicht angezeigt.
+Wenn deine Anfrage oder die Antwort der KI eine technische Sperre auslöst, erscheint eine Fehlermeldung im Chat. Die Nachricht wird nicht weitergeleitet bzw. die Antwort wird nicht angezeigt.
 
-Das bedeutet **nicht**, dass Sie etwas falsch gemacht haben — Sperren können auch bei harmlosen Formulierungen anschlagen, wenn bestimmte Schlüsselwörter enthalten sind.
+Das bedeutet **nicht**, dass du etwas falsch gemacht hast — Sperren können auch bei harmlosen Formulierungen anschlagen, wenn bestimmte Schlüsselwörter enthalten sind.
 
-**Was Sie tun können:**
-- Formulieren Sie Ihre Frage um und versuchen Sie es erneut.
-- Wählen Sie ein anderes KI-Modell aus.
-- Sprechen Sie Ihre Lehrkraft an, wenn Sie glauben, dass die Sperre Ihren Arbeitsauftrag betrifft.
+**Was du tun kannst:**
+- Formuliere deine Frage um und versuche es erneut.
+- Wähle ein anderes KI-Modell aus.
+- Sprich deine Lehrkraft an, wenn du glaubst, dass die Sperre deinen Arbeitsauftrag betrifft.
 
 ## Verhaltenshinweise der Schule
 
-Ihre Schule kann der KI schulweite Leitlinien mitgeben — etwa den Hinweis, altersgerechte Sprache zu verwenden, Unsicherheiten zu kennzeichnen oder bei emotionaler Belastung auf schulische Ansprechpersonen hinzuweisen. Diese Leitlinien gelten für alle Gespräche und alle Assistenten.
+Deine Schule kann der KI schulweite Leitlinien mitgeben — etwa den Hinweis, altersgerechte Sprache zu verwenden, Unsicherheiten zu kennzeichnen oder bei emotionaler Belastung auf schulische Ansprechpersonen hinzuweisen. Diese Leitlinien gelten für alle Gespräche und alle Assistenten.
 
 ## Wer legt die Guardrails fest?
 
-Guardrails werden ausschließlich von Schuladministratoren eingerichtet. Als Nutzerin oder Nutzer können Sie sie weder einsehen noch verändern. Bei Fragen wenden Sie sich an Ihre Lehrkraft oder die Schuladministration.
+Guardrails werden ausschließlich von Schuladministratoren eingerichtet. Als Nutzerin oder Nutzer kannst du sie weder einsehen noch verändern. Bei Fragen wende dich an deine Lehrkraft oder die Schuladministration.

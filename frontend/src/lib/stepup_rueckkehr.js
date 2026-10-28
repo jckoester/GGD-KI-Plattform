@@ -19,18 +19,18 @@ function uhrzeit(jetzt) {
 /** Der Satz zu einem Fehlercode aus dem Backend (`_stepup_abgelehnt`), oder null. */
 export function stepupFehlerText(code, jetzt = new Date()) {
   if (!code) return null;
-  const melden = `Scheitert es wieder, nennen Sie der Administration die Uhrzeit (${uhrzeit(jetzt)}) — dann lässt sich der Grund im Protokoll finden.`;
+  const melden = `Scheitert es wieder, nenne der Administration die Uhrzeit (${uhrzeit(jetzt)}) — dann lässt sich der Grund im Protokoll finden.`;
   switch (code) {
     case "abgebrochen":
       return "Die erneute Anmeldung wurde abgebrochen. Die Aktion wurde nicht ausgeführt.";
     case "anderes_konto":
-      return "Sie haben sich mit einem anderen Konto angemeldet als dem, mit dem Sie hier arbeiten. Die Aktion wurde nicht ausgeführt.";
+      return "Du hast dich mit einem anderen Konto angemeldet als dem, mit dem du hier arbeitest. Die Aktion wurde nicht ausgeführt.";
     case "ohne_2fa":
       return "Die erneute Anmeldung muss mit dem zweiten Faktor erfolgen (etwa dem Code aus der Authenticator-App). Die Aktion wurde nicht ausgeführt.";
     case "nicht_frisch":
-      return `Die erneute Anmeldung ließ sich nicht bestätigen. Bitte versuchen Sie es noch einmal. ${melden}`;
+      return `Die erneute Anmeldung ließ sich nicht bestätigen. Bitte versuch es noch einmal. ${melden}`;
     default:
-      return `Die erneute Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es noch einmal. ${melden}`;
+      return `Die erneute Anmeldung ist fehlgeschlagen. Bitte versuch es noch einmal. ${melden}`;
   }
 }
 

@@ -96,9 +96,9 @@
       <h1 class="text-2xl font-semibold">Krisen-Freigaben</h1>
     </div>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-6">
-      Offene Anträge auf Einsicht in geflaggte Konversationen. Geben Sie nur frei, wenn
-      die Einsicht fachlich begründet ist — Sie sind die <strong>zweite</strong> Person
-      im Vier-Augen-Prinzip. Eigene Anträge können Sie nicht selbst freigeben.
+      Offene Anträge auf Einsicht in geflaggte Konversationen. Gib nur frei, wenn
+      die Einsicht fachlich begründet ist — du bist die <strong>zweite</strong> Person
+      im Vier-Augen-Prinzip. Eigene Anträge kannst du nicht selbst freigeben.
     </p>
 
     {#if error}

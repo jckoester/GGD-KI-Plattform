@@ -286,7 +286,7 @@
                     <div
                         class="p-3 text-sm text-light-tx-2 dark:text-dark-tx-2"
                     >
-                        Keine IK-Kompetenz gefunden. Drücken Sie Enter, um die
+                        Keine IK-Kompetenz gefunden. Drück Enter, um die
                         Nummer trotzdem hinzuzufügen.
                     </div>
                 {:else}

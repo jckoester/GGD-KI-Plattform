@@ -29,7 +29,7 @@ export function curriculumLage(daten) {
             art: "fach_fehlt",
             text: "Dieser Gruppe ist kein Fach zugeordnet.",
             tun: "Ohne Fach gibt es kein Curriculum, keine Assistentenauswahl und keine "
-                + "Fachseite. Legen Sie die Gruppe über „Klasse und Fach“ neu an.",
+                + "Fachseite. Leg die Gruppe über „Klasse und Fach“ neu an.",
         }
     }
     if (daten?.grade_unbekannt) {
@@ -39,7 +39,7 @@ export function curriculumLage(daten) {
             // ⚠️ Früher stand hier „es werden alle Curricula des Fachs angezeigt“ — das
             // war die Beschreibung eines Fehlers: Einem Abi-Kurs wurde „CH Kl. 8“
             // angeboten. Jetzt wird nichts angeboten, und der Satz sagt, warum.
-            tun: "Tragen Sie ihn unter „Meine Unterrichtsgruppen“ ein, dann erscheinen "
+            tun: "Trag ihn unter „Meine Unterrichtsgruppen“ ein, dann erscheinen "
                 + "die passenden Kapitel.",
         }
     }

@@ -33,7 +33,7 @@ describe("schuelerLeerSatz", () => {
         // `leerSatz` (Lehrkraft) sagt „Legen Sie eine an". Eine Schüler:in kann keine
         // Unterrichtsgruppe anlegen — der Satz wäre eine Sackgasse.
         const satz = schuelerLeerSatz({ grund: "kein_unterricht" }, false)
-        expect(satz).not.toMatch(/legen sie|anlegen|einrichten Sie/i)
+        expect(satz).not.toMatch(/legen sie|leg eine an|anlegen|einrichten Sie/i)
         expect(satz).toContain("eingerichtet")
     })
 

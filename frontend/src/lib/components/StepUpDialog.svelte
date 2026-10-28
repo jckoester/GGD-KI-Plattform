@@ -70,7 +70,7 @@
       <h2 class="text-lg font-semibold">Erneute Anmeldung</h2>
     </div>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
-      Diese Aktion ist besonders geschützt. Bitte bestätigen Sie kurz Ihre Identität.
+      Diese Aktion ist besonders geschützt. Bitte bestätige kurz deine Identität.
     </p>
 
     {#if loading}

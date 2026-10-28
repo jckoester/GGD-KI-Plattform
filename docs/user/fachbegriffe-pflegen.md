@@ -10,16 +10,16 @@ Dateiformat und die beiden Wege — einspielen und wieder herausholen.
 > **Wozu der Aufwand?** Ein gepflegter Fachbegriff wirkt an drei Stellen: Er ist über
 > Namen und Suchbegriffe auffindbar, er steht in der Sammlung zum Nachschlagen, und ein
 > Assistent bekommt ihn ungefragt dazugelegt, wenn eine Frage dazu passt. Die letzte
-> Stelle ist die wichtigste: Dort entscheidet Ihr Text, ob die KI die Sprache Ihrer
+> Stelle ist die wichtigste: Dort entscheidet dein Text, ob die KI die Sprache deiner
 > Fachschaft spricht oder ihre eigene.
 
 ## Zwei Wege, einer davon zurück
 
-Sie können Ihre Begriffe **in Dateien pflegen** (etwa in einem Obsidian-Vault) und
-einspielen, oder Sie pflegen sie **in der Oberfläche** im Editor. Beides geht, und Sie
-können wechseln: Der Export gibt Ihnen den Bestand jederzeit wieder als Dateien.
+Du kannst deine Begriffe **in Dateien pflegen** (etwa in einem Obsidian-Vault) und
+einspielen, oder du pflegst sie **in der Oberfläche** im Editor. Beides geht, und du
+kannst wechseln: Der Export gibt dir den Bestand jederzeit wieder als Dateien.
 
-Beides finden Sie unter **Fächer → Ihr Fach → „weiterer Kontext"**:
+Beides findest du unter **Fächer → dein Fach → „weiterer Kontext"**:
 
 | Schaltfläche | Was sie tut |
 |---|---|
@@ -27,17 +27,17 @@ Beides finden Sie unter **Fächer → Ihr Fach → „weiterer Kontext"**:
 | **Als Zip** | den ganzen Bestand des Fachs als Dateien sichern |
 | **+ Neuer Knoten** | einen einzelnen Eintrag im Editor anlegen |
 
-Einen einzelnen Eintrag holen Sie in seiner Detailansicht über **Als Markdown** heraus.
+Einen einzelnen Eintrag holst du in seiner Detailansicht über **Als Markdown** heraus.
 
 **Wer darf das?** Lehrkräfte des Fachs — genauer: wer in der **Fachschaftsgruppe** des
 Fachs ist. Eine Rolle „Fachschaftsleitung" gibt es nicht; innerhalb der Fachschaft sind
 alle gleichberechtigt. Dasselbe gilt für das Ändern, Archivieren und Verknüpfen im Editor.
 
-> Die Fachschaftsgruppe übernimmt die Plattform aus Ihrem Schulkonto. Wenn Sie das Fach
+> Die Fachschaftsgruppe übernimmt die Plattform aus deinem Schulkonto. Wenn du das Fach
 > unterrichten, die Schaltfläche aber mit einer Absage antwortet, fehlt diese Gruppe —
-> das ist eine Sache der Administration, nicht Ihres Kontos.
+> das ist eine Sache der Administration, nicht deines Kontos.
 >
-> **Begriffe eines anderen Fachs** spielen Sie nicht in Ihr Fach ein — dort pflegt sie
+> **Begriffe eines anderen Fachs** spielst du nicht in dein Fach ein — dort pflegt sie
 > dessen Fachschaft. Fehlen sie, kann die Administration sie unter **Einstellungen →
 > Fachbegriffe** in das richtige Fach einspielen, auch wenn es dort keine Fachschaft gibt.
 
@@ -45,7 +45,7 @@ alle gleichberechtigt. Dasselbe gilt für das Ändern, Archivieren und Verknüpf
 
 Am schnellsten geht es mit der **Vorlage**: Im Dialog „Aus Dateien" steht „Vorlage
 herunterladen" — ein kleines Paket mit zwei Musterbegriffen, einem Stoffsteckbrief und
-einer Kurzfassung dieser Seite. Ändern Sie darin Titel und Inhalt, und Sie haben Ihre
+einer Kurzfassung dieser Seite. Ändere darin Titel und Inhalt, und du hast deine
 erste eigene Datei.
 
 Eine Datei besteht aus einem **Kopf** zwischen zwei Zeilen aus drei Strichen und einem
@@ -82,7 +82,7 @@ Zeilen im Kopf, die mit `#` beginnen, sind Anmerkungen und werden nicht eingespi
 | `id` | die Kennung, an der die Plattform den Eintrag wiedererkennt (siehe unten) |
 | `fassung` | unterscheidet gleichnamige Einträge |
 | `ab_klasse` | **nur** bei Begriffen mit mehreren Fassungen |
-| `fach` | können Sie weglassen; eingespielt wird in das Fach, dessen Seite Sie offen haben |
+| `fach` | kannst du weglassen; eingespielt wird in das Fach, dessen Seite du offen hast |
 | `bevorzugter_begriff` | die Bezeichnung, mit der ein Assistent antwortet |
 | `aliase` | Suchbegriffe (siehe unten) |
 | `genus`, `plural` | Artikel und Mehrzahl — eine Hilfe für alle, die Deutsch als Zweitsprache lernen |
@@ -118,7 +118,7 @@ Fehler.
 **1. Das Wichtigste zuerst.** Ein Assistent bekommt von langen Einträgen nur den Anfang
 zu sehen. Die Definition sollte höchstens etwa 250 Zeichen lang sein, und der erste
 Absatz der Erklärung trägt die zentrale Unterscheidung. Beispiele sind Zusatz für die
-Detailansicht — verlassen Sie sich nicht darauf, dass sie ankommen.
+Detailansicht — verlass dich nicht darauf, dass sie ankommen.
 
 **2. Aliase sind Suchbegriffe, keine Antwortbegriffe.** Hier gehört alles hinein, womit
 jemand nach dem Begriff *fragt*: Synonyme, Schreibweisen anderer Quellen, Formelzeichen
@@ -129,7 +129,7 @@ Ist ein Alias fachlich falsch, gehört die Richtigstellung als Fehlvorstellung d
 
 Ein Suchbegriff wirkt auch **mitten im Satz** *(seit 0.16)*: Steht er in einer
 Chat-Nachricht, bietet die Plattform der KI den Eintrag mit seinem Titel an — sie holt ihn,
-wenn er für die Antwort zählt —, legt ihn aber nicht ungefragt in den Prompt. Wählen Sie
+wenn er für die Antwort zählt —, legt ihn aber nicht ungefragt in den Prompt. Wähle
 Suchbegriffe deshalb als **zweite Namen** des Begriffs, nicht als Themenwörter: „Umwelt" am
 Gefahrenpiktogramm GHS09 ließe die KI bei jedem Satz über Umweltschutz an das Piktogramm
 denken. Welche Einträge oft angeboten und nie nachgeschlagen werden, zeigt die Statistik der
@@ -140,8 +140,8 @@ handelt von Umweltschäden, und die Plattform bot es auch ohne den Suchbegriff b
 etwas für die Umwelt tun.“ an. Für solche Einträge gibt es das Feld `angebot: nur wenn genannt`
 — in der Oberfläche **„Im Chat anbieten“**. Die Plattform bietet den Eintrag dann nur an, wenn
 sein Titel oder ein Suchbegriff in der Nachricht steht. Eine Frage, die ihn deutlich trifft
-(„Was bedeutet das Piktogramm mit dem toten Fisch?“), findet ihn weiter. Setzen Sie das Feld
-nur, wenn Ihnen ein Eintrag in fremden Zusammenhängen auffällt: Ohne es bietet die Plattform
+(„Was bedeutet das Piktogramm mit dem toten Fisch?“), findet ihn weiter. Setze das Feld
+nur, wenn dir ein Eintrag in fremden Zusammenhängen auffällt: Ohne es bietet die Plattform
 auch Umschreibungen an, die keinen Suchbegriff treffen.
 
 **3. Fehlvorstellungen im Wortlaut der Schüler:innen.** „Die Blasen in kochendem Wasser
@@ -150,8 +150,8 @@ Assistent spricht die vermerkten Irrtümer an, wenn sie zur Frage passen — er 
 nicht auf.
 
 **4. Zwei Fassungen statt eines Kompromisses.** Bedeutet ein Begriff in Klasse 8 etwas
-anderes als in Klasse 10, legen Sie **zwei** Einträge an, unterscheiden Sie sie über
-`fassung` und verbinden Sie sie mit `vertieft_in`. Ein Eintrag, der beides zugleich zu
+anderes als in Klasse 10, leg **zwei** Einträge an, unterscheide sie über
+`fassung` und verbinde sie mit `vertieft_in`. Ein Eintrag, der beides zugleich zu
 sagen versucht, ist für beide Jahrgänge falsch.
 
 **5. Keine Verweise nach außen.** „Siehe Buch S. 42" oder „wie im Unterricht besprochen"
@@ -159,10 +159,10 @@ kann ein Assistent nicht auflösen.
 
 ## Verweise, die ins Leere zeigen
 
-`[[Oxidationsmittel]]` verweist auf die **Datei** dieses Namens in Ihrem Paket. Gibt es
+`[[Oxidationsmittel]]` verweist auf die **Datei** dieses Namens in deinem Paket. Gibt es
 sie noch nicht, entsteht keine Verbindung — und das ist kein Fehler, sondern der
 Normalfall beim Aufbau. Der Bericht listet solche Verweise nach Häufigkeit auf: Das ist
-Ihre Arbeitsliste für die nächste Runde. Sobald das Ziel da ist, schließt der nächste
+deine Arbeitsliste für die nächste Runde. Sobald das Ziel da ist, schließt der nächste
 Lauf die Lücke von selbst.
 
 ## Begriffe anderer Fächer
@@ -170,14 +170,14 @@ Lauf die Lücke von selbst.
 *Seit 0.16.*
 
 **Verweisen statt doppelt anlegen.** NwT braucht „Fotosynthese", Biologie hat den Eintrag
-schon: Verweisen Sie auf ihn, statt einen eigenen anzulegen. `[[Fotosynthese]]` findet ihn,
+schon: Verweise auf ihn, statt einen eigenen anzulegen. `[[Fotosynthese]]` findet ihn,
 wenn Biologie ein **Bezugsfach** von NwT ist (das legt die Schule in ihrer Fächerliste
 fest). Eindeutig in jedem Fach ist die **Kennung** des Eintrags, etwa `[[bio-fotosynthese]]`.
 Sie steht in seiner Detailansicht oben, neben Typ und Fassung. Führen zwei Bezugsfächer
 denselben Titel, entsteht über den Titel keine Verbindung — dann hilft nur die Kennung.
 
 **Ein eigener Eintrag braucht eine Abgrenzung.** Führt ein anderes Fach schon einen Begriff
-desselben Namens — oder ist Ihr Titel dort ein Suchbegriff —, legt die Plattform Ihren nur an,
+desselben Namens — oder ist dein Titel dort ein Suchbegriff —, legt die Plattform deinen nur an,
 wenn er den vorhandenen unter `## Abgrenzung` nennt, mit dem Unterschied:
 
 ```markdown
@@ -187,8 +187,8 @@ wenn er den vorhandenen unter `## Abgrenzung` nennt, mit dem Unterschied:
 ```
 
 Ohne Abgrenzung überspringt der Import die Datei und nennt den vorhandenen Eintrag. Im Editor
-fragt die Plattform beim Speichern nach („Mit Abgrenzung speichern"); den Unterschied tragen
-Sie danach unter „Verknüpfen" als Hinweis ein. Gleiche **Suchbegriffe** in zwei Fächern sind
+fragt die Plattform beim Speichern nach („Mit Abgrenzung speichern"); den Unterschied trägst
+du danach unter „Verknüpfen" als Hinweis ein. Gleiche **Suchbegriffe** in zwei Fächern sind
 erlaubt — der Bericht nennt sie nur.
 
 Einträge, die schon vor 0.16 doppelt angelegt waren, bleiben bearbeitbar. Die Admins haben
@@ -197,8 +197,8 @@ Fachschaften.
 
 ## Abbildungen
 
-Legen Sie SVG-Dateien in einen Unterordner `_Abb/`, tragen Sie sie unter
-`illustrationen` mit einer **Beschreibung** ein und setzen Sie `![[dateiname.svg]]` an
+Leg SVG-Dateien in einen Unterordner `_Abb/`, trag sie unter
+`illustrationen` mit einer **Beschreibung** ein und setze `![[dateiname.svg]]` an
 die Stelle im Text, an der die Abbildung erklärt wird.
 
 Die Beschreibung ist kein Beiwerk. Sie ist das, was ein Assistent über das Bild weiß —
@@ -213,7 +213,7 @@ er sieht die Zeichnung nicht — und das, was ein Screenreader vorliest.
 ## Einspielen: erst Vorschau, dann bestätigen
 
 „Aus Dateien" nimmt einzelne `.md`-Dateien, einzelne `.svg` oder ein **Zip-Paket** mit
-allem darin. Danach folgt eine **Vorschau** — und bis Sie bestätigen, ist nichts
+allem darin. Danach folgt eine **Vorschau** — und bis du bestätigst, ist nichts
 geschrieben.
 
 Die Vorschau zeigt je Datei, was geschähe:
@@ -230,14 +230,14 @@ Dazu die Hinweise und die Verweise ins Leere.
 
 > **Einspielen heißt veröffentlichen.** Es gibt keinen Entwurfszustand: Was eingespielt
 > ist, sehen alle, die das Fach lesen dürfen — auch Schüler:innen. Der Prüfschritt liegt
-> **vor** dem Einspielen. Tragen Ihre Dateien ein Feld `pruefstatus`, wird es nicht
+> **vor** dem Einspielen. Tragen deine Dateien ein Feld `pruefstatus`, wird es nicht
 > übernommen; die Vorschau weist aber darauf hin, wenn etwas nicht als geprüft markiert
 > ist.
 
 ### Wenn jemand in der Oberfläche gearbeitet hat
 
 Hat jemand einen Eintrag seit dem letzten Einspielen im Editor bearbeitet, wird er
-**nicht** überschrieben. Er erscheint in der Vorschau ganz oben, und Sie entscheiden je
+**nicht** überschrieben. Er erscheint in der Vorschau ganz oben, und du entscheidest je
 Zeile: behalten (die Vorgabe) oder mit der Datei überschreiben.
 
 Das ist der Grund, warum diese Gruppe oben steht — sie ist das Einzige, wozu die
@@ -252,26 +252,26 @@ nicht erreichbar ist —, holt die Plattform es in der Nacht nach.
 
 ## Umbenennen und die Kennung `id`
 
-Jeder Eintrag hat eine **Kennung**, an der die Plattform ihn wiedererkennt. Sie brauchen
+Jeder Eintrag hat eine **Kennung**, an der die Plattform ihn wiedererkennt. Du brauchst
 sie nicht zu setzen: Beim ersten Einspielen wird eine vergeben (aus Fachkürzel und
 Dateiname, etwa `ch-oxidation-sauerstoffaufnahme`), und der Export trägt sie in die
 Datei ein.
 
-> ⚠️ **Solange keine `id` in Ihrer Datei steht, hängt die Identität am Dateinamen.**
-> Benennen Sie die Datei dann um, entsteht beim nächsten Einspielen ein **zweiter**
-> Eintrag. Wollen Sie umbenennen, tragen Sie vorher die Kennung ein, die der Bericht
-> nennt — oder exportieren Sie einmal, dann steht sie überall drin.
+> ⚠️ **Solange keine `id` in deiner Datei steht, hängt die Identität am Dateinamen.**
+> Benennst du die Datei dann um, entsteht beim nächsten Einspielen ein **zweiter**
+> Eintrag. Willst du umbenennen, trag vorher die Kennung ein, die der Bericht
+> nennt — oder exportiere einmal, dann steht sie überall drin.
 
 Erlaubt sind Kleinbuchstaben, Ziffern und Bindestriche. Eine Kennung, die davon
 abweicht, wird verworfen und gemeldet; die Datei wird trotzdem gelesen.
 
 ## Herausholen: Export
 
-„Als Zip" gibt Ihnen den Bestand des Fachs als Dateien — dasselbe Format, das der Import
+„Als Zip" gibt dir den Bestand des Fachs als Dateien — dasselbe Format, das der Import
 liest. Ein einzelner Eintrag geht über „Als Markdown" in seiner Detailansicht.
 
-> ⚠️ **Der Export ersetzt Ihren Arbeitsordner nicht.** Er ist der Stand des
-> Wissensspeichers, nicht Ihre Datei von vorgestern. Nicht mitkommen können:
+> ⚠️ **Der Export ersetzt deinen Arbeitsordner nicht.** Er ist der Stand des
+> Wissensspeichers, nicht deine Datei von vorgestern. Nicht mitkommen können:
 >
 > - **Verweise auf Begriffe, die es noch nicht gibt.** Sie sind zu keiner Verbindung
 >   geworden und daher im Speicher nicht abgebildet. Wer damit einen gepflegten Ordner
@@ -286,7 +286,7 @@ liest. Ein einzelner Eintrag geht über „Als Markdown" in seiner Detailansicht
 
 | Meldung | Was zu tun ist |
 |---|---|
-| „nicht lesbar" | Der Kopf ist kaputt — meist ein Anführungszeichen zu viel. Enthält ein Wert selbst Anführungszeichen, nehmen Sie einfache: `'…'` |
+| „nicht lesbar" | Der Kopf ist kaputt — meist ein Anführungszeichen zu viel. Enthält ein Wert selbst Anführungszeichen, nimm einfache: `'…'` |
 | „Fach „X" unbekannt" / „importiert wird nach Y" | Die Datei nennt ein anderes Fach. Zeile löschen oder das richtige Fach öffnen |
 | „keine `id` ableitbar" | Der Dateiname besteht nur aus Sonderzeichen. Datei umbenennen oder `id:` setzen |
 | „Kennung … gehört schon zu …" | Zwei Dateien beanspruchen dieselbe Kennung |

@@ -62,7 +62,7 @@
     </h1>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-6 max-w-prose">
         Fachbegriffe und Stoffsteckbriefe in jedes Fach einspielen und wieder herausholen —
-        auch in eines, in dessen Fachschaft Sie nicht sind. Jede Datei geht in das Fach, das
+        auch in eines, in dessen Fachschaft du nicht bist. Jede Datei geht in das Fach, das
         sie unter <code>fach:</code> nennt; die Vorschau zeigt es je Datei. Dateien ohne
         Angabe gehen in das gewählte Fach, ist keines gewählt, werden sie übersprungen. Hat
         ein Fach keine Fachschaftsgruppe, ändern die Einträge vorerst nur Admins; gibt es

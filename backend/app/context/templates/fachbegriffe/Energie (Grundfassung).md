@@ -1,13 +1,13 @@
 ---
 # ── MUSTERDATEI ───────────────────────────────────────────────────────────────
-# Ändern Sie Titel und Inhalt, bevor Sie sie einspielen — sonst legen Sie einen
-# Eintrag „Energie" an, den Sie so nicht gemeint haben. Die Vorschau im Dialog zeigt
+# Ändere Titel und Inhalt, bevor du sie einspielst — sonst legst du einen
+# Eintrag „Energie" an, den du so nicht gemeint hast. Die Vorschau im Dialog zeigt
 # vorher, was geschähe. Alles, was mit # beginnt, ist eine Anmerkung und wird nicht
 # eingespielt.
 #
-# `id`: die Kennung, an der die Plattform den Eintrag wiedererkennt. Sie brauchen sie
+# `id`: die Kennung, an der die Plattform den Eintrag wiedererkennt. Du brauchst sie
 # nicht zu setzen — beim ersten Einspielen wird eine vergeben, und der Export trägt
-# sie hier ein. Von Hand nur dann, wenn Sie die Datei umbenennen wollen, bevor sie
+# sie hier ein. Von Hand nur dann, wenn du die Datei umbenennen willst, bevor sie
 # einmal eingespielt war.
 # id: energie-grundfassung
 
@@ -20,8 +20,8 @@ titel: Energie
 fassung: Grundfassung
 ab_klasse: 6
 
-# `fach` können Sie weglassen: Eingespielt wird in das Fach, dessen Seite Sie offen
-# haben. Steht hier ein anderes Fach, wird die Datei gemeldet und übergangen.
+# `fach` kannst du weglassen: Eingespielt wird in das Fach, dessen Seite du offen
+# hast. Steht hier ein anderes Fach, wird die Datei gemeldet und übergangen.
 # fach: Physik
 
 # Die Bezeichnung, mit der der Assistent antwortet.

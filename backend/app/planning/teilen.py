@@ -89,8 +89,8 @@ async def lege_zusammen(db: AsyncSession, slot: LessonSlot) -> LessonSlot:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Die {zweite.start_period}. Stunde trägt eigenen Inhalt. Verschieben oder "
-                "entfernen Sie ihn zuerst, dann lassen sich die Hälften zusammenlegen."
+                f"Die {zweite.start_period}. Stunde trägt eigenen Inhalt. Verschieb oder "
+                "entferne ihn zuerst, dann lassen sich die Hälften zusammenlegen."
             ),
         )
     erste.periods = 2

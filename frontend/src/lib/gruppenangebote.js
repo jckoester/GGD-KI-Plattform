@@ -57,7 +57,7 @@ export function angebotsHinweis(daten) {
     const was = n === 1 ? "Eine neue Unterrichtsgruppe" : `${n} neue Unterrichtsgruppen`
     return (
         `${was} aus dem Schulkonto ${n === 1 ? "wartet" : "warten"} auf Zuordnung. ` +
-        "Angelegt wird nichts von selbst — sonst entstünde neben Ihrer bestehenden " +
+        "Angelegt wird nichts von selbst — sonst entstünde neben deiner bestehenden " +
         "Gruppe eine zweite."
     )
 }
@@ -75,6 +75,6 @@ export function angebotsHinweis(daten) {
  */
 export function anlegenGesperrt(angebot) {
     if (angebot?.kann_angelegt_werden !== false) return null
-    return "Zu diesem Angebot lässt sich kein Fach bestimmen — ordnen Sie es einer " +
-        "vorhandenen Gruppe zu oder legen Sie sie über „Klasse und Fach“ an."
+    return "Zu diesem Angebot lässt sich kein Fach bestimmen — ordne es einer " +
+        "vorhandenen Gruppe zu oder lege sie über „Klasse und Fach“ an."
 }

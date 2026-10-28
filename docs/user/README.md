@@ -1,14 +1,14 @@
 # ki@schule — Anwender-Dokumentation
 
-Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher Intelligenz direkt aus dem Schulnetz — sicher, datenschutzkonform und ohne eigenen Account bei einem KI-Anbieter.
+Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher Intelligenz direkt aus dem Schulnetz — sicher, datenschutzkonform und ohne eigenen Account bei einem KI-Anbieter.
 
 ---
 
 > **Wichtig: Werkzeug, kein Wissensspeicher**
 >
-> ki@schule ist eine Werkzeugsammlung — kein dauerhafter Speicher für Ihre Arbeitsergebnisse.
+> ki@schule ist eine Werkzeugsammlung — kein dauerhafter Speicher für deine Arbeitsergebnisse.
 > **Chats werden nach 3 Monaten ohne neue Nachrichten automatisch und unwiederbringlich gelöscht.**
-> Ergebnisse, die Sie behalten möchten, müssen Sie selbst kopieren und anderweitig sichern
+> Ergebnisse, die du behalten möchtest, musst du selbst kopieren und anderweitig sichern
 > (z. B. in ein Dokument oder eine Notiz).
 
 ---
@@ -51,7 +51,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 ## Häufige Fragen
 
 **Ich kann mich nicht einloggen.**
-Die Anmeldung läuft über Ihr Schulkonto (SSO). Wenn die Anmeldung fehlschlägt, prüfen Sie zunächst, ob Sie sich in IServ normal einloggen können. Falls das Problem bestehen bleibt, wenden Sie sich an Ihre Lehrkraft oder den IT-Support der Schule.
+Die Anmeldung läuft über dein Schulkonto (SSO). Wenn die Anmeldung fehlschlägt, prüfe zunächst, ob du dich in IServ normal einloggen kannst. Falls das Problem bestehen bleibt, wende dich an deine Lehrkraft oder den IT-Support der Schule.
 
 **Mein Budget ist aufgebraucht — was jetzt?**
 Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das **jede Unterrichtswoche wächst**. Ist es aufgebraucht, werden neue Anfragen abgelehnt, bis in der nächsten Unterrichtswoche wieder Guthaben dazukommt — die [Profilseite](profil.md) nennt den Termin.
@@ -60,7 +60,7 @@ Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das **jede Unter
 Ja — über „Letzte Chats" in der Seitenleiste. Gespräche bleiben bis zu 3 Monate nach der letzten Nachricht gespeichert, danach werden sie automatisch gelöscht.
 
 **Kann die KI meine Hausaufgaben sehen?**
-Die KI sieht nur das, was Sie ihr direkt schicken — also den Text, den Sie eingeben, und eventuelle Dateien, die Sie anhängen. Es gibt keinen automatischen Zugriff auf andere Dateien, Ihren E-Mail-Account oder sonstige Schulinhalte.
+Die KI sieht nur das, was du ihr direkt schickst — also den Text, den du eingibst, und eventuelle Dateien, die du anhängst. Es gibt keinen automatischen Zugriff auf andere Dateien, deinen E-Mail-Account oder sonstige Schulinhalte.
 
 **Ist die Plattform auch für private Geräte nutzbar?**
 Ja, die Plattform läuft im Browser und ist über die Schuladresse auch von zu Hause erreichbar, sofern das die Schule freigeschaltet hat.

@@ -1,70 +1,70 @@
 # Fächer und Unterrichtsgruppen
 
-Wo Sie wieder anknüpfen, wenn Sie etwas fortsetzen wollen.
+Wo du wieder anknüpfst, wenn du etwas fortsetzen willst.
 
 ---
 
 ## Die Übersichtsseite
 
 Jedes Fach hat eine Übersicht, die eine einzige Frage beantworten soll: **Wo war ich
-stehengeblieben?** Sie erreichen sie über die Sidebar oder über **Meine Fächer**.
+stehengeblieben?** Du erreichst sie über die Sidebar oder über **Meine Fächer**.
 
 Die Seite ist für Schüler:innen und Lehrkräfte dieselbe — sie zeigt beiden dieselbe
 Unterrichtsgruppe, nur aus zwei Richtungen.
 
-### Was Sie dort finden
+### Was du dort findest
 
 | Abschnitt | Inhalt |
 |---|---|
 | **Jetzt** *(Lehrkräfte)* | Laufende und nächste Unterrichtseinheit, die zuletzt gehaltene und die nächsten Stunden |
-| **Weiterarbeiten** | Ihre letzten Chats in dieser Gruppe — und **„+ Neuer Chat"** für einen Chat, der zu dieser Gruppe gehört: Der Assistent kennt dann den aktuellen Unterricht (letzte und vorletzte Stunde mit ihren Inhalten, nächstes Thema, nächste Klassenarbeit) und die Fachbegriffe, die die Gruppe schon hatte |
+| **Weiterarbeiten** | Deine letzten Chats in dieser Gruppe — und **„+ Neuer Chat"** für einen Chat, der zu dieser Gruppe gehört: Der Assistent kennt dann den aktuellen Unterricht (letzte und vorletzte Stunde mit ihren Inhalten, nächstes Thema, nächste Klassenarbeit) und die Fachbegriffe, die die Gruppe schon hatte |
 | **Assistenten** | Die Assistenten, die für diese Gruppe freigegeben sind |
-| **Zuletzt entstanden** | Ihre Bausteine und Artefakte aus dieser Gruppe, gemischt und nach Datum |
+| **Zuletzt entstanden** | Deine Bausteine und Artefakte aus dieser Gruppe, gemischt und nach Datum |
 | **Nachschlagen** | Fachbegriffe, Methoden- und Operatorenblätter, Suche |
 
-**„Zuletzt entstanden" zeigt nur, was Ihnen gehört.** Ob ein Eintrag ein *Baustein* (im
+**„Zuletzt entstanden" zeigt nur, was dir gehört.** Ob ein Eintrag ein *Baustein* (im
 Wissensspeicher) oder ein *Artefakt* (in der Bibliothek) ist, steht rechts daneben —
-die Liste trennt danach aber nicht, weil es für Ihre Arbeit dieselbe Sorte Ergebnis ist.
+die Liste trennt danach aber nicht, weil es für deine Arbeit dieselbe Sorte Ergebnis ist.
 
 ---
 
 ## Für Schüler:innen: Fach heißt Unterrichtsgruppe
 
-Wenn in der Sidebar „Mathematik" steht, ist damit **Ihr** Mathematikunterricht gemeint —
-also die Gruppe bei Ihrer Lehrkraft. Alles, was Sie anlegen, gehört zu dieser Gruppe:
-Ihre Chats, Ihre Bausteine.
+Wenn in der Sidebar „Mathematik" steht, ist damit **dein** Mathematikunterricht gemeint —
+also die Gruppe bei deiner Lehrkraft. Alles, was du anlegst, gehört zu dieser Gruppe:
+deine Chats, deine Bausteine.
 
-Sollten Sie ausnahmsweise zwei Gruppen im selben Fach haben, fragt die Seite beim
-Öffnen nach, welche Sie meinen.
+Solltest du ausnahmsweise zwei Gruppen im selben Fach haben, fragt die Seite beim
+Öffnen nach, welche du meinst.
 
-**Sie sehen dort nichts von anderen?** Das stimmt: Chats und Bausteine sind persönlich.
-Was Ihre Lehrkraft für die Gruppe freigegeben hat, finden Sie über **Nachschlagen** und
+**Du siehst dort nichts von anderen?** Das stimmt: Chats und Bausteine sind persönlich.
+Was deine Lehrkraft für die Gruppe freigegeben hat, findest du über **Nachschlagen** und
 über die Suche.
 
 ### Ein Fach fehlt
 
-Zwei Dinge müssen zusammenkommen, damit ein Fach in Ihrer Übersicht steht.
+Zwei Dinge müssen zusammenkommen, damit ein Fach in deiner Übersicht steht.
 
-**Erstens die Zuordnung.** Sie kommt aus Ihrem Schulkonto, nicht aus dieser Plattform.
-Fehlt ein Fach oder steht eines zu viel da, wenden Sie sich an Ihre Lehrkraft — hier
+**Erstens die Zuordnung.** Sie kommt aus deinem Schulkonto, nicht aus dieser Plattform.
+Fehlt ein Fach oder steht eines zu viel da, wende dich an deine Lehrkraft — hier
 lässt sich das nicht ändern.
 
 **Zweitens: Im Fach muss etwas zu tun sein.** Angezeigt wird es, wenn mindestens eines
 davon zutrifft:
 
-* Sie haben dort schon **einen Chat**, oder
-* es gibt einen **Assistenten für dieses Fach**, den Sie nutzen dürfen.
+* Du hast dort schon **einen Chat**, oder
+* es gibt einen **Assistenten für dieses Fach**, den du nutzen darfst.
 
 Trifft keines von beidem zu, bleibt das Fach aus der Übersicht — es gäbe dort nichts zu
-sehen. Sobald Ihre Lehrkraft einen Fachassistenten freigibt, erscheint es.
+sehen. Sobald deine Lehrkraft einen Fachassistenten freigibt, erscheint es.
 
 ---
 
 ## Für Lehrkräfte: zwei Ebenen
 
-Sie arbeiten in einem Fach meist mit mehreren Klassen. Deshalb gibt es zwei Seiten:
+Du arbeitest in einem Fach meist mit mehreren Klassen. Deshalb gibt es zwei Seiten:
 
-**Die Fachseite** (`Mathematik`) bündelt. Sie zeigt Ihre Unterrichtsgruppen als Karten
+**Die Fachseite** (`Mathematik`) bündelt. Sie zeigt deine Unterrichtsgruppen als Karten
 und trägt alles, was zum Fach gehört, aber zu keiner Gruppe: persönliche Fach-Chats,
 Curriculum, Bildungsplan und die Bestände der Fachschaft.
 
@@ -74,13 +74,13 @@ Kontext sowie der Absprung in die Jahresplanung.
 
 ### Der Block „Jetzt"
 
-Er liest Ihren Jahresplan und zeigt, wo die Gruppe steht:
+Er liest deinen Jahresplan und zeigt, wo die Gruppe steht:
 
 - **Laufende und nächste Einheit** mit dem Stand („6 von 12 Stunden").
 - **Zuletzt, heute, als Nächstes** — die Stunden ringsum. Eine Stunde, die heute
   stattfindet, ist als *heute* gekennzeichnet.
 - Zu jeder Stunde: ob ein **Entwurf** vorliegt und ob sie **nachbereitet** ist. Fehlt
-  der Entwurf, legen Sie ihn direkt von hier aus an.
+  der Entwurf, leg ihn direkt von hier aus an.
 
 Ausgefallene Stunden zählen nicht mit — weder als letzte Stunde noch in den Stand der
 Einheit. Prüfungen und Pufferstunden zählen mit.
@@ -90,11 +90,11 @@ Steht dort ein Hinweis auf die Planung, hat die Gruppe noch kein Wochenmuster.
 ### Der Reiter „Archiv"
 
 Mit jedem Schuljahreswechsel liefert das Schulkonto neue Unterrichtsgruppen, und die
-alten verschwinden aus der Oberfläche. Ihre Arbeit darin ist deshalb nicht verloren:
-Das **Archiv** listet Gruppen vergangener Schuljahre und gibt Ihnen Ihre Chats und
+alten verschwinden aus der Oberfläche. Deine Arbeit darin ist deshalb nicht verloren:
+Das **Archiv** listet Gruppen vergangener Schuljahre und gibt dir deine Chats und
 Bausteine daraus zurück.
 
-Ihre **Stundenentwürfe** öffnen sich dabei wie gewohnt, mit Verlaufsplan — nur eben
+Deine **Stundenentwürfe** öffnen sich dabei wie gewohnt, mit Verlaufsplan — nur eben
 schreibgeschützt; ein Hinweis am Kopf sagt das.
 
 > **Was das Archiv nicht kann:** Die Jahresplanung einer früheren Gruppe — das
@@ -104,20 +104,20 @@ Gibt es zu einem Fach frühere Gruppen, weist die Fachseite darauf hin.
 
 ## Neue Gruppen aus dem Schulkonto
 
-Führt Ihre Schule Unterrichtsgruppen auch im Schulkonto — etwa für ein
+Führt deine Schule Unterrichtsgruppen auch im Schulkonto — etwa für ein
 Tauschverzeichnis —, tauchen sie unter **Unterricht → Meine Unterrichtsgruppen** als Angebot
 auf. Die Plattform legt sie **nicht** von selbst an: Sie kann nicht wissen, ob
-`unterricht.9d.ch` Ihre bestehende Gruppe *Chemie 9D* meint oder eine neue ist. Läge sie
+`unterricht.9d.ch` deine bestehende Gruppe *Chemie 9D* meint oder eine neue ist. Läge sie
 falsch, stünden zwei Jahrespläne ineinander.
 
 Drei Antworten stehen zur Wahl:
 
-- **Zuordnen** — die Gruppe gibt es schon. Wählen Sie sie aus der Liste; der Zusatz
+- **Zuordnen** — die Gruppe gibt es schon. Wähle sie aus der Liste; der Zusatz
   („12 Stunden · 4 Chats") hilft, die richtige zu treffen. Ab dann kommen die Mitglieder
   aus dem Schulkonto.
 - **Als neue Gruppe anlegen** — es ist wirklich eine neue.
 - **Ignorieren** — die Frage verschwindet und kehrt nicht wieder. Über „Ignorierte
-  anzeigen" holen Sie sie zurück.
+  anzeigen" holst du sie zurück.
 
 > **Was eine Zuordnung ändert:** Die Mitglieder kommen ab dem nächsten Login aus dem
 > Schulkonto. Wer bisher **über die Klasse** in der Gruppe war, verliert die
@@ -146,10 +146,10 @@ Nachzügler kommen später dazu. Für all das gibt es den **Beitrittscode**.
 
 ### Für Lehrkräfte
 
-Den Code finden Sie auf der Seite Ihrer Unterrichtsgruppe unter **Beitrittscode**.
+Den Code findest du auf der Seite deiner Unterrichtsgruppe unter **Beitrittscode**.
 
 - **Ausgeben / Erneuern.** Ein Code gilt **drei Tage**. Das reicht für die Stunde, in der
-  Sie ihn anschreiben, und für alle, die erst zu Hause beitreten. Beim Erneuern verfällt
+  du ihn anschreibst, und für alle, die erst zu Hause beitreten. Beim Erneuern verfällt
   der bisherige — es gilt immer nur einer.
 - **Ungültig machen.** Wer schon beigetreten ist, bleibt Mitglied; es kommt nur niemand
   mehr nach.
@@ -157,7 +157,7 @@ Den Code finden Sie auf der Seite Ihrer Unterrichtsgruppe unter **Beitrittscode*
   er ist zum Anschreiben und Vorlesen gemacht.
 
 **Zu viele beigetreten?** Unter dem Code steht, wie viele an welchem Tag dazugekommen
-sind — nur Zahlen, keine Namen. Sie können die Beitritte **eines Tages** oder **der
+sind — nur Zahlen, keine Namen. Du kannst die Beitritte **eines Tages** oder **der
 ganzen Code-Runde** zurücknehmen.
 
 > ⚠️ **Was dabei passiert:** Die betroffenen Mitgliedschaften werden entfernt, und der
@@ -188,18 +188,18 @@ Gruppe, für die er nicht gedacht war.
 **Warum sehe ich in „Zuletzt entstanden" ein Dokument nicht, das ich in der Werkstatt
 angelegt habe?**
 Der Bezug zur Gruppe entsteht über den Chat, in dem etwas entstanden ist. Ein Dokument,
-das Sie in der Werkstatt aus dem Nichts angelegt haben, hat keinen solchen Chat — es
+das du in der Werkstatt aus dem Nichts angelegt hast, hat keinen solchen Chat — es
 steht in der [Bibliothek](bibliothek.md), nur nicht in diesem Auszug.
 
 **Wo sind meine Chats ohne Fach?**
 Im [Verlauf](chat.md). Die Fachübersicht zeigt nur, was einem Fach zugeordnet ist; die
-Zuordnung ändern Sie im Menü neben jedem Chat.
+Zuordnung änderst du im Menü neben jedem Chat.
 
 **Meine Schüler:innen sehen das Fach nicht, obwohl sie in der Gruppe sind.**
 Dann fehlt der zweite Teil der Regel oben: Solange die Schüler:in dort keinen eigenen
 Chat hat, braucht es einen Assistenten **mit diesem Fach**. Entscheidend ist die
 Fachzuordnung des Assistenten, nicht seine Freigabe: Ein schulweit freigegebener
-Assistent **ohne** Fach lässt kein Fach erscheinen. Prüfen Sie im Assistenten-Editor, ob
+Assistent **ohne** Fach lässt kein Fach erscheinen. Prüfe im Assistenten-Editor, ob
 das Feld „Fach" gesetzt ist.
 
 **Der Abschnitt „Nachschlagen" zeigt bei mir mehr/weniger als bei anderen.**

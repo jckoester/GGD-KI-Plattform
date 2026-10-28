@@ -156,7 +156,7 @@
     Zugangstoken
 </h2>
 <p class="text-sm mb-3 text-light-tx-2 dark:text-dark-tx-2">
-    Für Programme außerhalb des Browsers, die auf Ihre Unterrichtsplanung oder Ihre
+    Für Programme außerhalb des Browsers, die auf deine Unterrichtsplanung oder deine
     Bausteine zugreifen sollen. Ein Token kann nicht chatten und nichts verwalten.
 </p>
 
@@ -194,7 +194,7 @@
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Lädt…</p>
 {:else}
     {#if tokens.length === 0}
-        <InfoBanner message="Sie haben noch keine Zugangstoken angelegt." />
+        <InfoBanner message="Du hast noch keine Zugangstoken angelegt." />
     {:else}
         <ul class="mb-4 flex flex-col gap-2">
             {#each tokens as eintrag (eintrag.id)}
@@ -277,8 +277,8 @@
             {#if frischNoetig}
                 <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3 text-sm text-light-tx dark:text-dark-tx">
                     <p class="mb-2">
-                        Zum Schutz Ihres Kontos lassen sich Token nur in den ersten 15 Minuten
-                        nach der Anmeldung anlegen. Ihre Eingaben bleiben erhalten.
+                        Zum Schutz deines Kontos lassen sich Token nur in den ersten 15 Minuten
+                        nach der Anmeldung anlegen. Deine Eingaben bleiben erhalten.
                     </p>
                     <button
                         class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-white"

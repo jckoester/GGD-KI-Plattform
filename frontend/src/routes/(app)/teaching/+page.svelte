@@ -206,8 +206,8 @@
             Unterricht
         </h1>
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-            Ihre Unterrichtsgruppen, Ihr Kürzel im Stundenplan und der Abgleich — die
-            Einstellungen, die Sie meist zu Schuljahresbeginn einmal treffen.
+            Deine Unterrichtsgruppen, dein Kürzel im Stundenplan und der Abgleich — die
+            Einstellungen, die du meist zu Schuljahresbeginn einmal treffen.
         </p>
     </div>
 
@@ -242,7 +242,7 @@
             for="webuntis-kuerzel"
             class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
         >
-            Ihr Kürzel im Stundenplan
+            Dein Kürzel im Stundenplan
         </label>
         <select
             id="webuntis-kuerzel"
@@ -260,10 +260,10 @@
         </select>
 
         <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
-            Ihr Kürzel wird ausschließlich verwendet, um Ihren Stundenplan abzurufen
+            Dein Kürzel wird ausschließlich verwendet, um deinen Stundenplan abzurufen
             (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
             KI-Modelle übermittelt und erscheint in keinem Chat, keinem
-            Assistenten-Kontext und keinem Wissensknoten. Sie können es jederzeit
+            Assistenten-Kontext und keinem Wissensknoten. Du kannst es jederzeit
             entfernen; dann entfällt die Stundenplan-Übernahme.
         </p>
 

@@ -6,14 +6,15 @@
 - nicht weggeklickt;
 - nicht älter als das eigene Konto (F7.1) — wer neu dazukommt, wird nicht mit alten
   Neuigkeiten begrüßt;
-- nicht abgelaufen (`bis`);
+- nicht abgelaufen: `bis`, sonst `LAUFZEIT` Tage ab `datum` (0.25) — ohne Vorgabe blieb ein
+  Hinweis für immer stehen;
 - der `eintrag` liegt in der eigenen Darstellungsstufe (F7.2). Kennt die Konfiguration der
   Schule den Eintrag gar nicht, erscheint der Hinweis trotzdem: Lieber einer zu viel als ein
   verschluckter.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from app.ui.levels import BEKANNTE_EINTRAEGE, UiLevels
 # Neben dem Modul, nicht über die Wurzel gerechnet (`test_container_pfade.py`).
 DATEI = Path(__file__).with_name("neuigkeiten.yaml")
 ROLLEN = frozenset({"student", "teacher", "admin"})
+LAUFZEIT = timedelta(days=42)
 
 
 class Neuigkeit(BaseModel):
@@ -102,7 +104,7 @@ def sichtbar(
             continue
         if konto_seit is not None and n.datum < konto_seit.date():
             continue
-        if n.bis is not None and n.bis < heute:
+        if (n.bis if n.bis is not None else n.datum + LAUFZEIT) < heute:
             continue
         if n.eintrag and erreichbar is not None and n.eintrag in bekannt and n.eintrag not in erreichbar:
             continue

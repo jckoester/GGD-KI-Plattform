@@ -1659,7 +1659,7 @@
                 {@const antwort = messages.slice(bearbeitung + 1).find((m) => m.role === "assistant")}
                 <div class="mb-2 space-y-1">
                     <div class="flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
-                        <span>Sie bearbeiten Ihre letzte Nachricht — Senden ersetzt sie samt Antwort.</span>
+                        <span>Du bearbeitest deine letzte Nachricht — Senden ersetzt sie samt Antwort.</span>
                         <button class="underline hover:text-light-bl dark:hover:text-dark-bl"
                                 onclick={bearbeitenAbbrechen}>Abbrechen</button>
                     </div>
@@ -1667,7 +1667,7 @@
                         <WarningBanner message={wirkungsHinweis(antwort)} />
                     {/if}
                     {#if hatteAnhaenge(messages[bearbeitung])}
-                        <InfoBanner message="Die ursprüngliche Nachricht hatte Anhänge. Fügen Sie sie bitte neu hinzu, wenn sie wieder dabei sein sollen." />
+                        <InfoBanner message="Die ursprüngliche Nachricht hatte Anhänge. Füg sie bitte neu hinzu, wenn sie wieder dabei sein sollen." />
                     {/if}
                 </div>
             {/if}

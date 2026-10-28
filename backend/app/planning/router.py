@@ -499,7 +499,7 @@ async def update_slot(
             stunde = f", {belegt.start_period}. Stunde" if belegt.start_period else ""
             raise HTTPException(status_code=409, detail=(
                 f"Dieser Stundenentwurf hängt schon am {belegt.date:%d.%m.%Y}{stunde}. "
-                "Lösen Sie ihn dort zuerst oder verschieben Sie die Stunde."))
+                "Löse ihn dort zuerst oder verschieb die Stunde."))
 
     changes_assignment = bool(_SNAPSHOT_ASSIGNMENT_FIELDS & update_data.keys())
     if changes_assignment:
@@ -784,7 +784,7 @@ async def delete_slot(
         raise HTTPException(
             status_code=409,
             detail=(
-                "Diese Stunde trägt Inhalt. Verschieben Sie ihn zuerst auf einen "
+                "Diese Stunde trägt Inhalt. Verschieb ihn zuerst auf einen "
                 "anderen Termin."
             ),
         )
@@ -793,7 +793,7 @@ async def delete_slot(
             status_code=409,
             detail=(
                 "Diese Stunde stammt aus dem Wochenmuster und entsteht beim nächsten "
-                "Erzeugen wieder. Ändern Sie das Wochenmuster der Gruppe."
+                "Erzeugen wieder. Ändere das Wochenmuster der Gruppe."
             ),
         )
 

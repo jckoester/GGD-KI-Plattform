@@ -1,6 +1,6 @@
 ---
-# MUSTERDATEI für einen Stoffsteckbrief. Ändern Sie Titel und Inhalt, bevor Sie sie
-# einspielen.
+# MUSTERDATEI für einen Stoffsteckbrief. Ändere Titel und Inhalt, bevor du sie
+# einspielst.
 knotentyp: stoffsteckbrief
 titel: Wasser
 bevorzugter_begriff: Wasser
@@ -17,7 +17,7 @@ plural: Wässer
 formel: '\ce{H2O}'
 smiles: 'O'
 
-# Ein Wikilink auf die unterste Stufe Ihrer Stoffeinteilung.
+# Ein Wikilink auf die unterste Stufe deiner Stoffeinteilung.
 # stoffklasse: "[[Molekülsubstanz]]"
 
 # Feste Schlüssel; „—" heißt „trifft nicht zu".

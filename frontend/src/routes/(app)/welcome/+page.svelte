@@ -3,7 +3,7 @@
     import { MessageSquare } from 'lucide-svelte'
     import { user } from '$lib/stores/user.js'
     import { getAssistants, getMeinTag, getMeinTagSchueler, getNeuigkeiten } from '$lib/api.js'
-    import { schliessen } from '$lib/neuigkeiten.js'
+    import { alleSchliessen, aufteilen, schliessen } from '$lib/neuigkeiten.js'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
     import {
         KEIN_NAECHSTER,
@@ -30,6 +30,10 @@
             .then((d) => (neuigkeiten = d))
             .catch(() => {})
     })
+    // Höchstens zwei offen, der Rest auf Wunsch (0.25).
+    let weitereOffen = $state(false)
+    const hinweise = $derived(aufteilen(neuigkeiten))
+    const angezeigt = $derived(weitereOffen ? neuigkeiten : hinweise.offen)
     const lage = $derived({
         hatGruppen: tag?.hat_gruppen ?? false,
         hatPlanung: tag?.hat_planung ?? false,
@@ -118,14 +122,39 @@
 
         <!-- Hinweise auf Neuerungen -->
         {#if kacheln.neuigkeiten}
-            {#each neuigkeiten as n (n.id)}
-                <InfoBanner
-                    title={n.titel}
-                    message={n.text}
-                    href={n.link}
-                    onclose={async () => (neuigkeiten = await schliessen(neuigkeiten, n.id))}
-                />
-            {/each}
+            <section aria-label="Neuerungen">
+                {#each angezeigt as n (n.id)}
+                    <InfoBanner
+                        title={n.titel}
+                        message={n.text}
+                        href={n.link}
+                        onclose={async () => (neuigkeiten = await schliessen(neuigkeiten, n.id))}
+                    />
+                {/each}
+                {#if neuigkeiten.length > 1}
+                    <div class="flex justify-between text-sm text-light-tx-2 dark:text-dark-tx-2">
+                        {#if hinweise.weitere.length > 0}
+                            <button
+                                onclick={() => (weitereOffen = !weitereOffen)}
+                                aria-expanded={weitereOffen}
+                                class="hover:underline"
+                            >
+                                {weitereOffen
+                                    ? "Weniger anzeigen"
+                                    : `Weitere Neuerungen (${hinweise.weitere.length})`}
+                            </button>
+                        {:else}
+                            <span></span>
+                        {/if}
+                        <button
+                            onclick={async () => (neuigkeiten = await alleSchliessen(neuigkeiten))}
+                            class="hover:underline"
+                        >
+                            Alle schließen
+                        </button>
+                    </div>
+                {/if}
+            </section>
         {/if}
 
         <!-- Begrüßung -->

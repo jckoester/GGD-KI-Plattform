@@ -188,7 +188,7 @@
 
       <div class="mb-4">
         <WarningBanner
-          message="Nur-Lese-Einsicht im Vier-Augen-Prinzip. Jeder Zugriff und Export wird protokolliert. Behandeln Sie die Inhalte streng vertraulich."
+          message="Nur-Lese-Einsicht im Vier-Augen-Prinzip. Jeder Zugriff und Export wird protokolliert. Behandle die Inhalte streng vertraulich."
         />
       </div>
 

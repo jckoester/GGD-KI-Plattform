@@ -240,7 +240,7 @@ async def angebot_zuordnen(
         raise HTTPException(404, str(exc)) from None
     except PermissionError:
         await db.rollback()
-        raise HTTPException(403, "Sie sind keine Lehrkraft dieser Gruppe.") from None
+        raise HTTPException(403, "Du bist keine Lehrkraft dieser Gruppe.") from None
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(409, str(exc)) from None

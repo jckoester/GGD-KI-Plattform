@@ -43,14 +43,14 @@ export function darfZurueckgenommenWerden(slot) {
 export function ruecknahmeWarnung(reichweite) {
     if (reichweite !== "tag") return null
     return "Das nimmt alle selbst eingetragenen Ausfälle dieses Tages zurück — auch "
-        + "solche, die Sie einzeln für eine Stunde gesetzt haben. Ausfälle aus dem "
+        + "solche, die du einzeln für eine Stunde gesetzt haben. Ausfälle aus dem "
         + "Stundenplan bleiben."
 }
 
 /** Die Frage vor dem Eintragen — sie nennt die Reichweite beim Namen. */
 export function eintragFrage(reichweite, gruppenname) {
     return reichweite === "tag"
-        ? "Alle Ihre Stunden dieses Tages als Ausfall markieren?"
+        ? "Alle deine Stunden dieses Tages als Ausfall markieren?"
         : `Alle Stunden von ${gruppenname || "dieser Gruppe"} an diesem Tag als Ausfall markieren?`
 }
 

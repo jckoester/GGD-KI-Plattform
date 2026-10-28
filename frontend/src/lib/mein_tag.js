@@ -24,10 +24,10 @@ const KENNZEICHEN = {
  */
 export function leerSatz(tag, lage = {}) {
     if (!lage.hatGruppen) {
-        return "Noch keine Unterrichtsgruppen. Legen Sie eine an, dann steht hier Ihr Tag."
+        return "Noch keine Unterrichtsgruppen. Leg eine an, dann steht hier dein Tag."
     }
     if (!lage.hatPlanung) {
-        return "Für Ihre Gruppen sind noch keine Stunden angelegt — dafür braucht es ein Wochenmuster."
+        return "Für deine Gruppen sind noch keine Stunden angelegt — dafür braucht es ein Wochenmuster."
     }
     switch (tag?.grund) {
         case "ferien":
@@ -269,8 +269,8 @@ export function offeneEntscheidungen(vorschlaege = 0, angebote = 0) {
     const n = (vorschlaege || 0) + (angebote || 0)
     if (!n) return null
     return n === 1
-        ? "1 Gruppe wartet auf Ihre Entscheidung"
-        : `${n} Gruppen warten auf Ihre Entscheidung`
+        ? "1 Gruppe wartet auf deine Entscheidung"
+        : `${n} Gruppen warten auf deine Entscheidung`
 }
 
 function alsTagMonat(wert) {

@@ -131,7 +131,7 @@
             goto(`/knowledge/curriculum/${node.id}/edit`)
         } catch (e) {
             if (e.status === 403) {
-                saveError = 'Keine Berechtigung — Sie müssen Mitglied der Fachschaft sein.'
+                saveError = 'Keine Berechtigung — du musst Mitglied der Fachschaft sein.'
             } else if (e.status === 422) {
                 saveError = e.message || 'Für diesen Bildungsplan wurde noch kein Plan importiert.'
             } else {
@@ -155,7 +155,7 @@
             Neues Curriculum anlegen
         </h1>
         <p class="mt-1 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Wählen Sie den Bildungsplan und die Jahrgangsstufe. Das Curriculum wird als leere Vorlage angelegt.
+            Wähle den Bildungsplan und die Jahrgangsstufe. Das Curriculum wird als leere Vorlage angelegt.
         </p>
     </div>
 

@@ -352,7 +352,7 @@
                 </p>
                 {#if fachschaftFehlt && $myFachschaften.length === 0}
                     <p class="text-xs text-light-re dark:text-dark-re mt-1">
-                        Sie gehören keiner Fachschaft an; dieser Eintrag lässt sich
+                        Du gehörst keiner Fachschaft an; dieser Eintrag lässt sich
                         deshalb nicht anlegen.
                     </p>
                 {/if}

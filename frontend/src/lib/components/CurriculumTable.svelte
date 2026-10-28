@@ -436,7 +436,7 @@
                 Löschen bestätigen
             </h3>
             <p class="text-light-tx-2 dark:text-dark-tx-2 mb-4">
-                Möchten Sie "{deleteConfirm.title}" wirklich löschen? Dieser
+                Möchtest du "{deleteConfirm.title}" wirklich löschen? Dieser
                 Vorgang kann nicht rückgängig gemacht werden.
             </p>
             <div class="flex gap-3 justify-end">

@@ -5,6 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.25.0] – 2026-10-28
+
+Die Plattform duzt durchgehend; die Startseite zeigt weniger Hinweise auf einmal. Keine Migration.
+
+### Geändert
+
+- **Anrede „du“** in Oberfläche, Fehlermeldungen, Hilfe, Neuigkeiten und Fachbegriff-Vorlagen. `docs/admin` und
+  `docs/dev` bleiben beim „Sie“.
+- **Neuigkeiten auf der Startseite:** höchstens zwei offen, der Rest unter „Weitere Neuerungen“; „Alle schließen“.
+  Ein Hinweis ohne `bis` endet 42 Tage nach seinem Datum.
+
+### Nach dem Update
+
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+
 ## [0.24.0] – 2026-10-28
 
 Der Chat schlägt Schüler:innen einen passenden Assistenten vor. Eine Migration (0092).

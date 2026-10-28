@@ -325,9 +325,9 @@
                           {#if l.status === ZUR_GRUPPE}
                             dieser Gruppe zugeordnet
                           {:else if l.status === OHNE_GRUPPE}
-                            keiner Ihrer Gruppen zugeordnet
+                            keiner deiner Gruppen zugeordnet
                           {:else}
-                            einer anderen Ihrer Gruppen zugeordnet
+                            einer anderen deiner Gruppen zugeordnet
                           {/if}
                         </li>
                       {/each}

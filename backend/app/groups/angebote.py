@@ -211,7 +211,7 @@ async def lege_an(db: AsyncSession, angebot_id: UUID, pseudonym: str) -> int:
     if offer.subject_id is None:
         raise FachFehlt(
             f"Zu „{offer.name}“ lässt sich kein Fach bestimmen. "
-            "Legen Sie die Gruppe über „Klasse und Fach“ an oder ordnen Sie das Angebot "
+            "Leg die Gruppe über „Klasse und Fach“ an oder ordne das Angebot "
             "einer vorhandenen Gruppe zu."
         )
     basis = f"sso-{offer.sso_group_id.replace('.', '-').lower()}"

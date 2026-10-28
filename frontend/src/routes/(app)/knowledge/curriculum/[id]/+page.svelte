@@ -140,7 +140,7 @@
         } catch (e) {
             deleteError =
                 e.status === 403
-                    ? "Keine Berechtigung — Sie müssen Mitglied der Fachschaft sein."
+                    ? "Keine Berechtigung — du musst Mitglied der Fachschaft sein."
                     : e.message || "Curriculum konnte nicht gelöscht werden.";
             deleting = false;
         }
@@ -311,7 +311,7 @@
                 Curriculum löschen
             </h3>
             <p class="text-light-tx-2 dark:text-dark-tx-2 mb-4">
-                Möchten Sie „{curriculum.title}" wirklich löschen? Alle
+                Möchtest du „{curriculum.title}" wirklich löschen? Alle
                 enthaltenen Kapitel und Lernsequenzen werden mitgelöscht. Dieser
                 Vorgang kann nicht rückgängig gemacht werden.
             </p>

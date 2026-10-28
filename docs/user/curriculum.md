@@ -7,10 +7,10 @@ welcher Reihenfolge, mit welchem Zeitansatz und mit welchen Schwerpunkten die Ko
 eines Fachs unterrichtet werden.
 
 > **Bildungsplan ≠ Curriculum.** Der **Bildungsplan** ist die Landesvorgabe — er steht fest
-> und lässt sich hier nicht ändern. Das **Curriculum** ist Ihre Fachschaftsarbeit darauf:
+> und lässt sich hier nicht ändern. Das **Curriculum** ist eure Fachschaftsarbeit darauf:
 > Kapitel, Lernsequenzen, Konkretisierungen, Material.
 
-Sie erreichen Curricula über **Wissen → Curricula** oder direkt von der Fachseite aus.
+Du erreichst Curricula über **Wissen → Curricula** oder direkt von der Fachseite aus.
 
 ---
 
@@ -23,7 +23,7 @@ Ein Curriculum gehört der **Fachschaft**, nicht einer einzelnen Person.
 | **Ansehen** | alle Lehrkräfte |
 | **Bearbeiten** | Mitglieder der Fachschaft, dazu Admins |
 
-Wenn Sie ein Curriculum nur lesen können, obwohl es Ihr Fach ist, fehlt Ihnen
+Wenn du ein Curriculum nur lesen kannst, obwohl es dein Fach ist, fehlt dir
 wahrscheinlich die Fachschaftsmitgliedschaft — das klärt die Administration.
 
 ---
@@ -36,11 +36,11 @@ wahrscheinlich die Fachschaftsmitgliedschaft — das klärt die Administration.
    oder die überarbeitete Fassung V2).
 2. **Jahrgangsstufe oder Stufenband** eintragen — freie Eingabe: `7`, `7/8`, `5–6`.
 
-Den Rest bauen Sie im Editor auf.
+Den Rest baust du im Editor auf.
 
-> Erscheint Ihr Fach nicht in der Auswahl, ist sein Bildungsplan in dieser Installation
+> Erscheint dein Fach nicht in der Auswahl, ist sein Bildungsplan in dieser Installation
 > noch nicht eingelesen. Das ist eine Aufgabe der Administration, keine Einstellung, die
-> Sie ändern können.
+> du ändern kannst.
 
 ---
 
@@ -57,20 +57,20 @@ Curriculum  (Fach + Jahrgangsband)
 über den Pfeil im Kopf **einklappen** — bei langen Curricula die schnellste Art, den
 Überblick zu behalten.
 
-Die **Stundenansätze** addiert die Ansicht mit; oben sehen Sie die Gesamtsumme. So merken
-Sie früh, wenn die Planung nicht ins Schuljahr passt.
+Die **Stundenansätze** addiert die Ansicht mit; oben siehst du die Gesamtsumme. So merkst
+du früh, wenn die Planung nicht ins Schuljahr passt.
 
 ---
 
 ## Kompetenzen verknüpfen
 
-In jedem Eintrag verknüpfen Sie Kompetenzen des Bildungsplans:
+In jedem Eintrag verknüpfst du Kompetenzen des Bildungsplans:
 
 - **IK** — inhaltsbezogene Kompetenzen (was inhaltlich behandelt wird)
 - **PK** — prozessbezogene Kompetenzen (welche Arbeitsweisen geübt werden)
 
-Beide Felder durchsuchen den Bildungsplan **Ihres Fachs in der passenden Fassung** — Sie
-müssen sich also nicht darum kümmern, ob eine Kompetenz zur richtigen Edition gehört.
+Beide Felder durchsuchen den Bildungsplan **deines Fachs in der passenden Fassung** — du
+musst dich also nicht darum kümmern, ob eine Kompetenz zur richtigen Edition gehört.
 
 **„Partiell" ankreuzen**, wenn eine Kompetenz an dieser Stelle nur teilweise bedient wird.
 Das ist kein Schönheitsfehler, sondern die ehrliche Auskunft: Dieselbe Kompetenz taucht
@@ -78,7 +78,7 @@ dann an mehreren Stellen auf, und keine behauptet, sie allein abzudecken.
 
 ### Hinweise und Leitperspektiven
 
-Im Feld **Hinweise** schreiben Sie Freitext. Mit `@` verweisen Sie zusätzlich auf
+Im Feld **Hinweise** schreibst du Freitext. Mit `@` verweist du zusätzlich auf
 **Leitperspektiven** und ihre Aspekte, mit `#` auf Kompetenzen **anderer Fächer** — das ist
 der Weg, fächerverbindende Bezüge sichtbar zu machen.
 
@@ -95,7 +95,7 @@ PK-Felder. Zwei Wege für dieselbe Verknüpfung wären nur verwirrend.
 
 ## Titel und Jahrgangsband ändern
 
-Beides ändern Sie im Bearbeitungsmodus direkt im Kopf: den **Titel** durch Klick darauf,
+Beides änderst du im Bearbeitungsmodus direkt im Kopf: den **Titel** durch Klick darauf,
 das **Jahrgangsband** im Feld daneben.
 
 Die **Bildungsplan-Fassung** steht dort nur zur Anzeige. Sie lässt sich nicht frei
@@ -108,16 +108,16 @@ nächsten Abschnitt.
 ## Auf eine neue Bildungsplan-Fassung wechseln
 
 Erscheint eine überarbeitete Fassung des Bildungsplans, wandert sie **stufenweise** ein —
-nicht in allen Jahrgängen gleichzeitig. Ihr Curriculum wird deshalb **nicht** automatisch
+nicht in allen Jahrgängen gleichzeitig. Dein Curriculum wird deshalb **nicht** automatisch
 umgestellt.
 
-In der Ansicht gibt es dafür **„Bildungsplan aktualisieren"**. Sie bekommen zuerst eine
+In der Ansicht gibt es dafür **„Bildungsplan aktualisieren"**. Du bekommst zuerst eine
 **Vorschau**, erst danach passiert etwas. Drei mögliche Ergebnisse:
 
 | Ergebnis | Bedeutung |
 |---|---|
 | **Keine Aktualisierung nötig** | Das Curriculum liegt schon auf der aktuellen Fassung. |
-| **Aktualisieren** | Die neue Fassung gilt für Ihr ganzes Jahrgangsband — das Curriculum wird umgestellt. |
+| **Aktualisieren** | Die neue Fassung gilt für dein ganzes Jahrgangsband — das Curriculum wird umgestellt. |
 | **Kopie anlegen** | Die neue Fassung gilt erst für einen Teil des Bandes. Es entsteht eine **Kopie** auf der neuen Fassung; das Original bleibt für die Jahrgänge, die noch nicht gewechselt haben. |
 
 **Was dabei mit den Kompetenzen geschieht:**
@@ -126,14 +126,14 @@ In der Ansicht gibt es dafür **„Bildungsplan aktualisieren"**. Sie bekommen z
 - Nicht mehr vorhanden oder inhaltlich geändert → bleibt stehen und wird **durchgestrichen
   mit ⚠ markiert**.
 
-Die Markierung ist eine Bitte um Prüfung, kein Fehler: Sie müssen entscheiden, wodurch die
+Die Markierung ist eine Bitte um Prüfung, kein Fehler: Du musst entscheiden, wodurch die
 Kompetenz zu ersetzen ist. Nichts wird stillschweigend gelöscht.
 
 ---
 
 ## Exportieren
 
-Über **Export** erhalten Sie das Curriculum als:
+Über **Export** erhältst du das Curriculum als:
 
 - **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte
 - **YAML** — die maschinenlesbare Fassung
@@ -148,8 +148,8 @@ eine Übungsumgebung zu übertragen. Das erledigt die Administration
 
 **Ich sehe eine Kompetenz durchgestrichen mit ⚠. Habe ich etwas falsch gemacht?**
 Nein. Das Curriculum wurde auf eine neue Bildungsplan-Fassung aktualisiert, und diese
-Kompetenz gibt es dort nicht mehr oder sie wurde geändert. Ersetzen Sie sie, wenn Sie
-Gelegenheit haben.
+Kompetenz gibt es dort nicht mehr oder sie wurde geändert. Ersetze sie, wenn du
+Gelegenheit hast.
 
 **Kann ich ein Curriculum kopieren, statt es neu anzulegen?**
 Beim Fassungswechsel entsteht in einem Fall automatisch eine Kopie (siehe oben). Ein freies

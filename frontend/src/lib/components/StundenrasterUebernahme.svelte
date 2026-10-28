@@ -140,7 +140,7 @@
     Stundenraster aus dem Stundenplan
   </h2>
   <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
-    Liest vier Wochen Ihres Stundenplans und legt für jede Gruppe das Wochenmuster samt
+    Liest vier Wochen deines Stundenplans und legt für jede Gruppe das Wochenmuster samt
     Stunden an. Dasselbe geht einzeln im Jahresplan jeder Gruppe.
   </p>
 
@@ -161,7 +161,7 @@
     <InfoBanner
       message={anlegbar.length
         ? "Im Stundenplan stehen Lerngruppen, für die es hier noch keine Unterrichtsgruppe gibt — unten anlegen."
-        : "Im Stundenplan wurde nichts gefunden, das zu einer Ihrer Unterrichtsgruppen passt."}
+        : "Im Stundenplan wurde nichts gefunden, das zu einer deiner Unterrichtsgruppen passt."}
     />
   {:else}
     <ul class="mb-4 flex flex-col gap-2">
@@ -237,8 +237,8 @@
         Noch ohne Unterrichtsgruppe ({anlegbar.length})
       </h4>
       <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2">
-        Diese Lerngruppen stehen in Ihrem Stundenplan, aber nicht auf der Plattform.
-        Angelegt werden Sie darin zur Lehrkraft.
+        Diese Lerngruppen stehen in deinem Stundenplan, aber nicht auf der Plattform.
+        Legst du sie an, bist du darin die Lehrkraft.
       </p>
 
       {#if anlegeFehler}<ErrorBanner message={anlegeFehler} />{/if}

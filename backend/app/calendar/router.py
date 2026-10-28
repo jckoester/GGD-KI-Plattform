@@ -465,7 +465,7 @@ async def gruppe_aus_stundenplan_anlegen(
         # dieser Lehrkraft. Der Unterschied ist eine Rechte-, keine Existenzfrage.
         raise HTTPException(
             403,
-            "Diese Lerngruppe steht nicht als fehlend in Ihrem Stundenplan. "
+            "Diese Lerngruppe steht nicht als fehlend in deinem Stundenplan. "
             "Vielleicht ist die Gruppe inzwischen angelegt — bitte Liste neu laden.",
         )
     if vorschlag.subject_id != body.subject_id:

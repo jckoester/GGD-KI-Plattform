@@ -2,13 +2,13 @@
 
 Der Lader weist kaputte Dateien ab; `sichtbar` entscheidet an einer Stelle, wer was sieht.
 """
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 import yaml
 
-from app.neuigkeiten.quelle import DATEI, Neuigkeit, lade, sichtbar
+from app.neuigkeiten.quelle import DATEI, LAUFZEIT, Neuigkeit, lade, sichtbar
 from app.ui.levels import UiLevels
 
 BEISPIEL = Path(__file__).resolve().parents[3] / "config" / "ui_levels.example.yaml"
@@ -96,6 +96,19 @@ def test_abgelaufen():
     assert _sicht(_n(bis=HEUTE)) == ["x"]
 
 
+def test_ohne_bis_endet_der_hinweis_nach_der_laufzeit():
+    start = date(2026, 10, 17)
+    assert _sicht(_n(datum=start), heute=start + LAUFZEIT) == ["x"]                # letzter Tag
+    assert _sicht(_n(datum=start), heute=start + LAUFZEIT + timedelta(days=1)) == []
+
+
+def test_bis_geht_der_laufzeit_vor():
+    start = date(2026, 10, 17)
+    spaeter = start + LAUFZEIT + timedelta(days=10)
+    assert _sicht(_n(datum=start, bis=spaeter), heute=spaeter) == ["x"]
+    assert _sicht(_n(datum=start, bis=start), heute=start + timedelta(days=1)) == []
+
+
 def test_eintrag_ueber_der_eigenen_stufe():
     """`planner` liegt bei Lehrkräften auf Stufe 3 (Beispielkonfiguration)."""
     assert _sicht(_n(eintrag="planner"), stufe=2) == []
@@ -109,6 +122,6 @@ def test_eintrag_ohne_platz_in_der_konfiguration_zeigt_trotzdem():
 
 
 def test_neueste_zuerst():
-    alt, neu = _n(id="alt", datum=date(2026, 9, 1)), _n(id="neu", datum=date(2026, 10, 1))
+    alt, neu = _n(id="alt", datum=date(2026, 9, 20)), _n(id="neu", datum=date(2026, 10, 1))
     assert [n.id for n in sichtbar([alt, neu], rollen=["teacher"], gelesen=set(), konto_seit=None,
                                    stufe=None, stufen=STUFEN, heute=HEUTE)] == ["neu", "alt"]

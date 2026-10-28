@@ -686,8 +686,8 @@ def _check_assistant_update_permission(assistant: Assistant, current_user: JwtPa
             raise HTTPException(
                 status_code=409,
                 detail="Schulweite Assistenten lassen sich nur im Entwurf bearbeiten. "
-                       "Ziehen Sie die Einreichung zurueck oder beantragen Sie die "
-                       "Loeschung.",
+                       "Zieh die Einreichung zurück oder beantrage die "
+                       "Löschung.",
             )
 
 
@@ -719,7 +719,7 @@ def _check_assistant_delete_permission(assistant: Assistant, current_user: JwtPa
             raise HTTPException(
                 status_code=409,
                 detail="Ein freigegebener schulweiter Assistent wird nicht selbst "
-                       "geloescht - beantragen Sie die Loeschung.",
+                       "gelöscht - beantrage die Löschung.",
             )
 
 
@@ -1238,8 +1238,8 @@ async def request_deletion(
     if assistant.scope not in SCHOOLWIDE_SCOPES:
         raise HTTPException(
             status_code=409,
-            detail="Diesen Assistenten koennen Sie selbst loeschen - ein Antrag ist "
-                   "nicht noetig.",
+            detail="Diesen Assistenten kannst du selbst löschen - ein Antrag ist "
+                   "nicht nötig.",
         )
     if assistant.status in ("draft", "pending_review"):
         raise HTTPException(

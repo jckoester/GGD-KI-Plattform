@@ -912,7 +912,7 @@ async def update_node(
                 status_code=422,
                 detail=(
                     "Die Bildungsplan-Edition eines Curriculums lässt sich hier nicht "
-                    "ändern. Nutzen Sie „Auf neue Edition aktualisieren“ (relink)."
+                    "ändern. Nutze „Auf neue Edition aktualisieren“ (relink)."
                 ),
             )
 
@@ -1955,7 +1955,7 @@ async def create_curriculum_node(
         if not await is_subject_department_member(db, subject_id, user.sub):
             raise HTTPException(
                 status_code=403,
-                detail="Keine Berechtigung - Sie müssen Mitglied der Fachschaft sein"
+                detail="Keine Berechtigung - du musst Mitglied der Fachschaft sein"
             )
 
     # Idempotenz: bestehenden aktiven Knoten zurückliefern
@@ -2392,7 +2392,7 @@ async def _fach_mit_schreibrecht(
             status_code=403,
             detail=(
                 f"Dafür braucht es die Fachschaftsgruppe von {treffer.name}. Die "
-                "Plattform übernimmt sie aus dem Schulkonto; fehlt sie oder sind Sie "
+                "Plattform übernimmt sie aus dem Schulkonto; fehlt sie oder bist du "
                 "nicht darin, hilft die Administration weiter."
             ),
         )

@@ -144,7 +144,7 @@
                     class="w-full p-3 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
                            bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
                            font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"
-                    placeholder="Geben Sie den Inhalt im Markdown-Format ein..."
+                    placeholder="Gib den Inhalt im Markdown-Format ein..."
 ></textarea>
             </div>
 
