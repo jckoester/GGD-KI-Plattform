@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.24.0] – 2026-10-28
+
+Der Chat schlägt Schüler:innen einen passenden Assistenten vor. Eine Migration (0092).
+
 ### Neu
 
 - **Assistenten-Vorschlag im Chat:** Schreibt eine Schüler:in eine Aufgabe in den normalen Chat, für die es einen
@@ -13,6 +17,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Konversation, bis gewechselt wird. Einstellung `VORSCHLAG_MODEL` (Alias `system-vorschlag`, über den
   Systemschlüssel); Migration 0092.
 - **Assistenten-Editor:** „Satz im Vorschlag“ und, für Admins, „Darunter anbieten“ (Rückfall-Assistenten).
+
+### Nach dem Update
+
+- `alembic upgrade head` (0092) — wie im regulären Update.
+- **Klassifikator einrichten**, sonst bleibt der Vorschlag aus:
+  1. In `infra/litellm_config.yaml` den Eintrag `system-vorschlag` ergänzen — Vorlage in
+     `infra/litellm_config.ionos.example.yaml` (IONOS Mistral-Small-24B) bzw. `infra/litellm_config.example.yaml`.
+     Ein schnelles Modell ohne Denkphase; Denkmodelle sind zu langsam. Dann `docker compose restart litellm`.
+  2. In der `.env` `VORSCHLAG_MODEL=system-vorschlag` setzen.
+- Backend **und** Frontend neu bauen und starten (`docker compose up -d` liest die `.env` neu); offene Browser-Tabs
+  einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.23.0] – 2026-10-27
 

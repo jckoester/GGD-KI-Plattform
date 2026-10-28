@@ -128,3 +128,26 @@
     Definition im Bildungsplan, in der Fassung ihrer Klasse: Fehlt bei „erläutern“ das Beispiel
     oder bei „bewerten“ der Wertmaßstab, fragt er genau danach — ohne es vorzusagen.
   link: /help/assistenten
+
+- id: "0.24-vorschlag-schueler"
+  version: "0.24.0"
+  datum: 2026-10-28
+  rollen: [student]
+  titel: "Der Chat schlägt passende Assistenten vor"
+  text: >-
+    Schreiben Sie eine Aufgabe in den Chat, für die es einen Assistenten gibt, erscheint unter der
+    Antwort ein Vorschlag. Wählen Sie ihn, beantwortet der Assistent Ihre Nachricht noch einmal und
+    begleitet Sie Schritt für Schritt. Mit „Hier bleiben“ geht es einfach weiter.
+  link: /help/assistenten
+
+- id: "0.24-vorschlag-lehrkraefte"
+  version: "0.24.0"
+  datum: 2026-10-28
+  rollen: [teacher]
+  titel: "Assistenten-Vorschlag für Ihre Schüler:innen"
+  text: >-
+    Schreiben Schüler:innen eine Aufgabe in den normalen Chat, für die es einen Assistenten gibt,
+    bietet der Chat ihn unter der Antwort an — etwa den Assistenten für stöchiometrische
+    Berechnungen. Für eigene Assistenten legen Sie das im Editor unter „Vorschlag im Chat“ fest;
+    wie es aussieht, zeigt der Vorschaumodus.
+  link: /help/assistenten
