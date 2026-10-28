@@ -361,8 +361,9 @@ _SEARCH_CONTEXT_NODES_TOOL = {
 }
 
 
-#: Wie lange der Assistenten-Vorschlag nach dem Ende der Antwort noch fertig werden darf (C2, F5).
-VORSCHLAG_NACHLAUF = 2.0
+#: Wie lange der Assistenten-Vorschlag nach dem Ende der Antwort noch fertig werden darf (C2, F5;
+#: Jan 28.10.2026: Eingabe schon bei `message` frei, deshalb mehr als die geplanten 2 s).
+VORSCHLAG_NACHLAUF = 10.0
 
 
 def _vorschlag_moeglich(user: JwtPayload, ist_test: bool, stunde_id) -> bool:
@@ -1562,12 +1563,13 @@ async def _persist(
     cost_usd: Optional[float] = None,
     cost_status: Optional[str] = None,
     assistant_id: Optional[int] = None,
-    conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
+    conv_assistant_update: Optional[tuple[Optional[int], Optional[str]]] = None,
     skip_user_message: bool = False,
     generated_image_ids: Optional[list] = None,
     provider_model: Optional[str] = None,
     bausteine: Optional[list] = None,
     ersetze_ids: Optional[list[UUID]] = None,
+    ruheregel_leeren: bool = False,
     abgebrochen: bool = False,
     werkzeuge_mit_wirkung: Optional[list[str]] = None,
 ) -> Optional[UUID]:
@@ -1631,6 +1633,9 @@ async def _persist(
         new_asst_id, new_snapshot = conv_assistant_update
         update_values["assistant_id"] = new_asst_id
         update_values["system_prompt_snapshot"] = new_snapshot
+    # C2, F4: Ein Wechsel (oder Beenden) setzt die Ruheregel des Vorschlags zurück.
+    if ruheregel_leeren:
+        update_values["vorgeschlagen"] = []
 
     await db.execute(
         update(Conversation)
@@ -1921,10 +1926,11 @@ async def chat(
     title_prompt: str | None = None
     # Ruheregel des Assistenten-Vorschlags (C2, F4): in dieser Konversation schon angeboten.
     schon_vorgeschlagen: set[int] = set()
+    ruheregel_leeren = False
 
     # Für Assistentenwechsel mid-Chat
     active_assistant_id: Optional[int] = None
-    conv_assistant_update: Optional[tuple[int, Optional[str]]] = None
+    conv_assistant_update: Optional[tuple[Optional[int], Optional[str]]] = None
 
     if is_new:
         assistant: Optional[Assistant] = None
@@ -2063,6 +2069,21 @@ async def chat(
                 select(Assistant).where(Assistant.id == active_assistant_id)
             )
             active_assistant = asst_r.scalar_one_or_none()
+
+        # 2-1b: Assistent beenden (C2) — zurück zum Standard-Chat in derselben Konversation.
+        if request.assistent_beenden and existing.assistant_id is not None:
+            system_prompt_snapshot = None
+            active_assistant_id = None
+            active_assistant = None
+            conv_assistant_update = (None, None)
+            model_used = settings.chat_default_model
+
+        # C2, F4 (Verfeinerung, Jan 28.10.2026): Ein tatsächlicher Wechsel — aus dem Vorschlag
+        # oder von Hand — setzt die Ruheregel zurück. Sonst käme bei „Stöchiometrie →
+        # Reaktionsgleichung → Stöchiometrie" der erste Assistent nie wieder.
+        if conv_assistant_update is not None and conv_assistant_update[0] != existing.assistant_id:
+            schon_vorgeschlagen = set()
+            ruheregel_leeren = True
 
         # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
         if request.model_id:
@@ -2752,6 +2773,7 @@ async def chat(
                 generated_image_ids=list(_generated_image_ids),
                 bausteine=vereinige(kontext.bausteine, _werkzeug_bausteine),
                 ersetze_ids=ersetze_ids, werkzeuge_mit_wirkung=list(_wirkende_werkzeuge),
+                ruheregel_leeren=ruheregel_leeren,
                 offen=[response, *_extra_responses], client=client,
             )
             raise
@@ -2812,6 +2834,7 @@ async def chat(
                 provider_model=await anbietermodell(_deployment_id, model_used),
                 bausteine=_bausteine,
                 ersetze_ids=ersetze_ids,
+                ruheregel_leeren=ruheregel_leeren,
                 werkzeuge_mit_wirkung=_wirkende_werkzeuge,
             )
         except Exception:
@@ -2825,44 +2848,6 @@ async def chat(
                 gesucht=bool(_suchanfragen), modell=model_used,
             )
 
-        # Assistenten-Vorschlag (C2, F5): Die Antwort ist fertig — höchstens noch
-        # VORSCHLAG_NACHLAUF Sekunden warten, sonst entfällt er still. Erscheint er, zählt er für
-        # die Ruheregel (F4: beim Anzeigen).
-        _vorschlag, _vorschlag_debug = None, None
-        if _vorschlag_task is not None:
-            try:
-                _vorschlag = await asyncio.wait_for(_vorschlag_task, timeout=VORSCHLAG_NACHLAUF)
-                _vorschlag_debug = _vorschlag.debug if _vorschlag else {"optionen": []}
-            except asyncio.TimeoutError:
-                _vorschlag_debug = {"abgebrochen": "Zeitlimit"}
-            except Exception as fehler:          # wirft nie in die Antwort hinein
-                logger.warning("Assistenten-Vorschlag fehlgeschlagen: %s", type(fehler).__name__)
-                _vorschlag_debug = {"abgebrochen": type(fehler).__name__}
-        if _vorschlag is not None and _vorschlag.optionen:
-            _vorschlag_debug["optionen"] = [o.assistant_id for o in _vorschlag.optionen]
-            try:
-                await db.execute(
-                    update(Conversation).where(Conversation.id == conversation_id).values(
-                        vorgeschlagen=sorted(schon_vorgeschlagen | {o.assistant_id for o in _vorschlag.optionen})
-                    )
-                )
-                await db.commit()
-            except Exception:
-                logger.exception("Ruheregel nicht gespeichert (Konversation %s)", conversation_id)
-            yield "event: vorschlag\ndata: " + json.dumps({"optionen": [
-                {"assistant_id": o.assistant_id, "name": o.name, "text": o.text, "art": o.art}
-                for o in _vorschlag.optionen
-            ]}, ensure_ascii=False) + "\n\n"
-
-        _debug = _vorab_debug_ereignis(
-            kontext.angebot, _werkzeug_bausteine, _suchanfragen,
-            [b for b in kontext.bausteine if b.grund == "gruppe"],
-            _aufzaehlungen,
-            _operator,
-            _vorschlag_debug,
-        )
-        if _debug:
-            yield _debug
 
         if _nachricht_id is not None and _bausteine:
             # Aus der Datenbank, nicht aus `_bausteine`: Dieselbe Abfrage liefert die
@@ -2901,6 +2886,51 @@ async def chat(
         # beim Ereignis `fehler` ab und zeigt die Meldung.
         if _abbruch:
             yield f"event: fehler\ndata: {json.dumps({'detail': _abbruch})}\n\n"
+
+        # Assistenten-Vorschlag (C2, F5) — **nach** `message`: Die Oberfläche gibt die Eingabe
+        # dort frei (Jan, 28.10.2026), der Stream bleibt für einen späten Vorschlag offen. Der
+        # Klassifikator brauchte im Tagesverlauf 2–15 s; ein festes Fenster von 2 s nach der
+        # Antwort verlor ihn bei kurzen Antworten. Höchstens VORSCHLAG_NACHLAUF Sekunden, sonst
+        # entfällt er still. Erscheint er, zählt er für die Ruheregel (F4: beim Anzeigen).
+        # Nach einem Abbruch nicht — die Oberfläche zeigt dann einen Fehler.
+        _vorschlag, _vorschlag_debug = None, None
+        if _vorschlag_task is not None and _abbruch:
+            _vorschlag_task.cancel()
+            _vorschlag_debug = {"abgebrochen": "Antwort abgebrochen"}
+        elif _vorschlag_task is not None:
+            try:
+                _vorschlag = await asyncio.wait_for(_vorschlag_task, timeout=VORSCHLAG_NACHLAUF)
+                _vorschlag_debug = _vorschlag.debug if _vorschlag else {"optionen": []}
+            except asyncio.TimeoutError:
+                _vorschlag_debug = {"abgebrochen": "Zeitlimit"}
+            except Exception as fehler:          # wirft nie in die Antwort hinein
+                logger.warning("Assistenten-Vorschlag fehlgeschlagen: %s", type(fehler).__name__)
+                _vorschlag_debug = {"abgebrochen": type(fehler).__name__}
+        if _vorschlag is not None and _vorschlag.optionen:
+            _vorschlag_debug["optionen"] = [o.assistant_id for o in _vorschlag.optionen]
+            try:
+                await db.execute(
+                    update(Conversation).where(Conversation.id == conversation_id).values(
+                        vorgeschlagen=sorted(schon_vorgeschlagen | {o.assistant_id for o in _vorschlag.optionen})
+                    )
+                )
+                await db.commit()
+            except Exception:
+                logger.exception("Ruheregel nicht gespeichert (Konversation %s)", conversation_id)
+            yield "event: vorschlag\ndata: " + json.dumps({"optionen": [
+                {"assistant_id": o.assistant_id, "name": o.name, "text": o.text, "art": o.art}
+                for o in _vorschlag.optionen
+            ]}, ensure_ascii=False) + "\n\n"
+
+        _debug = _vorab_debug_ereignis(
+            kontext.angebot, _werkzeug_bausteine, _suchanfragen,
+            [b for b in kontext.bausteine if b.grund == "gruppe"],
+            _aufzaehlungen,
+            _operator,
+            _vorschlag_debug,
+        )
+        if _debug:
+            yield _debug
 
         yield "data: [DONE]\n\n"
 

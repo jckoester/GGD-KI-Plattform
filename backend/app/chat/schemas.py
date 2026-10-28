@@ -54,11 +54,17 @@ class ChatRequest(BaseModel):
     # Die letzte eigene Nachricht wird ersetzt (0.19): Sie und ihre Antwort werden
     # ausgeblendet, sobald die neue gespeichert ist. `messages` trägt dann den Verlauf ohne sie.
     ersetzt_letzte: bool = False
+    # Assistent der Konversation beenden (Päckchen C2): zurück zum Standard-Chat, in derselben
+    # Konversation. Mit `ersetzt_letzte` beantwortet der Standard-Chat die letzte Nachricht neu —
+    # so nimmt die Oberfläche „Assistent beenden und weiter chatten" aus dem Vorschlag an.
+    assistent_beenden: bool = False
 
     @model_validator(mode="after")
     def at_least_one_message(self):
         if not self.messages:
             raise ValueError("messages darf nicht leer sein")
+        if self.assistent_beenden and self.assistant_id is not None:
+            raise ValueError("assistent_beenden und assistant_id schließen sich aus")
         if self.model_id is not None:
             normalized = self.model_id.strip()
             self.model_id = normalized or None

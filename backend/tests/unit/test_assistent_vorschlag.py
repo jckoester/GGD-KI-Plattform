@@ -66,3 +66,31 @@ def test_vorschlag_nur_fuer_schuelerinnen_ohne_vorschau_und_stundenbezug():
     assert not _vorschlag_moeglich(schueler, False, "stunde")                # Stundenbezug
     assert not _vorschlag_moeglich(SimpleNamespace(roles=["teacher"]), False, None)
     assert not _vorschlag_moeglich(SimpleNamespace(roles=["student", "teacher"]), False, None)
+
+
+def test_beenden_und_assistent_schliessen_sich_aus():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.chat.schemas import ChatRequest
+
+    nachricht = [{"role": "user", "content": "x"}]
+    assert ChatRequest(messages=nachricht, assistent_beenden=True).assistent_beenden
+    with pytest.raises(ValidationError):
+        ChatRequest(messages=nachricht, assistent_beenden=True, assistant_id=3)
+
+
+async def test_klassifikator_zweiter_versuch_bei_5xx():
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from app.assistants import vorschlag as dienst
+
+    def antwort(code):
+        a = MagicMock(status_code=code)
+        a.json.return_value = {"choices": [{"message": {"content": '{"spezifisch": []}'}}]}
+        a.raise_for_status = MagicMock()
+        return a
+    client = MagicMock(post=AsyncMock(side_effect=[antwort(500), antwort(200)]))
+    with patch("app.litellm.systemkonto.verbuche", new=AsyncMock()):
+        r = await dienst.klassifiziere("x", [], modell="m", client=client)
+    assert client.post.await_count == 2 and r["roh"] == '{"spezifisch": []}'

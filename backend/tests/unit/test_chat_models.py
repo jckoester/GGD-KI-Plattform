@@ -1117,7 +1117,9 @@ async def test_messkanal_traegt_angebot_ergebnis_und_suchanfrage():
     assert [a["node_id"] for a in daten["angebot"]] == ["n-1", "n-2"]
     assert daten["nachgeschlagen"] == ["n-1"]
     assert daten["suchanfragen"] == ["Elektronegativität"]
-    assert ausgabe.index("event: vorab_debug") < ausgabe.index("event: message")
+    # Seit C2 (0.24) nach `message`: Der Messkanal trägt auch den Assistenten-Vorschlag, auf den
+    # nach der Antwort noch gewartet wird. Vor `[DONE]` bleibt er.
+    assert ausgabe.index("event: message") < ausgabe.index("event: vorab_debug") < ausgabe.index("data: [DONE]")
 
 
 @pytest.mark.asyncio

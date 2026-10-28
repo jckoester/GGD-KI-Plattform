@@ -150,3 +150,20 @@ async def test_abbruch_speichert_frage_teilantwort_und_kosten(sitzungen, test_cl
     assert nachrichten[1]["abgebrochen"] is True
     assert nachrichten[1]["werkzeuge_mit_wirkung"] == ["update_lesson_phases"]
     assert nachrichten[1]["cost_status"] == "ausstehend"
+
+
+@pytest.mark.asyncio
+async def test_wechsel_leert_die_ruheregel_des_vorschlags(sitzungen):
+    """C2, F4: Ein angenommener Wechsel (oder Beenden) setzt `vorgeschlagen` zurück; ein
+    gewöhnlicher Zug lässt es stehen."""
+    konv = await _konversation(sitzungen)
+    async with sitzungen() as db:
+        await db.execute(sa.update(Conversation).where(Conversation.id == konv).values(vorgeschlagen=[16, 18]))
+        await db.commit()
+    await _zug(sitzungen, konv, "eins", "A")
+    async with sitzungen() as db:
+        assert (await db.get(Conversation, konv)).vorgeschlagen == [16, 18]
+    await _zug(sitzungen, konv, "zwei", "B", conv_assistant_update=(None, None), ruheregel_leeren=True)
+    async with sitzungen() as db:
+        k = await db.get(Conversation, konv)
+        assert (k.vorgeschlagen, k.assistant_id, k.system_prompt_snapshot) == ([], None, None)

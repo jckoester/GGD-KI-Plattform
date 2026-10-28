@@ -241,8 +241,13 @@ async def klassifiziere(nachricht: str, band: list[Kandidat], *, modell: str, cl
         {"role": "user", "content": f"Nachricht: „{nachricht}“\n\nAssistenten:\n{prompt_kandidaten(band)}"},
     ]}
     beginn = time.monotonic()
-    antwort = await client.post(f"{settings.litellm_proxy_url}/chat/completions", json=rumpf,
-                                headers={"Authorization": f"Bearer {systemkonto.schluessel()}"})
+    # Ein zweiter Versuch bei 5xx: In der Live-Probe (28.10.2026) antwortete der Anbieter einmal
+    # mit 500. Das Zeitlimit des Aufrufers gilt für beide Versuche zusammen.
+    for versuch in (1, 2):
+        antwort = await client.post(f"{settings.litellm_proxy_url}/chat/completions", json=rumpf,
+                                    headers={"Authorization": f"Bearer {systemkonto.schluessel()}"})
+        if antwort.status_code < 500:
+            break
     antwort.raise_for_status()
     await systemkonto.verbuche(antwort)
     return {"roh": antwort.json()["choices"][0]["message"].get("content") or "",
