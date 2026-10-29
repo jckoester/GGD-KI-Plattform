@@ -59,8 +59,11 @@ def test_entscheidung_im_assistenten():
     nah = {"stoe": A(0.40, 1), "rg": A(0.20, 1), "nw": A(0.6, 1)}
     assert M.entscheidung_im_assistenten(nah, ART, "stoe", marge=0.1, **kw) == ("wechsel", "rg")
     assert M.entscheidung_im_assistenten(nah, ART, "stoe", marge=0.25, **kw) == ("bleiben", None)
+    # K5-neu: weit weg heißt trotzdem bleiben; Rückfall → Rückfall mit der größeren Marge.
     weit = {"stoe": A(0.60, 1), "rg": A(0.55, 1), "nw": A(0.6, 1)}
-    assert M.entscheidung_im_assistenten(weit, ART, "stoe", marge=0.0, **kw) == ("beenden", None)
+    assert M.entscheidung_im_assistenten(weit, ART, "stoe", marge=0.0, **kw) == ("bleiben", None)
+    rueck = {"stoe": A(0.60, 1), "rg": A(0.55, 1), "nw": A(0.25, 1)}
+    assert M.entscheidung_im_assistenten(rueck, ART, "stoe", marge=0.05, **kw) == ("wechsel", "nw")
 
 
 def test_bereiche():

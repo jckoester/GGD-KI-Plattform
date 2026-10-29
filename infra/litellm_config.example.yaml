@@ -185,6 +185,11 @@ guardrails:
       # Liefert auch der Rückfall nichts: Diese Teams arbeiten weiter, alle anderen
       # bekommen die Antwort zurückgehalten (Jugendschutz vor Verfügbarkeit).
       fail_open_teams: ["lehrkraefte"]
+
+      # Systemaufrufe ohne Prüfung (0.26): Ihre Ausgabe liest keine Schüler:in als Text bzw.
+      # fasst nur Geprüftes zusammen. Geprüft kosteten sie bei langsamem Anbieter bis zu ~16 s
+      # und fielen ohne Urteil aus (Vorschlag zu spät, Titel fehlten).
+      ausgenommene_modelle: ["system-vorschlag", "system-titel"]
       # Zählerstand für /admin/guardrail/health. Der Proxy schreibt die Datei, das
       # Backend liest sie — beide müssen dieselbe meinen.
       # In der mitgelieferten docker-compose.yml ist das ohne Zutun der Fall: `litellm`,

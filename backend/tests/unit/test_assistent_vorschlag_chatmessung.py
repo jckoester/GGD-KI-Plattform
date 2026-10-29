@@ -28,3 +28,10 @@ def test_rechtzeitig():
     ]
     r = M.rechtzeitig(faelle)
     assert (r["aufrufe"], r["zeitlimit"], r["anteil_rechtzeitig"], r["nach_antwort"]) == (2, 1, 0.5, [1.5])
+
+
+def test_verweis_im_ersten_satz():
+    assert M.verweist("Dafür gibt es den Assistenten für Lernen und Prüfungsvorbereitung. Trotzdem …",
+                      "Lernen und Prüfungsvorbereitung")
+    assert not M.verweist("Gute Frage. Der Assistent für Lernen und Prüfungsvorbereitung hilft.",
+                          "Lernen und Prüfungsvorbereitung")

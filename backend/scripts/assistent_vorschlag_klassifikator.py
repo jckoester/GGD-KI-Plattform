@@ -80,16 +80,25 @@ def prompt_kandidaten(kandidaten: list[dict]) -> str:
 
 def auswahl(spez: list[int], rueck: list[int], fallbacks: dict[int, list[int]], erlaubt: dict[int, str]
             ) -> list[int]:
-    """F7: höchstens zwei spezifische; Rückfälle = `fallbacks` der gewählten, sonst die des
-    Klassifikators — höchstens zwei, nur Kandidaten."""
+    """Wie `vorschlag.zusammenstellen`: höchstens zwei spezifische; Rückfälle = `fallbacks` der
+    gewählten (höchstens zwei), sonst der erste des Klassifikators (0.26, V1)."""
     spez = spez[:2]
     unter = [f for s in spez for f in fallbacks.get(s, []) if erlaubt.get(f) == "fallback"]
-    rueck = list(dict.fromkeys(unter or rueck))[:2]
+    rueck = list(dict.fromkeys(unter))[:2] if unter else rueck[:1]
     return spez + rueck
 
 
+def k8_trifft(fall: dict) -> bool:
+    """K8 (0.26): Bei einem Nachbarpaar steht ein ``soll``-Assistent in der Auswahl, und vor
+    ihm steht keiner aus ``nicht`` — „der richtige zuerst oder beide“ (``darf`` zählt nicht)."""
+    g = fall["gewaehlt"]
+    soll, nicht = set(fall.get("soll") or []), set(fall.get("nicht") or [])
+    erster = next((i for i, n in enumerate(g) if n in soll), None)
+    return erster is not None and not any(n in nicht for n in g[:erster])
+
+
 def bewerte(faelle: list[dict], namen_art: dict[str, str]) -> dict:
-    """K1–K4 über die Auswahl je Fall (Feld ``gewaehlt``: Namen)."""
+    """K1–K4 und K8 über die Auswahl je Fall (Feld ``gewaehlt``: Namen, in Reihenfolge)."""
     pos = {n: [0, 0] for n in namen_art}
     nachbar = {n: [0, 0] for n in namen_art}
     stoer = []
@@ -108,8 +117,12 @@ def bewerte(faelle: list[dict], namen_art: dict[str, str]) -> dict:
     k2 = all(t >= 4 * g / 5 for n, (t, g) in pos.items() if namen_art[n] == "fallback")
     k3 = not stoer
     k4 = all(fehl <= max(1, g // 5) for fehl, g in nachbar.values())
+    paare = [f for f in faelle if f["art"] == "nachbar" and f.get("soll")]
+    k8_fehl = [f["kennung"] for f in paare if not k8_trifft(f)]
+    k8 = len(paare) - len(k8_fehl) >= 4 * len(paare) / 5
     return {"positiv": pos, "nachbar": nachbar, "stoer": stoer, "K1": k1, "K2": k2, "K3": k3, "K4": k4,
-            "ok": k1 and k2 and k3 and k4}
+            "K8": k8, "k8_paare": len(paare), "k8_fehl": k8_fehl,
+            "ok": k1 and k2 and k3 and k4 and k8}
 
 
 # ── Modellaufruf ─────────────────────────────────────────────────────────────
@@ -191,6 +204,9 @@ def bericht(kopf: dict, faelle: list[dict], ergebnis: dict) -> str:
          "## Ergebnis", ""]
     for k in ("K1", "K2", "K3", "K4"):
         t.append(f"- **{k}:** {'✓' if ergebnis[k] else '✗'}")
+    t.append(f"- **K8 (Nachbarpaare, richtiger zuerst):** {'✓' if ergebnis['K8'] else '✗'} — "
+             f"{ergebnis['k8_paare'] - len(ergebnis['k8_fehl'])}/{ergebnis['k8_paare']}"
+             + (f"; daneben: {', '.join(ergebnis['k8_fehl'])}" if ergebnis["k8_fehl"] else ""))
     t.append("- **Positive in der Auswahl:** " + "; ".join(f"{n} {a}/{g}" for n, (a, g) in ergebnis["positiv"].items()))
     t.append("- **Nachbar-Fehltreffer:** " + "; ".join(f"{n} {a}/{g}" for n, (a, g) in ergebnis["nachbar"].items()))
     t.append(f"- **Begriff/Alltag mit Auswahl:** {', '.join(ergebnis['stoer']) or '—'}")
@@ -269,7 +285,10 @@ async def main_async(args):
         (args.ziel / f"vorschlag-{args.lauf}.md").write_text(text, encoding="utf-8")
         roh = {"kopf": kopf, "ergebnis": {k: v for k, v in ergebnis.items()},
                "faelle": [{k: v for k, v in f.items() if k != "abstaende"}
-                          | {"abstaende": {n: a.bsp for n, a in f["abstaende"].items()}} for f in faelle]}
+                          | {"abstaende": {n: a.bsp for n, a in f["abstaende"].items()},
+                             # Bestes Gegenbeispiel je Kandidat (0.26, Befunde r3) — `inf` ohne.
+                             "gegen": {n: (a.gegen if a.gegen != float("inf") else None)
+                                       for n, a in f["abstaende"].items()}} for f in faelle]}
         (args.ziel / f"vorschlag-{args.lauf}.json").write_text(json.dumps(roh, ensure_ascii=False, indent=1),
                                                                 encoding="utf-8")
         print(f"Protokoll: {args.ziel / f'vorschlag-{args.lauf}.md'}")

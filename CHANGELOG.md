@@ -11,6 +11,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   lösen“ und „Grundton“; sie kommen mit dem Release. Migration 0093.
 - **Rückfall-Assistenten** bekommen im Chat die übrigen Rückfall-Assistenten genannt, die die Schüler:in nutzen darf.
 
+### Geändert
+
+- **Vorschlag im Chat:** höchstens ein Rückfall-Assistent. In einem Assistenten entscheidet ein Klassifikator mit der
+  letzten Antwort als Kontext, ob eine Nachricht eine neue Aufgabe für einen anderen Assistenten (auch einen Rückfall)
+  ist; kein „Assistent beenden“ mehr. Neue Regeln für den Klassifikator.
+- **Jugendschutz-Guardrail:** prüft Klassifikator und Titelerzeugung nicht mehr (`ausgenommene_modelle`).
+
 ## [0.25.0] – 2026-10-28
 
 Die Plattform duzt durchgehend; die Startseite zeigt weniger Hinweise auf einmal. Keine Migration.

@@ -160,6 +160,24 @@ def fail_closed(team_id: str | None, fail_open_teams: set[str] | None = None) ->
     return (team_id or "") not in erlaubt
 
 
+def ausgenommen(data: dict, modelle: set[str] | None) -> bool:
+    """Ist die Anfrage ein Systemaufruf, den der Guardrail nicht prueft?
+
+    Gemeint sind Aufrufe, deren Ausgabe keine Schueler:in als Text liest oder die nur
+    Geprueftes zusammenfassen — etwa der Klassifikator des Assistenten-Vorschlags (JSON mit
+    Kennungen) und die Titelerzeugung (0.26, Jan 29.10.2026). Ohne Ausnahme pruefte der
+    Guardrail auch sie, ueber dasselbe Modell beim selben Anbieter: Bei langsamem Anbieter
+    kamen bis zu ~16 s dazu, und ohne Urteil wurde die Antwort zurueckgehalten.
+
+    Verglichen wird der Modell-Alias der Anfrage (``model``) und, falls LiteLLM ihn
+    umgeschrieben hat, die Modellgruppe aus den Metadaten.
+    """
+    if not modelle:
+        return False
+    meta = data.get("metadata") or {}
+    return (data.get("model") in modelle) or (meta.get("model_group") in modelle)
+
+
 # ── Betriebszustand (fuer Health-Endpunkt und Admin-Ansicht) ─────────────────
 
 def build_health_snapshot(counters: dict[str, int], *, classifier: str | None,

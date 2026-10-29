@@ -259,6 +259,14 @@ nicht. Ein Ausfall ist also kein Randfall. Deshalb greift eine Staffel:
    **unbekanntes Team gilt als schutzbedürftig**: Ein kaputter Team-Bezug darf nicht dazu
    führen, dass alle als Lehrkraft behandelt werden.
 
+**Ausgenommene Systemaufrufe** (`ausgenommene_modelle`, seit 0.26): Der Guardrail prüft
+Aufrufe dieser Modell-Aliase nicht. Mitgeliefert sind `system-vorschlag` (der Klassifikator des
+Assistenten-Vorschlags; seine Ausgabe ist JSON mit Kennungen, die niemand liest) und
+`system-titel` (der Titel einer Konversation, zusammengefasst aus Nachricht und schon geprüfter
+Antwort). Geprüft liefen sie über dasselbe Modell beim selben Anbieter: Bei langsamem Anbieter
+kamen bis zu etwa 16 Sekunden dazu, und ohne Urteil wurde die Antwort zurückgehalten — der
+Vorschlag kam zu spät, Titel fehlten. Antworten an Nutzer:innen gehören **nie** in diese Liste.
+
 ### Überwachung
 
 Fail-open ist nur zu verantworten, wenn man weiß, wie oft es eintritt — eine Warnung im

@@ -1,4 +1,5 @@
 import asyncio
+import time
 import json
 import logging
 import re
@@ -376,7 +377,7 @@ def _vorschlag_moeglich(user: JwtPayload, ist_test: bool, stunde_id) -> bool:
 
 async def _vorschlag_im_hintergrund(
     user: JwtPayload, nachricht: str, vektor, aktuell_id: Optional[int], schon: set[int],
-    konversationsfach: Optional[int],
+    konversationsfach: Optional[int], zeiten: Optional[dict] = None, letzte_antwort: Optional[str] = None,
 ):
     """Eigene Sitzung und eigener Client: Der Task läuft neben der Antwort, die die Sitzung
     des Requests benutzt — zwei Abfragen gleichzeitig auf einer Sitzung scheitern."""
@@ -387,7 +388,17 @@ async def _vorschlag_im_hintergrund(
         return await vorschlag_dienst.vorschlagen(
             db, nachricht=nachricht, vektor=vektor, zugang=zugang, aktuell_id=aktuell_id,
             schon_vorgeschlagen=schon, konversationsfach=konversationsfach, client=client,
+            zeiten=zeiten, letzte_antwort=letzte_antwort,
         )
+
+
+def _letzte_antwort(messages: list[ChatMessage]) -> Optional[str]:
+    """Die letzte Nachricht des Assistenten vor der neuen — Kontext für den Vorschlag in der
+    Assistenten-Konversation (Folgefrage oder neue Aufgabe?)."""
+    for m in reversed(messages[:-1]):
+        if m.role == "assistant":
+            return _user_text(m)
+    return None
 
 
 #: Obergrenze für den Klassifikator-Aufruf selbst; maßgeblich ist VORSCHLAG_NACHLAUF.
@@ -2141,11 +2152,16 @@ async def chat(
     # Assistenten-Vorschlag (Päckchen C2): parallel zur Antwort, mit eigener Sitzung und dem
     # Vektor der Vorab-Suche. Nur Schüler:innen (F6), keine Vorschau, kein Stundenbezug.
     _vorschlag_task: Optional[asyncio.Task] = None
+    # Zeitmarken (0.26, Befund chat-r1): Start des Tasks relativ zu hier, Stufen im Dienst,
+    # dazu `message` und das Ende des Wartens — im Debug-Kanal, auch nach einem Zeitlimit.
+    _vorschlag_zeiten: dict = {}
+    _vorschlag_t0 = time.monotonic()
     if (_vorschlag_moeglich(current_user, conversation_is_test, conversation_stunde_id)
             and kontext.vektor is not None and user_message.strip()):
         _vorschlag_task = asyncio.create_task(_vorschlag_im_hintergrund(
             current_user, user_message, kontext.vektor, active_assistant_id,
-            set(schon_vorgeschlagen), kontext.subject_id,
+            set(schon_vorgeschlagen), kontext.subject_id, _vorschlag_zeiten,
+            _letzte_antwort(request.messages) if active_assistant_id is not None else None,
         ))
 
     llm_messages: list[dict] = []
@@ -2913,6 +2929,7 @@ async def chat(
             _vorschlag_task.cancel()
             _vorschlag_debug = {"abgebrochen": "Antwort abgebrochen"}
         elif _vorschlag_task is not None:
+            _vorschlag_zeiten["message"] = round(time.monotonic() - _vorschlag_t0, 2)
             try:
                 _vorschlag = await asyncio.wait_for(_vorschlag_task, timeout=VORSCHLAG_NACHLAUF)
                 _vorschlag_debug = _vorschlag.debug if _vorschlag else {"optionen": []}
@@ -2921,6 +2938,8 @@ async def chat(
             except Exception as fehler:          # wirft nie in die Antwort hinein
                 logger.warning("Assistenten-Vorschlag fehlgeschlagen: %s", type(fehler).__name__)
                 _vorschlag_debug = {"abgebrochen": type(fehler).__name__}
+            _vorschlag_zeiten["gewartet_bis"] = round(time.monotonic() - _vorschlag_t0, 2)
+            _vorschlag_debug.setdefault("zeiten", _vorschlag_zeiten)
         if _vorschlag is not None and _vorschlag.optionen:
             _vorschlag_debug["optionen"] = [o.assistant_id for o in _vorschlag.optionen]
             try:

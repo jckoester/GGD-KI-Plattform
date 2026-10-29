@@ -61,6 +61,7 @@ from litellm.proxy._types import UserAPIKeyAuth
 
 from moderation_core import (
     DEFAULT_CATEGORIES,
+    ausgenommen,
     build_messages,
     build_health_snapshot,
     fail_closed,
@@ -102,6 +103,8 @@ class LlmModerationGuardrail(CustomGuardrail):
         fail_open_teams = kwargs.pop("fail_open_teams", None)
         self.fail_open_teams = set(fail_open_teams) if fail_open_teams is not None else None
         self.health_file = kwargs.pop("health_file", None)
+        # Systemaufrufe ohne Prüfung (Modell-Aliase), siehe `moderation_core.ausgenommen`.
+        self.ausgenommene_modelle = set(kwargs.pop("ausgenommene_modelle", None) or [])
 
         self._counters: Counter = Counter()
         super().__init__(**kwargs)
@@ -209,6 +212,8 @@ class LlmModerationGuardrail(CustomGuardrail):
     async def async_post_call_success_hook(
         self, data: dict, user_api_key_dict: UserAPIKeyAuth, response: Any
     ) -> Any:
+        if ausgenommen(data, self.ausgenommene_modelle):
+            return response
         text = _response_text(response)
         if not text:
             return response

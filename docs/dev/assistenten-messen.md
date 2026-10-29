@@ -110,9 +110,9 @@ Name und `suggestion_text`. Das ist derselbe Satz wie im Vorschlagsdialog. Ein N
 was das Modell damit tut. Steht keiner darin, verweist es auf niemanden; sonst erfände es bei
 leerer Liste einen Assistenten.
 
-⚠️ Die Liste überbrückt die heutige C2-Grenze: `im_assistenten` bietet nur spezifische
-Assistenten an. Bietet C2 Rückfälle in der Assistenten-Konversation an, entfällt sie, sonst
-steht der Hinweis doppelt.
+Seit 0.26 bietet der Vorschlag auch in der Assistenten-Konversation Rückfälle an (Klassifikator,
+siehe unten). Die Liste bleibt vorerst: Sie ist der einzige Hinweis, wenn der Vorfilter keinen
+Kandidaten findet oder der Klassifikator „laufendes Gespräch“ sagt.
 
 ### Was in die Prompt-Datei gehört
 
@@ -220,6 +220,25 @@ venv/bin/python scripts/assistent_vorschlag_klassifikator.py --modell system-vor
 venv/bin/python scripts/assistent_vorschlag_chatmessung.py --basis http://localhost:8001 \
     --konto <pseudonym-anfang> --ziel "<Vault>/Plaene/Messungen-Vorschlag" --lauf chat-1
 ```
+
+**In der Assistenten-Konversation** (0.26) derselbe Aufbau: Vorfilter = ein anderer Assistent
+mit bestem Beispiel < `IM_ASSISTENTEN` (0,45), dann `SYSTEM_IM_ASSISTENTEN` mit dem aktuellen
+Assistenten, dem Ende seiner letzten Nachricht, der neuen Nachricht und den Kandidaten. Antwort
+`{"bezug": …, "neue_aufgabe": Kennung | null}`; im Zweifel, bei Zeitlimit oder Unlesbarem: bleiben.
+Ohne Kandidat kein Aufruf. Gemessen über den Dienst selbst, ohne Chat:
+
+```bash
+venv/bin/python scripts/assistent_vorschlag_k5_messung.py --ziel "<Vault>/Plaene/Messungen-Vorschlag" --lauf k5-4
+```
+
+Das Protokoll trennt die Herkunft der Fälle (`frisch`) und rechnet offline den Vorfilter mit dem
+Mittel der drei nächsten Beispiele nach. Stand 29.10.2026 (`vorschlag-k5-4`): bleiben 64/67,
+wechsel 33/36; die nach der Prompt-Schärfung frisch geschriebene Gegenprobe 12/12 und 10/12.
+Der Prompt ist damit eingefroren.
+
+⚠️ **Bekannte Grenze:** Eine Bitte, die nur ein Fach nennt, aber keine Aufgabe („Kannst du mir bei
+der Englisch-Hausaufgabe helfen?“), löst einen Wechsel aus. Eine eigene Prompt-Zeile dafür fing
+keinen der beiden Fälle und kostete zwei richtige Wechsel (`vorschlag-k5-6`).
 
 ⚠️ **Denkmodelle taugen nicht als Klassifikator:** Mit `max_tokens` 200 verbrauchte die Denkphase
 die Grenze, die Antwort war leer; `chat-komplex` brauchte 19–60 s. Stand 28.10.2026: K1–K7 im

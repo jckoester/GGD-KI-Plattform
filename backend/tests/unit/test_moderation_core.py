@@ -286,3 +286,13 @@ def test_snapshot_reports_the_configured_models(core):
 
     assert s["classifier_model"] == "openai/gpt-4o-mini"
     assert s["fallback_model"] == "openai/mistralai/Mistral-Small-24B-Instruct"
+
+
+def test_systemaufrufe_ausgenommen():
+    """0.26: Klassifikator und Titel gehen nicht durch den Jugendschutz-Guardrail."""
+    m = _load()
+    modelle = {"system-vorschlag", "system-titel"}
+    assert m.ausgenommen({"model": "system-vorschlag"}, modelle)
+    assert m.ausgenommen({"model": "x", "metadata": {"model_group": "system-titel"}}, modelle)
+    assert not m.ausgenommen({"model": "chat-standard"}, modelle)
+    assert not m.ausgenommen({"model": "system-vorschlag"}, None)

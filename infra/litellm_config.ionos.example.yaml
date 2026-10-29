@@ -455,6 +455,11 @@ guardrails:
       # schutzbedürftig — ein kaputter Team-Bezug darf nicht alle zu Lehrkräften machen.
       fail_open_teams: ["lehrkraefte"]
 
+      # Systemaufrufe ohne Prüfung (0.26): Ihre Ausgabe liest keine Schüler:in als Text bzw.
+      # fasst nur Geprüftes zusammen. Geprüft kosteten sie bei langsamem Anbieter bis zu ~16 s
+      # und fielen ohne Urteil aus (Vorschlag zu spät, Titel fehlten).
+      ausgenommene_modelle: ["system-vorschlag", "system-titel"]
+
       # Zählerstand für /admin/guardrail/health. Fail-open ist nur zu verantworten, wenn
       # man weiß, wie oft es eintritt — eine Warnung im Log liest niemand.
       #

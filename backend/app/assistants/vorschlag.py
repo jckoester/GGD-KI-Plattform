@@ -16,9 +16,11 @@ Rückfall-Assistenten nicht von Alltag und Mathe):
    nächsten Beispiele; Antwort JSON. Gemessen (28.10.2026, Gate): Mistral-Small-24B trifft
    K1–K4; Denkmodelle brauchen zu lange.
 
-**In einer Assistenten-Konversation** genügen die Embeddings (C1, K5): Ein anderer Assistent
-nur, wenn er um :data:`MARGE` näher liegt als der aktuelle; liegt die Nachricht weit vom
-aktuellen weg (:data:`BEENDEN`), wird „Assistent beenden“ angeboten.
+**In einer Assistenten-Konversation** dieselben zwei Stufen (Jan, 29.10.2026, nach k5-1): Liegt
+ein anderer Assistent näher als :data:`IM_ASSISTENTEN`, entscheidet ein Klassifikator mit der
+letzten Nachricht des Assistenten als Kontext, ob die Nachricht zum laufenden Gespräch gehört
+oder eine neue Aufgabe für einen anderen ist (:data:`SYSTEM_IM_ASSISTENTEN`). Ohne Kandidat
+kein Aufruf; Standard ist bleiben, ein „beenden“ bietet der Vorschlag nicht an.
 
 **Ruheregel** (F4): Wer in ``schon_vorgeschlagen`` steht, kommt nicht wieder; 0 steht für
 „Assistent beenden“. Der Chat-Flow leert die Menge bei einem angenommenen Wechsel.
@@ -49,33 +51,67 @@ logger = logging.getLogger(__name__)
 
 #: Vorfilter: Kandidat ist, wessen bestes Beispiel näher liegt (C1: Positive 0,29–0,49).
 BAND = 0.50
-#: In der Assistenten-Konversation (K5, Lauf `vorschlag-2`, 28.10.2026): Schwelle für einen
-#: spezifischen Treffer, Marge gegenüber dem aktuellen Assistenten, Schwelle fürs Beenden.
-SPEZIFISCH_IM_ASSISTENTEN = 0.41
-MARGE = 0.05
-BEENDEN = 0.49
-#: Kennung von „Assistent beenden“ in der Ruheregel.
+#: Vorfilter in der Assistenten-Konversation: Der Klassifikator wird nur gefragt, wenn ein anderer
+#: Assistent — spezifisch oder Rückfall — mit seinem besten Beispiel näher liegt. Bewusst locker:
+#: Es entscheidet das Modell, nicht die Schwelle. Embeddings allein trennten einen echten Wechsel
+#: zwischen Rückfällen nicht von einer Folgefrage (k5-1). Das Mittel der drei nächsten Beispiele
+#: (< 0,50) brachte live nichts (k5-5: ein Wechsel mehr, zwei falsche mehr) — es wird nur gemessen.
+IM_ASSISTENTEN = 0.45
+#: ⚠️ Bekannte Grenze von SYSTEM_IM_ASSISTENTEN (k5-4, eingefroren 29.10.2026): Eine Bitte, die nur
+#: ein Fach nennt („Kannst du mir bei der Englisch-Hausaufgabe helfen?“, „kannst du mir auch was zu
+#: geschichte erklären?“), löst einen Wechsel aus. Eine eigene Zeile dafür fing keinen der beiden
+#: und kostete zwei richtige Wechsel (k5-6).
+#: Wie viel der letzten Assistenten-Nachricht der Klassifikator sieht — das Ende, dort steht die Frage.
+LETZTE_ANTWORT_ZEICHEN = 600
+#: Kennung von „Assistent beenden“ in der Ruheregel. Seit K5-neu bietet der Vorschlag „beenden“
+#: nicht mehr an; die Kennung bleibt für bestehende Ruheregeln und `assistent_beenden`.
 BEENDEN_KENNUNG = 0
 #: Wie viele Beispiele je Kandidat in den Prompt gehen.
 BEISPIELE_IM_PROMPT = 3
 
 SYSTEM = """Du ordnest die Nachricht einer Schülerin oder eines Schülers Assistenten einer Schulplattform zu.
-Ein Assistent passt nur, wenn die Nachricht eine **Aufgabe aus seinem Gebiet** ist, bei der er begleiten kann —
-nicht schon, wenn ein Fachwort darin vorkommt.
+Ein Assistent passt, wenn die Nachricht eine **Aufgabe oder ein konkretes Anliegen aus seiner Tätigkeit** ist,
+bei der er begleiten kann: etwas rechnen, einen Versuch auswerten, einen Text analysieren, überarbeiten oder
+planen, argumentieren, ein Referat vorbereiten, programmieren, für eine Arbeit lernen. Entscheidend ist die Art
+der Tätigkeit, nicht das Fach oder das Thema — und nicht schon, dass ein Fachwort darin vorkommt.
 
 Keinen Assistenten wählst du bei:
-- einer Frage nach einem Begriff oder einer Erklärung („Was ist ein Mol?“) — die beantwortet der normale Chat,
-- Alltag, Organisatorischem, Small Talk,
-- einer Aufgabe aus einem anderen Gebiet (etwa Mathematik ohne naturwissenschaftlichen Bezug),
-- Referaten, Präsentationen, Gliederungen und dem Schreiben von Texten — auch wenn das Thema naturwissenschaftlich
-  ist: Entscheidend ist die Art der Aufgabe, nicht ihr Thema.
+- einer Frage nach einem Begriff, einer Erklärung oder einem Sachverhalt („Was ist ein Mol?“, „Welche
+  Programmiersprache nehmen wir in Informatik?“) — die beantwortet der normale Chat,
+- Alltag, Organisatorischem, Small Talk, Stimmungen („keine Lust auf Hausaufgaben“),
+- der Bitte, etwas fertig zu erledigen, statt Hilfe dabei zu wollen („Fass mir das Buch zusammen“, „Übersetz mir
+  das“, „Schreib mir eine Entschuldigung“) — die Assistenten begleiten, sie erledigen nicht.
 
 Spezifische Assistenten haben eine eng umrissene Aufgabe; wähle sie nur, wenn genau diese Aufgabe gestellt ist.
-Rückfall-Assistenten decken ein ganzes Gebiet ab; wähle einen, wenn die Aufgabe in sein Gebiet fällt, auch wenn
-kein spezifischer passt.
+Rückfall-Assistenten decken je eine Tätigkeit ab; wähle den, dessen Tätigkeit die Nachricht verlangt, auch wenn
+kein spezifischer passt. Nenne höchstens einen Rückfall-Assistenten — den, der am besten passt.
 
 Antworte nur mit JSON, ohne Erklärung: {"spezifisch": [Kennungen], "rueckfall": [Kennungen]} — leere Listen,
 wenn keiner passt."""
+
+SYSTEM_IM_ASSISTENTEN = """Eine Schülerin oder ein Schüler arbeitet auf einer Schulplattform mit einem Assistenten und schreibt
+eine neue Nachricht. Du entscheidest, ob sie zum laufenden Gespräch gehört oder eine neue Aufgabe ist, für die
+einer der genannten anderen Assistenten da ist.
+
+Zum laufenden Gespräch gehört:
+- alles, was sich auf die laufende Aufgabe bezieht: eine Antwort auf die Frage des Assistenten, eine Rückfrage,
+  ein Zwischenergebnis, eine Begriffsfrage, der nächste Schritt — auch eine Nebenfrage dazu (wie man etwas
+  darstellt, rechnet, schreibt oder angibt), selbst wenn darin ein Wort vorkommt, das zur Tätigkeit eines anderen
+  Assistenten passt. Der andere Assistent hätte die laufende Aufgabe nicht vor sich;
+- eine Bitte um Hilfe in einem anderen Fach, ohne dass schon eine konkrete Aufgabe genannt ist — welche gemeint
+  ist, klärt der aktuelle Assistent;
+- die Bitte, etwas fertig zu erledigen statt Hilfe dabei („Schreib mir …“, „Mach mir …“) — die Assistenten
+  begleiten, sie erledigen nicht;
+- Alltag, Stimmungen, Unverständliches und eine weitere Aufgabe derselben Tätigkeit.
+
+Eine neue Aufgabe ist es nur, wenn die Nachricht eine konkrete Aufgabe nennt, die mit der laufenden nichts zu tun
+hat — oft angekündigt („neues Thema“, „kurz was anderes“, „ich hab noch …“) —, und diese Aufgabe die Tätigkeit
+eines der anderen Assistenten verlangt.
+
+Im Zweifel: laufendes Gespräch.
+
+Antworte nur mit JSON, ohne weiteren Text: {"bezug": "<ein kurzer Satz: worauf bezieht sich die Nachricht?>",
+"neue_aufgabe": Kennung oder null}."""
 
 
 @dataclass(frozen=True)
@@ -88,6 +124,7 @@ class Kandidat:
     fallbacks: tuple[int, ...]
     abstand: float                   # bestes Auslöser-Beispiel
     gegen: float                     # bestes Gegenbeispiel (inf ohne)
+    mittel: float = float("inf")     # Mittel der drei nächsten Beispiele — nur gemessen (k5-5)
     beispiele: tuple[str, ...] = ()
 
 
@@ -146,33 +183,58 @@ def zusammenstellen(
     spez: list[int], rueck: list[int], kandidaten: dict[int, Kandidat], konversationsfach: int | None = None
 ) -> list[Option]:
     """F7: höchstens zwei spezifische — ein passendes Konversationsfach zuerst, dann der nähere —,
-    darunter höchstens zwei Rückfälle: die `fallbacks` der gewählten spezifischen, sonst die des
-    Klassifikators. Nur Kandidaten (sichtbar, nicht schon vorgeschlagen)."""
+    darunter die Rückfälle: die `fallbacks` der gewählten spezifischen (höchstens zwei), sonst
+    **der erste** des Klassifikators. Nur Kandidaten (sichtbar, nicht schon vorgeschlagen).
+
+    Ein Rückfall statt zwei (0.26, Messung r3, V1): Wo der zweitgenannte falsch war, war der
+    erstgenannte fast immer richtig — zwölf Rückfälle sind Nachbarn, zwei davon anzubieten hieß
+    meist, den falschen mitzubieten."""
     def schluessel(i):
         k = kandidaten[i]
         return (konversationsfach is None or k.subject_id != konversationsfach, k.abstand)
     gewaehlt = sorted((i for i in spez if i in kandidaten), key=schluessel)[:2]
     unter = [f for s in gewaehlt for f in kandidaten[s].fallbacks
              if f in kandidaten and kandidaten[f].art == "fallback"]
-    rueckfaelle = list(dict.fromkeys(unter or [i for i in rueck if i in kandidaten]))[:2]
+    rueckfaelle = (list(dict.fromkeys(unter))[:2] if unter
+                   else [i for i in rueck if i in kandidaten][:1])
     return [Option(i, kandidaten[i].name, kandidaten[i].text, kandidaten[i].art)
             for i in gewaehlt + rueckfaelle]
 
 
-def im_assistenten(aktuell: float, kandidaten: dict[int, Kandidat], beenden_erlaubt: bool) -> list[Option]:
-    """K5: Wechsel zu einem spezifischen, der um die Marge näher liegt (und näher an seinen
-    Beispielen als an seinen Gegenbeispielen) — sonst „beenden“, wenn die Nachricht weit vom
-    aktuellen Assistenten liegt — sonst nichts."""
-    andere = sorted((k for k in kandidaten.values()
-                     if k.art == "specific" and k.abstand <= SPEZIFISCH_IM_ASSISTENTEN
-                     and k.abstand < k.gegen and k.abstand + MARGE < aktuell),
-                    key=lambda k: k.abstand)
-    if andere:
-        k = andere[0]
-        return [Option(k.id, k.name, k.text, k.art)]
-    if aktuell > BEENDEN and beenden_erlaubt:
-        return [Option(BEENDEN_KENNUNG, "", "", "beenden")]
-    return []
+def im_assistenten_band(kandidaten: dict[int, Kandidat]) -> list[Kandidat]:
+    """Wer in der Assistenten-Konversation dem Klassifikator vorgelegt wird: jeder andere
+    Assistent, dessen bestes Beispiel näher liegt als :data:`IM_ASSISTENTEN`, der nächste zuerst.
+    Leer heißt bleiben, ohne Aufruf — so fallen die ankerlosen Folgefragen („hä?“, „stimmt das
+    so?“) weiter still durch."""
+    return sorted((k for k in kandidaten.values() if k.abstand < IM_ASSISTENTEN), key=lambda k: k.abstand)
+
+
+def lies_wechsel(roh: str, erlaubt: set[int]) -> int | None:
+    """Die Kennung der neuen Aufgabe — oder ``None`` für das laufende Gespräch. Unlesbares und
+    fremde Kennungen heißen bleiben."""
+    m = re.search(r"\{.*\}", roh or "", re.S)
+    try:
+        daten = json.loads(m.group(0)) if m else {}
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(daten, dict):
+        return None
+    try:
+        i = int(daten.get("neue_aufgabe"))
+    except (TypeError, ValueError):
+        return None
+    return i if i in erlaubt else None
+
+
+def prompt_im_assistenten(nachricht: str, aktuell: tuple[str, str], letzte_antwort: str | None,
+                          band: list[Kandidat]) -> str:
+    letzte = (letzte_antwort or "").strip()
+    if len(letzte) > LETZTE_ANTWORT_ZEICHEN:
+        letzte = "…" + letzte[-LETZTE_ANTWORT_ZEICHEN:]
+    return (f"Aktueller Assistent: „Assistent für {aktuell[0]}“: {aktuell[1]}\n\n"
+            f"Letzte Nachricht des Assistenten: „{letzte or '(keine)'}“\n\n"
+            f"Neue Nachricht: „{nachricht}“\n\n"
+            f"Andere Assistenten:\n{prompt_kandidaten(band)}")
 
 
 # ── Datenbank und Modell ─────────────────────────────────────────────────────
@@ -193,15 +255,22 @@ async def _kandidaten(
     if not abfrage_ids:
         return {}, None
     distanz = AssistantTriggerExample.embedding.cosine_distance(vektor)
-    zeilen = (await db.execute(
-        sa.select(AssistantTriggerExample.assistant_id, AssistantTriggerExample.art,
-                  sa.func.min(distanz))
+    je = (
+        sa.select(AssistantTriggerExample.assistant_id, AssistantTriggerExample.art, distanz.label("d"),
+                  sa.func.row_number().over(
+                      partition_by=(AssistantTriggerExample.assistant_id, AssistantTriggerExample.art),
+                      order_by=distanz).label("rang"))
         .where(AssistantTriggerExample.assistant_id.in_(abfrage_ids),
                AssistantTriggerExample.embedding_model == settings.embedding_model,
                AssistantTriggerExample.embedding.is_not(None))
-        .group_by(AssistantTriggerExample.assistant_id, AssistantTriggerExample.art)
+    ).subquery()
+    zeilen = (await db.execute(
+        sa.select(je.c.assistant_id, je.c.art, sa.func.min(je.c.d), sa.func.avg(je.c.d))
+        .where(je.c.rang <= BEISPIELE_IM_PROMPT)
+        .group_by(je.c.assistant_id, je.c.art)
     )).all()
-    beste: dict[tuple[int, str], float] = {(a, art): float(d) for a, art, d in zeilen}
+    beste: dict[tuple[int, str], float] = {(a, art): float(d) for a, art, d, _ in zeilen}
+    mittel: dict[int, float] = {a: float(m) for a, art, _, m in zeilen if art == "beispiel"}
     nach_id = {a.id: a for a in sichtbar}
     kandidaten = {
         i: Kandidat(
@@ -209,6 +278,7 @@ async def _kandidaten(
             text=(nach_id[i].suggestion_text or nach_id[i].description or "").strip(),
             subject_id=nach_id[i].subject_id, fallbacks=tuple(nach_id[i].fallbacks or ()),
             abstand=beste[(i, "beispiel")], gegen=beste.get((i, "gegenbeispiel"), float("inf")),
+            mittel=mittel[i],
         )
         for i in ids if (i, "beispiel") in beste
     }
@@ -234,13 +304,18 @@ async def _mit_beispielen(db: AsyncSession, vektor, band: list[Kandidat]) -> lis
     return [Kandidat(**{**k.__dict__, "beispiele": tuple(texte.get(k.id, []))}) for k in band]
 
 
-async def klassifiziere(nachricht: str, band: list[Kandidat], *, modell: str, client) -> dict:
+async def klassifiziere(nachricht: str, band: list[Kandidat], *, modell: str, client, marke=None) -> dict:
     """Ein Aufruf über das Systemkonto. Wirft bei Netz- oder HTTP-Fehlern."""
+    return await _aufruf(SYSTEM, f"Nachricht: „{nachricht}“\n\nAssistenten:\n{prompt_kandidaten(band)}",
+                         modell=modell, client=client, marke=marke)
+
+
+async def _aufruf(system: str, inhalt: str, *, modell: str, client, marke=None) -> dict:
     from app.litellm import systemkonto
 
     rumpf = {"model": modell, "temperature": 0, "max_tokens": 400, "messages": [
-        {"role": "system", "content": SYSTEM},
-        {"role": "user", "content": f"Nachricht: „{nachricht}“\n\nAssistenten:\n{prompt_kandidaten(band)}"},
+        {"role": "system", "content": system},
+        {"role": "user", "content": inhalt},
     ]}
     beginn = time.monotonic()
     # Ein zweiter Versuch bei 5xx: In der Live-Probe (28.10.2026) antwortete der Anbieter einmal
@@ -248,10 +323,14 @@ async def klassifiziere(nachricht: str, band: list[Kandidat], *, modell: str, cl
     for versuch in (1, 2):
         antwort = await client.post(f"{settings.litellm_proxy_url}/chat/completions", json=rumpf,
                                     headers={"Authorization": f"Bearer {systemkonto.schluessel()}"})
+        if marke:
+            marke(f"http_{versuch}_{antwort.status_code}")
         if antwort.status_code < 500:
             break
     antwort.raise_for_status()
     await systemkonto.verbuche(antwort)
+    if marke:
+        marke("verbucht")
     return {"roh": antwort.json()["choices"][0]["message"].get("content") or "",
             "dauer": time.monotonic() - beginn}
 
@@ -266,12 +345,27 @@ async def vorschlagen(
     schon_vorgeschlagen: set[int],
     konversationsfach: int | None,
     client,
+    zeiten: dict | None = None,
+    letzte_antwort: str | None = None,
 ) -> Vorschlag | None:
-    """Die Optionen des Dialogs — oder ``None``, wenn nichts vorzuschlagen ist."""
+    """Die Optionen des Dialogs — oder ``None``, wenn nichts vorzuschlagen ist.
+
+    ``zeiten`` (0.26, Befund chat-r1): Sekunden seit dem Start je Stufe. Der Aufrufer hält das
+    Wörterbuch, damit es auch nach einem Zeitlimit zeigt, wie weit der Vorschlag kam.
+
+    ``letzte_antwort``: die letzte Nachricht des Assistenten — Kontext für den Klassifikator in
+    der Assistenten-Konversation."""
+    zeiten = {} if zeiten is None else zeiten
+    t0 = time.monotonic()
+
+    def marke(stufe: str) -> None:
+        zeiten[stufe] = round(time.monotonic() - t0, 2)
+
     if vektor is None:
         return None
     kandidaten, aktuell = await _kandidaten(db, zugang, vektor, aktuell_id)
-    debug = {"kandidaten": {k.name: round(k.abstand, 3) for k in kandidaten.values()}}
+    marke("kandidaten")
+    debug = {"kandidaten": {k.name: round(k.abstand, 3) for k in kandidaten.values()}, "zeiten": zeiten}
 
     def ohne_schon(optionen: list[Option]) -> Vorschlag | None:
         gezeigt = [o for o in optionen if o.assistant_id not in schon_vorgeschlagen]
@@ -283,14 +377,34 @@ async def vorschlagen(
         if aktuell is None:          # aktueller Assistent ohne Beispiele: keine Bezugsgröße
             return None
         debug["aktuell"] = round(aktuell, 3)
-        return ohne_schon(im_assistenten(aktuell, kandidaten, True))
+        band = im_assistenten_band(kandidaten)
+        debug["band"] = [k.name for k in band]
+        if not band or not settings.vorschlag_model:
+            return None
+        eigen = await db.get(Assistant, aktuell_id)
+        band = await _mit_beispielen(db, vektor, band)
+        marke("beispiele")
+        antwort = await _aufruf(
+            SYSTEM_IM_ASSISTENTEN,
+            prompt_im_assistenten(nachricht, (eigen.name, (eigen.suggestion_text or eigen.description or "").strip()),
+                                  letzte_antwort, band),
+            modell=settings.vorschlag_model, client=client, marke=marke)
+        marke("klassifikator")
+        debug |= {"klassifikator": antwort["roh"][:300], "dauer": round(antwort["dauer"], 2)}
+        ziel = lies_wechsel(antwort["roh"], {k.id for k in band})
+        if ziel is None:
+            return None
+        k = kandidaten[ziel]
+        return ohne_schon([Option(k.id, k.name, k.text, k.art)])
 
     band = sorted((k for k in kandidaten.values() if k.abstand < BAND), key=lambda k: k.abstand)
     debug["band"] = [k.name for k in band]
     if not band or not settings.vorschlag_model:
         return None
     band = await _mit_beispielen(db, vektor, band)
-    antwort = await klassifiziere(nachricht, band, modell=settings.vorschlag_model, client=client)
+    marke("beispiele")
+    antwort = await klassifiziere(nachricht, band, modell=settings.vorschlag_model, client=client, marke=marke)
+    marke("klassifikator")
     debug |= {"klassifikator": antwort["roh"][:300], "dauer": round(antwort["dauer"], 2)}
     spez, rueck = lies_antwort(antwort["roh"], {k.id: k.art for k in band})
     return ohne_schon(zusammenstellen(spez, rueck, kandidaten, konversationsfach))

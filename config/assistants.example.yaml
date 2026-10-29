@@ -73,7 +73,7 @@ assistants:
     documents:
       - config/prompts/stoechiometrie_pse_schulwerte.md
     tags: [chemie, stöchiometrie]
-    fallbacks: [naturwissenschaftliche Aufgaben]
+    fallbacks: [Rechnen mit Größen und Einheiten]
     suggest: specific
     suggestion_text: >-
       Für Rechenaufgaben mit Massen, Stoffmengen und Volumina gibt es einen Assistenten, der
@@ -92,6 +92,8 @@ assistants:
       - welcher stoff ist im überschuss wenn 5 g magnesium und 5 g sauerstoff reagieren
       - 'Ausbeute ausrechnen: theoretisch 20 g, rausgekommen sind 16 g'
     trigger_counterexamples:
+      - Berechne die Dichte eines Holzklotzes mit 300 g und 400 cm³
+      - Wie viele rote Blutkörperchen sind in einem Liter Blut, wenn in einem Mikroliter 5 Millionen sind?
       - Was ist eigentlich ein Mol?
       - Stell die Reaktionsgleichung für die Verbrennung von Methan auf
       - 'Gleich mir die Gleichung aus: Al + O2 -> Al2O3'
@@ -119,7 +121,7 @@ assistants:
     # enthält nur, was diesen Assistenten ausmacht (app/assistants/bausteine/).
     bausteine: [begleiten_statt_loesen, grundton]
     tags: [chemie, reaktionsgleichungen]
-    fallbacks: [naturwissenschaftliche Aufgaben]
+    fallbacks: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung]
     suggest: specific
     suggestion_text: >-
       Für das Aufstellen und Ausgleichen von Reaktionsgleichungen gibt es einen Assistenten,
@@ -147,15 +149,25 @@ assistants:
       - Warum löst sich Kochsalz in Wasser?
       - Was macht ein Katalysator?
 
-  # ── Rückfall-Assistent Naturwissenschaften (Landkarte: Rückfallebene; Messung 26./27.10.2026) ──
-  # Fachübergreifend (kein Fach), Kl. 5–13 (Jan: Biologie beginnt in Klasse 5). Erscheint im
-  # Vorschlag unter einem spezifischen Treffer bzw. für Aufgaben ohne spezifischen Assistenten.
+  # ── Allgemeine Assistenten: die Rückfallebene, einer je Tätigkeit (0.26) ──────────────────────
+  # Landkarte vom 28.10.2026, Plan „Rückfall-Assistenten“. Fachübergreifend (kein `subject`); die
+  # Fächer in `tags` dienen nur der Sortierung. Pflege durch den Admin (Entscheidung 1).
+  #
+  # Alle tragen die Bausteine „Begleiten statt lösen“ und „Grundton“ (app/assistants/bausteine/);
+  # der Prompt enthält nur die Tätigkeit. Sie ersetzen den früheren Sammel-Assistenten
+  # „naturwissenschaftliche Aufgaben“ (Prompt und Szenario bleiben als Archiv der Messungen).
+  #
+  # Modelle sind Startwerte; die Messung (Plan, Schritte 7–8) entscheidet. `chat-komplex` und
+  # `chat-code` sind für Schüler:innen nicht von selbst freigeschaltet: unter `/settings/models`
+  # für die Stufen freischalten.
+  #
+  # `operator_faecher`: kein `bnt` (entfällt mit V3); `nit` gibt es erst ab 2027/28, bis dahin
+  # übergeht der Seed es mit Warnung.
 
-  - name: naturwissenschaftliche Aufgaben
+  - name: Rechnen mit Größen und Einheiten
     description: >
-      Begleitet Schüler:innen bei Aufgaben aus Biologie, Chemie, Physik und NwT — rechnen,
-      erklären, Versuche und Diagramme auswerten, Experimente planen, beurteilen. Verweist
-      bei Stöchiometrie und Reaktionsgleichungen auf die beiden Chemie-Assistenten.
+      Begleitet Rechenaufgaben mit physikalischen, chemischen und biologischen Größen — gegeben
+      und gesucht, Größengleichungen umstellen, Einheiten umrechnen, sinnvoll runden.
     audience: student
     scope: all_students
     status: active
@@ -163,37 +175,524 @@ assistants:
     max_grade: 13
     model: chat-komplex
     disabled_augmentations: [metacognitive_nudges]
-    system_prompt_file: config/prompts/nw_aufgaben_assistent.md
-    tags: [biologie, chemie, physik, nwt]
-    # Päckchen AF: Aus diesen Fächern kommt die Definition des Operators, den die Aufgabe nennt.
-    # `nit` gibt es erst ab 2027/28 (in config/subjects.yaml noch auskommentiert); bis dahin
-    # übergeht der Seed es mit Warnung.
+    system_prompt_file: config/prompts/rechnen_groessen_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [physik, chemie, nwt, biologie]
+    operator_faecher: [physik, chemie, nwt, biologie]
+    suggest: fallback
+    suggestion_text: >-
+      Für Rechenaufgaben mit Größen und Einheiten gibt es einen Assistenten, der dich Schritt für
+      Schritt begleitet – rechnen tust du selbst.
+    trigger_examples:
+      - Wie berechne ich die Geschwindigkeit, wenn ein Zug 240 km in 3 Stunden fährt?
+      - ich muss die dichte von einem stein ausrechnen, masse 150 g volumen 60 cm³
+      - 'Aufgabe: Ein Wasserkocher hat 2000 W und läuft 3 Minuten. Wie viel Energie braucht er?'
+      - wie rechnet man km/h in m/s um
+      - Berechne die Kraft, die nötig ist, um 5 kg mit 2 m/s² zu beschleunigen
+      - ich weiß nicht wie ich die formel nach der zeit umstellen soll
+      - Welcher Strom fließt bei 12 V und 4 Ohm?
+      - 'Gegeben: m = 2 kg, h = 10 m. Gesucht: Lageenergie. Wie fange ich an?'
+      - wie viele stellen nach dem komma muss ich beim ergebnis angeben
+      - Wie viel Wärme braucht man, um 1 Liter Wasser von 20 auf 100 Grad zu erwärmen?
+      - ich hab 0,0045 kJ raus, kann das stimmen?
+      - Berechne den Druck, den ein Elefant mit 5 Tonnen auf vier Füße ausübt
+      - Bio-Aufgabe, das Herz pumpt 70 ml pro Schlag bei 75 Schlägen pro Minute, wie viel Liter sind das in einer Stunde
+      - 'm = 3 kg, a = 2 m/s², F = ?'
+    trigger_counterexamples:
+      - Löse die Gleichung 3x + 7 = 22
+      - Wie viel sind 15 Prozent von 80 Euro?
+      - Wie viel Gramm Kohlenstoffdioxid entstehen bei der Verbrennung von 24 g Kohlenstoff?
+      - Wie plane ich einen Versuch zur Abhängigkeit der Pendeldauer von der Länge?
+      - Was ist eigentlich Energie?
+      - Wir haben die Temperatur gemessen, wie zeichne ich daraus ein Diagramm?
+      - Beschreibe das Diagramm zur Bevölkerungsentwicklung
+      - Was ist der Unterschied zwischen Masse und Gewicht?
+
+  - name: Mathe-Aufgaben
+    description: >
+      Begleitet Mathematik-Aufgaben — rechnen mit Brüchen und Prozenten, Gleichungen und Terme,
+      Textaufgaben, Funktionen, Begründen und Beweisen.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/mathe_aufgaben_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [mathematik]
+    operator_faecher: [mathematik]
+    suggest: fallback
+    suggestion_text: >-
+      Für Mathe-Aufgaben gibt es einen Assistenten, der dich Schritt für Schritt begleitet – den
+      Rechenweg findest du selbst.
+    trigger_examples:
+      - Ein Rechteck ist 12 cm lang und 5 cm breit, wie groß sind Umfang und Fläche?
+      - ich versteh nicht wie man brüche mit verschiedenen nennern addiert
+      - Berechne 18 % von 250
+      - 'Textaufgabe: Ein Handyvertrag kostet 10 € Grundgebühr und 0,09 € pro Minute. Ab wann ist er teurer als eine Flatrate für 25 €?'
+      - wie berechnet man die nullstellen von f(x) = x² - 4x + 3
+      - Vereinfache den Term 3(a + 2b) - 2(a - b)
+      - wie geht schriftliches dividieren nochmal
+      - Zeige, dass die Winkelsumme im Dreieck 180° beträgt
+      - Bestimme die Steigung der Geraden durch die Punkte (1|2) und (3|8)
+      - ich muss die ableitung von x³ - 2x bilden, wie geht das
+      - Wie groß ist die Wahrscheinlichkeit, mit zwei Würfeln eine 7 zu werfen?
+      - wie löst man ein gleichungssystem mit zwei unbekannten
+      - Berechne den Flächeninhalt eines Kreises mit Radius 4 cm
+      - in mathe sollen wir ausrechnen wie viel ein liter benzin kostet wenn 40 liter 68 euro kosten
+      - Ein Fahrrad kostet nach 20 % Rabatt 360 €, was war der alte Preis?
+    trigger_counterexamples:
+      - Ein Auto fährt 90 km/h, wie weit kommt es in 20 Minuten? Rechne in Metern.
+      - Berechne die Dichte von Kupfer aus Masse und Volumen
+      - Was ist eine Funktion?
+      - Wie werte ich die Tabelle zur Arbeitslosigkeit aus?
+      - Mein Python-Programm rechnet die Summe falsch
+      - Was kommt in der Mathearbeit am Freitag dran?
+      - Wer hat den Satz des Pythagoras erfunden?
+      - Wie viele Sekunden hat ein Tag?
+
+  - name: Versuchsplanung und -auswertung
+    description: >
+      Begleitet Versuche und Experimente — planen, beobachten, Messwerte festhalten und darstellen,
+      deuten, Fehlerquellen finden, Protokoll — in Biologie, Chemie, Physik, BNT und NwT.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/versuche_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [biologie, chemie, physik, bnt, nwt]
     operator_faecher: [biologie, chemie, physik, nwt, nit]
     suggest: fallback
     suggestion_text: >-
-      Für Aufgaben aus Biologie, Chemie, Physik und NwT gibt es einen Assistenten, der dich
-      Schritt für Schritt begleitet – die Lösung erarbeitest du selbst.
+      Für eigene Versuche gibt es einen Assistenten, der dich beim Planen, beim Darstellen und Deuten
+      deiner Messwerte und beim Protokoll Schritt für Schritt begleitet – beobachten und deuten tust
+      du selbst.
     trigger_examples:
-      - Wie berechne ich die Beschleunigung, wenn ein Auto in 5 s von 0 auf 20 m/s kommt?
-      - erklär mal warum ein eisberg schwimmt, das sollen wir begründen
-      - Ich muss das Diagramm zur Fotosynthese auswerten, keine Ahnung wie
-      - wir haben einen versuch mit kressesamen gemacht, wie schreib ich die auswertung
-      - Wie plant man ein Experiment, ob die Temperatur die Gärung von Hefe beeinflusst?
-      - 'Aufgabe: Ein Körper mit 3 kg wird 2 m hochgehoben. Berechne die Lageenergie'
-      - Warum leuchtet eine Lampe heller, wenn man mehr Spannung anlegt? Erkläre
-      - Stelle eine Hypothese auf, warum Fische im warmen Wasser schlechter Sauerstoff bekommen
-      - Beurteile, ob Plastikflaschen oder Glasflaschen besser für die Umwelt sind
-      - ich soll beschreiben was im versuch passiert ist, was ist der unterschied zu erklären
-      - wie rechnet man den druck aus, kraft 200 N auf 0,5 m²
-      - Erläutere den Weg des Blutes durch den Körper
-      - Ich versteh die Tabelle bei der Aufgabe zum ohmschen Gesetz nicht
-      - Wie mache ich aus den Messwerten vom Pendelversuch ein Diagramm und was folgt daraus?
+      - wir haben einen versuch gemacht und ich weiß nicht wie ich das protokoll schreiben soll
+      - Wie plane ich ein Experiment, ob Licht das Wachstum von Bohnen beeinflusst?
+      - ich soll eine hypothese aufstellen warum das eis schneller schmilzt
+      - Was ist der Unterschied zwischen Beobachtung und Deutung in meinem Protokoll?
+      - Wir haben die Temperatur beim Erhitzen von Wasser jede Minute gemessen, wie werte ich das aus?
+      - welche fehlerquellen könnte unser versuch mit dem pendel haben
+      - wie mache ich aus meinen messwerten ein diagramm
+      - Ich soll einen Versuch zur Gärung mit Hefe planen, was muss ich gleich lassen?
+      - Bei unserem Versuch kam was anderes raus als erwartet, was schreibe ich in die Auswertung?
+      - 'Versuch: Kerze unter einem Glas geht aus. Ich muss die Beobachtung beschreiben'
+      - wie oft muss man einen versuch wiederholen damit es zählt
+      - Was ist ein Kontrollansatz und brauche ich den?
+      - kann ich den versuch mit essig und backpulver zu hause machen
+      - Unsere Messwerte streuen total, woran kann das liegen?
     trigger_counterexamples:
+      - Berechne die Beschleunigung aus 0 auf 100 km/h in 8 Sekunden
+      - Beschreibe das Klimadiagramm von Kairo
+      - Wie viel Gramm Wasser entstehen bei der Verbrennung von 4 g Wasserstoff?
+      - Gleich die Reaktionsgleichung für die Verbrennung von Magnesium aus
+      - Was ist Fotosynthese?
+      - Wie funktioniert ein Elektromotor?
+      - Wie gliedere ich mein Referat über Vulkane?
+      - Wir planen in NwT einen Roboter, wie teilen wir die Arbeit auf?
+
+  - name: Auswerten von Diagrammen, Tabellen und Statistiken
+    description: >
+      Begleitet das Lesen, Beschreiben, Deuten und kritische Prüfen von Diagrammen, Tabellen,
+      Klimadiagrammen, Statistiken und Umfrageergebnissen.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/diagramme_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [geographie, gemeinschaftskunde, wirtschaft, biologie, mathematik]
+    operator_faecher: [geographie, gemeinschaftskunde, wirtschaft, biologie, mathematik]
+    suggest: fallback
+    suggestion_text: >-
+      Für fertige Diagramme, Tabellen und Statistiken aus Buch oder Arbeitsblatt gibt es einen
+      Assistenten, der dich beim Beschreiben und Deuten Schritt für Schritt begleitet – die
+      Auswertung schreibst du selbst.
+    trigger_examples:
+      - ich muss ein klimadiagramm auswerten, wie fange ich an
+      - Beschreibe das Säulendiagramm zur Entwicklung der Arbeitslosigkeit
+      - In der Tabelle stehen die Einwohnerzahlen von 1950 bis 2020, was soll ich damit machen?
+      - wie beschreibt man ein liniendiagramm richtig
+      - Wir sollen eine Umfrage zur Handynutzung auswerten
+      - was ist der unterschied zwischen prozent und prozentpunkten in der statistik
+      - Werte das Kreisdiagramm zur Stromerzeugung in Deutschland aus
+      - wie erkenne ich ob ein diagramm manipuliert ist
+      - Ich soll zwei Bevölkerungspyramiden vergleichen
+      - 'Statistik: Mittelwert und Median, welcher ist bei Einkommen sinnvoller?'
+      - Was sagt mir dieses Diagramm zum CO2-Ausstoß pro Kopf?
+      - wie lese ich die zweite achse im klimadiagramm
+      - Interpretiere die Grafik zur Wahlbeteiligung nach Alter
+    trigger_counterexamples:
+      - Wir haben in Physik die Federverlängerung gemessen, wie schreibe ich das Protokoll?
+      - Berechne den Mittelwert von 4, 7, 9 und 12
+      - Zeichne den Graphen von f(x) = 2x + 1
+      - Analysiere die Karikatur zur Flüchtlingspolitik
+      - Was ist ein Klima?
+      - Was ist das Bruttoinlandsprodukt?
+      - Wie halte ich ein gutes Referat?
+      - Wie berechnet man die Bevölkerungsdichte?
+
+  - name: Analysieren von Texten, Quellen und Bildern
+    description: >
+      Begleitet das Untersuchen und Deuten von Gedichten, Erzähltexten, Dramen, Sachtexten,
+      historischen Quellen, Karikaturen und Bildern — Deutung und Belege kommen von der Schüler:in.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/analysieren_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [deutsch, geschichte, gemeinschaftskunde, bildende-kunst, englisch, franzoesisch, spanisch]
+    operator_faecher: [deutsch, geschichte, gemeinschaftskunde, bildende-kunst, englisch]
+    suggest: fallback
+    suggestion_text: >-
+      Für das Analysieren von Texten, Quellen und Bildern gibt es einen Assistenten, der dich Schritt
+      für Schritt begleitet – die Deutung findest du selbst.
+    trigger_examples:
       - Kannst du mir bei der Gedichtanalyse helfen?
+      - ich muss eine kurzgeschichte interpretieren und weiß nicht wo ich anfangen soll
+      - Wie analysiert man eine historische Quelle?
+      - 'Analysiere die Karikatur: ein Mann sitzt auf einem Sparschwein'
+      - welche sprachlichen mittel gibt es in diesem gedicht
+      - Ich soll die Figur des Vaters in der Geschichte charakterisieren
+      - Wie beschreibe ich ein Gemälde für Kunst?
+      - was will der autor mit dem text sagen
+      - Wir analysieren eine Rede von 1933, worauf muss ich achten?
+      - wie finde ich eine deutungshypothese
+      - Ich muss eine Szene aus Romeo und Julia analysieren
+      - Analyse a poem for English, I don't know what to look for
+      - Was ist der Unterschied zwischen Inhaltsangabe und Interpretation?
+      - In der Geschichte, die wir lesen, verrät der Junge seinen Freund – wie deute ich das?
+      - Was will uns die Erzählung über die Figur der Mutter sagen?
+    trigger_counterexamples:
+      - Fass mir den Inhalt von Romeo und Julia kurz zusammen
+      - Hier ist mein fertiger Interpretationsaufsatz, kannst du ihn verbessern?
+      - Ich muss eine Erörterung zum Thema Schuluniform schreiben
       - Wann war der Dreißigjährige Krieg?
-      - Löse die Gleichung 2x - 4 = 10
+      - Was ist eine Metapher?
+      - Schreib mir eine Zusammenfassung von Faust
+      - Ist das Komma in meinem Satz richtig?
+      - Beschreibe das Diagramm zur Wahlbeteiligung
+      - Übersetz mir den Text ins Deutsche
+
+  - name: Argumentieren und Erörtern
+    description: >
+      Begleitet das Finden, Prüfen und Gewichten von Argumenten, Erörterungen, Stellungnahmen und
+      Dilemmata — Argumente und Urteil kommen von der Schüler:in.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 7
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/argumentieren_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [deutsch, ethik, religion-ev, religion-kath, religion-isl, gemeinschaftskunde]
+    operator_faecher: [deutsch, ethik, religion-ev, religion-kath, religion-isl, gemeinschaftskunde]
+    suggest: fallback
+    suggestion_text: >-
+      Fürs Argumentieren und Erörtern gibt es einen Assistenten, der dich Schritt für Schritt
+      begleitet – die Argumente und dein Urteil findest du selbst.
+    trigger_examples:
       - Wie schreibe ich eine Erörterung?
+      - ich brauche argumente für und gegen handyverbot an schulen
+      - Was ist der Unterschied zwischen einer linearen und einer dialektischen Erörterung?
+      - Wir sollen Stellung nehmen, ob das Wahlalter auf 16 gesenkt werden soll
+      - wie baut man ein gutes argument auf
+      - Ich muss ein Dilemma in Ethik bearbeiten, wie gehe ich vor?
+      - mein argument ist irgendwie zu schwach, wie mache ich es besser
+      - Sollen Tierversuche erlaubt sein? Ich muss das diskutieren
+      - wie gliedere ich meine pro und contra argumente
+      - Wie komme ich am Ende der Erörterung zu einem Urteil?
+      - Ich soll beurteilen, ob ein Tempolimit sinnvoll ist
+      - wie entkräfte ich ein gegenargument
+      - 'Bewerte, ob Schuluniformen sinnvoll sind. Meine Antwort: Nein, weil man sich dann nicht ausdrücken kann. Reicht das?'
+      - Ich soll bewerten, ob Atomkraft eine gute Lösung ist
+      - Beurteile, ob man Autos aus der Innenstadt verbannen sollte
+    trigger_counterexamples:
+      - Welche Partei soll ich wählen?
+      - Welche Spielkonsole soll ich mir kaufen?
+      - Hier ist meine Erörterung, korrigier bitte die Rechtschreibung
+      - Analysiere die Rede von Martin Luther King
+      - Was ist Ethik?
+      - Wie viele Menschen sterben jährlich im Straßenverkehr?
+      - Was ist deine Meinung zur Todesstrafe?
+      - Wie halte ich ein Referat über den Klimawandel?
+      - Interpretiere das Gedicht „Der Panther“
+      - Wann ist die nächste Deutscharbeit?
+
+  - name: Überarbeiten eigener Texte
+    description: >
+      Rückmeldung zu eigenen Texten und Begleitung beim Planen — Aufsatz, Bericht, Brief, Bewerbung,
+      Texte in Fremdsprachen; der Assistent schreibt nichts um.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/ueberarbeiten_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [deutsch, englisch, franzoesisch, spanisch]
+    operator_faecher: [deutsch, englisch, franzoesisch, spanisch]
+    suggest: fallback
+    suggestion_text: >-
+      Für das Planen und Überarbeiten eigener Texte gibt es einen Assistenten, der dir Rückmeldung
+      gibt – verbessern tust du selbst.
+    trigger_examples:
+      - Ich muss mich um einen Praktikumsplatz bewerben, wie baue ich das Anschreiben auf?
+      - Kannst du meinen Aufsatz durchlesen und sagen, was ich besser machen kann?
+      - ich hab eine bewerbung geschrieben, ist die so gut?
+      - Hier ist meine Inhaltsangabe, passt das so?
+      - Can you give me feedback on my English essay?
+      - mein lehrer sagt mein text hat keinen roten faden, was heißt das
+      - Ich muss einen Bericht über unseren Ausflug schreiben, wie fange ich an?
+      - wie kann ich meinen schluss besser machen
+      - Ist meine Einleitung zu lang?
+      - Ich habe einen Brief an die Stadt geschrieben, wirkt der zu unfreundlich?
+      - hier ist mein text auf französisch, kannst du feedback geben
+      - wie vermeide ich wiederholungen in meinem text
+      - Mein Aufsatz ist zu kurz, was fehlt?
+      - Ist mein Text sachlich genug für einen Leserbrief?
+    trigger_counterexamples:
+      - Schreib mir einen Aufsatz über den Sommer
+      - Wie analysiere ich ein Gedicht?
+      - Ich brauche Argumente für eine Erörterung
+      - Wann schreibt man das mit zwei s?
+      - Übersetz mir meinen Text ins Englische
+      - Was ist ein Adjektiv?
+      - Wie mache ich gute Folien für mein Referat?
+      - Was ist eine Inhaltsangabe?
+
+  - name: Grammatik und Rechtschreibung
+    description: >
+      Begleitet Grammatik und Rechtschreibung in Deutsch, Englisch, Französisch, Spanisch und
+      Latein — Regeln verstehen, eigene Fehler selbst finden, üben; Latein ohne Übersetzen.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/grammatik_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [deutsch, englisch, franzoesisch, spanisch, latein]
+    operator_faecher: [deutsch, englisch, franzoesisch, spanisch, latein]
+    suggest: fallback
+    suggestion_text: >-
+      Für Grammatik und Rechtschreibung gibt es einen Assistenten, der dir Regeln erklärt und dich
+      Fehler selbst finden lässt – verbessern tust du selbst.
+    trigger_examples:
+      - wann schreibt man das und wann dass
+      - Ich verstehe den Unterschied zwischen Simple Past und Present Perfect nicht
+      - Wo kommen in diesem Satz die Kommas hin?
+      - kannst du mir übungen zu den zeitformen im englischen geben
+      - Wie bestimme ich die Form von amicorum?
+      - wann benutzt man ser und wann estar
+      - Hab ich in diesem Satz Fehler? He don't like apples.
+      - Groß- oder Kleinschreibung bei „das Lesen“?
+      - Ich brauche Hilfe beim passé composé mit être
+      - wie finde ich in einem lateinischen satz das prädikat
+      - Die Lehrerin hat in meinem Aufsatz dreimal „Zeit“ an den Rand geschrieben, was habe ich falsch gemacht?
+      - wann schreibt man ß und wann ss
+      - Übe mit mir if-clauses
+      - Sagt man „trotz dem Wetter“ oder „trotz des Wetters“?
+      - Wie konjugiert man venir im futur simple?
+    trigger_counterexamples:
       - Übersetz mir den Satz ins Englische
-      - Wann ist die nächste Chemiearbeit?
-      - Was ist eigentlich ein Atom?
+      - Kannst du meinen Aufsatz insgesamt bewerten?
+      - Wie schreibe ich eine Bewerbung?
+      - Analysiere das Gedicht von Goethe
+      - Was heißt „Hund“ auf Französisch?
+      - Wie schreibe ich eine gute Einleitung?
+      - Wer war Cicero?
+      - Wie lerne ich Vokabeln am besten für die Arbeit?
+
+  - name: Recherche, Referat und Präsentation
+    description: >
+      Begleitet Referate, GFS und Präsentationen — Thema eingrenzen, recherchieren, Quellen prüfen,
+      gliedern, Folien, Handout, Vortrag, Quellenangaben.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/recherche_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [deutsch, geschichte, geographie, biologie, englisch]
+    suggest: fallback
+    suggestion_text: >-
+      Für Referate, GFS und Präsentationen gibt es einen Assistenten, der dich vom Thema bis zum
+      Vortrag Schritt für Schritt begleitet – recherchieren und vortragen tust du selbst.
+    trigger_examples:
       - Hilf mir bei meinem Referat über Fußball
+      - ich muss eine gfs halten und weiß nicht wie ich anfangen soll
+      - Wie finde ich gute Quellen für mein Referat?
+      - wie viel text gehört auf eine folie
+      - Mein Thema ist zu groß, wie grenze ich es ein?
+      - Wie gebe ich Bilder aus dem Internet richtig an?
+      - ich hab angst vor meinem vortrag morgen, wie übe ich am besten
+      - Was gehört auf ein Handout?
+      - wie erkenne ich ob eine internetseite seriös ist
+      - Brauche ich eine Leitfrage für meine Präsentation?
+      - Muss ich angeben, dass ich dich für mein Referat benutzt habe?
+      - wie gliedere ich ein referat über die französische revolution
+      - Wie beginne ich meinen Vortrag spannend?
+    trigger_counterexamples:
+      - Schreib mir ein Referat über Vulkane
+      - Was ist ein Vulkan?
+      - Wann begann die Französische Revolution?
+      - Kannst du meine Erörterung überarbeiten?
+      - Wir bauen in NwT ein Solarauto und müssen das dokumentieren
+      - Beschreibe die Grafik zum Tourismus
+      - Wie analysiere ich eine Quelle?
+      - Wie lerne ich für die Geschichtsarbeit?
+
+  - name: Planen und Dokumentieren von Projekten
+    description: >
+      Begleitet Projekte in NwT, Seminarkurs, GFS oder Kunst — Ziel, Ideen, Entscheidung, Plan,
+      Arbeitsteilung, Arbeitsjournal und Abschluss.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 7
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/projekte_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [nwt, nwt-bf, bildende-kunst]
+    operator_faecher: [nwt]
+    suggest: fallback
+    suggestion_text: >-
+      Für Projekte gibt es einen Assistenten, der dich beim Planen, Aufteilen und Dokumentieren
+      Schritt für Schritt begleitet – planen und entscheiden tust du selbst.
+    trigger_examples:
+      - Wir bauen in NwT ein Solarauto und wissen nicht wo wir anfangen sollen
+      - wie schreibt man ein arbeitsjournal
+      - Wir müssen zwischen drei Ideen für unser Projekt entscheiden
+      - wie teilen wir im team die aufgaben auf
+      - Unser Projekt hängt hinterher, wie machen wir einen besseren Zeitplan?
+      - Was sind Meilensteine in einem Projekt?
+      - wie schreibe ich ein lastenheft
+      - Wir sollen am Ende unser Projekt reflektieren, was gehört da rein?
+      - Einer in unserer Gruppe macht nichts, was sollen wir tun?
+      - wie dokumentiere ich mein seminarkurs-projekt richtig
+      - Wir wollen eine Wetterstation bauen, wie planen wir das?
+      - welche kriterien nehme ich für eine bewertungstabelle
+      - Wie stelle ich unser Projekt am Projekttag vor?
+      - Wir können uns im Team nicht einigen, welche Idee wir für unser Projekt nehmen
+      - Wir müssen am Ende eine Projektmappe abgeben, was kommt da rein?
+    trigger_counterexamples:
+      - Wie schreibe ich eine Bewerbung für ein Schülerpraktikum?
+      - Mein Arduino-Code für den Sensor funktioniert nicht
+      - Wie plane ich einen Versuch zur Wärmedämmung?
+      - Wie halte ich eine GFS?
+      - Was ist ein Elektromotor?
+      - Berechne die Leistung eines Solarmoduls mit 5 V und 0,3 A
+      - Wie werte ich unsere Messwerte zur Solarzelle aus?
+      - Schreib mir einen Projektplan für ein Hochbeet
+      - Wie lerne ich für die NwT-Arbeit?
+
+  - name: Programmieren
+    description: >
+      Begleitet das Planen, schrittweise Entwickeln und Debuggen von Programmen — Python, Scratch,
+      Java, JavaScript, Arduino; der Code kommt von der Schüler:in.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 7
+    max_grade: 13
+    model: chat-code
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/programmieren_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: [informatik, ium, nwt]
+    operator_faecher: [informatik, ium]
+    suggest: fallback
+    suggestion_text: >-
+      Fürs Programmieren gibt es einen Assistenten, der dich beim Planen, Schreiben und Fehlersuchen
+      Schritt für Schritt begleitet – den Code schreibst du selbst.
+    trigger_examples:
+      - mein python programm gibt einen fehler aus und ich weiß nicht warum
+      - Wie fange ich an, ein Programm für ein Zahlenratespiel zu schreiben?
+      - meine schleife hört nicht auf
+      - 'Ich bekomme „IndentationError: unexpected indent“, was heißt das?'
+      - Wie mache ich in Scratch, dass die Figur springt, wenn ich die Leertaste drücke?
+      - mein arduino blinkt nicht, obwohl der code richtig aussieht
+      - Wie zeichne ich ein Struktogramm für meine Aufgabe?
+      - Wie speichere ich mehrere Werte in einer Liste?
+      - mein programm rechnet den durchschnitt falsch
+      - Was ist der Unterschied zwischen einer for- und einer while-Schleife in meiner Aufgabe?
+      - Ich muss eine Funktion schreiben, die prüft, ob eine Zahl eine Primzahl ist
+      - warum kommt bei mir NullPointerException in java
+      - Wie teste ich, ob mein Programm alle Fälle richtig macht?
+    trigger_counterexamples:
+      - Schreib mir ein Programm, das Primzahlen ausgibt
+      - Was ist ein Algorithmus?
+      - Wie funktioniert ein Computer?
+      - Wir bauen einen Roboter und müssen die Arbeit im Team verteilen
+      - Löse die Gleichung x² = 49
+      - Wie installiere ich Python auf meinem Laptop?
+      - Wie halte ich ein Referat über künstliche Intelligenz?
+      - Ist Informatik ein gutes Leistungsfach?
+
+  - name: Lernen und Prüfungsvorbereitung
+    description: >
+      Begleitet das Lernen für Klassenarbeiten — Lernplan, Stoffübersicht, Abfragen, Übungen, aus
+      alten Fehlern lernen; nutzt den Umfang der Arbeit aus der Planung, wenn es ihn gibt.
+    audience: student
+    scope: all_students
+    status: active
+    min_grade: 5
+    max_grade: 13
+    model: chat-standard
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/lernen_assistent.md
+    bausteine: [begleiten_statt_loesen, grundton]
+    tags: []
+    suggest: fallback
+    suggestion_text: >-
+      Für das Lernen auf eine Klassenarbeit gibt es einen Assistenten, der mit dir einen Lernplan
+      macht und dich abfragt – lernen tust du selbst.
+    trigger_examples:
+      - Wann ist die nächste Chemiearbeit?
+      - ich schreibe am freitag mathe und hab noch nichts gelernt
+      - Kannst du mich für die Bio-Arbeit abfragen?
+      - Wie mache ich einen Lernplan für die Klassenarbeit?
+      - was kommt in der englischarbeit dran
+      - Ich habe Prüfungsangst vor der Arbeit morgen
+      - wie lerne ich am besten vokabeln für den test
+      - Frag mich zu den Ursachen des Ersten Weltkriegs ab
+      - Ich hab in der letzten Arbeit eine 5 geschrieben, wie mache ich es diesmal besser?
+      - wie schreibe ich einen guten lernzettel
+      - Gib mir Übungsaufgaben für die Arbeit über Brüche
+      - ich habe noch drei tage bis zur physikarbeit, was soll ich zuerst lernen
+      - Wie bereite ich mich auf die mündliche Prüfung vor?
+    trigger_counterexamples:
+      - Löse die Aufgabe 3 auf Seite 45 für mich
+      - Was ist ein Bruch?
+      - Wann sind die Sommerferien?
+      - Wie schreibe ich eine Erörterung?
+      - Erkläre mir die Fotosynthese
+      - Ich verstehe die Aufgabe zur Stoffmenge nicht
+      - Wie halte ich ein Referat?
+      - Kannst du meinen Aufsatz korrigieren?

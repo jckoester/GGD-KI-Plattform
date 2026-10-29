@@ -127,14 +127,22 @@ def _bewerte(faelle, art, typ, s, gegen_regel):
 
 def entscheidung_im_assistenten(abstaende, art, aktuell, s_spez, s_rueck, gegen_regel,
                                 marge, s_beenden) -> tuple[str, str | None]:
-    """`wechsel` (zu wem), `beenden` oder `bleiben` — Notiz, Abschnitt Dialog."""
+    """`wechsel` (zu wem) oder `bleiben` — die reine Embedding-Regel K5-neu (29.10.2026), die
+    der Dienst bis zum Klassifikator in der Assistenten-Konversation hatte: ein anderer Assistent
+    unter 0,45 (Rückfall 0,30), näher an seinen Beispielen als an seinen Gegenbeispielen, um die
+    Marge näher als der aktuelle (``marge`` für spezifische, 0,10 für Rückfälle). Bleibt als
+    Vergleich; den Dienst misst `assistent_vorschlag_k5_messung.py`. ``s_spez``, ``s_rueck`` und
+    ``s_beenden`` bleiben nur der Signatur halber."""
+    IM_ASSISTENTEN, IM_ASSISTENTEN_RUECKFALL, MARGE_RUECKFALL = 0.45, 0.30, 0.10
     eigen = abstaende[aktuell].bsp
-    andere = [n for n in auswahl(abstaende, art, s_spez, s_rueck, gegen_regel, ohne=aktuell)
-              if abstaende[n].bsp + marge < eigen]
+    andere = sorted((n for n, a in abstaende.items()
+                     if n != aktuell
+                     and a.bsp < (IM_ASSISTENTEN if art[n] == "specific" else IM_ASSISTENTEN_RUECKFALL)
+                     and a.bsp < a.gegen
+                     and a.bsp + (marge if art[n] == "specific" else MARGE_RUECKFALL) < eigen),
+                    key=lambda n: abstaende[n].bsp)
     if andere:
         return "wechsel", andere[0]
-    if eigen > s_beenden:
-        return "beenden", None
     return "bleiben", None
 
 
@@ -143,7 +151,8 @@ def bewerte_k5(faelle, art, s_spez, s_rueck, gegen_regel, marge, s_beenden):
     for f in faelle:
         ergebnis, ziel = entscheidung_im_assistenten(f["abstaende"], art, f["aktuell"], s_spez, s_rueck,
                                                     gegen_regel, marge, s_beenden)
-        richtig = ergebnis == f["erwartet"] and (ergebnis != "wechsel" or ziel == f.get("wechsel_zu"))
+        richtig = ((ergebnis == f["erwartet"] and (ergebnis != "wechsel" or ziel == f.get("wechsel_zu")))
+                   or ergebnis in (f.get("darf") or []))
         if not richtig:
             fehler[f["erwartet"]].append(f["text"][:40])
     ok = all(len(v) <= 1 for v in fehler.values())

@@ -52,6 +52,13 @@ def ergebnis_im_assistenten(optionen: list[dict] | None, namen: dict[int, str]) 
     return "wechsel", namen.get(optionen[0]["assistant_id"], str(optionen[0]["assistant_id"]))
 
 
+def verweist(antwort: str, name: str) -> bool:
+    """K9: Der erste Satz der Antwort nennt den Assistenten ``name``."""
+    import re
+    erster = re.split(r"(?<=[.!?])\s", antwort.strip(), maxsplit=1)[0].lower()
+    return name.lower() in erster
+
+
 def rechtzeitig(faelle: list[dict]) -> dict:
     """K6: Unter den Fällen mit Klassifikator-Aufruf (oder K5-Entscheidung) — wie viele
     scheiterten am Zeitlimit, und wie lange kam ein Vorschlag nach der Antwort?"""
@@ -89,18 +96,32 @@ def main() -> None:
     art = {n: s for n, s in entfall._alle(conn, "SELECT name, suggest FROM assistants")}
     vorher = entfall._eins(conn, "SELECT coalesce(sum(kosten_usd), 0) FROM system_spend WHERE tag = current_date") or 0
 
-    faelle, im_assi, konversationen = [], [], []
+    faelle, im_assi, konversationen, abbrueche = [], [], [], []
     with httpx.Client(base_url=args.basis, timeout=300.0) as client:
-        def fragen(text, stufe, assistent=None):
+        def fragen(text, stufe, assistent=None, vorher=None):
             token, _ = get_jwt_service().issue(pseudonym=pseudonym, roles=["student"], grade=str(stufe))
             client.cookies.set("session", token)
+            # C4 (0.26): mitten im Gespräch — die letzte Antwort des Assistenten als Verlauf.
+            verlauf = ([{"role": "user", "content": "(vorige Nachricht)"},
+                        {"role": "assistant", "content": vorher}] if vorher else None)
             r = chat_probe.frage_stellen(client, text, assistent=assistent, gruppe=None,
-                                         modell=None if assistent else args.modell)
+                                         modell=None if assistent else args.modell, verlauf=verlauf)
             konversationen.append(r["konversation"])
             return r
+        def sicher(*a, **kw):
+            # Ein hängender Fall (ReadTimeout nach 300 s, 29.10.2026) soll nicht den ganzen Lauf
+            # kosten: Er wird als Fehler protokolliert, und es geht weiter.
+            try:
+                return fragen(*a, **kw)
+            except httpx.HTTPError as e:
+                print(f"  ⚠️ {type(e).__name__}: {a[0][:60]}", flush=True)
+                abbrueche.append(f"{type(e).__name__}: {a[0][:60]}")
+                return {"vorschlag": None, "vorab_debug": None, "konversation": None,
+                        "t_message": None, "t_vorschlag": None, "t_ende": None}
+
         for f in satz["faelle"]:
             text = k.C1.text_des_falls(f)
-            r = fragen(text, f["stufe"])
+            r = sicher(text, f["stufe"])
             faelle.append({**f, "kennung": f.get("quelle", f.get("text", ""))[:45], "text": text,
                            "soll": f.get("soll") or [], "nicht": f.get("nicht") or [],
                            "gewaehlt": [namen.get(o["assistant_id"], "?") for o in r["vorschlag"] or []
@@ -109,9 +130,15 @@ def main() -> None:
                            **{x: r[x] for x in ("t_message", "t_vorschlag", "t_ende")}})
             print(f"{faelle[-1]['kennung'][:40]:<41} {f['art']:<9} → {', '.join(faelle[-1]['gewaehlt']) or '—'}", flush=True)
         for f in satz["in_assistent"]:
-            r = fragen(f["text"], f["stufe"], assistent=ids[f["aktuell"]])
+            r = sicher(f["text"], f["stufe"], assistent=ids[f["aktuell"]], vorher=f.get("vorher"))
             ergebnis, ziel = ergebnis_im_assistenten(r["vorschlag"], namen)
-            richtig = ergebnis == f["erwartet"] and (ergebnis != "wechsel" or ziel == f.get("wechsel_zu"))
+            # K9 (C5): Verweist die Antwort im ersten Satz auf den anderen Rückfall-Assistenten?
+            if f.get("verweis_auf"):
+                f = {**f, "k9": verweist(r.get("antwort") or "", f["verweis_auf"]),
+                     "antwort_anfang": (r.get("antwort") or "").strip()[:160]}
+            # `darf` (K5-neu): ein Dialog, der nicht verlangt, aber vertretbar ist (etwa „beenden“).
+            richtig = ((ergebnis == f["erwartet"] and (ergebnis != "wechsel" or ziel == f.get("wechsel_zu")))
+                       or ergebnis in (f.get("darf") or []))
             im_assi.append({**f, "ergebnis": ergebnis, "ziel": ziel, "richtig": richtig,
                             "debug": (r["vorab_debug"] or {}).get("vorschlag"),
                             **{x: r[x] for x in ("t_message", "t_vorschlag", "t_ende")}})
@@ -137,6 +164,17 @@ def main() -> None:
          f"- **Prüfsatz:** {len(faelle)} Fälle im freien Chat, {len(im_assi)} in Assistenten-Konversationen", "",
          "## Ergebnis", ""]
     t += [f"- **{x}:** {'✓' if kk[x] else '✗'}" for x in ("K1", "K2", "K3", "K4")]
+    if abbrueche:
+        t.append(f"- ⚠️ **Abgebrochene Fälle:** {len(abbrueche)} — " + "; ".join(abbrueche))
+    k9 = [f for f in im_assi if "k9" in f]
+    if k9:
+        t.append(f"- **K9 (Rückfall → Rückfall, Verweis im ersten Satz):** "
+                 f"{sum(f['k9'] for f in k9)}/{len(k9)} — "
+                 + "; ".join(f"{f['text'][:30]} → {f['verweis_auf']}: {'✓' if f['k9'] else '✗'} "
+                             f"(„{f.get('antwort_anfang', '')[:80]}…“)" for f in k9))
+    t.append(f"- **K8 (Nachbarpaare, richtiger zuerst):** {'✓' if kk['K8'] else '✗'} — "
+             f"{kk['k8_paare'] - len(kk['k8_fehl'])}/{kk['k8_paare']}"
+             + (f"; daneben: {', '.join(kk['k8_fehl'])}" if kk["k8_fehl"] else ""))
     t.append("- **Positive im Dialog:** " + "; ".join(f"{a} {x}/{g}" for a, (x, g) in kk["positiv"].items()))
     t.append("- **Nachbar-Fehltreffer:** " + "; ".join(f"{a} {x}/{g}" for a, (x, g) in kk["nachbar"].items()))
     t.append(f"- **Begriff/Alltag mit Dialog:** {', '.join(kk['stoer']) or '—'}")

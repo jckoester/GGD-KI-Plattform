@@ -27,7 +27,7 @@ def test_lies_antwort_robust():
 def test_auswahl_rueckfall_aus_fallbacks_sonst_klassifikator():
     erlaubt = {1: "specific", 2: "specific", 5: "fallback", 6: "fallback"}
     assert K.auswahl([1], [6], {1: [5]}, erlaubt) == [1, 5]               # fallbacks des Treffers
-    assert K.auswahl([], [6, 5], {}, erlaubt) == [6, 5]                    # nur Rückfall
+    assert K.auswahl([], [6, 5], {}, erlaubt) == [6]                       # nur der erste Rückfall (V1)
     assert K.auswahl([1, 2], [], {1: [7]}, erlaubt) == [1, 2]              # 7 ist kein Kandidat
 
 
@@ -41,3 +41,12 @@ def test_bewerte():
     assert (e["K1"], e["K2"], e["K3"], e["K4"]) == (True, True, True, True)
     e = K.bewerte(faelle + [{"art": "begriff", "soll": [], "nicht": [], "gewaehlt": ["R"], "kennung": "b"}], art)
     assert not e["K3"] and e["stoer"] == ["b"]
+
+
+def test_k8_richtiger_zuerst_oder_beide():
+    k8 = K.k8_trifft
+    f = {"soll": ["A"], "nicht": ["B"], "darf": ["C"]}
+    assert k8(f | {"gewaehlt": ["A", "B"]})
+    assert k8(f | {"gewaehlt": ["C", "A"]})            # darf davor stört nicht
+    assert not k8(f | {"gewaehlt": ["B", "A"]})        # Nachbar zuerst
+    assert not k8(f | {"gewaehlt": ["C"]})             # richtiger fehlt

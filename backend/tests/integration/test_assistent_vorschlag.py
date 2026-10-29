@@ -112,16 +112,35 @@ async def test_ohne_modell_kein_vorschlag(sitzungen, bestand):
     assert v is None and not k.await_count
 
 
-async def test_in_der_assistenten_konversation_ohne_klassifikator(sitzungen, bestand):
-    # Aktuell NW (~0,14): Stöchio (~0,005) liegt um mehr als die Marge näher → Wechsel.
-    v, k = await _vorschlag(sitzungen, aktuell_id=bestand["nw"])
-    assert _ids(v) == [bestand["stoech"]] and not k.await_count
-    # Schon angeboten: kein Ausweichen auf den Nächstbesten.
-    v, _ = await _vorschlag(sitzungen, aktuell_id=bestand["nw"], schon_vorgeschlagen={bestand["stoech"]})
+async def _im_assistenten(sitzungen, antwort='{"neue_aufgabe": null}', **mehr):
+    werte = dict(nachricht="Wie viel Gramm …", vektor=NACHRICHT, zugang=ZUGANG, schon_vorgeschlagen=set(),
+                 konversationsfach=None, client=None, letzte_antwort="Welche Größe fehlt dir noch?") | mehr
+    k = AsyncMock(return_value={"roh": antwort, "dauer": 0.1})
+    with patch.object(dienst, "_aufruf", k), patch.object(settings, "vorschlag_model", "system-vorschlag"):
+        async with sitzungen() as db:
+            return await dienst.vorschlagen(db, **werte), k
+
+
+async def test_in_der_assistenten_konversation_entscheidet_der_klassifikator(sitzungen, bestand):
+    """Jan, 29.10.2026 (nach k5-1): Liegt ein anderer Assistent näher als 0,45, fragt der
+    Klassifikator — mit der letzten Nachricht des Assistenten als Kontext."""
+    v, k = await _im_assistenten(sitzungen, f'{{"neue_aufgabe": {bestand["stoech"]}}}', aktuell_id=bestand["nw"])
+    assert _ids(v) == [bestand["stoech"]]
+    system, inhalt = k.await_args.args
+    assert system == dienst.SYSTEM_IM_ASSISTENTEN
+    assert "Welche Größe fehlt dir noch?" in inhalt and "Assistent für VOR NW" in inhalt
+    assert f"Kennung {bestand['stoech']}" in inhalt
+    # Laufendes Gespräch, fremde Kennung oder Unlesbares: bleiben.
+    for roh in ('{"neue_aufgabe": null}', '{"neue_aufgabe": 999}', "weiß nicht"):
+        v, _ = await _im_assistenten(sitzungen, roh, aktuell_id=bestand["nw"])
+        assert v is None
+    # Schon angeboten: nicht noch einmal.
+    v, _ = await _im_assistenten(sitzungen, f'{{"neue_aufgabe": {bestand["stoech"]}}}', aktuell_id=bestand["nw"],
+                                 schon_vorgeschlagen={bestand["stoech"]})
     assert v is None
-    # Aktuell Stöchio, Nachricht weit weg von allem → beenden; mit Ruheregel nichts.
-    v, _ = await _vorschlag(sitzungen, aktuell_id=bestand["stoech"], vektor=[0.0, 0.0, -1.0])
-    assert [o.art for o in v.optionen] == ["beenden"]
-    v, _ = await _vorschlag(sitzungen, aktuell_id=bestand["stoech"], vektor=[0.0, 0.0, -1.0],
-                            schon_vorgeschlagen={dienst.BEENDEN_KENNUNG})
-    assert v is None
+
+
+async def test_in_der_assistenten_konversation_ohne_kandidat_kein_aufruf(sitzungen, bestand):
+    # Nachricht weit weg von allem: bleiben, ohne Aufruf — und nie „beenden“.
+    v, k = await _im_assistenten(sitzungen, aktuell_id=bestand["stoech"], vektor=[0.0, 0.0, -1.0])
+    assert v is None and not k.await_count

@@ -37,7 +37,6 @@ def test_schueler_assistent_traegt_vorschlag(eintrag):
 @pytest.mark.parametrize("szenario,name", [
     ("stoechiometrie.yaml", "stöchiometrische Berechnungen"),
     ("reaktionsgleichung.yaml", "Reaktionsgleichungen"),
-    ("nw_aufgaben.yaml", "naturwissenschaftliche Aufgaben"),
 ])
 def test_pruefsatz_nicht_unter_den_beispielen(szenario, name):
     """Die ersten Züge der Messszenarien sind der zurückgehaltene Prüfsatz (C1, Schritt 0/5)."""
@@ -64,21 +63,27 @@ def test_rueckfaelle_zeigen_auf_assistenten_der_datei():
             assert next(x for x in EINTRAEGE if x["name"] == r)["suggest"] == "fallback"
 
 
-def test_nw_assistent_hat_operator_faecher():
-    """Päckchen AF: Ohne Fächerkreis bekäme der Prompt (v5d) nie den Abschnitt „Operator
-    dieser Aufgabe"; die Fächer müssen in der ausgelieferten `subjects.yaml` stehen."""
-    import yaml
-    from pathlib import Path
-
-    wurzel = Path(__file__).resolve().parents[3]
-    eintraege = yaml.safe_load((wurzel / "config/assistants.example.yaml").read_text(encoding="utf-8"))
-    nw = next(e for e in eintraege["assistants"] if e["name"] == "naturwissenschaftliche Aufgaben")
+def test_operator_faecher_gibt_es():
+    """Päckchen AF: Die Fächer für den Abschnitt „Operator dieser Aufgabe" müssen in der
+    ausgelieferten `subjects.yaml` stehen — sonst übergeht der Seed sie still."""
     slugs = {f["slug"] for f in yaml.safe_load(
-        (wurzel / "config/subjects.yaml").read_text(encoding="utf-8"))["subjects"]}
+        (WURZEL / "config/subjects.example.yaml").read_text(encoding="utf-8"))["subjects"]}
     # Fächer, die erst noch kommen (in `subjects.yaml` auskommentiert): NiT ab 2027/28.
     kommen_noch = {"nit"}
-    assert nw["operator_faecher"] and set(nw["operator_faecher"]) <= slugs | kommen_noch
-    assert "bnt" not in nw["operator_faecher"]          # entfällt mit V3
+    for e in EINTRAEGE:
+        faecher = set(e.get("operator_faecher") or [])
+        assert faecher <= slugs | kommen_noch, e["name"]
+        assert "bnt" not in faecher, e["name"]          # entfällt mit V3
+
+
+def test_rueckfallebene_vollstaendig():
+    """Die zwölf allgemeinen Assistenten der Landkarte (28.10.2026), alle mit beiden Bausteinen."""
+    rueck = [e for e in SCHUELER if e["suggest"] == "fallback"]
+    assert len(rueck) == 12
+    for e in rueck:
+        assert e["bausteine"] == ["begleiten_statt_loesen", "grundton"], e["name"]
+        assert "subject" not in e, e["name"]
+    assert "naturwissenschaftliche Aufgaben" not in {e["name"] for e in EINTRAEGE}
 
 
 def test_bausteine_der_datei_gibt_es():

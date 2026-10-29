@@ -1,33 +1,47 @@
 # Prüfsatz „Assistent vorschlagen" (Päckchen C1, Schritt 0 · F6, Jan 25.10.2026 „wie vorgeschlagen")
 # Plan: Plaene/Assistenten-Vorschlag-C1-Plan.md · Konzept: Konzept/Notiz-Assistenten-Vorschlag.md
+# Umgeschrieben 28.10.2026 (Plan „Rückfall-Assistenten“, Schritt 6): Statt eines Rückfalls
+# „naturwissenschaftliche Aufgaben“ zwölf allgemeine Assistenten je Tätigkeit; spezifisch bleiben die
+# zwei Chemie-Assistenten. Die NW-Positiven sind den neuen Assistenten zugeordnet oder gestrichen.
+# Ergänzt 28.10.2026 abends (Review Jan/Claude): Kriterien als Anteile, Fachfremd in K3, Rückfall → anderer
+# Rückfall in K5, kurze inhaltsleere Folgefragen, je ein `bleiben` für alle Rückfälle, Telegrammstil-Positive,
+# fünfter Nachbar-Fall für sieben Rückfälle. Namen ohne Artikel (Namensschema „Assistent für …“).
 #
 # Gemessen wird in Schritt 5 (`assistent_vorschlag_messung.py`): Die Nachricht wird eingebettet und
 # gegen die Auslöser-Beispiele (`assistant_trigger_examples`, art = beispiel) der Kandidaten verglichen;
 # je Assistent zählt das **beste** Beispiel (kleinste Kosinus-Distanz), kein Mittelwert. Gegenbeispiele
 # (art = gegenbeispiel) werden mitgemessen — ob ihr Abstand hilft, entscheidet Schritt 5.
 #
-# ⚠️ **Die Positiven sind zurückgehalten.** Sie stammen aus den ersten Zügen der Messszenarien und
-# stehen nicht unter den eingebetteten Beispielen (Seed `config/assistants.example.yaml`); ein
-# Unit-Test hält das fest — sonst misst der Satz Abstand null. Dasselbe gilt für die Negativen
-# gegenüber den Gegenbeispielen.
+# ⚠️ **Die Positiven sind zurückgehalten.** Sie stammen aus den ersten Zügen der Messszenarien oder
+# sind eigene Texte und stehen nicht unter den eingebetteten Beispielen (Seed
+# `config/assistants.example.yaml`); ein Unit-Test hält das fest — sonst misst der Satz Abstand null.
+# Dasselbe gilt für die Negativen gegenüber den Gegenbeispielen.
 #
 # ── Kriterium (F6, vor dem ersten Lauf festgelegt) ───────────────────────────
 #
 # Auswahl = höchstens zwei **spezifische** Assistenten über der Schwelle S_spez (bester zuerst), dazu
 # höchstens zwei **Rückfall-Assistenten** über ihrer eigenen, lockereren Schwelle S_rueck.
 #
-#   K1 Spezifisch: Je spezifischem Assistenten stehen mindestens 4 von 5 Positiven in der Auswahl.
-#   K2 Rückfall:   Der Rückfall-Assistent steht bei mindestens 4 von 5 seiner Positiven in der Auswahl.
-#   K3 Gegenprobe Begriff/Alltag: Keine Begriffsfrage und keine Alltagsnachricht bringt irgendeinen
-#                  Assistenten in die Auswahl (0 von 10).
-#   K4 Gegenprobe Nachbar: Je Assistent steht er bei höchstens 1 von 5 Nachbar-Negativen in der
-#                  Auswahl (`nicht`). Für den Rückfall-Assistenten sind die Nachbarn fachfremde
-#                  Aufgaben (Mathe ohne NW-Bezug).
+#   K1 Spezifisch: Je spezifischem Assistenten stehen mindestens 80 % seiner Positiven in der Auswahl
+#                  (bei 5 Positiven: 4 von 5).
+#   K2 Rückfall:   Je Rückfall-Assistent steht er bei mindestens 80 % seiner Positiven in der Auswahl
+#                  (die Rückfälle haben 6–9 Positive, nicht 5).
+#   K3 Gegenprobe Begriff/Alltag/Fachfremd: Keine Begriffsfrage, keine Alltagsnachricht und keine
+#                  fachfremde Nachricht bringt irgendeinen Assistenten in die Auswahl (0 von 23).
+#   K4 Gegenprobe Nachbar: Je Assistent steht er bei höchstens 20 % seiner Nachbar-Negativen (`nicht`)
+#                  in der Auswahl (bei 5: höchstens 1). Nachbarn der Rückfälle sind die anderen
+#                  Tätigkeiten (Paare unten); jeder Rückfall hat mindestens fünf `nicht`.
 #   K5 In der Assistenten-Konversation (vorläufig, Schwellen und Marge legt Schritt 5 fest):
 #                  `bleiben` — kein Vorschlag; `wechsel` — der andere Assistent liegt um die Marge näher
-#                  als der aktuelle und steht in der Auswahl; `beenden` — „Assistent beenden und weiter
-#                  chatten“ wird angeboten (Nachricht weit vom aktuellen Assistenten, kein anderer trifft).
-#                  Ziel: je Art höchstens ein Fehler (bleiben 6, wechsel 3, beenden 3 Fälle).
+#                  als der aktuelle und steht in der Auswahl (nur zu einem **spezifischen**, wie
+#                  `im_assistenten` im Dienst); `beenden` — „Assistent beenden und weiter chatten“ wird
+#                  angeboten (Nachricht weit vom aktuellen Assistenten, kein spezifischer trifft — auch
+#                  wenn sie zu einem **anderen Rückfall** passt; den Hinweis darauf gibt der Prompt über
+#                  den Abschnitt „Andere allgemeine Assistenten“, nicht der Dienst).
+#                  Ziel: je Art höchstens ein Fehler. Die kurzen, inhaltsleeren Folgefragen („ok und
+#                  dann?“) sind der harte `bleiben`-Fall: kein fachlicher Anker im Text.
+#   K8 Nachbarpaare: Der Vorschlag nennt den richtigen Assistenten (`soll`) zuerst oder beide, wo der
+#                  Nachbar vertretbar ist (`darf`). Noch von keinem Messskript ausgewertet.
 #
 # Erfüllt die Embedding-Stufe K1–K4 nicht, wird für C2 der **Klassifikator-Aufruf** (Stufe 2 der
 # Notiz) geplant — nicht eine lockerere Schwelle.
@@ -39,143 +53,1037 @@
 #   text     stattdessen ein eigener Text
 #   stufe    Klassenstufe (Kandidatenmenge: Klassenstufen-Filter wie in der Übersicht)
 #   soll     Assistenten, die in der Auswahl stehen müssen (leer = keiner)
-#   darf     Assistenten, die stehen dürfen, ohne zu zählen (Rückfall unter einem spezifischen Treffer)
+#   darf     Assistenten, die stehen dürfen, ohne zu zählen (Rückfall unter einem spezifischen Treffer,
+#            vertretbarer Nachbar)
 #   nicht    Assistenten, deren Erscheinen als Fehltreffer zählt (alle übrigen zählen nicht mit)
 #   art      positiv | nachbar | begriff | alltag | fachfremd
 # In `in_assistent` zusätzlich: `aktuell` (Assistent der Konversation), `erwartet` bleiben|wechsel|beenden.
 
 assistenten:
   spezifisch: [stöchiometrische Berechnungen, Reaktionsgleichungen]
-  rueckfall: [naturwissenschaftliche Aufgaben]
+  rueckfall: [Rechnen mit Größen und Einheiten, Mathe-Aufgaben, Versuchsplanung und -auswertung,
+              "Auswerten von Diagrammen, Tabellen und Statistiken", "Analysieren von Texten, Quellen und Bildern",
+              Argumentieren und Erörtern, Überarbeiten eigener Texte, Grammatik und Rechtschreibung,
+              "Recherche, Referat und Präsentation", Planen und Dokumentieren von Projekten, Programmieren,
+              Lernen und Prüfungsvorbereitung]
 
 faelle:
 
-# ── Positive (zurückgehalten) ────────────────────────────────────────────────
+# ── Positive (zurückgehalten): Chemie ────────────────────────────────────────
 
 - {quelle: "stoechiometrie.yaml#A1-loesung-verlangt", stufe: 9, art: positiv,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#C6-massenanteil-bezug", stufe: 9, art: positiv,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#C7-konzentration-ml", stufe: 10, art: positiv,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#C10-teilchenzahl-geteilt", stufe: 9, art: positiv,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#F2-titration-kursstufe", stufe: 11, art: positiv,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 
 - {quelle: "reaktionsgleichung.yaml#A1-magnesium-loesung-verlangt", stufe: 8, art: positiv,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#A4-methan-nicht-ausgeglichen", stufe: 9, art: positiv,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#A7-faellung-ohne-ladung", stufe: 10, art: positiv,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#B4-veresterung", stufe: 10, art: positiv,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#C1-permanganat-eisen", stufe: 11, art: positiv,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
+
+# ── Positive: Rechnen mit Größen und Einheiten (NW-Rechenfälle R1–R3, R5) ────
 
 - {quelle: "nw_aufgaben.yaml#R1-geschwindigkeit-loesung-verlangt", stufe: 7, art: positiv,
-   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {quelle: "nw_aufgaben.yaml#E1-kirschen-osmose", stufe: 9, art: positiv,
-   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+   soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+- {quelle: "nw_aufgaben.yaml#R2-dichte-einheiten", stufe: 8, art: positiv,
+   soll: [Rechnen mit Größen und Einheiten], nicht: [stöchiometrische Berechnungen]}
+- {quelle: "nw_aufgaben.yaml#R3-ohm-falsch-umgestellt", stufe: 9, art: positiv,
+   soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+- {quelle: "nw_aufgaben.yaml#R5-freier-fall-kursstufe", stufe: 11, art: positiv,
+   soll: [Rechnen mit Größen und Einheiten]}
+- {text: "Wie viel Joule sind 0,5 kWh? Ich weiß nie, wie man das umrechnet", stufe: 9, art: positiv,
+   soll: [Rechnen mit Größen und Einheiten]}
+- {text: "Physik: Ein Kran hebt eine 300 kg schwere Last in 12 s um 8 m hoch. Welche Leistung hat er? Ich find die Formel nicht",
+   stufe: 10, art: positiv, soll: [Rechnen mit Größen und Einheiten]}
+- {text: "Bio: Ein Herz schlägt 70 Mal pro Minute und pumpt jedes Mal 70 ml. Wie viele Liter sind das an einem Tag?",
+   stufe: 7, art: positiv, soll: [Rechnen mit Größen und Einheiten]}
+- {text: "wir haben gemessen: die feder wird bei 200 g um 4 cm länger. wie groß ist dann die federkonstante in N/m?",
+   stufe: 9, art: positiv, soll: [Rechnen mit Größen und Einheiten], darf: [Versuchsplanung und -auswertung]}
+- {text: "F = 20 N, A = 4 cm², p = ?", stufe: 8, art: positiv,
+   soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}   # Telegrammstil
+
+# ── Positive: Mathe-Aufgaben ─────────────────────────────────────────────────
+
+- {quelle: "nw_aufgaben.yaml#S5-mathe-ausserhalb", stufe: 8, art: positiv,
+   soll: [Mathe-Aufgaben], nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Wie rechne ich 3/4 geteilt durch 2/5?", stufe: 6, art: positiv, soll: [Mathe-Aufgaben]}
+- {text: "Ich soll beweisen, dass die Summe von drei aufeinanderfolgenden Zahlen immer durch 3 teilbar ist",
+   stufe: 8, art: positiv, soll: [Mathe-Aufgaben]}
+- {text: "f(x) = -2x² + 8x, wo liegt der Scheitelpunkt? ich komm nicht weiter", stufe: 10, art: positiv,
+   soll: [Mathe-Aufgaben]}
+- {text: "Textaufgabe: Ein Pullover kostet nach 30 % Rabatt noch 42 €. Was hat er vorher gekostet?", stufe: 7,
+   art: positiv, soll: [Mathe-Aufgaben]}
+- {text: "Bestimme das Integral von 0 bis 2 über 3x² dx, ich weiß nicht wie man die Grenzen einsetzt", stufe: 12,
+   art: positiv, soll: [Mathe-Aufgaben]}
+- {text: "2x+3=11 x=?", stufe: 7, art: positiv, soll: [Mathe-Aufgaben], nicht: [Rechnen mit Größen und Einheiten]}   # Telegrammstil
+
+# ── Positive: Versuchsplanung und -auswertung (NW P1, P2, O7) ────────────────
+
+- {quelle: "nw_aufgaben.yaml#P1-duenger-planen", stufe: 8, art: positiv, soll: [Versuchsplanung und -auswertung]}
+- {quelle: "nw_aufgaben.yaml#P2-keimung-kl6", stufe: 6, art: positiv, soll: [Versuchsplanung und -auswertung]}
+- {quelle: "nw_aufgaben.yaml#O7-messen-unregelmaessig", stufe: 8, art: positiv,
+   soll: [Versuchsplanung und -auswertung]}
+- {text: "Wir sollen untersuchen, ob Salz das Gefrieren von Wasser beeinflusst. Wie baue ich den Versuch auf?",
+   stufe: 7, art: positiv, soll: [Versuchsplanung und -auswertung]}
+- {text: "In Chemie haben wir Magnesium angezündet, es hat hell geleuchtet und ein weißes Pulver blieb übrig. Was davon ist die Beobachtung?",
+   stufe: 8, art: positiv, soll: [Versuchsplanung und -auswertung], darf: [Reaktionsgleichungen]}
+- {text: "Ich muss für Bio ein Protokoll zum Stärkenachweis mit Iod schreiben, was gehört in die Durchführung?",
+   stufe: 6, art: positiv, soll: [Versuchsplanung und -auswertung]}
+
+# ── Positive: Auswerten von Diagrammen, Tabellen und Statistiken (NW V3) ─────
+
 - {quelle: "nw_aufgaben.yaml#V3-enzym-temperatur", stufe: 11, art: positiv,
-   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {quelle: "nw_aufgaben.yaml#P1-duenger-planen", stufe: 8, art: positiv,
-   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {quelle: "nw_aufgaben.yaml#B1-beurteilen-eauto", stufe: 10, art: positiv,
-   soll: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen]}
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"], darf: [Versuchsplanung und -auswertung]}
+- {text: "In meinem Erdkundebuch ist ein Klimadiagramm von Moskau, im Januar sind die Balken ganz klein und die Linie unter null. Was heißt das?",
+   stufe: 7, art: positiv, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Die Tabelle zeigt die Zahl der Smartphone-Nutzer von 2010 bis 2023. Wie formuliere ich die Beschreibung?",
+   stufe: 8, art: positiv, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "In Gemeinschaftskunde sollen wir eine Statistik zur Wahlbeteiligung von Jungwählern kritisch prüfen, die y-Achse fängt erst bei 60 % an",
+   stufe: 10, art: positiv, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Wirtschaft: Das Liniendiagramm zeigt die Inflationsrate seit 2019. Wie erkläre ich den Knick 2022?",
+   stufe: 10, art: positiv, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "hier ist eine grafik mit dem wasserverbrauch pro person in verschiedenen ländern, was kann ich daraus schließen?",
+   stufe: 6, art: positiv, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+
+# ── Positive: Analysieren von Texten, Quellen und Bildern ────────────────────
+
+- {text: "Hier ist das Gedicht, das wir in Deutsch haben: „Der Herbst kommt leis mit Nebelschritten, die Bäume stehen kahl und stumm …“ Ich soll sagen, wie es wirkt und warum",
+   stufe: 8, art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Wir sollen in Geschichte einen Feldpostbrief von 1916 als Quelle auswerten, worauf achte ich da?", stufe: 9,
+   art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Die Karikatur zeigt einen riesigen Fußabdruck auf einer Weltkugel. Was will der Zeichner damit sagen?",
+   stufe: 9, art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "In der Kurzgeschichte „Das Brot“ lügt der Mann seine Frau an. Warum gibt sie ihm am Ende ihre Scheibe?",
+   stufe: 8, art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Ich muss die Szene „Gretchen am Spinnrade“ deuten und brauche eine Idee für meine These", stufe: 11,
+   art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "For English we have to analyse a cartoon about social media addiction, what should I describe first?",
+   stufe: 10, art: positiv, soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "In Kunst sollen wir das Bild „Der Schrei“ von Munch beschreiben und deuten", stufe: 9, art: positiv,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+
+# ── Positive: Argumentieren und Erörtern (NW B1) ─────────────────────────────
+
+- {quelle: "nw_aufgaben.yaml#B1-beurteilen-eauto", stufe: 10, art: positiv, soll: [Argumentieren und Erörtern]}
+- {text: "Ich soll in Deutsch Stellung nehmen, ob die Schule erst um 9 Uhr anfangen sollte. Wie fange ich an?",
+   stufe: 8, art: positiv, soll: [Argumentieren und Erörtern]}
+- {text: "Sollen Hausaufgaben abgeschafft werden? Mir fallen nur Argumente dafür ein, keine dagegen", stufe: 7,
+   art: positiv, soll: [Argumentieren und Erörtern]}
+- {text: "Ethik: Darf man lügen, um einen Freund zu schützen? Ich muss das abwägen", stufe: 9, art: positiv,
+   soll: [Argumentieren und Erörtern]}
+- {text: "Bei meiner Erörterung zu Fast Fashion weiß ich nicht, ob ich die Argumente steigernd oder abwechselnd ordnen soll",
+   stufe: 10, art: positiv, soll: [Argumentieren und Erörtern]}
+- {text: "Wir sollen bewerten, ob Atomkraft beim Klimaschutz helfen kann, ich weiß nicht wie ich zu einem Urteil komme",
+   stufe: 11, art: positiv, soll: [Argumentieren und Erörtern]}
+
+# ── Positive: Überarbeiten eigener Texte ─────────────────────────────────────
+
+- {text: "Hier ist mein Gedicht, das ich selbst geschrieben habe: „Der Mond hängt schief am Himmelszelt, er schaut herab auf unsre Welt …“ Klingt das gut?",
+   stufe: 7, art: positiv, soll: [Überarbeiten eigener Texte]}
+- {text: "Das ist meine Inhaltsangabe zu „Die Welle“, die Lehrerin meint, ich erzähle zu viel nach. Kannst du drüberschauen?",
+   stufe: 9, art: positiv, soll: [Überarbeiten eigener Texte]}
+- {text: "Hier ist der Anfang meiner Bewerbung für ein Praktikum bei der Sparkasse, wirkt das zu steif?", stufe: 9,
+   art: positiv, soll: [Überarbeiten eigener Texte]}
+- {text: "Mein Bericht über das Sportfest ist fertig, aber ich glaube er ist langweilig. Was kann ich ändern?",
+   stufe: 6, art: positiv, soll: [Überarbeiten eigener Texte]}
+- {text: "Ich muss eine Erzählung schreiben und weiß noch nicht, wie ich den Spannungsbogen plane", stufe: 6,
+   art: positiv, soll: [Überarbeiten eigener Texte]}
+- {text: "Voici mon texte sur mes vacances en Bretagne, est-ce que tu peux me dire ce que je peux améliorer ?",
+   stufe: 9, art: positiv, soll: [Überarbeiten eigener Texte], darf: [Grammatik und Rechtschreibung]}
+
+# ── Positive: Grammatik und Rechtschreibung ──────────────────────────────────
+
+- {text: "Heißt es „wegen dem Regen“ oder „wegen des Regens“?", stufe: 7, art: positiv,
+   soll: [Grammatik und Rechtschreibung]}
+- {text: "ich verwechsle immer seit und seid, gibt es da einen trick?", stufe: 5, art: positiv,
+   soll: [Grammatik und Rechtschreibung]}
+- {text: "Latein: Warum steht hier „Romam“ ohne Präposition? Ist das ein Akkusativ der Richtung?", stufe: 8,
+   art: positiv, soll: [Grammatik und Rechtschreibung]}
+- {text: "When do I use going to and when will? I always mix it up", stufe: 7, art: positiv,
+   soll: [Grammatik und Rechtschreibung]}
+- {text: "Wie bildet man den subjonctif von faire?", stufe: 10, art: positiv, soll: [Grammatik und Rechtschreibung]}
+- {text: "Schreibt man „im Allgemeinen“ groß oder klein?", stufe: 8, art: positiv,
+   soll: [Grammatik und Rechtschreibung]}
+
+# ── Positive: Recherche, Referat und Präsentation ────────────────────────────
+
+- {text: "Ich halte nächste Woche ein Referat über Haie und hab keine Ahnung, wie ich anfangen soll", stufe: 6,
+   art: positiv, soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Für meine GFS über Elektromobilität finde ich nur Werbeseiten, wo kriege ich bessere Infos her?", stufe: 9,
+   art: positiv, soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Wie gebe ich ein YouTube-Video im Quellenverzeichnis meiner Präsentation an?", stufe: 10, art: positiv,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "meine folien haben total viel text, wie mach ich die übersichtlicher?", stufe: 8, art: positiv,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Ich soll eine Präsentation über Japan halten, aber nur 10 Minuten. Was lasse ich weg?", stufe: 7,
+   art: positiv, soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Ich muss in Geschichte einen Kurzvortrag über die Industrialisierung halten, wie strukturier ich den?",
+   stufe: 8, art: positiv, soll: ["Recherche, Referat und Präsentation"]}
+
+# ── Positive: Planen und Dokumentieren von Projekten ─────────────────────────
+
+- {text: "Wir sollen in NwT ein Gewächshaus mit automatischer Bewässerung bauen, wie fangen wir mit der Planung an?",
+   stufe: 9, art: positiv, soll: [Planen und Dokumentieren von Projekten], darf: [Programmieren]}
+- {text: "Im Seminarkurs müssen wir einen Projektantrag schreiben, was gehört da rein?", stufe: 11, art: positiv,
+   soll: [Planen und Dokumentieren von Projekten]}
+- {text: "Unser Kunstprojekt, ein Wandbild in der Mensa, muss bis Juni fertig sein. Wie machen wir einen Zeitplan?",
+   stufe: 10, art: positiv, soll: [Planen und Dokumentieren von Projekten]}
+- {text: "Zwei aus unserer Gruppe wollen ein Katapult bauen, zwei eine Brücke, wie entscheiden wir uns fair?",
+   stufe: 8, art: positiv, soll: [Planen und Dokumentieren von Projekten]}
+- {text: "Was schreibe ich ins Projekttagebuch, wenn wir heute nur Material sortiert haben?", stufe: 8, art: positiv,
+   soll: [Planen und Dokumentieren von Projekten]}
+- {text: "Unser Projekt ist fertig, jetzt müssen wir noch einen Abschlussbericht mit Rückblick schreiben", stufe: 10,
+   art: positiv, soll: [Planen und Dokumentieren von Projekten], darf: [Überarbeiten eigener Texte]}
+
+# ── Positive: Programmieren ──────────────────────────────────────────────
+
+- {text: "Ich will in Python Noten aus einer Liste einlesen und den Schnitt ausgeben, wie fange ich an?", stufe: 9,
+   art: positiv, soll: [Programmieren]}
+- {text: "Warum kommt bei meinem Code TypeError: can only concatenate str (not 'int') to str?", stufe: 8,
+   art: positiv, soll: [Programmieren]}
+- {text: "In Scratch soll meine Katze Punkte sammeln, aber der Zähler geht nicht hoch", stufe: 7, art: positiv,
+   soll: [Programmieren]}
+- {text: "Mein Java-Programm soll ein Array sortieren, aber am Ende ist es genauso wie vorher", stufe: 11,
+   art: positiv, soll: [Programmieren]}
+- {text: "ich hab einen ultraschallsensor am arduino und der serielle monitor zeigt immer 0 an", stufe: 9,
+   art: positiv, soll: [Programmieren]}
+- {text: "Wie kann ich in JavaScript prüfen, ob ein Eingabefeld leer ist?", stufe: 10, art: positiv,
+   soll: [Programmieren]}
+
+# ── Positive: Lernen und Prüfungsvorbereitung ────────────────────────────────
+
+- {text: "Frag mich die Hauptstädte Europas ab, ich schreibe morgen den Erdkundetest", stufe: 6, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung]}
+- {text: "Ich hab nächste Woche drei Arbeiten, wie teile ich mir das Lernen ein?", stufe: 8, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung]}
+- {text: "Kannst du mir Übungsaufgaben zum Satz des Pythagoras für die Mathearbeit geben?", stufe: 8, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung], darf: [Mathe-Aufgaben]}
+- {text: "Welche Themen kommen in der Bio-Arbeit nächste Woche dran?", stufe: 9, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung]}
+- {text: "ich lerne immer und dann ist in der arbeit alles weg, was mache ich falsch?", stufe: 7, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung]}
+- {text: "Mach mit mir ein Quiz zur Weimarer Republik fürs Abi", stufe: 12, art: positiv,
+   soll: [Lernen und Prüfungsvorbereitung]}
 
 # ── Nachbar-Negative: Aufgabe des jeweils anderen Chemie-Assistenten ─────────
 
 # … gegen „stöchiometrische Berechnungen" (Gleichungsaufgaben ohne Rechnung)
 - {quelle: "reaktionsgleichung.yaml#A2-index-veraendert", stufe: 8, art: nachbar,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#A8-redox-elektronen-kl10", stufe: 10, art: nachbar,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#B5-ethanol-verbrennung", stufe: 10, art: nachbar,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "reaktionsgleichung.yaml#C6-ladung-nicht-ausgeglichen", stufe: 11, art: nachbar,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 - {quelle: "nw_aufgaben.yaml#S3-uebergabe-reaktionsgleichung", stufe: 9, art: nachbar,
-   soll: [Reaktionsgleichungen], darf: [naturwissenschaftliche Aufgaben], nicht: [stöchiometrische Berechnungen]}
+   soll: [Reaktionsgleichungen], darf: [Rechnen mit Größen und Einheiten, Versuchsplanung und -auswertung],
+   nicht: [stöchiometrische Berechnungen]}
 
 # … gegen „Reaktionsgleichungen" (Rechenaufgaben, auch wenn eine Gleichung darin vorkommt)
 - {quelle: "stoechiometrie.yaml#C8-begrenzender-stoff", stufe: 10, art: nachbar,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#C9-molares-volumen-bedingungen", stufe: 10, art: nachbar,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#D3-nur-ergebnis-falsch", stufe: 9, art: nachbar,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "stoechiometrie.yaml#E1-ratlos-stufen", stufe: 9, art: nachbar,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 - {quelle: "nw_aufgaben.yaml#S2-uebergabe-stoechiometrie", stufe: 9, art: nachbar,
-   soll: [stöchiometrische Berechnungen], darf: [naturwissenschaftliche Aufgaben], nicht: [Reaktionsgleichungen]}
+   soll: [stöchiometrische Berechnungen], darf: [Rechnen mit Größen und Einheiten], nicht: [Reaktionsgleichungen]}
 
-# … gegen „naturwissenschaftliche Aufgaben" (fachfremde Aufgaben, Mathe ohne NW-Bezug)
-- {quelle: "nw_aufgaben.yaml#S5-mathe-ausserhalb", stufe: 8, art: fachfremd, soll: [],
-   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {text: "Wie berechnet man den Flächeninhalt eines Kreises mit r = 3 cm?", stufe: 7, art: fachfremd, soll: [],
-   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {text: "Prozentrechnung: Wie viel sind 20 % von 85 €?", stufe: 7, art: fachfremd, soll: [],
-   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {text: "Analysiere das Gedicht „Der Panther“ von Rilke", stufe: 10, art: fachfremd, soll: [],
-   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
-- {text: "Welche Ursachen hatte der Erste Weltkrieg?", stufe: 9, art: fachfremd, soll: [],
-   nicht: [naturwissenschaftliche Aufgaben, stöchiometrische Berechnungen, Reaktionsgleichungen]}
+# ── Nachbarpaar Mathe-Aufgaben ↔ Rechnen mit Größen und Einheiten ────────────
+# Sachaufgabe mit Einheiten aus dem Matheunterricht vs. Physik-, Chemie-, Bio-Rechnung.
+
+- {text: "Mathe-Hausaufgabe: Ein Schwimmbecken ist 25 m lang, 10 m breit und 2 m tief. Wie viele Liter passen rein?",
+   stufe: 7, art: nachbar, soll: [Mathe-Aufgaben], darf: [Rechnen mit Größen und Einheiten]}
+- {text: "In Mathe haben wir Dreisatz: 4 kg Äpfel kosten 6 €, wie viel kosten dann 7 kg?", stufe: 6, art: nachbar,
+   soll: [Mathe-Aufgaben], nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Maßstab 1:25000, auf der Karte sind es 6 cm. Wie weit ist das in echt in km? Haben wir in Mathe gerade",
+   stufe: 6, art: nachbar, soll: [Mathe-Aufgaben], darf: [Rechnen mit Größen und Einheiten]}
+- {text: "Löse 2x² − 8 = 0 nach x auf", stufe: 9, art: nachbar, soll: [Mathe-Aufgaben],
+   nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Ein Quader hat das Volumen 120 cm³, er ist 6 cm lang und 4 cm breit. Wie hoch ist er?", stufe: 6,
+   art: nachbar, soll: [Mathe-Aufgaben], nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Physik: Ein Auto bremst in 4 s von 72 km/h bis zum Stillstand. Wie groß ist die Verzögerung?", stufe: 10,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+- {text: "In Chemie sollen wir die Dichte von Ethanol ausrechnen, 40 g haben ein Volumen von 50 ml", stufe: 8,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben, stöchiometrische Berechnungen]}
+- {text: "Ich muss U = R · I nach R umstellen, aber in Mathe hatten wir das nur mit x und y", stufe: 8, art: nachbar,
+   soll: [Rechnen mit Größen und Einheiten], darf: [Mathe-Aufgaben]}
+- {text: "Bio: Eine Bakterienkultur verdoppelt sich alle 20 Minuten. Wie viele sind es nach 3 Stunden, wenn man mit 500 anfängt?",
+   stufe: 10, art: nachbar, soll: [Rechnen mit Größen und Einheiten], darf: [Mathe-Aufgaben]}
+- {text: "Ein Fahrradfahrer schafft 15 km in 40 Minuten. Wie viele Meter pro Sekunde sind das? Das ist für NwT",
+   stufe: 8, art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+
+# ── Nachbarpaar Versuchsplanung ↔ Auswerten von Diagrammen ───────────────────
+# Eigener Versuch, eigene Messwerte vs. fertige Grafik oder Tabelle.
+
+- {text: "Wir haben in Physik gemessen, wie schnell Tee abkühlt, und eine Kurve gezeichnet. Was schreibe ich in die Deutung?",
+   stufe: 8, art: nachbar, soll: [Versuchsplanung und -auswertung],
+   nicht: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "wir haben jeden tag gemessen wie hoch die bohnen sind, jetzt soll ich das darstellen", stufe: 6,
+   art: nachbar, soll: [Versuchsplanung und -auswertung], darf: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Wir haben im Versuch die Stromstärke bei verschiedenen Spannungen gemessen. Welche Fehlerquellen kann es da geben?",
+   stufe: 9, art: nachbar, soll: [Versuchsplanung und -auswertung],
+   nicht: ["Auswerten von Diagrammen, Tabellen und Statistiken", Rechnen mit Größen und Einheiten]}
+- {quelle: "nw_aufgaben.yaml#V2-abkuehlkurve-plateau", stufe: 9, art: nachbar, soll: [Versuchsplanung und -auswertung],
+   darf: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Im Buch ist ein Diagramm zur Löslichkeit von Salzen bei verschiedenen Temperaturen, wie beschreibe ich das?",
+   stufe: 9, art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"],
+   nicht: [Versuchsplanung und -auswertung]}
+- {text: "Die Grafik zeigt den Anstieg des Meeresspiegels seit 1900. Was soll ich dazu schreiben?", stufe: 8,
+   art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"], nicht: [Versuchsplanung und -auswertung]}
+- {text: "Die Tabelle auf dem Arbeitsblatt zeigt den Puls von zehn Schülern vor und nach dem Sport. Werte sie aus",
+   stufe: 7, art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"],
+   darf: [Versuchsplanung und -auswertung]}
+- {quelle: "nw_aufgaben.yaml#O2-auswerten-nur-beschrieben", stufe: 8, art: nachbar,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"], nicht: [Versuchsplanung und -auswertung],
+   darf: [Rechnen mit Größen und Einheiten]}
+
+# ── Nachbarn Analysieren ↔ Argumentieren ↔ Überarbeiten ──────────────────────
+# Interpretation erarbeiten vs. Erörterung planen vs. fertigen Text überarbeiten.
+
+- {text: "Ich muss eine Interpretation zum „Erlkönig“ schreiben, aber ich verstehe gar nicht, was das Ende bedeutet",
+   stufe: 8, art: nachbar, soll: ["Analysieren von Texten, Quellen und Bildern"],
+   nicht: [Argumentieren und Erörtern, Überarbeiten eigener Texte]}
+- {text: "Im Sachtext geht es ums Tempolimit. Ich soll untersuchen, wie der Autor argumentiert", stufe: 10,
+   art: nachbar, soll: ["Analysieren von Texten, Quellen und Bildern"], darf: [Argumentieren und Erörtern],
+   nicht: [Überarbeiten eigener Texte]}
+- {text: "Wir sollen erörtern, ob Social Media Jugendlichen mehr schadet als nützt. Wie sammle ich Argumente?",
+   stufe: 9, art: nachbar, soll: [Argumentieren und Erörtern],
+   nicht: ["Analysieren von Texten, Quellen und Bildern", Überarbeiten eigener Texte]}
+- {text: "Im Text steht, Schuluniformen machen alle gleich. Jetzt soll ich selbst Stellung dazu nehmen", stufe: 9,
+   art: nachbar, soll: [Argumentieren und Erörtern], darf: ["Analysieren von Texten, Quellen und Bildern"],
+   nicht: [Überarbeiten eigener Texte]}
+- {text: "Hier ist meine fertige Erörterung zum Thema Ganztagsschule. Sind meine Argumente überzeugend und passt der Aufbau?",
+   stufe: 10, art: nachbar, soll: [Überarbeiten eigener Texte], darf: [Argumentieren und Erörtern],
+   nicht: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Das ist meine Gedichtanalyse zu „Mondnacht“, sag mir bitte, wo mir Belege fehlen", stufe: 10, art: nachbar,
+   soll: [Überarbeiten eigener Texte], darf: ["Analysieren von Texten, Quellen und Bildern"],
+   nicht: [Argumentieren und Erörtern]}
+- {text: "Ich hab den Schluss meiner Interpretation geschrieben: „Insgesamt zeigt die Geschichte, dass …“ Ist der so gut?",
+   stufe: 9, art: nachbar, soll: [Überarbeiten eigener Texte],
+   nicht: ["Analysieren von Texten, Quellen und Bildern", Argumentieren und Erörtern]}
+
+# ── Nachbarpaar Überarbeiten (ohne Entwurf) ↔ Argumentieren (Erörterung planen) ──
+
+- {text: "Ich muss eine Erörterung über Tierhaltung im Zoo schreiben und weiß nicht, wie ich die Gliederung aufbaue",
+   stufe: 9, art: nachbar, soll: [Argumentieren und Erörtern], nicht: [Überarbeiten eigener Texte]}
+- {text: "Wir sollen eine Stellungnahme planen, ob Handys im Unterricht erlaubt sein sollen. Wie gehe ich vor, bevor ich schreibe?",
+   stufe: 8, art: nachbar, soll: [Argumentieren und Erörtern], nicht: [Überarbeiten eigener Texte]}
+- {text: "Ich soll einen Leserbrief gegen die Schließung unseres Hallenbads schreiben, hab aber noch nichts", stufe: 8,
+   art: nachbar, soll: [Argumentieren und Erörtern], darf: [Überarbeiten eigener Texte]}
+- {text: "Ich muss zu einer Bildergeschichte einen Aufsatz schreiben und habe noch keinen Anfang", stufe: 7,
+   art: nachbar, soll: [Überarbeiten eigener Texte], nicht: [Argumentieren und Erörtern]}
+- {text: "Ich soll für die Schülerzeitung einen Bericht über den Spendenlauf schreiben, wie plane ich den?", stufe: 7,
+   art: nachbar, soll: [Überarbeiten eigener Texte], nicht: [Argumentieren und Erörtern]}
+
+# ── Nachbarpaar Grammatik ↔ Überarbeiten (Rechtschreibung im eigenen Text) ───
+
+- {text: "Hier ist ein Absatz aus meinem Aufsatz. Sag mir nur, wo Kommafehler sind, aber verbessere sie nicht",
+   stufe: 8, art: nachbar, soll: [Grammatik und Rechtschreibung], darf: [Überarbeiten eigener Texte]}
+- {text: "In meinem Englischtext hab ich überall „I have went“ geschrieben, die Lehrerin hat es angestrichen. Warum ist das falsch?",
+   stufe: 7, art: nachbar, soll: [Grammatik und Rechtschreibung], nicht: [Überarbeiten eigener Texte]}
+- {text: "Ich mache in Diktaten immer dieselben Fehler beim Dehnungs-h. Wie übe ich das?", stufe: 5, art: nachbar,
+   soll: [Grammatik und Rechtschreibung], darf: [Lernen und Prüfungsvorbereitung], nicht: [Überarbeiten eigener Texte]}
+- {text: "Mein Brief an die Gastfamilie auf Französisch – stimmen da die Verbformen?", stufe: 9, art: nachbar,
+   soll: [Grammatik und Rechtschreibung], darf: [Überarbeiten eigener Texte]}
+- {text: "Kannst du meinen Aufsatz über die Klassenfahrt lesen, ob Aufbau und Spannung passen? Rechtschreibung ist egal",
+   stufe: 7, art: nachbar, soll: [Überarbeiten eigener Texte], nicht: [Grammatik und Rechtschreibung]}
+- {text: "Die Lehrerin sagt, mein Text ist zu umgangssprachlich. Hier ist er: „Also wir sind dann halt zum See und so …“",
+   stufe: 8, art: nachbar, soll: [Überarbeiten eigener Texte], nicht: [Grammatik und Rechtschreibung]}
+
+# ── Nachbarpaar Recherche ↔ Projekte ─────────────────────────────────────────
+
+- {text: "Wir müssen unser NwT-Projekt, einen Solarkocher, am Ende vor der Klasse präsentieren. Wie machen wir gute Folien?",
+   stufe: 9, art: nachbar, soll: ["Recherche, Referat und Präsentation"], darf: [Planen und Dokumentieren von Projekten]}
+- {text: "Ich muss für meine GFS über Wildbienen zuverlässige Quellen finden", stufe: 8, art: nachbar,
+   soll: ["Recherche, Referat und Präsentation"], nicht: [Planen und Dokumentieren von Projekten]}
+- {text: "Ich soll ein Handout zu meinem Vortrag über den Mauerfall machen", stufe: 10, art: nachbar,
+   soll: ["Recherche, Referat und Präsentation"], nicht: [Planen und Dokumentieren von Projekten]}
+- {text: "Für den Seminarkurs müssen wir als Gruppe eine Umfrage in der Stadt organisieren, wer macht was bis wann?",
+   stufe: 11, art: nachbar, soll: [Planen und Dokumentieren von Projekten],
+   nicht: ["Recherche, Referat und Präsentation"]}
+- {text: "Unser Projekt Schulgarten: Wir müssen jede Woche festhalten, was wir gemacht haben", stufe: 8, art: nachbar,
+   soll: [Planen und Dokumentieren von Projekten], nicht: ["Recherche, Referat und Präsentation"]}
+- {text: "Wir drehen als Gruppe einen Erklärfilm über Plastikmüll, wie verteilen wir Drehbuch, Filmen und Schnitt?",
+   stufe: 9, art: nachbar, soll: [Planen und Dokumentieren von Projekten], darf: ["Recherche, Referat und Präsentation"]}
+
+# ── Nachbarpaar Programmieren ↔ Projekte (Arduino im NwT-Projekt) ────────────
+
+- {text: "Im NwT-Projekt läuft unser Arduino-Code für die Ampel nicht, die rote LED geht nie aus", stufe: 9,
+   art: nachbar, soll: [Programmieren], nicht: [Planen und Dokumentieren von Projekten]}
+- {text: "Für unsere Wetterstation muss ich den Temperatursensor auslesen, aber im Code kommt nur Unsinn raus",
+   stufe: 10, art: nachbar, soll: [Programmieren], darf: [Planen und Dokumentieren von Projekten]}
+- {text: "Ich muss in Informatik ein Programm planen, das die Klassensprecherwahl auszählt. Wie zerlege ich das in Schritte?",
+   stufe: 9, art: nachbar, soll: [Programmieren], nicht: [Planen und Dokumentieren von Projekten]}
+- {text: "Wir bauen in NwT eine Alarmanlage mit Arduino. Wie planen wir die nächsten Wochen und wer macht was?",
+   stufe: 9, art: nachbar, soll: [Planen und Dokumentieren von Projekten], nicht: [Programmieren]}
+- {text: "Unser Roboter-Projekt: Wir müssen ein Pflichtenheft schreiben, bevor wir programmieren", stufe: 10,
+   art: nachbar, soll: [Planen und Dokumentieren von Projekten], nicht: [Programmieren]}
+- {text: "Wir sollen in NwT ein Messgerät bauen und am Ende dokumentieren, was geklappt hat und was nicht", stufe: 10,
+   art: nachbar, soll: [Planen und Dokumentieren von Projekten], nicht: [Programmieren, Versuchsplanung und -auswertung]}
+
+# ── Nachbarn Lernen ↔ fachliche Assistenten (Abfrage vs. einzelne Aufgabe) ───
+
+- {text: "Frag mich die Formeln für Geschwindigkeit, Dichte und Kraft ab, Donnerstag ist Physikarbeit", stufe: 8,
+   art: nachbar, soll: [Lernen und Prüfungsvorbereitung], nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Wir schreiben am Montag in Deutsch eine Gedichtanalyse, wie lerne ich dafür?", stufe: 9, art: nachbar,
+   soll: [Lernen und Prüfungsvorbereitung], nicht: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Mach mir einen Lernplan für die Chemiearbeit über Säuren und Basen", stufe: 9, art: nachbar,
+   soll: [Lernen und Prüfungsvorbereitung], nicht: [Reaktionsgleichungen, stöchiometrische Berechnungen]}
+- {text: "Kannst du mir für die Englischarbeit Lückensätze zum Present Perfect geben?", stufe: 7, art: nachbar,
+   soll: [Lernen und Prüfungsvorbereitung], darf: [Grammatik und Rechtschreibung]}
+- {text: "Ich hänge bei Aufgabe 4: Ein Körper mit 3 kg wird mit 6 N beschleunigt, wie groß ist a?", stufe: 9,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Ich versteh bei dieser einen Aufgabe nicht, wie ich 2/3 + 3/4 rechne", stufe: 6, art: nachbar,
+   soll: [Mathe-Aufgaben], nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Ich soll das Gedicht „Die Stadt“ von Storm interpretieren, morgen ist Abgabe", stufe: 9, art: nachbar,
+   soll: ["Analysieren von Texten, Quellen und Bildern"], nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Morgen schreiben wir den Englischtest, und ich weiß bei dieser Übung nicht, ob da „since“ oder „for“ hingehört",
+   stufe: 7, art: nachbar, soll: [Grammatik und Rechtschreibung], darf: [Lernen und Prüfungsvorbereitung]}
+- {text: "Für die Bio-Arbeit: Wir haben im Versuch Hefe mit Zucker angesetzt und der Ballon wurde dick, wie deute ich das?",
+   stufe: 9, art: nachbar, soll: [Versuchsplanung und -auswertung], nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Ich hab Arbeit in Informatik und mein Programm für die Übungsaufgabe stürzt bei der Eingabe ab", stufe: 10,
+   art: nachbar, soll: [Programmieren], nicht: [Lernen und Prüfungsvorbereitung]}
+
+# ── Weitere Nachbarn (je Rückfall mindestens fünf `nicht`) ───────────────────
+
+- {text: "Wie lange braucht das Licht von der Sonne zur Erde, wenn es 150 Millionen km sind?", stufe: 7,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+- {text: "Wie groß ist die Gewichtskraft von einem 65-kg-Menschen auf dem Mond, g ist dort 1,6 N/kg?", stufe: 8,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Mathe-Aufgaben]}
+- {text: "Was ist der Median von 2, 9, 4, 7 und 5? Muss ich die Zahlen vorher sortieren?", stufe: 6, art: nachbar,
+   soll: [Mathe-Aufgaben], nicht: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Auf der Karikatur steht ein Politiker auf einem Geldsack und hält eine Rede. Wie deute ich das?", stufe: 9,
+   art: nachbar, soll: ["Analysieren von Texten, Quellen und Bildern"],
+   nicht: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Ich soll ein Zeitungsfoto vom Mauerfall 1989 als Quelle untersuchen, was mache ich da?", stufe: 10,
+   art: nachbar, soll: ["Analysieren von Texten, Quellen und Bildern"], nicht: ["Recherche, Referat und Präsentation"]}
+- {text: "Für die Pro-Contra-Debatte zur Vier-Tage-Woche brauche ich gute Gegenargumente", stufe: 10, art: nachbar,
+   soll: [Argumentieren und Erörtern], nicht: ["Recherche, Referat und Präsentation"]}
+- {text: "Frag mich die Lateinvokabeln von Lektion 12 ab", stufe: 6, art: nachbar,
+   soll: [Lernen und Prüfungsvorbereitung], nicht: [Grammatik und Rechtschreibung]}
+- {text: "Ich muss für Englisch einen Leserbrief schreiben und weiß nicht, wie ich ihn aufbaue", stufe: 9,
+   art: nachbar, soll: [Überarbeiten eigener Texte], darf: [Argumentieren und Erörtern],
+   nicht: [Grammatik und Rechtschreibung]}   # Leserbrief ist beides, wie beim Hallenbad-Fall oben
+- {text: "In unserer Informatik-Projektgruppe streiten wir, wer was macht und bis wann", stufe: 9, art: nachbar,
+   soll: [Planen und Dokumentieren von Projekten], nicht: [Programmieren]}
+# … fünfter `nicht`-Fall für die Rückfälle, die bis hier nur vier hatten (28.10. abends)
+- {text: "Wir haben in NwT die Temperatur im Gewächshaus jede Stunde gemessen, welche Fehler könnten in unseren Messwerten stecken?",
+   stufe: 9, art: nachbar, soll: [Versuchsplanung und -auswertung],
+   nicht: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Im Erdkundebuch ist eine Tabelle mit den Einwohnerzahlen der zehn größten Städte Deutschlands, ich soll sie vergleichen",
+   stufe: 7, art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"],
+   nicht: [Versuchsplanung und -auswertung]}
+- {text: "Wir sollen in Geschichte ein Referat über die Französische Revolution halten, welche Quellen sind dafür gut?",
+   stufe: 8, art: nachbar, soll: ["Recherche, Referat und Präsentation"],
+   nicht: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Mein Englischaufsatz über my hometown ist fertig, ist der Aufbau okay?", stufe: 7, art: nachbar,
+   soll: [Überarbeiten eigener Texte], nicht: [Grammatik und Rechtschreibung]}
+- {text: "Ich muss für NwT ein Protokoll über unseren Brückentest schreiben, die Brücke hat 4 kg gehalten",
+   stufe: 9, art: nachbar, soll: [Versuchsplanung und -auswertung], nicht: [Planen und Dokumentieren von Projekten]}
+- {text: "Für Gemeinschaftskunde soll ich eine Statistik zur Jugendarbeitslosigkeit beschreiben, die im Buch steht",
+   stufe: 9, art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"],
+   nicht: ["Recherche, Referat und Präsentation"]}
+- {text: "Ich muss für den Informatikvortrag erklären, wie das Internet funktioniert, wie strukturier ich das?",
+   stufe: 8, art: nachbar, soll: ["Recherche, Referat und Präsentation"], nicht: [Programmieren]}
+
+# ── Fachfremd: keine Tätigkeit, die ein Assistent begleitet ──────────────────
+
+- {text: "Übersetz mir bitte: Ich gehe am Wochenende gern schwimmen", stufe: 7, art: fachfremd, soll: [],
+   nicht: [Grammatik und Rechtschreibung, Überarbeiten eigener Texte]}
+- {text: "Wie funktioniert eigentlich ein Kühlschrank?", stufe: 8, art: fachfremd, soll: [],
+   nicht: [Versuchsplanung und -auswertung, Rechnen mit Größen und Einheiten]}
+- {text: "Wann wurde Rom gegründet?", stufe: 6, art: fachfremd, soll: [],
+   nicht: ["Analysieren von Texten, Quellen und Bildern", Lernen und Prüfungsvorbereitung,
+           "Recherche, Referat und Präsentation"]}
+- {text: "Schreib mir eine Geschichte über einen Drachen, der Angst vor Feuer hat", stufe: 5, art: fachfremd, soll: [],
+   nicht: [Überarbeiten eigener Texte]}
+- {text: "Fass mir das Buch „Tschick“ in fünf Sätzen zusammen", stufe: 8, art: fachfremd, soll: [],
+   nicht: ["Analysieren von Texten, Quellen und Bildern", Überarbeiten eigener Texte]}
+- {text: "Welche Programmiersprache benutzen eigentlich Spieleentwickler?", stufe: 9, art: fachfremd, soll: [],
+   nicht: [Programmieren, Planen und Dokumentieren von Projekten]}
+- {text: "Welche Partei ist die beste?", stufe: 10, art: fachfremd, soll: [],
+   nicht: [Argumentieren und Erörtern, "Auswerten von Diagrammen, Tabellen und Statistiken"]}
 
 # ── Begriffsfragen: bleiben im freien Chat ───────────────────────────────────
 
 - {text: "Was bedeutet eigentlich Stoffmenge?", stufe: 9, art: begriff, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
-- {text: "Was ist eine Oxidation?", stufe: 8, art: begriff, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [stöchiometrische Berechnungen, Rechnen mit Größen und Einheiten]}
+- {text: "Was ist eine Oxidation?", stufe: 8, art: begriff, soll: [], nicht: [Reaktionsgleichungen]}
 - {text: "Was versteht man unter Osmose?", stufe: 9, art: begriff, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [Versuchsplanung und -auswertung]}
 - {text: "Was ist der Unterschied zwischen einem Atom und einem Ion?", stufe: 9, art: begriff, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
-- {text: "Was heißt Energieerhaltung?", stufe: 8, art: begriff, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [Reaktionsgleichungen, stöchiometrische Berechnungen]}
+- {text: "Was heißt Energieerhaltung?", stufe: 8, art: begriff, soll: [], nicht: [Rechnen mit Größen und Einheiten]}
+- {text: "Was ist ein Sonett?", stufe: 10, art: begriff, soll: [], nicht: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Was ist eine These?", stufe: 9, art: begriff, soll: [], nicht: [Argumentieren und Erörtern]}
+- {text: "Was ist ein Median?", stufe: 8, art: begriff, soll: [],
+   nicht: [Mathe-Aufgaben, "Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Was bedeutet Variable in der Informatik?", stufe: 8, art: begriff, soll: [], nicht: [Programmieren]}
+- {text: "Was ist eine Primärquelle?", stufe: 7, art: begriff, soll: [],
+   nicht: ["Recherche, Referat und Präsentation", "Analysieren von Texten, Quellen und Bildern"]}
 
 # ── Alltag und Organisatorisches ─────────────────────────────────────────────
 
-- {text: "Wann schreiben wir die nächste Physikarbeit?", stufe: 9, art: alltag, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
 - {text: "Kannst du mir eine Entschuldigung für die Schule schreiben?", stufe: 8, art: alltag, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [Überarbeiten eigener Texte]}
 - {text: "Ich hab heute echt keine Lust auf Hausaufgaben", stufe: 9, art: alltag, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
-- {text: "Mach mir eine Gliederung für mein Referat über Vulkane", stufe: 8, art: alltag, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [Lernen und Prüfungsvorbereitung]}
 - {text: "Welche Bücher brauche ich für die Oberstufe?", stufe: 10, art: alltag, soll: [],
-   nicht: [stöchiometrische Berechnungen, Reaktionsgleichungen, naturwissenschaftliche Aufgaben]}
+   nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Wann fangen die Herbstferien an?", stufe: 7, art: alltag, soll: [], nicht: [Lernen und Prüfungsvorbereitung]}
+- {text: "Welches Handy soll ich mir zum Geburtstag wünschen?", stufe: 8, art: alltag, soll: [],
+   nicht: [Argumentieren und Erörtern, "Recherche, Referat und Präsentation"]}
+- {text: "Erzähl mir einen Witz über Lehrer", stufe: 6, art: alltag, soll: [], nicht: [Überarbeiten eigener Texte]}
 
 # ── In einer Assistenten-Konversation (Schwelle „Assistent beenden" und Marge, K5) ──
+# Wechsel bietet der Dienst nur zu **spezifischen** Assistenten an (`im_assistenten`); eine Nachricht,
+# die zu einem anderen Rückfall passt, heißt dort „beenden“.
+
+# ── Frische Positive (F14, 29.10.2026) ───────────────────────────────────────
+# Von einem Agenten geschrieben, der weder Seed noch Prüfsatz kannte; ausgewertet auch getrennt
+# (`frisch: true`), weil r2 an den eigenen Fehltreffern nachgebessert war.
+
+- {text: "wie viel gramm wasser entstehen wenn man 4 g wasserstoff verbrennt? ich komm mit den mol nicht klar", stufe: 9, art: positiv, frisch: true,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Wir sollen ausrechnen, wie viel Liter CO2 bei der Reaktion von 10 g Calciumcarbonat mit Salzsäure frei werden (Normbedingungen). Ich habe die Gleichung, weiß aber nicht, wie ich von der Masse aufs Volumen komme.", stufe: 10, art: positiv, frisch: true,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Titration: 20 ml Natronlauge unbekannter Konzentration, verbraucht 12,5 ml HCl mit c = 0,1 mol/l. kannst du mir zeigen wie ich die konzentration der lauge rauskriege, ich will es selber rechnen", stufe: 11, art: positiv, frisch: true,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "eisen + schwefel → eisensulfid, wie schreib ich das mit formeln und stimmt das so schon oder muss ich da zahlen davor machen", stufe: 8, art: positiv, frisch: true,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Ich muss die Redoxgleichung für Permanganat mit Eisen(II)-Ionen in saurer Lösung aufstellen. Teilgleichungen hab ich angefangen, aber die Elektronen gehen bei mir nicht auf.", stufe: 11, art: positiv, frisch: true,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Al + O2 -> Al2O3 wie gleich ich das aus?? bei mir kommt immer was ungerades raus", stufe: 9, art: positiv, frisch: true,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Ein Auto fährt 120 km in 1 h 20 min. Wie schnell in m/s? Ich weiß nicht wie man die Zeit umrechnet", stufe: 7, art: positiv, frisch: true,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "muss die formel für die kinetische energie nach v umstellen, E = 1/2 m v², und dann mit m = 800 g und E = 3,6 J rechnen. wie viele nachkommastellen soll ich angeben?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "In Bio sollen wir ausrechnen, wie viele Zellen in 1 mm³ Blut sind, wenn in einem Kästchen der Zählkammer (0,0025 mm² Fläche, 0,1 mm tief) 12 Zellen liegen. Ich verhedder mich mit den Einheiten.", stufe: 9, art: positiv, frisch: true,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "3/4 + 2/5 wie geht das nochmal mit dem gleichen nenner", stufe: 6, art: positiv, frisch: true,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "Ein Pullover kostet nach 25 % Rabatt noch 36 €. Wie teuer war er vorher? Ich hab 45 raus, aber meine Freundin sagt 48.", stufe: 7, art: positiv, frisch: true,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "Guten Tag, ich soll zeigen, dass die Funktion f(x) = x³ − 3x genau zwei Extrempunkte hat, und die Art bestimmen. Ich habe die Ableitung gebildet, weiß aber nicht, wie ich das sauber begründe.", stufe: 11, art: positiv, frisch: true,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "wir sollen einen versuch planen ob pflanzen ohne licht wachsen können. wie fang ich da an", stufe: 6, art: positiv, frisch: true,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "Wir haben die Fallzeit einer Kugel aus 1 m Höhe fünfmal gemessen: 0,47 s, 0,44 s, 0,46 s, 0,51 s, 0,45 s. Rauskommen soll g, aber unser Wert ist zu klein. Woran kann das liegen und wie schreib ich das in die Auswertung?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "Protokoll zur Enzymaktivität bei verschiedenen Temperaturen – ich hab die Messwerte, aber die Beobachtung und Deutung vermischen sich bei mir immer. Kannst du mir helfen, das zu trennen?", stufe: 12, art: positiv, frisch: true,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "Klimadiagramm von Manaus: Temperatur immer so 27 Grad, Niederschlag jeden Monat über 200 mm, März 300. Ich soll das beschreiben und sagen welche Klimazone, wie mach ich das richtig", stufe: 7, art: positiv, frisch: true,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "In der Tabelle steht die Arbeitslosenquote 2005–2020 nach Bundesländern. Was soll ich da rauslesen, das sind so viele zahlen", stufe: 9, art: positiv, frisch: true,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Wir haben eine Umfrage in der Klasse gemacht: 18 von 27 nutzen TikTok täglich, 5 nie. Die Lehrerin sagt, man kann daraus nicht auf alle Jugendlichen schließen. Ich soll erklären warum und das Säulendiagramm interpretieren.", stufe: 8, art: positiv, frisch: true,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "„Der Mond ist aufgegangen, / die goldnen Sternlein prangen…“ – wir sollen das Gedicht analysieren, ich hab keine ahnung was die sprachlichen mittel sind und was das bedeuten soll", stufe: 8, art: positiv, frisch: true,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Ich habe eine Karikatur zum Wiener Kongress, auf der Metternich die Landkarte zerschneidet. Wie gehe ich bei der Deutung vor, damit ich nicht nur beschreibe?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Szenenanalyse Faust, Studierzimmer I. ich weiß was passiert aber nicht wie ich das in die Gesamtdeutung einordnen soll", stufe: 12, art: positiv, frisch: true,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "sollte handy in der schule erlaubt sein, ich brauch argumente dafür und dagegen aber nicht nur „macht spaß“", stufe: 7, art: positiv, frisch: true,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "Ich schreibe eine dialektische Erörterung zum Thema Tempolimit auf Autobahnen. Meine Argumente habe ich, aber ich weiß nicht, wie ich sie anordnen soll und wie der Schluss aussieht.", stufe: 10, art: positiv, frisch: true,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "In Ethik das Weichensteller-Problem: soll man einen opfern um fünf zu retten? Ich muss Stellung nehmen und meine Position begründen, kannst du meine Begründung mal kritisch hinterfragen?", stufe: 11, art: positiv, frisch: true,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "hier ist mein unfallbericht: „Ich ging nach der Schule nach Hause und dann hab ich gesehen wie ein Fahrrad und ein Auto zusammengestoßen sind, es war echt krass.“ ist das so ok?", stufe: 6, art: positiv, frisch: true,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "Dear Mr Smith, I am writing to apply for the summer job in your shop. I am 16 years old and I am very motivated. – Könntest du mir sagen, was ich am Anschreiben verbessern kann, bevor ich es abgebe?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "Ich muss eine Bewerbung für ein BOGY-Praktikum bei einer Tierarztpraxis schreiben und weiß nicht, wie ich das aufbaue.", stufe: 9, art: positiv, frisch: true,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "wann schreibt man das und wann dass, ich mach das in jedem diktat falsch", stufe: 5, art: positiv, frisch: true,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "Bei mir steht in der Arbeit dreimal „Zeitfehler“ angestrichen: „Yesterday I have seen my friend.“ Warum ist das falsch, und kannst du mir ein paar Sätze zum Üben geben?", stufe: 7, art: positiv, frisch: true,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "subjonctif nach „il faut que“ – ich versteh nicht wann man das benutzt, bitte mit übungen", stufe: 9, art: positiv, frisch: true,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "ich hab ein referat über eisbären in 2 wochen, wo finde ich gute infos", stufe: 5, art: positiv, frisch: true,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Meine GFS in Geschichte ist über die Weiße Rose. Wie prüfe ich, ob die Internetseiten seriös sind, und wie viele Folien sind für 20 Minuten sinnvoll?", stufe: 9, art: positiv, frisch: true,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Ich halte nächste Woche meinen Vortrag zu CRISPR und brauche noch ein Handout auf einer Seite. Was gehört da rein und was nicht?", stufe: 12, art: positiv, frisch: true,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "wir sind zu viert in nwt und sollen eine automatische pflanzenbewässerung bauen, wie teilen wir die arbeit auf?", stufe: 9, art: positiv, frisch: true,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "Im Seminarkurs müssen wir ein Arbeitsjournal führen. Was schreibt man da konkret rein? Bisher stehen bei mir nur Daten und „recherchiert“.", stufe: 11, art: positiv, frisch: true,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "Unser Projekt (Solarofen) ist fast fertig, aber die Temperatur erreicht nur 60 °C statt 100. Wir müssen eine Abschlussreflexion schreiben – wie gehen wir damit um, dass das Ziel nicht erreicht wurde?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "in scratch soll meine katze springen wenn man leertaste drückt aber sie fliegt einfach weg und kommt nicht mehr runter", stufe: 7, art: positiv, frisch: true,
+   soll: ["Programmieren"]}
+- {text: "for i in range(1, 10): if i % 2 = 0: print(i) → SyntaxError. was ist falsch", stufe: 9, art: positiv, frisch: true,
+   soll: ["Programmieren"]}
+- {text: "Ich möchte mit dem Arduino eine Ampel programmieren, die bei Tastendruck auf Grün schaltet. Ich weiß nicht, wie ich das in Schritte zerlege, bevor ich anfange zu schreiben.", stufe: 10, art: positiv, frisch: true,
+   soll: ["Programmieren"]}
+- {text: "nächsten dienstag englisch vokabeltest unit 3, kannst du mich abfragen", stufe: 6, art: positiv, frisch: true,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+- {text: "Ich schreibe in zehn Tagen Bio über Genetik und Proteinbiosynthese und habe noch nichts gemacht. Kannst du mir einen Plan machen, was ich wann lerne?", stufe: 10, art: positiv, frisch: true,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+- {text: "hab in der letzten mathearbeit ne 4 bekommen, hauptsächlich wegen vorzeichenfehlern beim ableiten. abi ist im april – wie bekomm ich das weg?", stufe: 12, art: positiv, frisch: true,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+
+# ── Frische Positive, zweite Reihe (29.10.2026) ──────────────────────────────
+# Nach V5 (Seed an den Fehltreffern von r3 nachgebessert) wieder von einem Agenten ohne Kenntnis
+# von Seed und Prüfsatz geschrieben; dazu Begriff/Alltag/„erledige das für mich“.
+
+- {text: "wie viel gramm kalk brauch ich um 50 ml salzsäure mit c=2 mol/l komplett zu neutralisieren? ich häng bei der stoffmenge fest", stufe: 10, art: positiv, frisch: 2,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Wir sollen ausrechnen, wie viel Liter CO2 beim Verbrennen von einem Liter Benzin entstehen (als Octan rechnen, Dichte 0,7 g/ml). Die Gleichung hab ich schon, aber wie komm ich vom Volumen zur Masse und dann wieder zum Gasvolumen?", stufe: 11, art: positiv, frisch: 2,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Aufgabe 4, Thermitverfahren: 1 kg Eisen soll entstehen, wie viel Aluminium braucht man. Ich hab 241 g raus, kommt mir aber zu wenig vor", stufe: 9, art: positiv, frisch: 2,
+   soll: ["stöchiometrische Berechnungen"], darf: ["Rechnen mit Größen und Einheiten"]}
+- {text: "kann mir wer helfen die gleichung für kupfer mit konzentrierter salpetersäure aufzustellen? mit oxidationszahlen, da entsteht irgendwie NO2", stufe: 12, art: positiv, frisch: 2,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Fe + Cl2 → FeCl3 ich krieg das nich ausgeglichen egal was ich vorne hinschreib", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Wir haben Bariumchloridlösung zu Natriumsulfatlösung gegeben und es ist weiß geworden. Wie schreibe ich das als Ionengleichung und welche Ionen darf ich weglassen?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Reaktionsgleichungen"], darf: ["Rechnen mit Größen und Einheiten", "Versuchsplanung und -auswertung"]}
+- {text: "Bio: Schlagvolumen 70 ml, Puls 72 pro Minute. Wie viel Liter pro Stunde pumpt das Herz? Ich weiß nicht, wie ich die Einheiten umwandeln soll.", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "wie stell ich p = F/A nach A um und wie viel cm² sind 0,0035 m²", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Ein Radfahrer fährt 18 km/h und bremst in 2,5 s bis zum Stillstand. Bei mir kommt für die Bremsverzögerung 7,2 m/s² raus, das kann doch nicht stimmen?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Rechnen mit Größen und Einheiten"]}
+- {text: "Glücksrad mit 3 roten und 5 blauen Feldern, es wird zweimal gedreht. Wie groß ist die Wahrscheinlichkeit für genau einmal rot? Baum hab ich gezeichnet aber weiß nicht welche pfade ich addieren muss", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "zeige dass die summe von drei aufeinanderfolgenden zahlen immer durch 3 teilbar ist. ich hab keine ahnung wie man sowas anfängt", stufe: 7, art: positiv, frisch: 2,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "f(x)=0,5x³-3x²+4, gesucht ist die Wendetangente. Die Wendestelle x=2 hab ich, aber wie gehts dann weiter?", stufe: 11, art: positiv, frisch: 2,
+   soll: ["Mathe-Aufgaben"]}
+- {text: "wir wollen testen ob salzwasser schneller oder langsamer gefriert als normales wasser. wie bauen wir das auf damit es fair ist?", stufe: 6, art: positiv, frisch: 2,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "Unsere Pendel-Messwerte: 20 cm → 0,92 s, 40 cm → 1,25 s, 60 cm → 1,71 s, 80 cm → 1,77 s. Der dritte Wert passt nicht rein. Was könnte da schiefgelaufen sein und wie schreib ich das in die Fehlerbetrachtung?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "In Sport sollen wir selbst untersuchen, ob Dehnen vor dem Sprint was bringt, wir messen 30-m-Zeiten. Wie viele Durchgänge brauchen wir und was müssen wir alles gleich lassen?", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Versuchsplanung und -auswertung"]}
+- {text: "Klimadiagramm von Manaus: Temperatur immer so um die 27 °C, Niederschlag fast jeden Monat über 200 mm. Wie beschreib ich das richtig und was sagt das über die Vegetation?", stufe: 7, art: positiv, frisch: 2,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "In Wirtschaft haben wir eine Tabelle zur Arbeitslosenquote in Deutschland von 2005 bis 2023 bekommen. Ich soll sie auswerten, weiß aber nicht, was ich außer „geht runter“ schreiben soll.", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "bevölkerungspyramide von niger und japan vergleichen. bei niger ist es unten voll breit, japan sieht aus wie ne urne. was heißt das jetzt genau", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"]}
+- {text: "Wir lesen „Der Sandmann“ und ich soll die Szene analysieren, in der Nathanael Olimpia durch das Perspektiv anschaut. Ich verstehe nicht, welche Bedeutung das Fernglas da hat.", stufe: 11, art: positiv, frisch: 2,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Karikatur zum Wiener Kongress, da tanzen die Herrscher und einer zerrt an der Landkarte. Wie geh ich bei der Deutung vor?", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "latein, catull carmen 85 „odi et amo“: wir sollen die stilmittel finden und sagen wie sie zum inhalt passen", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Analysieren von Texten, Quellen und Bildern"]}
+- {text: "Sollte unsere Schule eine Vier-Tage-Woche einführen? Ich brauch Argumente für eine dialektische Erörterung, hab erst 2 Pro und noch gar kein Contra", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "Ethik: Eine Ärztin hat nur ein Spenderorgan, aber zwei Patienten. Ich soll Stellung nehmen – wie begründe ich das einmal mit Kant und einmal utilitaristisch?", stufe: 11, art: positiv, frisch: 2,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "should tourists have to pay to enter venice? wir sollen ne opinion mit argumenten schreiben und ich hab nur „it is too crowded“", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Argumentieren und Erörtern"]}
+- {text: "Kannst du über mein Anschreiben für das BOGY-Praktikum beim Tierarzt schauen? „Sehr geehrte Damen und Herren, ich heiße Lena und bin 14 Jahre alt. Ich mag Tiere sehr gerne und will deshalb bei Ihnen ein Praktikum machen.“ Klingt irgendwie zu kindisch.", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "Spanisch, mein correo an eine amiga: „El verano pasado fui a Italia con mi familia. Hacía mucho calor y comimos helado todos los días.“ ist das so okay oder zu einfach für B1?", stufe: 11, art: positiv, frisch: 2,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "ich muss einen unfallbericht schreiben, hab im sport gesehn wie einer vom barren gefallen ist. wie fang ich an und was muss alles rein?", stufe: 6, art: positiv, frisch: 2,
+   soll: ["Überarbeiten eigener Texte"]}
+- {text: "Ich hab in der Arbeit „il faut que tu viens“ geschrieben und es war falsch. Ich check einfach nicht, wann man den subjonctif nimmt.", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "ablativus absolutus – ich erkenn den im satz nie. z.b. „Caesare duce milites vicerunt“, woran sieht man das?", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "unsere lehrerin hat „If I would have more time I would learn spanish“ rot angestrichen. wieso??", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Grammatik und Rechtschreibung"]}
+- {text: "Ich halte eine GFS in Geographie über Desertifikation in der Sahelzone. Wie viele Folien sind sinnvoll und wie gliedere ich das?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "ist wikipedia ne gute quelle für mein referat über hatschepsut? unsere lehrerin sagt nein aber wo soll ich sonst suchen", stufe: 6, art: positiv, frisch: 2,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Handout für mein IMP-Referat über Blockchain, nur eine Seite erlaubt – was gehört da rein?", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Recherche, Referat und Präsentation"]}
+- {text: "Wir bauen in NwT zu viert eine automatische Pflanzenbewässerung und haben noch 6 Wochen. Wie teilen wir das auf, damit nicht einer alles macht?", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "Seminarkurs: Wir müssen ein Arbeitsjournal führen. Was schreibt man da eigentlich jede Woche rein?", stufe: 11, art: positiv, frisch: 2,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "kunst: wir machen als klasse einen stop-motion-film zum thema müll, wie fangen wir mit der planung an", stufe: 7, art: positiv, frisch: 2,
+   soll: ["Planen und Dokumentieren von Projekten"]}
+- {text: "mein python programm soll aus einer liste mit noten den durchschnitt ausrechnen aber es kommt ZeroDivisionError: division by zero", stufe: 9, art: positiv, frisch: 2,
+   soll: ["Programmieren"]}
+- {text: "Arduino: Ein Ultraschallsensor soll eine LED einschalten, wenn etwas näher als 10 cm ist. Wo fange ich an?", stufe: 8, art: positiv, frisch: 2,
+   soll: ["Programmieren"]}
+- {text: "scratch: meine katze soll hüpfen wenn man leertaste drückt aber sie fliegt einfach nach oben weg und kommt nich wieder", stufe: 7, art: positiv, frisch: 2,
+   soll: ["Programmieren"]}
+- {text: "Ich schreibe in 9 Tagen Bio über Genetik und hab noch nichts gemacht. Wie teile ich mir das am besten auf?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+- {text: "nächste woche sporttheorie test über energiebereitstellung, kannst du mich abfragen?", stufe: 12, art: positiv, frisch: 2,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+- {text: "In der letzten Geschichtsarbeit habe ich bei den Quellenaufgaben immer Punkte verloren, weil ich zu viel nacherzählt habe. Wie bereite ich mich diesmal besser vor?", stufe: 10, art: positiv, frisch: 2,
+   soll: ["Lernen und Prüfungsvorbereitung"]}
+- {text: "Was ist der Unterschied zwischen Wetter und Klima?", stufe: 5, art: begriff, frisch: 2}
+- {text: "wer war mansa musa", stufe: 7, art: begriff, frisch: 2}
+- {text: "Was versteht man unter Opportunitätskosten?", stufe: 10, art: begriff, frisch: 2}
+- {text: "was ist eigentlich ein ablaut", stufe: 8, art: begriff, frisch: 2}
+- {text: "wann sind dieses jahr die pfingstferien", stufe: 7, art: alltag, frisch: 2}
+- {text: "hab heute ehrlich null bock auf schule", stufe: 8, art: alltag, frisch: 2}
+- {text: "Hallo, bist du eine echte Person?", stufe: 5, art: alltag, frisch: 2}
+- {text: "wo kann ich mich für die theater-ag anmelden?", stufe: 6, art: alltag, frisch: 2}
+- {text: "schreib mir eine Erörterung zu Tierversuchen, ca. 600 Wörter", stufe: 10, art: fachfremd, frisch: 2}
+- {text: "übersetz bitte ins französische: Am Wochenende war ich mit meinem Bruder im Kino.", stufe: 8, art: fachfremd, frisch: 2}
+- {text: "fass mir kapitel 3 von tschick zusammen", stufe: 8, art: fachfremd, frisch: 2}
+- {text: "gib mir einfach die lösungen von s. 87 nr 3a-f im lambacher schweizer", stufe: 9, art: fachfremd, frisch: 2}
 
 in_assistent:
-- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "und wie viel Liter sind das dann?"}
-- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "Wo finde ich die molare Masse von Magnesium?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben,
+   vorher: "Genau, 0,5 mol Wasserstoff – die Stoffmenge hast du richtig. Gesucht ist aber das Volumen des Gases. Welche Größe brauchst du, um von der Stoffmenge zum Volumen zu kommen?",
+   text: "und wie viel Liter sind das dann?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben,
+   vorher: "Gut, du hast aufgeschrieben: gegeben m(Mg) = 6 g, gesucht n(Mg). Um von der Masse zur Stoffmenge zu kommen, brauchst du noch eine weitere Größe. Welche ist das?",
+   text: "Wo finde ich die molare Masse von Magnesium?"}
 - {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   vorher: "Stimmt, aus 0,2 mol Kohlenstoff entstehen nach dem Verhältnis 1 : 1 auch 0,2 mol Kohlenstoffdioxid. Jetzt fehlt nur noch der Schritt von der Stoffmenge zur Masse. Welche Größe brauchst du dafür?",
    text: "Gleich mir noch Fe + O2 -> Fe2O3 aus, das ist eine andere Aufgabe"}
-- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: beenden, text: "Schreib mir eine Gliederung für mein Referat über den Klimawandel"}
-- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "Was ist ein Oxidationsmittel nochmal?"}
-- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "Muss ich da jetzt eine 2 vor das Wasser schreiben?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Richtig, die molare Masse von Kupfer liegt bei etwa 63,5 g/mol. Damit kannst du jetzt aus der Masse die Stoffmenge berechnen. Welche Größengleichung verbindet Masse, Stoffmenge und molare Masse?",
+   text: "Schreib mir eine Gliederung für mein Referat über den Klimawandel"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben,
+   vorher: "Gut, die Formeln von Kupferoxid und Wasserstoff hast du richtig aufgeschrieben. In der Aufgabe sollst du auch angeben, welcher Stoff als Oxidationsmittel wirkt. Welcher Stoff gibt bei dieser Reaktion Sauerstoff ab?",
+   text: "Was ist ein Oxidationsmittel nochmal?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben,
+   vorher: "Deine Gleichung H2 + O2 → H2O hat die richtigen Formeln. Zähl jetzt einmal die Sauerstoff-Atome auf beiden Seiten. Wie viele sind es links und wie viele rechts?",
+   text: "Muss ich da jetzt eine 2 vor das Wasser schreiben?"}
 - {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   vorher: "Sehr gut, 2 H2 + O2 → 2 H2O stimmt: Links und rechts stehen jetzt je vier Wasserstoff- und zwei Sauerstoff-Atome. Damit ist die Gleichung ausgeglichen. Gibt es in deiner Aufgabe noch einen Teil, bei dem ich dich begleiten soll?",
    text: "Und wie viel Gramm Wasser entstehen dann aus 4 g Wasserstoff?"}
-- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: beenden, text: "Kannst du mir bei der Englisch-Hausaufgabe helfen?"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "und welche Einheit hat das Ergebnis?"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "Ist das jetzt beschreiben oder schon erklären?"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
-   text: "Gleich mir mal die Gleichung Al + O2 -> Al2O3 aus"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: beenden, text: "Wer war eigentlich Napoleon?"}
-# ── Neue, fernere K5-Texte (Päckchen C2, Schritt 1, 28.10.2026) ──────────────
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Fast: Bei Mg + O2 → MgO stimmen die Formeln, aber die Sauerstoff-Atome sind noch nicht ausgeglichen. Links stehen zwei, rechts eins. Was kannst du ändern, ohne die Formeln selbst anzufassen?",
+   text: "Kannst du mir bei der Englisch-Hausaufgabe helfen?"}
+# ── Fernere K5-Texte (Päckchen C2, Schritt 1, 28.10.2026) ────────────────────
 # C1 fand vier Prüftexte als Fast-Dubletten von Seed-Texten; diese sind frei formuliert.
-- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, text: "hä warum muss ich da durch die molare masse teilen"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben,
+   vorher: "Gegeben m(Fe) = 11,2 g und gesucht n(Fe) hast du richtig aufgeschrieben. Jetzt setzt du in n = m / M ein. Welchen Wert hat die molare Masse von Eisen?",
+   text: "hä warum muss ich da durch die molare masse teilen"}
 - {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   vorher: "Dein Stoffmengenverhältnis stimmt: Aus der Gleichung liest du ab, dass auf 2 mol Aluminium 1 mol Aluminiumoxid kommt. Du hast 0,4 mol Aluminium. Wie viel mol Aluminiumoxid entstehen dann?",
    text: "neue Aufgabe: Natrium reagiert mit Chlor, stell dafür die Formelgleichung auf"}
-- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: beenden, text: "Was bedeutet eigentlich das Wort Metapher?"}
-- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben, text: "warum steht bei O2 die 2 klein unten und nicht groß davor?"}
+- {aktuell: stöchiometrische Berechnungen, stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Die Einheit passt jetzt: g geteilt durch g/mol ergibt mol. Dein Ergebnis von 0,25 mol Schwefel hat auch eine sinnvolle Größenordnung. Wie lautet dein Antwortsatz?",
+   text: "Was bedeutet eigentlich das Wort Metapher?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: bleiben,
+   vorher: "Du schreibst für Sauerstoff einfach „O“. Sauerstoff kommt als Element aber nicht als einzelnes Atom vor. Wie sieht die Formel für ein Sauerstoff-Molekül aus?",
+   text: "warum steht bei O2 die 2 klein unten und nicht groß davor?"}
 - {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   vorher: "Prima, 2 Cu + O2 → 2 CuO ist ausgeglichen: Auf beiden Seiten stehen zwei Kupfer- und zwei Sauerstoff-Atome. Damit ist dieser Teil der Aufgabe fertig. Was verlangt die nächste Teilaufgabe von dir?",
    text: "jetzt soll ich noch ausrechnen wie viel gramm kupferoxid aus 6 g kupfer werden"}
-- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: beenden, text: "Hilf mir bei meinem Bewerbungsschreiben fürs Praktikum"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: bleiben, text: "Muss ich das Ergebnis eigentlich runden?"}
-- {aktuell: naturwissenschaftliche Aufgaben, stufe: 9, erwartet: beenden, text: "Wie viele Vokabeln sollte ich pro Tag lernen?"}
+- {aktuell: Reaktionsgleichungen, stufe: 9, erwartet: wechsel, wechsel_zu: "Überarbeiten eigener Texte",
+   vorher: "Bei der Verbrennung von Methan hast du links CH4 und O2, rechts CO2 und H2O – die Formeln stimmen. Jetzt geht es ans Ausgleichen. Mit welcher Atomsorte fängst du am besten an?",
+   text: "Hilf mir bei meinem Bewerbungsschreiben fürs Praktikum"}
+# ── In Rückfall-Assistenten (Plan „Rückfall-Assistenten“, Schritt 6, 28.10.2026) ──
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: bleiben,
+   vorher: "Gut umgestellt: v = s / t. Jetzt setzt du deine Werte mit Einheiten ein, also 120 m und 15 s. Was kommt heraus, wenn du rechnest?",
+   text: "und welche Einheit hat das Ergebnis?"}
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: bleiben,
+   vorher: "Dein Rechenweg für die Dichte stimmt, und die Einheit g/cm³ passt auch. Auf deinem Taschenrechner stehen jetzt viele Nachkommastellen. Mit wie vielen gültigen Ziffern sind die Werte in der Aufgabe angegeben?",
+   text: "Muss ich das Ergebnis eigentlich runden?"}
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   vorher: "Richtig, 72 km/h sind 20 m/s – du hast durch 3,6 geteilt. Damit hast du die gesuchte Größe in der verlangten Einheit. Wie lautet dein Antwortsatz?",
+   text: "nächste Aufgabe ist Chemie: wie viel Gramm Magnesiumoxid entstehen aus 12 g Magnesium?"}
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Du hast gegeben F = 600 N und A = 0,02 m² notiert, gesucht ist der Druck. Die passende Größengleichung hast du auch schon. Was erhältst du, wenn du einsetzt und rechnest?",
+   text: "Wer war eigentlich Napoleon?"}
+- {aktuell: Versuchsplanung und -auswertung, stufe: 9, erwartet: bleiben,
+   vorher: "In der Aufgabe kommen zwei Operatoren vor: erst „beschreibe“, dann „erkläre“. Dein Satz „Das Kalkwasser wird trüb“ ist schon genau beobachtet. Zu welchem Teil der Aufgabe gehört er?",
+   text: "Ist das jetzt beschreiben oder schon erklären?"}
+- {aktuell: Versuchsplanung und -auswertung, stufe: 9, erwartet: wechsel, wechsel_zu: Reaktionsgleichungen,
+   vorher: "Deine Beobachtung ist genau: Das Gemisch glüht auf, und es entsteht ein schwarzer, spröder Stoff. Für die Auswertung brauchst du jetzt eine Deutung. Woran erkennst du, dass ein neuer Stoff entstanden ist?",
+   text: "Zu dem Versuch soll ich jetzt noch die Reaktionsgleichung von Kupfer mit Schwefel aufstellen"}
+- {aktuell: Versuchsplanung und -auswertung, stufe: 9, erwartet: wechsel, wechsel_zu: "Lernen und Prüfungsvorbereitung",
+   vorher: "Gute Idee, die Temperatur als einzige Größe zu verändern. Damit dein Versuch fair ist, müssen alle anderen Bedingungen gleich bleiben. Welche Größen hältst du konstant?",
+   verweis_auf: "Lernen und Prüfungsvorbereitung",
+   text: "Wie viele Vokabeln sollte ich pro Tag lernen?"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 9, erwartet: bleiben,
+   vorher: "Für die erste Strophe hast du die hellen Farbwörter und die Sonne als Bilder für Freude gut belegt. Achte jetzt darauf, ob die Stimmung im Gedicht so bleibt. Was fällt dir auf, wenn du weiterliest?",
+   text: "und was ist mit der zweiten Strophe, da wird es plötzlich dunkel"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Du hast schon erkannt, dass die Karikatur einen Politiker mit einem viel zu großen Schlüssel zeigt. Bevor du deutest, beschreib erst genau, was noch zu sehen ist. Welche Personen oder Gegenstände sind außerdem auf dem Bild?",
+   text: "Wann fangen eigentlich die Osterferien an?"}
+- {aktuell: Mathe-Aufgaben, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   vorher: "Deine Gleichung 3x + 5 = 20 hast du richtig aufgestellt. Als Nächstes willst du das x allein auf eine Seite bringen. Was machst du zuerst mit der 5?",
+   text: "Andere Frage aus Chemie: Wie viel mol sind 36 g Wasser?"}
+- {aktuell: Programmieren, stufe: 9, erwartet: bleiben,
+   vorher: "Deine Schleife läuft schon und gibt die Zahlen aus – gut. Im Moment hört sie aber nie auf, weil die Bedingung immer wahr bleibt. Was müsste sich bei jedem Durchlauf ändern, damit das irgendwann anders wird?",
+   text: "und wie sorge ich dafür, dass die Schleife nach 10 Durchläufen aufhört?"}
+- {aktuell: Programmieren, stufe: 9, erwartet: bleiben, darf: [beenden],
+   vorher: "Die Fehlermeldung „NameError: name 'summe' is not defined“ sagt dir, dass Python eine Variable nicht kennt. Schau dir die Stelle an, an der du summe zum ersten Mal benutzt. Steht dort schon ein Wert in der Variable?",
+   text: "Kannst du mir ein Rezept für Pfannkuchen geben?"}
+# ── Rückfall → anderer Rückfall heißt „beenden“ (28.10. abends) ────────────
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: wechsel, wechsel_zu: "Versuchsplanung und -auswertung",
+   vorher: "Deine Tabelle mit den Messwerten für Weg und Zeit ist vollständig. Für die erste Messung hast du die Geschwindigkeit schon richtig berechnet. Was bekommst du für die zweite Messung heraus?",
+   verweis_auf: "Versuchsplanung und -auswertung",
+   text: "jetzt soll ich die Messwerte noch in ein Diagramm zeichnen"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 9, erwartet: wechsel, wechsel_zu: "Überarbeiten eigener Texte",
+   vorher: "Du hast den Wendepunkt der Kurzgeschichte gut gefunden: Als der Vater schweigt, ändert sich alles. Jetzt fehlt noch, was dieses Schweigen über die Beziehung der beiden zeigt. Wie würdest du das deuten?",
+   verweis_auf: "Überarbeiten eigener Texte",
+   text: "kannst du mal meinen fertigen Aufsatz dazu anschauen, ob er gut ist?"}
+- {aktuell: Lernen und Prüfungsvorbereitung, stufe: 9, erwartet: wechsel, wechsel_zu: stöchiometrische Berechnungen,
+   vorher: "Gut, du willst bis Freitag Stoffmenge und molare Masse wiederholen. Ein Plan hilft, damit du nicht alles am letzten Abend machst. An welchen Tagen hast du Zeit zum Üben?",
+   text: "ok, und jetzt Aufgabe 3 aus dem Buch: 12 g Magnesium verbrennen, wie viel Magnesiumoxid entsteht?"}
+# ── Kurze, inhaltsleere Folgefragen — harter `bleiben`-Fall (28.10. abends) ──
+- {aktuell: Rechnen mit Größen und Einheiten, stufe: 9, erwartet: bleiben,
+   vorher: "Gut, gegeben und gesucht stehen jetzt mit Einheiten da. Prüf als Nächstes, ob die Einheiten zusammenpassen: Die Zeit ist in Minuten angegeben. Was machst du damit, bevor du einsetzt?",
+   text: "ok und dann?"}
+- {aktuell: Mathe-Aufgaben, stufe: 9, erwartet: bleiben,
+   vorher: "Du hast die Klammer schon richtig aufgelöst. Jetzt fasst du auf der linken Seite die Glieder mit x zusammen. Was steht dann da?",
+   text: "stimmt das so?"}
+- {aktuell: Grammatik und Rechtschreibung, stufe: 7, erwartet: bleiben,
+   vorher: "In deinem Satz „Yesterday I go to the cinema“ stimmt die Zeitform noch nicht. Das Wort „yesterday“ zeigt, dass es um die Vergangenheit geht. Welche Zeitform brauchst du dafür?",
+   text: "hä?"}
+- {aktuell: Programmieren, stufe: 9, erwartet: bleiben,
+   vorher: "Super, deine Funktion liefert für 3 und 4 jetzt das richtige Ergebnis. Teste sie noch mit anderen Eingaben, bevor du weitermachst. Welche Werte probierst du als Nächstes?",
+   text: "und jetzt?"}
+# ── Je ein `bleiben` für die bisher fehlenden Rückfälle (28.10. abends) ──────
+- {aktuell: Lernen und Prüfungsvorbereitung, stufe: 6, erwartet: bleiben,
+   vorher: "Dann frag ich dich jetzt ab, und du antwortest ohne nachzuschauen. Erste Runde: Frankreich, Italien, Spanien, Portugal. Wie heißen die Hauptstädte dieser Länder?",
+   text: "Paris, Rom, Madrid, Lissabon"}
+- {aktuell: Grammatik und Rechtschreibung, stufe: 7, erwartet: bleiben,
+   vorher: "In deinem Satz „My brother go to school by bus“ stimmt etwas am Verb nicht. Denk an die Regel für he, she, it im simple present. Wie muss das Verb dann aussehen?",
+   text: "also goes?"}
+- {aktuell: Argumentieren und Erörtern, stufe: 8, erwartet: bleiben,
+   vorher: "Dein erstes Argument, dass Hausaufgaben oft Stress machen, hast du mit einem Beispiel aus deinem Alltag gut gestützt. Eine Erörterung überzeugt mehr, wenn weitere Argumente dazukommen. Welches Argument fällt dir als Nächstes ein?",
+   text: "mein zweites Argument wäre, dass man ohne Hausaufgaben mehr Zeit für Hobbys hat"}
+- {aktuell: Überarbeiten eigener Texte, stufe: 9, erwartet: bleiben,
+   vorher: "Dein Einstieg beginnt mit „Ich finde Handys doof“ – damit verrätst du deine Meinung, bevor du zum Thema hingeführt hast. Ein guter Einleitungssatz nennt zuerst die Frage, um die es geht. Wie könntest du den ersten Satz umschreiben?",
+   text: "ich hab den Absatz jetzt so umgeschrieben: „Zunächst stellt sich die Frage, ob Handys im Unterricht nützen oder stören.“"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 8, erwartet: bleiben,
+   vorher: "Gut, du hast schon erkannt, dass das Diagramm die Jahre 2000 bis 2020 zeigt. Bevor du Werte abliest, musst du wissen, was die andere Achse angibt. Was steht an der y-Achse, und in welcher Einheit?",
+   text: "an der y-Achse steht Millionen Tonnen"}
+- {aktuell: "Recherche, Referat und Präsentation", stufe: 6, erwartet: bleiben,
+   vorher: "Haie sind ein spannendes Thema! Damit dein Referat nicht zu groß wird, hilft eine Leitfrage, die du am Ende beantworten kannst. Was möchtest du über Haie herausfinden?",
+   text: "meine Leitfrage wäre: Warum sind Haie vom Aussterben bedroht?"}
+- {aktuell: Planen und Dokumentieren von Projekten, stufe: 9, erwartet: bleiben,
+   vorher: "Euer Ziel ist klar: ein Insektenhotel für den Schulgarten bis zu den Sommerferien. Als Nächstes teilt ihr das Projekt in Arbeitspakete auf und schätzt, wie lange jedes dauert. Womit fangt ihr an, und wie viel Zeit plant ihr dafür ein?",
+   text: "unser erstes Arbeitspaket ist der Rahmen aus Holz, dafür brauchen wir zwei Wochen"}
+
+# ── K5-neu (29.10.2026): Folgefragen, die nach einem Nachbarn klingen, bleiben ─────────────
+- {aktuell: Versuchsplanung und -auswertung, stufe: 8, erwartet: bleiben,
+   vorher: "Deine drei Messungen für die Fallzeit liegen nah beieinander. Für die Auswertung brauchst du einen Wert, der alle drei Durchgänge zusammenfasst. Wie willst du aus den drei Messungen einen Wert bilden?",
+   text: "und wie rechne ich dann den mittelwert aus den drei messungen aus?"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 9, erwartet: bleiben,
+   vorher: "Du hast richtig abgelesen: 2010 waren es etwa 40, 2020 etwa 50 Millionen Tonnen. Jetzt sollst du die Entwicklung beschreiben. Wie groß ist der Anstieg im Verhältnis zum Anfangswert?",
+   text: "wie viel prozent mehr ist das dann?"}
+- {aktuell: Argumentieren und Erörtern, stufe: 10, erwartet: bleiben,
+   vorher: "Dein Argument hat jetzt Behauptung, Begründung und ein Beispiel. Das trägt. Wie willst du es in deiner Erörterung einleiten?",
+   text: "und wie schreib ich das jetzt als ganzen absatz?"}
+- {aktuell: Lernen und Prüfungsvorbereitung, stufe: 7, erwartet: bleiben,
+   vorher: "Bei der Abfrage zu Brüchen hast du das Erweitern sicher gewusst, beim Kürzen hast du gezögert. Das nehmen wir uns morgen im Plan noch einmal vor. Welches Thema willst du als Nächstes abfragen lassen?",
+   text: "kannst du mir das mit dem kürzen nochmal kurz erklären?"}
+
+# ── Frische Fälle im Assistenten (K5-neu, 29.10.2026) ─────────────────────────
+# Von einem Agenten ohne Kenntnis von Seed und Prüfsatz geschrieben — Gegenprobe zur Schwelle 0,30.
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 8, erwartet: bleiben, frisch: true,
+   vorher: "Du hast jetzt fünf Temperaturwerte für jede Minute aufgeschrieben. Bevor du das Diagramm zeichnest, lohnt es sich, die Messreihen zusammenzufassen. Wie willst du mit den drei Durchgängen umgehen, die ihr gemacht habt?",
+   text: "wie rechne ich nochmal den durchschnitt aus"}
+- {aktuell: "Überarbeiten eigener Texte", stufe: 7, erwartet: bleiben, frisch: true,
+   vorher: "Dein Anfang macht neugierig, weil man sofort mitten im Geschehen ist. Im zweiten Absatz wechselst du aber zwischen Präteritum und Präsens hin und her. Welche Zeitform möchtest du für die ganze Geschichte verwenden?",
+   text: "präteritum glaub ich. und schreibt man „nämlich“ eigentlich mit h?"}
+- {aktuell: "Rechnen mit Größen und Einheiten", stufe: 10, erwartet: bleiben, frisch: true,
+   vorher: "Gesucht ist die Geschwindigkeit des Radfahrers zwischen der 2. und der 6. Sekunde. Du brauchst dafür die zurückgelegte Strecke und die Zeit in diesem Abschnitt. Woher bekommst du die Strecke?",
+   text: "muss ich da die steigung im diagramm ablesen oder wie"}
+- {aktuell: "Lernen und Prüfungsvorbereitung", stufe: 9, erwartet: bleiben, frisch: true,
+   vorher: "Gut, die erste Karte hast du sicher gewusst. Nächste Aufgabe: Vereinfache den Term (x − 3)² so weit wie möglich. Welche Formel brauchst du dafür?",
+   text: "warte war die zweite binomische a² - 2ab + b² oder mit plus am ende"}
+- {aktuell: "stöchiometrische Berechnungen", stufe: 10, erwartet: bleiben, frisch: true,
+   vorher: "Du willst wissen, wie viel Gramm Magnesiumoxid aus 4,8 g Magnesium entstehen. Als Erstes brauchst du die Stoffmenge des Magnesiums. Welche Angabe aus dem Periodensystem hilft dir dabei?",
+   text: "die molare masse oder? aber muss ich die reaktionsgleichung nicht erst ausgleichen bevor ich rechne"}
+- {aktuell: "Argumentieren und Erörtern", stufe: 9, erwartet: bleiben, frisch: true,
+   vorher: "Deine These ist klar formuliert. Beim ersten Argument fehlt aber noch ein Beispiel, das es für die Leser greifbar macht. Was könntest du aus deinem eigenen Schulalltag als Beleg nehmen?",
+   text: "das mit dem busfahren vielleicht. und muss vor „dass“ eigentlich immer ein komma?"}
+- {aktuell: "Recherche, Referat und Präsentation", stufe: 8, erwartet: bleiben, frisch: true,
+   vorher: "Deine Gliederung für das Referat über den Klimawandel steht schon gut. Bei Punkt 2 willst du die Ursachen erklären, das ist aber noch ziemlich abstrakt. Wie könntest du das für deine Klasse anschaulich machen?",
+   text: "soll ich da ein diagramm mit den co2 werten zeigen oder ist das zu viel für die folie"}
+- {aktuell: "Programmieren", stufe: 11, erwartet: bleiben, frisch: true,
+   vorher: "Deine Schleife summiert die Noten jetzt richtig auf. Damit fehlt nur noch der letzte Schritt zum Notendurchschnitt. Durch welche Zahl musst du die Summe teilen?",
+   text: "durch len(noten). ok und wie runde ich das ergebnis auf zwei nachkommastellen?"}
+- {aktuell: "Mathe-Aufgaben", stufe: 6, erwartet: bleiben, frisch: true,
+   vorher: "Du sollst 3/4 und 1/6 addieren. Dafür müssen beide Brüche denselben Nenner haben. Welche Zahl ist durch 4 und durch 6 teilbar?",
+   text: "hä?"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 10, erwartet: bleiben, frisch: true,
+   vorher: "Du hast schon bemerkt, dass in der zweiten Strophe der Satz über das Versende hinausläuft. Das ist ein bewusst eingesetztes Stilmittel. Welche Wirkung hat das an dieser Stelle auf dich beim Lesen?",
+   text: "wie heißt das nochmal, enjambement? was genau ist das"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 7, erwartet: bleiben, frisch: true,
+   vorher: "Das Diagramm zeigt, wie sich die Zahl der Hasen in einem Gebiet über zehn Jahre verändert. Schau dir zuerst nur den groben Verlauf der Linie an. Was fällt dir auf?",
+   text: "also am anfang steigt die kurve voll stark und dann wird sie flacher"}
+- {aktuell: "Planen und Dokumentieren von Projekten", stufe: 9, erwartet: bleiben, frisch: true,
+   vorher: "Euer Projekt zur Mülltrennung an der Schule hat jetzt ein klares Ziel. Als Nächstes geht es darum, wer im Team welche Aufgaben übernimmt. Wie wollt ihr die Arbeit aufteilen?",
+   text: "wir sind zu viert, lena macht die umfrage, tim und ich die plakate und jonas schreibt das journal"}
+- {aktuell: "Mathe-Aufgaben", stufe: 8, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "Du hast die Gleichung 3x + 5 = 20 schon fast gelöst. Auf der linken Seite steht nur noch 3x. Was musst du jetzt tun, damit x allein steht?",
+   text: "kannst du mir auch bei deutsch helfen?"}
+- {aktuell: "Reaktionsgleichungen", stufe: 9, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "Links stehen jetzt zwei Wasserstoffmoleküle und ein Sauerstoffmolekül. Zähl noch einmal die Sauerstoffatome auf beiden Seiten. Stimmt die Anzahl schon überein?",
+   text: "wann ist eigentlich wandertag"}
+- {aktuell: "Grammatik und Rechtschreibung", stufe: 6, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "In deinem Satz steht „das Fahrrad, das ich bekommen habe“. Überleg, ob du das „das“ durch „welches“ ersetzen kannst. Was passiert, wenn du es ausprobierst?",
+   text: "mir is voll langweilig"}
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 11, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "Deine Hypothese zur Enzymaktivität bei verschiedenen Temperaturen ist gut formuliert. Jetzt brauchst du eine Variable, die du gezielt veränderst, während alles andere gleich bleibt. Welche Größe willst du variieren?",
+   text: "kannst du mir auch was zu geschichte erklären?"}
+- {aktuell: "Lernen und Prüfungsvorbereitung", stufe: 12, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "Bis zur Klausur hast du noch zwölf Tage, und du hast vier Themenblöcke genannt. Ein Plan klappt meist besser, wenn auch Wiederholungstage eingeplant sind. Wie viele Tage pro Woche kannst du realistisch lernen?",
+   text: "weißt du ob die mensa heute offen hat"}
+- {aktuell: "Programmieren", stufe: 10, erwartet: bleiben, darf: [beenden], frisch: true,
+   vorher: "Die Fehlermeldung sagt, dass in Zeile 7 eine Variable verwendet wird, die noch nicht existiert. Schau mal, wo du sie zum ersten Mal festlegst. Steht diese Stelle vor oder nach Zeile 7?",
+   text: "was ist eigentlich dein lieblingsfilm"}
+- {aktuell: "Mathe-Aufgaben", stufe: 9, erwartet: wechsel, wechsel_zu: "Überarbeiten eigener Texte", frisch: true,
+   vorher: "Du hast den Satz des Pythagoras richtig aufgeschrieben. Jetzt musst du nur noch die beiden Kathetenlängen einsetzen. Welche Seiten sind in deiner Skizze die Katheten?",
+   text: "andere sache: ich hab meine inhaltsangabe zu „Das Brot“ fertig geschrieben, kannst du die durchlesen und mir sagen was ich besser machen kann?"}
+- {aktuell: "Grammatik und Rechtschreibung", stufe: 7, erwartet: wechsel, wechsel_zu: "Mathe-Aufgaben", frisch: true,
+   vorher: "Du hast richtig erkannt, dass „das Laufen“ hier ein Nomen ist. Deshalb wird es großgeschrieben. Findest du in deinem Text noch ein Verb, das als Nomen gebraucht wird?",
+   text: "ok danke. kannst du mir jetzt bei mathe hausaufgaben helfen, ich check prozentrechnung nicht, wie viel sind 15 % von 240 €"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 11, erwartet: wechsel, wechsel_zu: "Programmieren", frisch: true,
+   vorher: "Die Karikatur zeigt einen Politiker, der auf einem schwankenden Turm aus Akten steht. Achte einmal auf die Größenverhältnisse im Bild. Was will der Zeichner damit ausdrücken?",
+   text: "sorry neues thema, ich muss bis morgen in python ein programm schreiben das alle primzahlen bis 100 ausgibt und hab keine ahnung wie ich anfangen soll"}
+- {aktuell: "Lernen und Prüfungsvorbereitung", stufe: 10, erwartet: wechsel, wechsel_zu: "Recherche, Referat und Präsentation", frisch: true,
+   vorher: "Die Vokabeln aus Unit 3 sitzen schon ziemlich gut. Bei „to achieve“ hast du zweimal gezögert. Magst du dir dafür einen Beispielsatz überlegen?",
+   text: "später. ich muss in drei wochen eine GFS über erneuerbare energien halten und weiß überhaupt nicht wie ich da anfangen soll"}
+- {aktuell: "Rechnen mit Größen und Einheiten", stufe: 8, erwartet: wechsel, wechsel_zu: "Versuchsplanung und -auswertung", frisch: true,
+   vorher: "Du hast 2,5 km in Meter umgerechnet und 2500 m herausbekommen. Jetzt sollst du noch die 45 Minuten in Sekunden angeben. Mit welcher Zahl musst du dafür rechnen?",
+   text: "lassen wir das. wir sollen morgen in nwt selbst einen versuch planen ob salzwasser langsamer gefriert als normales wasser, wie gehen wir da vor?"}
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 9, erwartet: wechsel, wechsel_zu: "Auswerten von Diagrammen, Tabellen und Statistiken", frisch: true,
+   vorher: "Euer Protokoll zum Pendelversuch hat schon Aufbau und Durchführung. In der Auswertung fehlt noch ein Satz dazu, ob eure Vermutung bestätigt wurde. Was habt ihr vorher vermutet?",
+   text: "das mach ich später. hab noch geo hausi: im buch auf s. 87 ist ein diagramm zur bevölkerungsentwicklung in nigeria und ich soll das beschreiben und erklären"}
+- {aktuell: "Planen und Dokumentieren von Projekten", stufe: 10, erwartet: wechsel, wechsel_zu: "Argumentieren und Erörtern", frisch: true,
+   vorher: "Euer Zeitplan für den Schulgarten bis zu den Pfingstferien steht. Im Arbeitsjournal fehlt aber noch der Eintrag zur letzten Sitzung. Was habt ihr da beschlossen?",
+   text: "ganz andere frage, ich muss für deutsch eine dialektische erörterung schreiben „sollen handys an schulen verboten werden?“ und brauche hilfe bei den argumenten"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 8, erwartet: wechsel, wechsel_zu: "Lernen und Prüfungsvorbereitung", frisch: true,
+   vorher: "In der Tabelle sind die Niederschläge für jeden Monat in Millimetern angegeben. Vergleiche einmal Sommer und Winter miteinander. Welche Jahreszeit ist nasser?",
+   text: "kannst du mich stattdessen für die bio arbeit am freitag abfragen? thema ist das auge"}
+- {aktuell: "Programmieren", stufe: 9, erwartet: wechsel, wechsel_zu: "Grammatik und Rechtschreibung", frisch: true,
+   vorher: "Dein Roboter fährt jetzt geradeaus, biegt aber an der Wand nicht ab. Schau dir die Bedingung in deiner if-Abfrage noch einmal an. Welchen Wert liefert der Abstandssensor direkt vor der Wand?",
+   text: "kurz was anderes, meine deutschlehrerin sagt ich mach voll viele kommafehler bei nebensätzen. kannst du mir die regel erklären?"}
+- {aktuell: "Mathe-Aufgaben", stufe: 10, erwartet: wechsel, wechsel_zu: "stöchiometrische Berechnungen", frisch: true,
+   vorher: "Die Funktion f(x) = x² − 4x + 3 hat zwei Nullstellen. Du kannst sie mit der Mitternachtsformel oder durch Faktorisieren finden. Welchen Weg möchtest du ausprobieren?",
+   text: "mach ich nachher. erst chemie: wie viel gramm kohlenstoffdioxid entstehen wenn man 12 g kohlenstoff verbrennt?"}
+- {aktuell: "Argumentieren und Erörtern", stufe: 9, erwartet: wechsel, wechsel_zu: "Reaktionsgleichungen", frisch: true,
+   vorher: "Dein Gegenargument zur Ganztagsschule ist schon gut begründet. Es fehlt aber noch eine Überleitung zum nächsten Abschnitt. Wie könntest du deine Leser zur Gegenseite führen?",
+   text: "andere frage, chemie hausaufgabe: wie gleiche ich Fe + O2 → Fe2O3 aus??"}
+- {aktuell: "Recherche, Referat und Präsentation", stufe: 11, erwartet: wechsel, wechsel_zu: "stöchiometrische Berechnungen", frisch: true,
+   vorher: "Für dein Referat über das Haber-Bosch-Verfahren hast du schon drei gute Quellen. Bei einer davon ist aber unklar, wer sie verfasst hat. Wie könntest du herausfinden, ob sie vertrauenswürdig ist?",
+   text: "ok mach ich. aber wir haben auch noch ne rechenaufgabe dazu bekommen: wie viel gramm wasserstoff braucht man um 170 g ammoniak herzustellen"}
+
+# ── Folgefragen mit fremdem Fachwort (29.10.2026) ────────────────────────────
+# Für den Klassifikator im Assistenten: Folgefragen, die ein typisches Wort eines anderen Assistenten
+# enthalten — der Fall, in dem das Modell versucht sein wird zu wechseln. Von einem Agenten ohne
+# Kenntnis von Seed und Prüfsatz geschrieben (`frisch: 3`).
+- {aktuell: "Mathe-Aufgaben", stufe: 7, erwartet: bleiben, frisch: 3,
+   vorher: "Gut, du hast die Gleichung schon richtig aufgestellt: 3x + 5 = 20. Jetzt willst du x allein auf eine Seite bringen. Was musst du als Erstes mit der 5 machen?",
+   text: "minus 5 auf beiden seiten oder? soll ich das dann noch mit nem diagramm zeigen oder reicht das so"}
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 9, erwartet: bleiben, frisch: 3,
+   vorher: "Deine Frage ist, ob die Temperatur beeinflusst, wie schnell sich Zucker in Wasser löst. Damit der Versuch fair ist, darfst du nur eine Größe verändern. Welche Dinge musst du bei allen Durchgängen gleich lassen?",
+   text: "die zuckermenge und wie viel wasser. aber muss ich das nachher im protokoll als quelle angeben wo ich die idee herhab?"}
+- {aktuell: "Argumentieren und Erörtern", stufe: 10, erwartet: bleiben, frisch: 3,
+   vorher: "Dein Pro-Argument zur Handynutzung in der Pause steht schon: Schüler:innen können sich besser absprechen. Jetzt fehlt noch ein Beispiel, das die Behauptung stützt. Fällt dir eine Situation aus deinem Alltag ein, die das zeigt?",
+   text: "vielleicht wenn man sich für ne gruppenarbeit absprechen muss. ist das mit der rechtschreibung eigentlich wichtig bei der erörterung oder nur der inhalt"}
+- {aktuell: "Programmieren", stufe: 8, erwartet: bleiben, frisch: 3,
+   vorher: "Deine Schleife läuft gerade von 1 bis 10 und gibt jede Zahl aus. Du willst aber nur die geraden Zahlen sehen. Mit welcher Bedingung im if könntest du prüfen, ob eine Zahl gerade ist?",
+   text: "irgendwas mit % 2 == 0? und kann ich die zahlen dann auch in einer tabelle ausgeben statt untereinander"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 11, erwartet: bleiben, frisch: 3,
+   vorher: "Du hast die Karikatur schon gut beschrieben: Bismarck als Lotse, der das Schiff verlässt. Jetzt geht es um die Deutung. Was könnte der Zeichner damit sagen wollen, dass Wilhelm II. von oben zuschaut?",
+   text: "dass der kaiser ihn quasi rausgeworfen hat? muss ich das für die klausur so auswendig lernen oder reicht es wenn ich das schema kann"}
+
+# ── Gegenprobe Klassifikator im Assistenten (29.10.2026) ─────────────────────
+# Nach der Prompt-Schärfung an k5-2 von einem Agenten ohne Kenntnis von Seed, Prüfsatz und Prompt
+# geschrieben (`frisch: 4`) — der unabhängige Teil für SYSTEM_IM_ASSISTENTEN.
+- {aktuell: "Rechnen mit Größen und Einheiten", stufe: 9, erwartet: bleiben, frisch: 4,
+   vorher: "Gut, du hast die Geschwindigkeit in km/h. Für die Formel brauchst du aber m/s. Weißt du noch, mit welcher Zahl man zwischen km/h und m/s umrechnet?",
+   text: "also durch 3,6? dann wärs 25 m/s oder"}
+- {aktuell: "Mathe-Aufgaben", stufe: 7, erwartet: bleiben, frisch: 4,
+   vorher: "Bevor du 2/3 und 1/4 addieren kannst, brauchen beide Brüche denselben Nenner. Welche Zahl wäre ein gemeinsamer Nenner von 3 und 4?",
+   text: "versteh ich nich wieso muss man den nenner überhaupt gleich machen man kann doch einfach oben und unten plus rechnen"}
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 8, erwartet: bleiben, frisch: 4,
+   vorher: "Deine Frage ist, ob Zucker sich in warmem Wasser schneller löst. Was veränderst du in deinem Versuch absichtlich, und was musst du überall gleich lassen?",
+   text: "ich änder die temperatur, menge zucker und wasser bleibt gleich. kann ich die zeiten dann am ende in ein diagramm machen? welches wär da gut"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 10, erwartet: bleiben, frisch: 4,
+   vorher: "Schau dir das Klimadiagramm von Manaus zuerst als Ganzes an. Welche zwei Größen sind darin dargestellt, und woran erkennst du das?",
+   text: "die blauen balken sind niederschlag oder? und die rote linie temperatur. aber wieso hat das zwei y achsen"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 11, erwartet: bleiben, frisch: 4,
+   vorher: "Du hast die Karikatur zu Bismarck schon gut beschrieben. Was will der Zeichner deiner Meinung nach mit dem Lotsen ausdrücken, der das Schiff verlässt?",
+   text: "dass bismarck nicht mehr gebraucht wird glaub ich. in der aufgabe steht aber noch beurteile, muss ich da dann so richtig argumentieren ob der zeichner recht hat?"}
+- {aktuell: "Argumentieren und Erörtern", stufe: 9, erwartet: bleiben, frisch: 4,
+   vorher: "Dein erstes Argument für ein Handyverbot in der Pause ist klar formuliert. Hast du schon ein zweites Argument, und kannst du es mit einem Beispiel stützen?",
+   text: "zweites argument wär dass man sich im unterricht danach besser konzentriert weil man nicht noch an insta denkt. reicht das als beispiel?"}
+- {aktuell: "Überarbeiten eigener Texte", stufe: 8, erwartet: bleiben, frisch: 4,
+   vorher: "Der Anfang deiner Geschichte ist spannend, aber im dritten Satz beginnen drei Sätze hintereinander mit „Dann“. Wie könntest du die Satzanfänge abwechslungsreicher machen?",
+   text: "hab jetzt „plötzlich“ und „auf einmal“ genommen. schreibt man auf einmal eigentlich zusammen oder getrennt"}
+- {aktuell: "Grammatik und Rechtschreibung", stufe: 6, erwartet: bleiben, frisch: 4,
+   vorher: "Ein Tipp: Wenn du „das“ durch „dieses“ oder „welches“ ersetzen kannst, schreibst du es mit einem s. Probier es mal an deinem Satz aus: Passt „dieses“ da hinein?",
+   text: "ahh ok jetzt check ichs. also: ich glaube, dass es morgen regnet. richtig so?"}
+- {aktuell: "Programmieren", stufe: 10, erwartet: bleiben, frisch: 4,
+   vorher: "Deine for-Schleife soll die Zahlen von 1 bis 10 ausgeben. Lass das Programm mal laufen und schau, was genau passiert. Was gibt Python dir aus?",
+   text: "IndentationError: unexpected indent zeile 4 ??? was heißt das"}
+- {aktuell: "Lernen und Prüfungsvorbereitung", stufe: 12, erwartet: bleiben, frisch: 4,
+   vorher: "Bis zu deiner Mathe-Abiprüfung hast du noch sechs Wochen. Welche Themen fallen dir im Moment am schwersten, damit wir sie im Plan früh einbauen?",
+   text: "vor allem integrale und so flächenberechnung, stochastik geht eigentlich. soll ich für integrale dann einfach mehr tage nehmen oder öfter kurz"}
+- {aktuell: "stöchiometrische Berechnungen", stufe: 9, erwartet: bleiben, frisch: 4,
+   vorher: "Für die Aufgabe brauchst du zuerst die Stoffmenge von 10 g Wasserstoff. Welche molare Masse hat Wasserstoff, und wie kommst du damit auf n?",
+   text: "1 g/mol also 10 mol? oder 2 weil h2. und muss ich die reaktionsgleichung nochmal ausgleichen oder passt die so wie im buch"}
+- {aktuell: "Recherche, Referat und Präsentation", stufe: 7, erwartet: bleiben, frisch: 4,
+   vorher: "Deine Gliederung zu den Wölfen in Deutschland sieht gut aus. Wie lange soll dein Referat dauern? Danach richtet sich, wie viele Folien sinnvoll sind.",
+   text: "sry war kurz weg. lol keine ahnung, frau maier hat glaub 10 min gesagt"}
+- {aktuell: "Mathe-Aufgaben", stufe: 8, erwartet: wechsel, wechsel_zu: "Grammatik und Rechtschreibung", frisch: 4,
+   vorher: "Du hast die Gleichung 3x + 5 = 20 schon fast. Was musst du als Nächstes auf beiden Seiten tun, damit x allein steht?",
+   text: "andere sache, in englisch müssen wir simple past üben. ist he goed richtig oder wie heißt das"}
+- {aktuell: "Rechnen mit Größen und Einheiten", stufe: 10, erwartet: wechsel, wechsel_zu: "stöchiometrische Berechnungen", frisch: 4,
+   vorher: "Die Dichte ist Masse durch Volumen. Du hast 270 g und 100 cm³ gegeben. Was kommt heraus, und welche Einheit hat dein Ergebnis?",
+   text: "ok hab 2,7 g/cm3. nächste aufgabe ist chemie: wie viel gramm co2 entstehen wenn man 12 g kohlenstoff verbrennt"}
+- {aktuell: "Reaktionsgleichungen", stufe: 9, erwartet: wechsel, wechsel_zu: "stöchiometrische Berechnungen", frisch: 4,
+   vorher: "Super, 2 Mg + O2 → 2 MgO ist ausgeglichen. Kannst du noch einmal erklären, warum vor dem MgO eine 2 stehen muss?",
+   text: "weil sonst links 2 o sind und rechts nur eins. jetzt aufgabe b: wie viel g magnesiumoxid krieg ich aus 4,8 g magnesium"}
+- {aktuell: "Analysieren von Texten, Quellen und Bildern", stufe: 11, erwartet: wechsel, wechsel_zu: "Argumentieren und Erörtern", frisch: 4,
+   vorher: "Im Kommentar zum Tempolimit nutzt der Autor viele rhetorische Fragen. Welche Wirkung sollen die deiner Meinung nach auf die Leser haben?",
+   text: "ganz andere aufgabe: ich soll jetzt selber eine erörterung schreiben ob schuluniformen sinnvoll sind. wie fang ich an?"}
+- {aktuell: "Überarbeiten eigener Texte", stufe: 10, erwartet: wechsel, wechsel_zu: "Recherche, Referat und Präsentation", frisch: 4,
+   vorher: "In deinem Bewerbungsschreiben ist der zweite Absatz noch sehr allgemein. Was genau hast du im Praktikum gelernt, das zu dieser Stelle passt?",
+   text: "ich muss bis freitag ein referat über die französische revolution halten und hab noch nix. wo find ich gute quellen die nicht nur wikipedia sind"}
+- {aktuell: "Programmieren", stufe: 11, erwartet: wechsel, wechsel_zu: "Mathe-Aufgaben", frisch: 4,
+   vorher: "Deine Funktion gibt die Liste schon sortiert zurück. Wie könntest du testen, ob sie auch mit einer leeren Liste funktioniert?",
+   text: "kannst du mir bei den mathe hausis helfen, ableitung von f(x)=x^3*e^x mit produktregel, ich komm da nich weiter"}
+- {aktuell: "Auswerten von Diagrammen, Tabellen und Statistiken", stufe: 8, erwartet: wechsel, wechsel_zu: "Versuchsplanung und -auswertung", frisch: 4,
+   vorher: "Im Diagramm siehst du das Wachstum der Bohnenpflanzen über vier Wochen. Was fällt dir auf, wenn du die Kurve mit und ohne Licht vergleichst?",
+   text: "wir sollen jetzt selber einen versuch planen ob kresse mit dünger schneller wächst. was brauch ich da alles und wie mach ich das"}
+- {aktuell: "Lernen und Prüfungsvorbereitung", stufe: 7, erwartet: wechsel, wechsel_zu: "Programmieren", frisch: 4,
+   vorher: "Karteikarten sind eine gute Idee für die Vokabeln. Wie oft am Tag könntest du dir realistisch zehn Minuten dafür nehmen?",
+   text: "andres thema. in informatik machen wir scratch und meine katze bewegt sich nicht wenn ich auf die grüne flagge drück"}
+- {aktuell: "Versuchsplanung und -auswertung", stufe: 9, erwartet: wechsel, wechsel_zu: "Planen und Dokumentieren von Projekten", frisch: 4,
+   vorher: "Deine Messwerte zum Pendel streuen ziemlich. Was könnte beim Messen der Zeit zu den Abweichungen geführt haben?",
+   text: "neues thema: in der projektwoche machen wir einen schulgarten und ich soll den zeitplan machen und aufschreiben wer was macht. hilfst du mir"}
+- {aktuell: "Grammatik und Rechtschreibung", stufe: 6, erwartet: wechsel, wechsel_zu: "Mathe-Aufgaben", frisch: 4,
+   vorher: "Nomen schreibt man groß. In deinem Satz „wir gehen morgen ins kino“ steckt ein Nomen. Findest du es?",
+   text: "kino. was ist 3/4 + 2/5 das ist meine nächste hausaufgabe"}
+- {aktuell: "Argumentieren und Erörtern", stufe: 12, erwartet: wechsel, wechsel_zu: "Analysieren von Texten, Quellen und Bildern", frisch: 4,
+   vorher: "Deine These zur aktiven Sterbehilfe ist klar. Welches Gegenargument hältst du für das stärkste, und wie willst du es entkräften?",
+   text: "andere aufgabe für deutsch: wir haben heines nachtgedanken bekommen und sollen die sprachlichen mittel und ihre wirkung rausarbeiten"}
+- {aktuell: "Planen und Dokumentieren von Projekten", stufe: 10, erwartet: wechsel, wechsel_zu: "Auswerten von Diagrammen, Tabellen und Statistiken", frisch: 4,
+   vorher: "Euer Projekttagebuch hat für die letzte Woche noch keinen Eintrag. Was habt ihr in der Gruppe seitdem geschafft, und was ist noch offen?",
+   text: "in erdkunde haben wir die bevölkerungspyramide von deutschland 2020 bekommen und ich soll beschreiben was man da sieht, kp wo ich anfangen soll"}

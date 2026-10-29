@@ -1,17 +1,20 @@
+import pytest
 """Assistenten-Vorschlag im Chat (Päckchen C2, Schritt 2) — reine Funktionen des Dienstes."""
 from app.assistants.vorschlag import (
-    BEENDEN_KENNUNG,
     Kandidat,
-    im_assistenten,
+    im_assistenten_band,
     lies_antwort,
+    lies_wechsel,
+    prompt_im_assistenten,
     prompt_kandidaten,
     zusammenstellen,
 )
 
 
-def _k(i, art="specific", abstand=0.4, gegen=float("inf"), fach=None, fallbacks=()):
+def _k(i, art="specific", abstand=0.4, gegen=float("inf"), fach=None, fallbacks=(), mittel=None):
     return Kandidat(id=i, name=f"A{i}", art=art, text=f"Text {i}", subject_id=fach,
-                    fallbacks=tuple(fallbacks), abstand=abstand, gegen=gegen)
+                    fallbacks=tuple(fallbacks), abstand=abstand, gegen=gegen,
+                    mittel=abstand if mittel is None else mittel)
 
 
 def test_lies_antwort_codeblock_und_fremde_kennungen():
@@ -34,18 +37,16 @@ def test_zusammenstellen_konversationsfach_sortiert_schliesst_nicht_aus():
 
 def test_zusammenstellen_hoechstens_zwei_und_nur_kandidaten():
     k = {i: _k(i, abstand=0.3 + i / 100) for i in (1, 2, 3)} | {8: _k(8, "fallback"), 9: _k(9, "fallback")}
-    assert [o.assistant_id for o in zusammenstellen([3, 1, 2, 42], [9, 8, 7], k)] == [1, 2, 9, 8]
+    assert [o.assistant_id for o in zusammenstellen([3, 1, 2, 42], [9, 8, 7], k)] == [1, 2, 9]
+    # Ohne spezifischen Treffer: nur der erste Rückfall des Klassifikators (0.26, V1).
+    assert [o.assistant_id for o in zusammenstellen([], [9, 8, 7], k)] == [9]
 
 
-def test_im_assistenten_wechsel_beenden_bleiben():
-    k = {2: _k(2, abstand=0.30)}
-    assert [o.assistant_id for o in im_assistenten(0.40, k, True)] == [2]           # 0,30 + 0,05 < 0,40
-    assert im_assistenten(0.33, k, True) == []                                      # Marge nicht erreicht
-    assert [o.art for o in im_assistenten(0.60, {}, True)] == ["beenden"]
-    assert im_assistenten(0.60, {}, False) == []                                    # Ruheregel
-    assert im_assistenten(0.45, {}, True) == []                                     # bleiben
-    gegen = {2: _k(2, abstand=0.30, gegen=0.25)}
-    assert [o.assistant_id for o in im_assistenten(0.60, gegen, True)] == [BEENDEN_KENNUNG]
+def test_zusammenstellen_fallbacks_des_treffers_bis_zwei():
+    k = {1: _k(1, fallbacks=[8, 9]), 8: _k(8, "fallback"), 9: _k(9, "fallback")}
+    assert [o.assistant_id for o in zusammenstellen([1], [], k)] == [1, 8, 9]
+
+
 
 
 def test_prompt_nennt_art_und_beispiele():
@@ -94,3 +95,29 @@ async def test_klassifikator_zweiter_versuch_bei_5xx():
     with patch("app.litellm.systemkonto.verbuche", new=AsyncMock()):
         r = await dienst.klassifiziere("x", [], modell="m", client=client)
     assert client.post.await_count == 2 and r["roh"] == '{"spezifisch": []}'
+
+
+def test_im_assistenten_band():
+    """Vorfilter für den Klassifikator in der Assistenten-Konversation (Jan, 29.10.2026): jeder
+    andere Assistent mit seinem besten Beispiel unter 0,45, spezifisch wie Rückfall — ohne Marge
+    und Gegenbeispiel-Regel."""
+    k = {1: _k(1, abstand=0.40), 2: _k(2, "fallback", abstand=0.35), 3: _k(3, "fallback", abstand=0.45),
+         4: _k(4, abstand=0.30, gegen=0.20, mittel=0.60)}
+    assert [c.id for c in im_assistenten_band(k)] == [4, 2, 1]        # das beste Beispiel, nicht das Mittel
+    assert im_assistenten_band({}) == []
+
+
+def test_lies_wechsel():
+    assert lies_wechsel('```json\n{"neue_aufgabe": "7"}\n```', {7}) == 7
+    assert lies_wechsel('{"neue_aufgabe": null}', {7}) is None
+    assert lies_wechsel('{"neue_aufgabe": 8}', {7}) is None          # nicht im Band
+    assert lies_wechsel("laufendes Gespräch", {7}) is None
+    assert lies_wechsel('{"neue_aufgabe": [7]}', {7}) is None
+
+
+def test_prompt_im_assistenten_kuerzt_von_vorn():
+    lang = "x" * 1000 + " Welche Größe fehlt?"
+    text = prompt_im_assistenten("hä?", ("Mathe-Aufgaben", "Hilft bei Mathe"), lang, [_k(3)])
+    assert "Welche Größe fehlt?“" in text and "x" * 700 not in text
+    assert "„Assistent für Mathe-Aufgaben“: Hilft bei Mathe" in text and "Kennung 3" in text
+    assert "(keine)" in prompt_im_assistenten("hä?", ("M", ""), None, [])

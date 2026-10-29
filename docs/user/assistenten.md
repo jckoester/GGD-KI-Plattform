@@ -76,9 +76,9 @@ der dich Schritt für Schritt begleitet“* — mit einem oder zwei Assistenten 
   Der Chat bleibt derselbe; die erste Antwort wird ausgeblendet.
 - **Hier bleiben:** Der Kasten verschwindet. Denselben Assistenten schlägt der Chat in diesem
   Gespräch nicht noch einmal vor — außer du wechselst zwischendurch zu einem anderen.
-- **In einem Assistenten** erscheint der Kasten, wenn deine Nachricht besser zu einem anderen
-  passt, oder als *„Assistent beenden und weiter chatten“*, wenn sie gar nicht zu ihm gehört.
-  Dann antwortet der normale Chat.
+- **In einem Assistenten** erscheint der Kasten nur, wenn du mit einer neuen Aufgabe beginnst,
+  für die ein anderer Assistent da ist. Fragen zur laufenden Aufgabe bleiben beim Assistenten. Gehört sie zu gar keinem, sagt dir der Assistent das in seiner
+  Antwort; für den normalen Chat beginnst du mit „Neuer Chat“ ein neues Gespräch.
 
 Weiterschreiben kannst du jederzeit; der Kasten verschwindet dann. Fragen nach einem Begriff
 („Was ist ein Mol?“) beantwortet der normale Chat selbst — dafür gibt es keinen Vorschlag.

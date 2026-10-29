@@ -9,11 +9,11 @@ er auf niemanden.
 Aus dem Bestand gebaut, nicht in den Prompt geschrieben: So bleibt der Prompt stabil gegen
 Umbenennungen und gegen Nachbarn, die es in dieser Schule (noch) nicht gibt.
 
-⚠️ **Überbrückt die heutige C2-Grenze, nicht für immer.** In der Assistenten-Konversation
-bietet `vorschlag.im_assistenten` nur spezifische Assistenten an. Zieht C2 dort Rückfälle
-nach (Vorschlags-Notiz: „über ihrer eigenen, lockereren Schwelle“), **entfällt dieser
-Abschnitt** — sonst steht der Hinweis doppelt da, einmal vom Modell, einmal vom Dialog.
-Spezifische Assistenten stehen deshalb schon heute nicht darin.
+⚠️ **Zur Probe behalten (Jan, 29.10.2026, F21).** Seit 0.26 bietet der Vorschlag auch in der
+Assistenten-Konversation Rückfälle an (Klassifikator mit der letzten Antwort als Kontext). Der
+Abschnitt bleibt trotzdem vorerst: Er ist der einzige Hinweis, wenn der Vorfilter keinen
+Kandidaten findet. Steht der Hinweis in der Praxis doppelt da, entfällt er. Spezifische
+Assistenten stehen nicht darin.
 """
 from __future__ import annotations
 

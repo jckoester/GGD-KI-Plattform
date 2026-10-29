@@ -70,4 +70,7 @@ def test_in_assistent():
         assert ("wechsel_zu" in f) == (f["erwartet"] == "wechsel")
         if "wechsel_zu" in f:
             assert f["wechsel_zu"] in ALLE and f["wechsel_zu"] != f["aktuell"]
-    assert all(n >= 3 for n in arten.values())
+    # K5-neu (29.10.2026): „beenden“ wird nicht mehr erwartet, höchstens erlaubt (`darf`).
+    assert arten["bleiben"] >= 3 and arten["wechsel"] >= 3
+    for f in SATZ["in_assistent"]:
+        assert set(f.get("darf") or []) <= {"beenden", "wechsel"}
