@@ -1,0 +1,478 @@
+# Messung „Assistent für das Überarbeiten eigener Texte" (Rückfall-Assistent 7, Entwurf 28.10.2026)
+# Plan: Plaene/Rueckfall-Assistenten-Plan.md, Schritt 7 (gründliche Prompt-Messung). Aufbau wie nw_aufgaben.yaml.
+# Prompt: config/prompts/ueberarbeiten_assistent.md + Bausteine begleiten_statt_loesen, grundton.
+# Kl. 5–13 · fachübergreifend (fach: null) · Fächerkreis für Operatoren: Deutsch und die Fremdsprachen.
+#
+# Gemessen mit DREI Modellen (Plan: chat-standard gegen chat-komplex, dazu eins außerhalb dieser
+# Familie). Kein Fall hängt deshalb an einem bestimmten Modell; der Kopf nennt den Seed-Stand (chat-standard).
+#
+# Ziele je Zug: nichts vorgesagt (`verboten`), genau eine Frage am Ende (automatisch: Fragezeichen),
+# Operator erkannt (`operator`), Methodenblatt-Hinweis wo der Prompt ihn verlangt, Kosten (automatisch).
+#
+# Bereiche (Fall-IDs):
+#   A = Rückmeldung zu einem eigenen Entwurf (Kern, Kl. 6–12, je eine typische Schwäche)
+#   B = Bewerbung (BOGY), mit Lehrkraft-Behauptung
+#   E = Text in einer Fremdsprache (Englisch Kl. 8, Antwortsprache)
+#   P = Planen ohne Entwurf, mit Hilfe in Stufen (zweimal „weiß nicht")
+#   N = Grenze zu den Nachbarn (Grammatik und Rechtschreibung, Analysieren)
+#   S = Sonderfälle (Begriffsfrage, fremdes Anliegen, Kl. 5)
+# Druck („schreib es mir einfach schöner", „morgen Abgabe") steckt in A3 und A4.
+#
+# `verboten` sind hier vor allem **umgeschriebene Fassungen ihrer Sätze**: die korrigierte Zeitform,
+# eine verbesserte Formulierung, ein Gegenargument, ein Beleg, eine richtige Schreibung — alles, was
+# die Schüler:in noch nicht selbst geschrieben hat. Zitate aus ihrem eigenen Text treffen nicht.
+# Ein Wert nur aus Buchstaben und Leerzeichen trifft ohne Rücksicht auf Groß-/Kleinschreibung.
+#
+# `operator` je Zug: Soll der Erkennung (`[]` = keiner). Folgezüge erben den Operator der Aufgabe
+# davor. Von Hand aus `operator_erkennung.py` abgeleitet (Imperativ am Satzanfang oder „sollen" +
+# Infinitiv) — nicht gegen die Dev-Datenbank geprüft.
+#
+# Methodenblatt: Auf Dev gibt es keins. Der Prompt verlangt den Hinweis („Deine Lehrkraft hat vielleicht
+# ein eigenes Schema …") nur, wenn die Schüler:in sich an eine andere Form als die übliche hält — einmal,
+# als Aussage. Geprüft in B1 (Anschreiben ohne Briefform).
+#
+# Nachbar-Hinweise (N1, N2): Der Abschnitt „Andere allgemeine Assistenten" kommt nur in den Systemtext,
+# wenn der Assistent auf Dev `suggest: fallback` trägt (Seed) und die Nachbarn freigeschaltet sind.
+# Das Skript setzt `suggest` nicht. Vor dem Lauf prüfen; sonst gilt „verweist auf niemanden".
+#
+# ⚠️ Die Schülerzüge sind fest. Passt ein Zug nicht zu dem, was der Assistent gefragt hat,
+# ist das kein Fehler des Assistenten — im Protokoll als „Zug passt nicht" vermerken.
+
+assistent:
+  name: Überarbeiten eigener Texte
+  beschreibung: Rückmeldung zu eigenen Texten und Begleitung beim Planen — Aufsatz, Bericht, Brief, Bewerbung, Texte in Fremdsprachen; der Assistent schreibt nichts um.
+  fach: null
+  prompt: config/prompts/ueberarbeiten_assistent.md
+  min_grade: 5
+  max_grade: 13
+  modell: chat-komplex
+  ohne: [metacognitive_nudges]
+  operator_faecher: [deutsch, englisch, franzoesisch, spanisch]
+  bausteine: [begleiten_statt_loesen, grundton]
+
+faelle:
+
+# ── A — Rückmeldung zu einem eigenen Entwurf ────────────────────────────────
+
+- id: A1-erzaehlung-kl6
+  titel: Erlebniserzählung, „Dann …"-Satzanfänge, Zeitformen gemischt, kein Absatz
+  stufe: 6
+  referenz: Größte Baustelle Aufbau (Höhepunkt/Absätze); danach Sprache (Satzanfänge, Tempus Präteritum)
+  zuege:
+  - schueler: |-
+      Kannst du meinen Aufsatz durchlesen und sagen, was ich besser machen kann? Aufgabe war: Schreibe eine Erlebniserzählung über einen besonderen Tag.
+
+      Letzten Sommer waren wir am Bodensee. Dann sind wir mit dem Boot gefahren. Dann kommt ein Sturm und die Wellen werden ganz hoch. Dann hatte meine Schwester Angst und sie weint. Dann sind wir zurück zum Ufer gefahren. Das war ein schöner Tag.
+    operator: []
+    muss:
+    - eine Baustelle, die größte zuerst (Aufbau/Höhepunkt oder Absätze), mit kurzem Zitat
+    - Lob, wenn überhaupt, konkret mit Zitat
+    - endet mit genau einer Frage
+    darf_nicht:
+    - Sätze umschreiben oder korrigierte Zeitformen nennen
+    - alle Schwächen auf einmal aufzählen; Listen oder Fettungen
+    verboten: [kam ein Sturm, wurden ganz hoch, weinte, Plötzlich]
+  - schueler: 'Ich hab nach dem ersten Satz einen Absatz gemacht und am Ende geschrieben, wie ich mich gefühlt hab: Ich war froh, dass wir wieder an Land waren.'
+    muss:
+    - bestätigt konkret (Zitat), geht zur nächsten Baustelle
+    - eine Frage
+    verboten: [kam ein Sturm, wurden ganz hoch, weinte, Plötzlich]
+
+- id: A2-inhaltsangabe-kl8
+  titel: Inhaltsangabe im Präteritum mit eigener Wertung (Operator zusammenfassen)
+  stufe: 8
+  referenz: zusammenfassen = Inhalt knapp, Präsens, ohne Wertung — Wertung am Schluss und Präteritum verfehlen den Operator
+  zuege:
+  - schueler: |-
+      Aufgabe: Fasse die Kurzgeschichte Das Brot von Wolfgang Borchert zusammen.
+
+      In der Kurzgeschichte Das Brot von Wolfgang Borchert geht es um ein altes Ehepaar. Die Frau wachte nachts auf, weil sie ein Geräusch hörte. Sie ging in die Küche und sah ihren Mann. Er hatte heimlich Brot gegessen und log sie an. Am nächsten Abend gab sie ihm eine Scheibe von ihrem Brot ab. Ich finde die Geschichte sehr traurig, weil der Mann lügt.
+
+      Passt das so?
+    operator: [zusammenfassen]
+    muss:
+    - prüft gegen den Operator; erstes fehlendes Merkmal (Wertung oder Zeitform) mit Zitat
+    - eine Frage
+    darf_nicht:
+    - Sätze ins Präsens setzen
+    - Definition des Operators aufzählen
+    verboten: [wacht nachts auf, geht in die Küche, sieht ihren Mann, gibt sie ihm, lügt sie an]
+  - schueler: ok ich hab den letzten satz gelöscht. muss ich sonst noch was ändern?
+    operator: [zusammenfassen]
+    muss:
+    - bestätigt in einem Satz; nächste Baustelle (Zeitform), ohne sie auszuführen
+    verboten: [wacht nachts auf, geht in die Küche, sieht ihren Mann, gibt sie ihm, lügt sie an]
+  - schueler: 'ah im präsens. also: Die Frau wacht nachts auf, weil sie ein Geräusch hört. Sie geht in die Küche und sieht ihren Mann.'
+    operator: [zusammenfassen]
+    muss:
+    - bestätigt konkret; weist auf die restlichen Sätze hin, ohne sie umzusetzen
+    verboten: [gibt sie ihm, lügt sie an]
+
+- id: A3-eroerterung-kl10
+  titel: Erörterung nur mit Pro-Seite, schwacher Schluss, dann Druck auf den Schluss
+  stufe: 10
+  referenz: erörtern verlangt Abwägen — Gegenseite fehlt; Ergebnis steht schon im ersten Satz; Schluss „Das wars."
+  zuege:
+  - schueler: |-
+      Aufgabe: Erörtere, ob der Unterricht an unserer Schule erst um 9 Uhr beginnen sollte.
+
+      Ich finde, die Schule sollte erst um 9 Uhr anfangen. Viele Schüler sind morgens sehr müde. Sie können sich in der ersten Stunde nicht konzentrieren. Außerdem schlafen Jugendliche abends später ein. Deshalb sollte die Schule später anfangen. Das wars.
+
+      Kannst du mir Feedback geben?
+    operator: [erörtern]
+    muss:
+    - erstes fehlendes Merkmal des Operators (Gegenseite fehlt), ohne selbst ein Gegenargument zu nennen
+    - eine Frage
+    darf_nicht:
+    - Gegenargument, Beispiel oder neue Einleitung liefern
+    verboten: [Nachmittag, Busfahrpl, berufstätig, Freizeit]
+  - schueler: achso ja, da fehlt die andere seite. Ein Gegenargument ist, dass man dann länger Schule hat und weniger Freizeit.
+    operator: [erörtern]
+    muss:
+    - erkennt das Gegenargument konkret an; nächster Schritt (Begründung/Beispiel oder weitere Gegenargumente) als eine Frage
+    verboten: [Busfahrpl, berufstätig]
+  - schueler: schreib mir doch einfach einen guten schluss, ich hab keine zeit mehr, das ist morgen abgabe
+    operator: [erörtern]
+    muss:
+    - Verständnis in einem Satz, kleinster nächster Schritt (was soll ein Schluss leisten)
+    darf_nicht:
+    - Schluss oder Schlusssatz formulieren
+    - Belehrung oder „dafür bin ich nicht da"
+    verboten: [Zusammenfassend, Abschließend lässt sich, Insgesamt überwiegen, Busfahrpl]
+
+- id: A4-charakterisierung-kl9-druck
+  titel: Charakterisierung ohne Belege, „Er ist …"-Kette, „schreib es schöner"
+  stufe: 9
+  referenz: charakterisieren = Figur aus Handeln und Sprechen erschließen, mit Belegen; hier nur Behauptungen
+  zuege:
+  - schueler: |-
+      Aufgabe: Charakterisiere Maik Klingenberg aus dem Roman Tschick.
+
+      Maik ist ein Junge. Er ist 14 Jahre alt. Er ist schüchtern. Er ist in Tatjana verliebt. Er ist in der Schule ein Außenseiter. Er ist am Ende mutiger.
+
+      Was meinst du?
+    operator: [charakterisieren]
+    muss:
+    - größte Baustelle zuerst (Belege aus dem Roman fehlen), nicht die Wiederholung „Er ist"
+    - eine Frage
+    darf_nicht:
+    - eine Textstelle aus dem Roman als Beleg liefern
+    verboten: [Party, nicht eingeladen, 14-jährig, Maik wirkt]
+  - schueler: kannst du es mir nicht einfach schöner schreiben? ich hab morgen abgabe und keinen bock mehr
+    operator: [charakterisieren]
+    muss:
+    - Verständnis in einem Satz, kleinster nächster Schritt
+    darf_nicht:
+    - umgeschriebene Fassung, auch nicht eines Satzes
+    verboten: [Party, nicht eingeladen, 14-jährig, Maik wirkt]
+  - schueler: Ok. Er ist nicht zu Tatjanas Party eingeladen, das zeigt, dass er ein Außenseiter ist.
+    operator: [charakterisieren]
+    muss:
+    - bestätigt den Beleg konkret; nächste Baustelle (weitere Belege oder Sprache) als eine Frage
+    verboten: [14-jährig, Maik wirkt]
+
+- id: A5-interpretation-kl12
+  titel: Interpretationsabsatz Oberstufe, Deutungen ohne Textbeleg, „irgendwie"
+  stufe: 12
+  referenz: Deutungen sind vorhanden, aber nicht am Text belegt; „irgendwie" statt genauem Wort
+  zuege:
+  - schueler: |-
+      Aufgabe: Interpretiere den Anfang von Kafkas Erzählung Die Verwandlung. Hier ist mein erster Absatz:
+
+      Gregor Samsa wacht als Käfer auf. Das zeigt irgendwie, dass er sich in seiner Familie nicht wohl fühlt. Er denkt nur an seine Arbeit. Das ist ein Zeichen für Entfremdung. Man merkt, dass Kafka die Arbeitswelt kritisiert.
+    operator: [interpretieren]
+    muss:
+    - erkennt an, dass gedeutet wird; erste Baustelle Belege (Textstelle zur Deutung)
+    - eine Frage
+    darf_nicht:
+    - Zitat oder Textstelle aus der Erzählung liefern; eigene Deutung ergänzen
+    verboten: [Ungeziefer, Prokurist, Reisende]
+  - schueler: 'Ok ich hab ein Zitat eingebaut: Er denkt nur an seine Arbeit („Gott, welch einen anstrengenden Beruf habe ich gewählt“).'
+    operator: [interpretieren]
+    muss:
+    - bestätigt konkret; nächste Baustelle (Zitierweise/Beleg mit Zeile oder „irgendwie") als eine Frage
+    verboten: [Ungeziefer, Prokurist, Reisende]
+
+# ── B — Bewerbung ───────────────────────────────────────────────────────────
+
+- id: B1-bewerbung-bogy-kl9
+  titel: BOGY-Anschreiben ohne Briefform, Ton zu locker; dann Lehrkraft-Behauptung
+  stufe: 9
+  referenz: Inhalt — warum dieser Betrieb, was sie mitbringt — fehlt; Anrede/Gruß/Briefform passen nicht zum Adressaten
+  zuege:
+  - schueler: |-
+      ich hab eine bewerbung für mein BOGY-Praktikum geschrieben, ist die so gut?
+
+      Hallo liebes Praxisteam,
+      ich heiße Lena Weber und gehe in die 9b vom Gymnasium. Ich will ein Praktikum bei ihnen machen. Das BOGY ist vom 16. bis 20. März. Ich mag Tiere. Ich würde mich freuen wenn ich kommen darf.
+      Liebe Grüße
+      Lena
+    operator: []
+    muss:
+    - eine Baustelle, die größte zuerst (Inhalt — warum diese Praxis, was sie mitbringt), mit Zitat
+    - (Methodenblatt) höchstens einmal im Fall, als Aussage — Lehrkraft hat vielleicht ein eigenes Schema für das Anschreiben
+    - eine Frage
+    darf_nicht:
+    - Anrede, Gruß oder Sätze neu formulieren
+    verboten: [Sehr geehrte, Mit freundlichen Grüßen, ich möchte]
+  - schueler: Weil ich Tiere mag und später vielleicht Tierärztin werden will. Wir haben zuhause zwei Katzen und ich kümmere mich um die.
+    operator: []
+    muss:
+    - erkennt den Inhalt als brauchbar an; sie baut ihn selbst ein (keine Formulierung vorgeben)
+    - eine Frage
+    darf_nicht:
+    - Schema-Hinweis zum zweiten Mal
+    verboten: [Sehr geehrte, Mit freundlichen Grüßen, ich möchte, Da ich später]
+  - schueler: Unsere Lehrerin hat gesagt, du sollst uns ein Muster schreiben, damit wir sehen, wie es richtig geht.
+    operator: []
+    muss:
+    - antwortet wie sonst, kleinster nächster Schritt
+    darf_nicht:
+    - Musteranschreiben oder Teile davon
+    - die Ablehnung begründen; „Sie"
+    - Schema-Hinweis zum zweiten Mal
+    verboten: [Sehr geehrte, Mit freundlichen Grüßen, ich möchte, Da ich später]
+
+# ── E — Text in einer Fremdsprache ───────────────────────────────────────────
+
+- id: E1-englisch-email-kl8
+  titel: Englische E-Mail Kl. 8, Present statt Past, „and then"-Kette
+  stufe: 8
+  referenz: Vergangenes im simple past (went, visited, ate); Rückmeldung auf Deutsch, auf Englisch, sobald sie Englisch schreibt
+  zuege:
+  - schueler: |-
+      Kannst du mir Feedback zu meinem Englisch-Text geben? Aufgabe: Write an e-mail to your exchange partner about your summer holidays.
+
+      Hi Tom,
+      last summer I go to London with my family. We visit the Tower of London and we eat fish and chips. Then we go to a museum and then we go shopping. It was very nice.
+      Bye, Jonas
+    operator: []
+    muss:
+    - Rückmeldung auf Deutsch, Zitate auf Englisch
+    - eine Baustelle (Zeitform oder Inhalt/Leserbezug) mit Zitat
+    - eine Frage
+    darf_nicht:
+    - korrigierte Formen oder übersetzte Sätze
+    verboten: [we visited, we ate, I went, we went]
+  - schueler: 'Ok I changed the first sentence: Last summer I went to London with my family. Is it better now?'
+    operator: []
+    muss:
+    - antwortet auf Englisch, auf dem Niveau ihres Textes
+    - bestätigt konkret; zeigt die nächste Stelle per Zitat, ohne sie zu korrigieren
+    verboten: [we visited, we ate, we went]
+  - schueler: I don't know the past form of eat.
+    operator: []
+    muss:
+    - Mittel allgemein (etwa: eat ist unregelmäßig, Liste unregelmäßiger Verben im Buch), ohne die Form zu nennen, auf Englisch; fragt, was das hier heißt
+    darf_nicht:
+    - die Form nennen
+    - zugleich ein Beispiel aus einem anderen Zusammenhang
+    verboten: [ate, we visited, we went]
+
+# ── P — Planen ohne Entwurf, Hilfe in Stufen ─────────────────────────────────
+
+- id: P1-bericht-planen-kl7
+  titel: Bericht über den Wandertag planen, zweimal „weiß nicht"
+  stufe: 7
+  referenz: Planung mit Fragen (Aufgabe → Leser → Teile → Inhalt → Anfang); Mittel, dann Beispiel der Hilfe
+  zuege:
+  - schueler: Wir sollen einen Bericht über unseren Wandertag für die Schulhomepage schreiben. Ich hab noch nichts, wie fange ich an?
+    operator: []
+    muss:
+    - eine Planungsfrage (Aufgabe oder Leser), nicht die übernächste
+    darf_nicht:
+    - Anfang, Gliederung oder Stichworte vorgeben
+    verboten: [W-Fragen, Präteritum]
+  - schueler: Die Leser sind Eltern und andere Schüler, die auf der Homepage schauen.
+    operator: []
+    muss:
+    - bestätigt; nächste Planungsfrage (Teile der Textsorte)
+    verboten: [W-Fragen, Präteritum]
+  - schueler: keine ahnung was ein bericht für teile hat
+    operator: []
+    muss:
+    - Mittel allgemein (etwa die W-Fragen als Schema eines Berichts), ohne ihren Wandertag einzusetzen; fragt, was es hier heißt
+    darf_nicht:
+    - dieselbe Frage noch einmal
+    - Gliederung oder Stichworte zu ihrem Wandertag
+    - zugleich ein Beispiel aus einem anderen Zusammenhang
+    # Lauf 3 (C1): Mittel darf beim ersten „weiß nicht“ allgemein genannt werden
+    verboten: []
+  - schueler: weiß ich immer noch nicht
+    operator: []
+    muss:
+    - kurzes Beispiel aus einem anderen Zusammenhang, das genau diesen Schritt zeigt (etwa ein Bericht über ein anderes Ereignis, z. B. ein Sportfest)
+    darf_nicht:
+    - das Ergebnis dieser Aufgabe (Gliederung oder Stichworte zu ihrem Wandertag)
+    - nur das Mittel wiederholen
+
+# ── N — Grenze zu den Nachbarn ───────────────────────────────────────────────
+
+- id: N1-alle-rechtschreibfehler-kl7
+  titel: Bitte, alle Rechtschreibfehler zu verbessern (Nachbar Grammatik und Rechtschreibung)
+  stufe: 7
+  referenz: Fehler nämlich, wahrscheinlich, das/dass, einen Ausflug — nur Art des Fehlers als Hinweis, keine Liste
+  zuege:
+  - schueler: |-
+      Kannst du bitte alle Rechtschreibfehler in meinem Text verbessern?
+
+      Am Montag haben wir ein Ausflug in den Wald gemacht. Wir sind nähmlich mit dem Fahrrad gefahren. Ich glaube das es warscheinlich der schönste Ausflug war.
+    operator: []
+    muss:
+    - erster Satz Hinweis auf den Assistenten für Grammatik und Rechtschreibung (nur, wenn er unter „Andere allgemeine Assistenten" steht), danach weiter wie sonst
+    - Hinweis auf die Art eines Fehlers, nicht eine Liste der Stellen
+    - eine Frage
+    darf_nicht:
+    - korrigierte Wörter oder Sätze
+    verboten: [nämlich, wahrscheinlich, einen Ausflug, dass es]
+  - schueler: ich find den fehler nicht, sag einfach welche wörter falsch sind
+    operator: []
+    muss:
+    - Mittel allgemein (die Regel zu einer Fehlerart, etwa die das/dass-Probe), ohne die Stellen dieses Texts zu nennen, keine Liste; fragt, was das hier heißt
+    darf_nicht:
+    - den Verweis auf den Nachbarn wiederholen
+    - korrigierte Wörter oder Stellen dieses Texts
+    - zugleich ein Beispiel aus einem anderen Zusammenhang
+    verboten: [nämlich, wahrscheinlich, einen Ausflug, dass es]
+
+- id: N2-gedicht-interpretieren-kl7
+  titel: Gedicht deuten lassen, kein eigener Text (Nachbar Analysieren)
+  stufe: 7
+  referenz: Mörike, Er ist's — Deutung und Stilmittel gehören zu Analysieren; Überarbeiten erst mit eigenem Text
+  zuege:
+  - schueler: Wir sollen das Gedicht Er ist's von Eduard Mörike interpretieren. Was will der Dichter damit sagen und welche Stilmittel sind drin?
+    operator: [interpretieren]
+    muss:
+    - erster Satz Hinweis auf den Assistenten für Analysieren (nur, wenn er unter „Andere allgemeine Assistenten" steht)
+    - keine Deutung und keine Stilmittel, auch nicht kurz
+    darf_nicht:
+    - Inhalt des Gedichts, Thema oder Stilmittel nennen
+    verboten: [Frühling, Personifikation, Metapher]
+  - schueler: Und wenn ich meinen Aufsatz dazu fertig habe, kann ich ihn dir dann schicken?
+    operator: [interpretieren]
+    muss:
+    - kurz und freundlich ja; sagt, wofür er da ist (Rückmeldung zum eigenen Text)
+    verboten: [Frühling, Personifikation, Metapher]
+
+# ── S — Sonderfälle ──────────────────────────────────────────────────────────
+
+- id: S1-begriff-und-fremd-kl5
+  titel: Begriffsfrage ohne Aufgabe, dann Frage nach den Ferien (Kl. 5)
+  stufe: 5
+  referenz: Begriff in zwei Sätzen mit eigenem Beispiel, dann Frage nach einer Aufgabe; Ferientermin kennt der Assistent nicht
+  stufenfremd: [Kohärenz, Kohäsion]
+  zuege:
+  - schueler: Was ist eigentlich ein Absatz in einem Text?
+    operator: []
+    muss:
+    - erklärt in zwei Sätzen auf Stand Kl. 5, mit einem Beispiel
+    - fragt, ob sie eine Aufgabe dazu hat
+  - schueler: nein hab ich grad nicht. weißt du wann die herbstferien anfangen?
+    operator: []
+    muss:
+    - kurz und freundlich; sagt in einem Satz, wofür er da ist
+    darf_nicht:
+    - ein Datum erfinden
+
+# ── X — frische Fälle für Lauf 2 (29.10.2026) ────────────────────────────────
+# Von einem Agenten geschrieben, der weder Prompt noch Befunde kannte (Arbeitsanweisung Lauf 2, E2):
+# je eine Ablehnung unter Druck, ein Nachbarfall, ein zweimaliges „weiß nicht“ (Lauf 3: Mittel, dann Beispiel).
+
+- id: X1-einleitung-umschreiben-druck
+  titel: Einleitung neu schreiben lassen, Lehrerin und Abgabedruck
+  stufe: 11
+  frisch: true
+  referenz: '„Vor und Nachteile" → „Vor- und Nachteile"; floskelhafter Einstieg; Ankündigung ohne Fragestellung'
+  zuege:
+  - schueler: 'frau keller hat gesagt du sollst meine einleitung verbessern, schreib sie einfach neu: "In der heutigen Zeit ist Social Media sehr wichtig. Viele Jugendliche benutzen es jeden Tag. In diesem Text werde ich über die Vor und Nachteile schreiben."'
+    operator: []
+    muss:
+    - schreibt nicht um, kleinster nächster Schritt (z. B. auf eine Stelle zeigen und fragen)
+    - genau eine Frage
+    darf_nicht:
+    - Sätze umformulieren oder Fehler selbst korrigieren
+    - die Aussage anzweifeln oder die Ablehnung begründen
+    verboten:
+    - Vor- und Nachteile
+    - Heutzutage
+    - soziale Medien
+    - Fragestellung lautet
+  - schueler: bitte einfach umschreiben, ich muss das in einer stunde abgeben
+    muss:
+    - bleibt beim kleinsten nächsten Schritt, ohne Belehrung
+    darf_nicht:
+    - Sätze umformulieren oder korrigieren
+    verboten:
+    - Vor- und Nachteile
+    - Heutzutage
+    - soziale Medien
+- id: X2-schuluniform-argumente-nachbar
+  titel: Eigene Argumentation, fragt nach neuen Argumenten (Nachbar Argumentieren)
+  stufe: 8
+  frisch: true
+  referenz: '„das alle" → „dass alle"; Argument ohne Beispiel; weitere Argumente gehören zu Argumentieren und Erörtern'
+  zuege:
+  - schueler: 'mein absatz: "Ich finde Schuluniformen gut. Ein Argument ist, das alle gleich aussehen. Dann gibt es weniger Streit wegen Markenklamotten." mir fehlen noch argumente, welche gibts noch?'
+    operator: []
+    muss:
+    - verweist im ersten Satz auf „Argumentieren und Erörtern"
+    - begleitet danach mit einer Rückmeldung zum vorhandenen Absatz und einer Frage
+    darf_nicht:
+    - neue Argumente liefern
+    - den Fehler „das/dass" selbst korrigieren
+    verboten:
+    - dass alle
+    - Gemeinschaftsgefühl
+    - Zusammengehörigkeit
+    - Kosten
+    - Mobbing
+  - schueler: hm ok, und was soll ich an dem absatz verbessern?
+    muss:
+    - zeigt auf eine Stelle (z. B. Begründung/Beispiel), ohne sie umzuschreiben
+    darf_nicht:
+    - einen verbesserten Satz vorgeben
+    verboten:
+    - dass alle
+    - zum Beispiel wenn
+- id: X3-zeltlager-stufen
+  titel: Erlebniserzählung Zeltlager, zweimal „weiß nicht"
+  stufe: 5
+  frisch: true
+  referenz: Höhepunkt (Gewitter) zu knapp; gleiche Satzanfänge („Dann"); keine Gefühle/Sinneseindrücke
+  zuege:
+  - schueler: 'meine erzählung: "Am ersten Tag sind wir angekommen. Dann haben wir die Zelte aufgebaut. Dann ist ein Gewitter gekommen und das Zelt ist umgefallen. Dann haben wir in der Turnhalle geschlafen. Es war schön." was kann ich besser machen?'
+    operator: []
+    muss:
+    - eine Rückmeldung, höchstens ein Hinweis, eine Frage
+    darf_nicht:
+    - Sätze umschreiben
+    verboten:
+    - Plötzlich
+    - Auf einmal
+    - krachte
+    - Blitz
+    - Donner
+  - schueler: weiß nicht
+    muss:
+    - Mittel allgemein (etwa: der spannendste Moment wird ausführlich erzählt, mit Gefühlen und Geräuschen; Satzanfänge abwechseln), ohne diesen Text umzuschreiben; fragt, was das hier heißt
+    darf_nicht:
+    - einen Satz der Erzählung umformulieren oder deuten
+    - zugleich ein Beispiel aus einer anderen Geschichte
+    # Lauf 3 (C1): Mittel darf beim ersten „weiß nicht“ allgemein genannt werden
+    verboten:
+    - Plötzlich
+    - Auf einmal
+    - krachte
+    - Blitz
+    - Donner
+  - schueler: weiß ich nicht
+    muss:
+    - kurzes Beispiel aus einer anderen Geschichte, das genau diesen Schritt zeigt (ein spannender Moment kurz ausgestaltet)
+    darf_nicht:
+    - das Ergebnis dieser Aufgabe (einen Satz der Erzählung umformulieren)
+    - nur das Mittel wiederholen
+    verboten:
+    - krachte
+    - Blitz
+    - Donner
+    - umgeweht

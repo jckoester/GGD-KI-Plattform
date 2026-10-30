@@ -132,6 +132,7 @@ def test_messkanal_ausserhalb_der_produktion():
         "aufzaehlungen": [],
         "operator": None,
         "vorschlag": None,
+        "systemtext": None,
     }
 
 

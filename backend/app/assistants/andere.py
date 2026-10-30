@@ -35,6 +35,12 @@ def abschnitt(eintraege: list[tuple[str, str]]) -> str:
             "(in der Assistentenauswahl oder mit „/“):\n" + "\n".join(zeilen))
 
 
+def andere_namen(text: str) -> list[str]:
+    """Die Namen in einem Abschnitt aus :func:`abschnitt` — für den Messkanal."""
+    vorn = "- Assistent für "
+    return [z[len(vorn):].split(": ", 1)[0] for z in text.splitlines() if z.startswith(vorn)]
+
+
 async def andere_allgemeine(db: AsyncSession, zugang: Zugang, eigene_id: int) -> str:
     """Die übrigen Rückfall-Assistenten, die diese Person nutzen darf, als Abschnitt."""
     zeilen = (await db.execute(

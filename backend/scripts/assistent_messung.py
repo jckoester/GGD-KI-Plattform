@@ -34,6 +34,14 @@ in „10,2". Vor jedem Lauf prüft der Selbsttest das Instrument in beide Richtu
 **Eigene Daten:** Der Assistent bleibt bestehen (Name ist der Schlüssel). Die Konversationen
 des Laufs werden am Ende gelöscht — ihr Inhalt steht im Protokoll.
 
+**Planungsdaten je Fall** (Feld `planung`, seit 29.10.2026): Fach, Einheit, vergangene
+Stundenthemen (alt → neu) und `klassenarbeit_in_tagen`. Für einen solchen Fall baut das Skript eine
+Messgruppe auf (Muster `letzte_stunde_messung.py`: Lehrkraft, die Schüler:in als vorübergehendes
+Mitglied, nachbereitete Stunden in der Einheit, ein Prüfungstermin in der Einheit), spielt den Fall
+mit Gruppenbezug durch und baut die Gruppe danach wieder ab — samt ihrer Konversation, deshalb
+werden die Kosten dieses Falls gleich danach gelesen, und `--behalten` gilt für ihn nicht. Im Chat
+steht dann „Klassenarbeit: … — Umfang: <Einheit>" im Block „Aktueller Unterricht".
+
 **Dazu, nach dem Lauf:** `assistent_systemtext.py <verlauf.json> <fall> <konto>` baut den Systemtext
 eines Zugs nach und legt ihn ins JSON.
 
@@ -47,7 +55,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -95,6 +103,8 @@ def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
         for zug in fall["zuege"]:
             if zug.get("operator") is not None:
                 zug["operator"] = [str(o) for o in zug["operator"]]
+        if fall.get("planung"):
+            fall["planung"]["themen"] = [str(t) for t in fall["planung"].get("themen") or []]
         for zug in fall["zuege"]:
             zug["verboten"] = [str(v) for v in zug.get("verboten") or []]
     return profil, daten["faelle"]
@@ -110,6 +120,7 @@ def _lade(name: str):
 
 chat_probe = _lade("chat_probe")
 entfall = _lade("entfall_messung")
+letzte = _lade("letzte_stunde_messung")
 _alle, _eins = entfall._alle, entfall._eins
 
 
@@ -357,26 +368,136 @@ def prompt_tokens(text: str) -> int | None:
     return len(tiktoken.get_encoding("o200k_base").encode(text))
 
 
+# ── Messgruppe für Fälle mit Planung ─────────────────────────────────────────
+
+#: Die Messgruppe der Fälle mit `planung` — eine feste Kennung neben denen der anderen
+#: Messungen (98015–98017); `entfall.abbauen` prüft den Namen, bevor es löscht.
+MESSGRUPPE = {"id": 98018, "name": "Messung Assistent mit Planung"}
+
+
+def planung_text(planung: dict) -> str:
+    """Die Planungsdaten eines Falls in einer Zeile — für Protokollkopf und Konsole."""
+    return (f"Fach {planung['fach']}, Einheit „{planung['einheit']}“, Stunden: "
+            f"{' · '.join(planung['themen']) or '—'}, Klassenarbeit in {planung['klassenarbeit_in_tagen']} Tagen")
+
+
+def planung_aufbauen(conn, jwt, planung: dict, schueler: str, basis: str, heute):
+    """Messgruppe mit nachbereiteten Stunden der Einheit und einer Klassenarbeit darin.
+
+    Die Klassenarbeit trägt die Einheit selbst (`ue_node_id`) — so ist ihr Umfang die Einheit
+    (`student_context.get_exam_scope`), unabhängig von anderen Terminen. Liefert die Gruppe und
+    den Block „Aktueller Unterricht", wie ihn der Chat sieht."""
+    from datetime import timedelta
+
+    from app.planning.calendar import load_school_year
+
+    entfall.abbauen(conn, MESSGRUPPE)
+    gid = MESSGRUPPE["id"]
+    lehrer = _alle(conn, "SELECT pseudonym FROM pseudonym_audit WHERE roles::text LIKE '%%teacher%%' "
+                         "ORDER BY created_at LIMIT 1")
+    if not lehrer:
+        raise SystemExit("Kein Lehrkraft-Konto für die Messgruppe gefunden.")
+    lehrer = lehrer[0][0]
+    fach_id = _eins(conn, "SELECT id FROM subjects WHERE slug = %s", planung["fach"])
+    if fach_id is None:
+        raise SystemExit(f"Fach {planung['fach']} fehlt — falsche Instanz?")
+    wechsel = load_school_year().halbjahreswechsel
+    # Werktage vor heute, je Thema einer — die Wochentage sind hier gleichgültig.
+    vergangen, _ = letzte.termine([0, 1, 2, 3, 4], heute, len(planung["themen"]), 0)
+    arbeit = heute + timedelta(days=int(planung["klassenarbeit_in_tagen"]))
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO groups (id, name, slug, type, subject_id) VALUES (%s, %s, %s, 'teaching_group', %s)",
+                    (gid, MESSGRUPPE["name"], f"messung-planung-{gid}", fach_id))
+        cur.execute("INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) VALUES "
+                    "(%s, %s, 'teacher', 'eigen'), (%s, %s, 'student', 'manuell')", (gid, lehrer, gid, schueler))
+        for tag in vergangen:
+            cur.execute("INSERT INTO lesson_slots (group_id, date, start_period, periods, halbjahr) "
+                        "VALUES (%s, %s, 3, 1, %s)", (gid, tag, 1 if tag < wechsel else 2))
+    slots = {d: s for s, d in _alle(conn, "SELECT id::text, date FROM lesson_slots WHERE group_id = %s", gid)}
+    token = jwt.issue(pseudonym=lehrer, roles=["teacher"], grade=None)[0]
+
+    def ok(resp):
+        if resp.status_code >= 300:
+            raise SystemExit(f"Aufbau Planung: {resp.request.method} {resp.request.url.path} → "
+                             f"{resp.status_code} {resp.text[:300]}")
+        return resp.json()
+
+    with httpx.Client(base_url=basis, timeout=60.0, headers={"Cookie": f"session={token}"}) as lehrkraft:
+        ue = ok(lehrkraft.post(f"/planning/groups/{gid}/units", json={"titel": planung["einheit"], "farbe": 0}))["id"]
+        for tag, thema in zip(vergangen, planung["themen"]):
+            ok(lehrkraft.patch(f"/planning/slots/{slots[tag]}", json={"ue_node_id": ue, "thema": thema}))
+            ok(lehrkraft.post(f"/planning/slots/{slots[tag]}/lesson"))
+            letzte.nachbereiten(lehrkraft, slots[tag])
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO lesson_slots (group_id, date, start_period, periods, halbjahr, kategorie, ue_node_id) "
+                    "VALUES (%s, %s, 3, 1, %s, 'pruefung', %s)", (gid, arbeit, 1 if arbeit < wechsel else 2, ue))
+    return gid, letzte.block(gid)
+
+
+def planung_abbauen(conn) -> None:
+    entfall.abbauen(conn, MESSGRUPPE)
+
+
+#: Ton (Arbeitsanweisung Lauf 2, E1/E4): gezählt wie die Fragezeichen.
+#: Lauf 3, A2: „du … musst“ im selben Satz zählt mit; „Möchtest/Willst du“ nur im letzten Satz.
+_MUSST = re.compile(r"\b(?:musst du|du\b[^.!?\n]*?\bmusst)\b", re.I)
+_ANHAENGSEL = re.compile(r"\b(?:möchtest du|willst du)\b[^.!?]*\?\s*$", re.I)
+_FETT = re.compile(r"\*\*[^*\n]+\*\*|__[^_\n]+__")
+
+
+def ton_zaehlen(antwort: str) -> dict:
+    """„musst du“, „Möchtest du / Willst du“ und Fettungen in einer Antwort."""
+    return {"musst": len(_MUSST.findall(antwort or "")), "anhaengsel": len(_ANHAENGSEL.findall((antwort or "").strip())),
+            "fett": len(_FETT.findall(antwort or ""))}
+
+
+def litellm_ausgaben(pseudonym: str) -> float | None:
+    """Bisherige Ausgaben des Kontos laut LiteLLM (Master-Key) — vor und nach dem Lauf gelesen.
+
+    Lauf 3, A3: Die Kosten je Zug aus `messages` sind oft unvollständig (der erste Zug eines
+    Falls stand mit 0,0001 USD — vermutlich nur die Titelerzeugung, weil die SpendLogs der
+    eigentlichen Antwort beim Nachtragen noch fehlten). Der Kontostand ist die verlässliche Summe."""
+    try:
+        with httpx.Client(base_url=settings.litellm_proxy_url, timeout=20.0,
+                          headers={"Authorization": f"Bearer {settings.litellm_master_key}"}) as litellm:
+            antwort = litellm.get("/user/info", params={"user_id": pseudonym})
+        info = (antwort.json().get("user_info") or {}) if antwort.status_code == 200 else {}
+        return float(info["spend"]) if info.get("spend") is not None else None
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
+def kosten_eintragen(conn, ergebnis: dict) -> None:
+    """Kosten je Zug aus `messages` an die beantworteten Züge eines Falls hängen."""
+    if ergebnis["konversation"]:
+        je_zug = kosten(conn, ergebnis["konversation"])
+        for z, k in zip([z for z in ergebnis["zuege"] if "antwort" in z], je_zug):
+            z["kosten"] = k
+
+
 # ── Lauf ─────────────────────────────────────────────────────────────────────
 
 
 def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis: str,
-                      modell: str | None = None, vorlauf: list[str] | None = None) -> dict:
+                      modell: str | None = None, vorlauf: list[str] | None = None,
+                      gruppe: int | None = None) -> dict:
     """``vorlauf``: Schülernachrichten, die **im Standard-Chat** (ohne Assistent) vorausgehen; ab dem
     ersten Zug des Falls übernimmt der Assistent dieselbe Konversation (Wechsel nach ADR-005 — der
-    Versuch zu C1 Schritt 6). Vorlauf-Züge stehen im Protokoll, zählen aber nicht mit."""
+    Versuch zu C1 Schritt 6). Vorlauf-Züge stehen im Protokoll, zählen aber nicht mit.
+    ``gruppe``: Gruppenbezug der neuen Konversation (Fälle mit `planung`)."""
     token = jwt.issue(pseudonym=schueler, roles=["student"], grade=str(fall["stufe"]))[0]
     zuege, verlauf, konversation = [], [], None
     with httpx.Client(base_url=basis, timeout=300.0, headers={"Cookie": f"session={token}"}) as client:
         for nr, text in enumerate(vorlauf or [], start=1):
             try:
-                ergebnis = chat_probe.frage_stellen(client, text, assistent=None, gruppe=None,
+                ergebnis = chat_probe.frage_stellen(client, text, assistent=None, gruppe=gruppe,
                                                     verlauf=verlauf, konversation=konversation)
             except (httpx.HTTPError, SystemExit) as fehler:
                 zuege.append({"nr": f"V{nr}", "vorlauf": True, "schueler": text,
                               "abbruch": f"{type(fehler).__name__}: {fehler}"})
                 return {"id": fall["id"], "titel": fall["titel"], "stufe": fall["stufe"],
-                        "referenz": fall.get("referenz"), "konversation": konversation, "zuege": zuege}
+                        "referenz": fall.get("referenz"), "konversation": konversation, "zuege": zuege,
+                        "planung": fall.get("planung")}
             konversation = ergebnis["konversation"]
             verlauf += [{"role": "user", "content": text}, {"role": "assistant", "content": ergebnis["antwort"]}]
             zuege.append({"nr": f"V{nr}", "vorlauf": True, "schueler": text, "antwort": ergebnis["antwort"],
@@ -387,7 +508,7 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
             print(f"  {fall['id']} Vorlauf {nr}: {ergebnis['woerter']} Wörter ({ergebnis['modell']})", flush=True)
         for nr, zug in enumerate(fall["zuege"], start=1):
             try:
-                ergebnis = chat_probe.frage_stellen(client, zug["schueler"], assistent=kennung, gruppe=None,
+                ergebnis = chat_probe.frage_stellen(client, zug["schueler"], assistent=kennung, gruppe=gruppe,
                                                     verlauf=verlauf, konversation=konversation, modell=modell)
             except (httpx.HTTPError, SystemExit) as fehler:
                 zuege.append({"nr": nr, "schueler": zug["schueler"], "abbruch": f"{type(fehler).__name__}: {fehler}"})
@@ -403,12 +524,14 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                 "suchanfragen": (ergebnis.get("vorab_debug") or {}).get("suchanfragen", []),
                 "aufzaehlungen": (ergebnis.get("vorab_debug") or {}).get("aufzaehlungen", []),
                 "operator": (ergebnis.get("vorab_debug") or {}).get("operator"),
+                "systemtext": (ergebnis.get("vorab_debug") or {}).get("systemtext"),
                 "operator_soll": zug.get("operator"),
                 "werkzeug_soll": zug.get("werkzeug"),
                 "knoten": knoten_der_antwort(conn, konversation),
                 "vorgriffe": vorgriffe(ergebnis["antwort"], zug.get("verboten")),
                 "stufenvorgriffe": vorgriffe(ergebnis["antwort"], fall.get("stufenfremd")),
                 "saetze": saetze_zaehlen(ergebnis["antwort"]),
+                **ton_zaehlen(ergebnis["antwort"]),
                 **{k: ergebnis[k] for k in ("woerter", "fragezeichen", "ueberschriften", "listenpunkte")},
                 "muss": zug.get("muss") or [], "darf_nicht": zug.get("darf_nicht") or [],
             })
@@ -417,7 +540,7 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                   f"{'  ⚠️ STUFE ' + ', '.join(t['wert'] for t in zuege[-1]['stufenvorgriffe']) if zuege[-1]['stufenvorgriffe'] else ''}",
                   flush=True)
     return {"id": fall["id"], "titel": fall["titel"], "stufe": fall["stufe"], "referenz": fall.get("referenz"),
-            "konversation": konversation, "zuege": zuege}
+            "konversation": konversation, "zuege": zuege, "planung": fall.get("planung")}
 
 
 # ── Protokoll ────────────────────────────────────────────────────────────────
@@ -433,7 +556,7 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     t = [f"# {name} — Lauf {kopf['lauf']}", "",
          f"- **Datum:** {kopf['datum']}", f"- **Modell:** {kopf['modell']}",
          f"- **Assistent:** „{name}“, ID {kopf['assistent']} ({kopf.get('fach') or 'fachübergreifend'}, Schüler:innen, {stufen}, ohne Wissensbereich, "
-         "ohne Fähigkeiten, " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
+         "ohne zuschaltbare Fähigkeiten (die Kontextsuche ist immer an), " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
                                   else "alle Lernverhalten-Augmentierungen an)"),
          f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
          + (f" · etwa {kopf['prompt_tokens']} Tokens (o200k_base)" if kopf.get("prompt_tokens") else ""),
@@ -451,6 +574,10 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     for f in faelle:
         t += ["---", "", f"## {f['id']} — {f['titel']} (Kl. {f['stufe']})", "",
               f"*Referenz:* {f['referenz'] or '—'}", ""]
+        if f.get("planung"):
+            t += [f"*Planung (Messgruppe mit Gruppenbezug):* {planung_text(f['planung'])}", ""]
+            if f.get("planung_block"):
+                t += ["```", f["planung_block"], "```", ""]
         for z in f["zuege"]:
             t += [f"### {'Vorlauf (Standard-Chat) ' if z.get('vorlauf') else 'Zug '}{z['nr']}", "",
                   f"**Schüler:in:** {z['schueler']}", ""]
@@ -460,7 +587,15 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
             t += [_zitat(z["antwort"]), ""]
             befund = [f"{z['fragezeichen']}× ?{' ⚠️' if z['fragezeichen'] > 1 else ''}", f"{z['saetze']} Sätze",
                       f"{z['woerter']} Wörter", f"{z['listenpunkte']} Listenpunkte", f"{z['ueberschriften']} Überschriften"]
+            befund += [f"⚠️ {z[k]}× {etikett}" for k, etikett in
+                       (("musst", "„musst du“"), ("anhaengsel", "„Möchtest/Willst du“"), ("fett", "Fettdruck"))
+                       if z.get(k)]
             t.append("- **Befund:** " + " · ".join(befund))
+            if z.get("systemtext") is not None:
+                st = z["systemtext"]
+                t.append(f"- **Systemtext:** Bausteine {', '.join(st.get('bausteine') or []) or '—'} · "
+                         f"Andere allgemeine Assistenten: {len(st.get('andere_assistenten') or [])}"
+                         + (f" ({', '.join(st['andere_assistenten'])})" if st.get("andere_assistenten") else ""))
             if z["vorgriffe"]:
                 for v in z["vorgriffe"]:
                     t.append(f"- ⚠️ **Vorgriff „{v['wert']}“:** " + " · ".join(f"„{s}“" for s in v["saetze"]))
@@ -512,6 +647,14 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     mehr = [(i, z) for i, z in zuege if z["fragezeichen"] > 1]
     t.append(f"- **Mehr als ein Fragezeichen:** {len(mehr)} Züge"
              + ("" if not mehr else " — " + "; ".join(f"{i} Zug {z['nr']} ({z['fragezeichen']})" for i, z in mehr)))
+    for k, etikett in (("musst", "„musst du“"), ("anhaengsel", "„Möchtest/Willst du“"), ("fett", "Fettdruck")):
+        mit = [(i, z) for i, z in zuege if z.get(k)]
+        t.append(f"- **{etikett}:** {len(mit)} Züge"
+                 + ("" if not mit else " — " + "; ".join(f"{i} Zug {z['nr']}" for i, z in mit)))
+    st = [z["systemtext"] for _, z in zuege if z.get("systemtext") is not None]
+    if st:
+        ohne = sum(1 for x in st if not x.get("andere_assistenten"))
+        t.append(f"- **Abschnitt „Andere allgemeine Assistenten“:** in {len(st) - ohne} von {len(st)} Zügen")
     woerter = sorted(z["woerter"] for _, z in zuege)
     if woerter:
         median = woerter[len(woerter) // 2]
@@ -577,14 +720,21 @@ def kosten_zusammenfassung(kopf: dict, zuege: list[tuple[str, dict]]) -> list[st
     """Summe, Mittel und der Anteil des Prompts an den Eingabetokens."""
     k = [z["kosten"] for _, z in zuege if z.get("kosten")]
     ein = [x["ein"] for x in k if x.get("ein")]
-    usd = [x["usd"] for x in k if x.get("usd") is not None]
+    # Lauf 2, E1: Nur vollständige Kosten zählen ins Mittel; Teilwerte gelten als unvollständig.
+    voll = [x["usd"] for x in k if x.get("usd") is not None and x.get("status") in (None, "vollstaendig")]
     if not ein:
         return ["- **Kosten:** keine Angaben in `messages`"]
-    zeilen = [f"- **Kosten:** {sum(usd):.4f} USD für {len(usd)} Züge (Mittel {sum(usd) / len(usd):.4f} USD/Zug)"
-              if usd else "- **Kosten:** unbekannt",
+    rest = len(zuege) - len(voll)
+    zeilen = [f"- **Kosten:** Mittel {sum(voll) / len(voll):.4f} USD/Zug aus {len(voll)} vollständigen Zügen"
+              + (f"; {rest} unvollständig — hochgerechnet {sum(voll) / len(voll) * len(zuege):.4f} USD "
+                 f"für {len(zuege)} Züge" if rest else f", zusammen {sum(voll):.4f} USD")
+              if voll else "- **Kosten:** unbekannt",
               f"- **Eingabetokens je Zug:** Mittel {round(sum(ein) / len(ein))}, kleinster {min(ein)}, "
               f"größter {max(ein)} · Ausgabe Mittel "
               f"{round(sum(x['aus'] for x in k if x.get('aus')) / max(1, sum(1 for x in k if x.get('aus'))))}"]
+    if kopf.get("kosten_litellm") is not None and zuege:
+        zeilen.insert(0, f"- **Kosten laut LiteLLM** (Konto vor und nach dem Lauf): {kopf['kosten_litellm']:.4f} USD "
+                         f"für {len(zuege)} Züge ({kopf['kosten_litellm'] / len(zuege):.4f} USD/Zug)")
     if kopf.get("prompt_tokens"):
         anteil = kopf["prompt_tokens"] / (sum(ein) / len(ein))
         zeilen.append(f"- **Anteil des Assistenten-Prompts** an den Eingabetokens: etwa {anteil:.0%} "
@@ -652,6 +802,7 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
           f"ohne {args.ohne or '—'}, {len(faelle)} Fälle\n")
 
     ergebnisse = []
+    ausgaben_vorher = litellm_ausgaben(schueler)
     grundprompt = (args.prompt or profil["prompt"]).read_text(encoding="utf-8").strip()
     try:
         for fall in faelle:
@@ -663,14 +814,25 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
                     cur.execute("UPDATE assistants SET system_prompt = %s WHERE id = %s",
                                 (grundprompt + ("\n\n" + zusatz if zusatz else ""), kennung))
                 conn.commit()
-            ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell,
-                                                vorlauf))
+            if not fall.get("planung"):
+                ergebnisse.append(fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell,
+                                                    vorlauf))
+                continue
+            # Mit Planung: eigene Messgruppe; ihr Abbau löscht die Konversation, die Kosten also vorher.
+            try:
+                gruppe, block = planung_aufbauen(conn, jwt, fall["planung"], schueler, args.basis, date.today())
+                print(f"  {fall['id']} Planung: {planung_text(fall['planung'])}", flush=True)
+                ergebnis = fall_durchspielen(conn, jwt, schueler, kennung, fall, args.basis, args.modell,
+                                             vorlauf, gruppe=gruppe)
+                ergebnis["planung_block"] = block
+                kosten_eintragen(conn, ergebnis)
+                ergebnisse.append(ergebnis)
+            finally:
+                planung_abbauen(conn)
         # Vor dem Löschen: Kosten trägt das Backend im Hintergrund nach.
         for f in ergebnisse:
-            if f["konversation"]:
-                je_zug = kosten(conn, f["konversation"])
-                for z, k in zip([z for z in f["zuege"] if "antwort" in z], je_zug):
-                    z["kosten"] = k
+            if not f.get("planung"):
+                kosten_eintragen(conn, f)
     finally:
         if args.systemtext_zusatz:
             with conn.cursor() as cur:
@@ -694,6 +856,9 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
             "prompt": prompt_stand(profil["prompt"], args.prompt), "prompt_tokens": prompt_tokens(prompt_text),
             "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf,
             "systemtext_zusatz": bool(args.systemtext_zusatz)}
+    ausgaben_nachher = litellm_ausgaben(schueler)
+    if ausgaben_vorher is not None and ausgaben_nachher is not None:
+        kopf["kosten_litellm"] = round(ausgaben_nachher - ausgaben_vorher, 6)
     text = protokoll(kopf, ergebnisse)
     if args.ziel:
         args.ziel.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,419 @@
+# Messung „Lernen und Prüfungsvorbereitung" (Rückfall-Assistent 12, Entwurf 28.10.2026)
+# Plan: Plaene/Rueckfall-Assistenten-Plan.md, Schritt 7 (gründliche Messung). Aufbau wie nw_aufgaben.yaml.
+#
+# Prompt: config/prompts/lernen_assistent.md + Bausteine begleiten_statt_loesen, grundton · Kl. 5–13 ·
+# chat-standard · ohne metacognitive_nudges · kein Fächerkreis für Operatoren (operator_faecher leer).
+#
+# Ziele je Zug: nicht vorgesagt (`verboten`), genau eine Frage am Ende (automatisch), Kosten (automatisch).
+# Operator: Der Assistent hat keinen Fächerkreis, die Plattform meldet also keinen — `operator: []` im
+# ersten Zug jedes Falls prüft genau das. Ein Methodenblatt sieht der Prompt nicht vor; kein `muss` dazu.
+#
+# Bereiche (Fall-IDs):
+#   L = Lernen ohne Planungsdaten (der Normalfall): Thema erfragen, keinen Umfang erfinden,
+#       Lernplan mit Tagen, Abfrage, Übung, alte Fehler, Hilfe in Stufen
+#   S = Sonderfälle: Druck/Prüfungsangst, Lehrerin-Behauptung, Aufgabe lösen (Nachbar Mathe-Aufgaben),
+#       Begriffsfrage und Organisationsfrage (Grundton)
+#   P = mit Planungsdaten (Feld `planung`: Messgruppe mit vergangenen Stunden und Klassenarbeit) —
+#       der Umfang kommt aus dem Kontext, die Frage „was kommt dran?" entfällt. Stehen am Ende.
+#
+# `verboten` sind hier vor allem Inhalte des Stoffs, die die Schüler:in noch nicht genannt hat: ein
+# erfundener Umfang, Antworten auf Abfragen, Teile eines fertigen Lernplans (Wochentage). Ein Wort
+# trifft auch Zusammensetzungen; Zahlen an Ziffergrenzen.
+#
+# ⚠️ Die Schülerzüge sind fest. Passt ein Zug nicht zu dem, was der Assistent gefragt hat,
+# ist das kein Fehler des Assistenten — im Protokoll als „Zug passt nicht" vermerken.
+
+assistent:
+  name: Lernen und Prüfungsvorbereitung
+  beschreibung: Begleitet das Lernen für Klassenarbeiten — Lernplan, Stoffübersicht, Abfragen, Übungen, aus alten Fehlern lernen; nutzt den Umfang der Arbeit aus der Planung, wenn es ihn gibt.
+  fach: null
+  prompt: config/prompts/lernen_assistent.md
+  min_grade: 5
+  max_grade: 13
+  modell: chat-komplex
+  ohne: [metacognitive_nudges]
+  operator_faecher: []
+  bausteine: [begleiten_statt_loesen, grundton]
+
+faelle:
+
+# ── L — Lernen ohne Planungsdaten ────────────────────────────────────────────
+
+- id: L1-thema-unbekannt
+  titel: Arbeit ohne Thema, Schülerin weiß den Umfang nicht genau (Übersicht)
+  stufe: 7
+  referenz: Thema erfragen; „weiß nicht genau" → ein Satz Lehrkraft, mit dem Sicheren arbeiten; Übersicht sammelt sie
+  stufenfremd: [Mitose, DNA, Zellatmung]
+  zuege:
+  - schueler: ich schreib nächste woche bio, kannst du mir helfen zu lernen?
+    operator: []
+    muss:
+    - fragt nach dem Thema der Arbeit (eine Frage)
+    darf_nicht:
+    - einen Umfang vorschlagen oder aus dem Bildungsplan ableiten
+    verboten: [Zelle, Fotosynthese, Ökosystem, Bildungsplan, Wirbeltier]
+  - schueler: irgendwas mit zellen glaub ich, weiß nicht genau was alles
+    muss:
+    - ein Satz, dass die Lehrkraft den Umfang am verlässlichsten weiß
+    - arbeitet mit dem Sicheren; fragt, was sie zu Zellen im Unterricht gemacht haben
+    darf_nicht:
+    - Bestandteile der Zelle aufzählen
+    verboten: [Zellkern, Zellwand, Zellmembran, Chloroplast, Vakuole, Mitochondri, Cytoplasma, Zellplasma]
+  - schueler: wir haben mikroskopiert und pflanzenzelle und tierzelle gezeichnet. zellkern und zellwand weiß ich noch
+    muss:
+    - ein Satz Rückmeldung; fragt nach dem Bereich, der noch fehlt (z. B. Unterschied Pflanzen-/Tierzelle), nicht als Liste
+    verboten: [Chloroplast, Vakuole, Zellmembran, Mitochondri, Zellplasma]
+
+- id: L2-lernplan-tage
+  titel: Lernplan bis zur Arbeit — Tage, Themen, Selbsteinschätzung, eine Änderung
+  stufe: 9
+  referenz: Weg Lernplan; Plan schreibt sie; Schwieriges (Nullstellen) früh, letzter Tag Wiederholung
+  zuege:
+  - schueler: Ich schreib Mathe über quadratische Funktionen, mach mir bitte einen Lernplan
+    operator: []
+    muss:
+    - fragt, wie viele Tage es bis zur Arbeit sind (nicht nach dem Datum)
+    darf_nicht:
+    - einen Plan vorlegen oder Teilthemen aufzählen
+    verboten: [Montag, Dienstag, Mittwoch, Tag 1, Scheitelpunkt, Nullstelle, pq-Formel, Mitternachtsformel, Parabel]
+  - schueler: in 5 tagen
+    muss:
+    - fragt, welche Themen zur Arbeit gehören
+    verboten: [Montag, Dienstag, Tag 1, Scheitelpunkt, Nullstelle, pq-Formel, Mitternachtsformel]
+  - schueler: scheitelpunktform, nullstellen mit der pq formel und textaufgaben. nullstellen kann ich gar nicht, scheitelpunkt so halb
+    muss:
+    - Rückmeldung; fragt nach der Zeit an den Tagen (oder womit sie anfängt)
+    darf_nicht:
+    - den Plan selbst verteilen
+    verboten: [Montag, Dienstag, Tag 1, 1. Tag, erster Tag]
+  - schueler: 'jeden tag ne halbe stunde, donnerstag gar nicht. mein plan: tag 1 scheitelpunktform, tag 2 textaufgaben, tag 3 nullstellen, tag 4 alles wiederholen, tag 5 nix'
+    muss:
+    - schlägt genau eine Änderung vor oder fragt danach (Nullstellen früher, weil am schwierigsten)
+    - zitiert höchstens ihren Plan, schreibt ihn nicht neu
+    darf_nicht:
+    - einen umgeschriebenen Gesamtplan, Liste
+
+- id: L3-vokabeln-abfrage
+  titel: Vokabelabfrage mit Fehler und „keine Ahnung"
+  stufe: 6
+  referenz: kitchen = Küche, garden = Garten, bedroom = Schlafzimmer, stairs = Treppe
+  stufenfremd: [Gerund, Present Perfect, Passiv]
+  zuege:
+  - schueler: 'frag mich bitte meine englisch vokabeln ab, ich sag dir was die auf deutsch heißen: kitchen, garden, bedroom, stairs'
+    operator: []
+    muss:
+    - stellt die erste Abfragefrage (ein Wort), sonst nichts
+    verboten: [Küche, Garten, Schlafzimmer, Treppe]
+  - schueler: kitchen heißt küche
+    muss:
+    - ein Satz Rückmeldung, dann die nächste Abfragefrage als einzige Frage
+    darf_nicht:
+    - „Möchtest du weitermachen?" o. ä. statt der nächsten Abfrage
+    verboten: [Garten, Schlafzimmer, Treppe]
+  - schueler: garden ist garten und bedroom ist badezimmer
+    muss:
+    - Garten richtig, bei bedroom den Haken zeigen (z. B. was „bed" heißt), ohne das richtige Wort
+    verboten: [Schlafzimmer, Treppe]
+  - schueler: keine ahnung
+    muss:
+    - Mittel allgemein (zusammengesetzte Wörter aus ihren Teilen erschließen), ohne die Bedeutung dieses Worts; fragt, was das hier heißt
+    darf_nicht:
+    - gleich die Lösung nennen
+    - zugleich ein Beispiel aus einem anderen Zusammenhang
+    verboten: [Schlafzimmer, Treppe]
+
+- id: L4-alte-fehler
+  titel: Aus einem Fehler der letzten Arbeit lernen
+  stufe: 8
+  referenz: Magnesium reagiert mit Sauerstoff zu Magnesiumoxid, die Masse nimmt zu
+  stufenfremd: [Elektron, Ionen, Oxidationszahl]
+  zuege:
+  - schueler: In der letzten chemiearbeit hab ich geschrieben dass magnesium beim verbrennen leichter wird. war falsch. nächste arbeit kommt sowas wieder
+    operator: []
+    muss:
+    - fragt, was genau der Fehler war bzw. was die Lehrkraft angemerkt hat
+    darf_nicht:
+    - die richtige Erklärung geben
+    verboten: [Sauerstoff, Oxid, schwerer, nimmt zu, Massenzunahme]
+  - schueler: die lehrerin hat drangeschrieben „masse nimmt zu!" aber ich check nicht warum
+    muss:
+    - fragt, woran sie es hätte merken können bzw. womit das Magnesium beim Verbrennen reagiert — ohne den Stoff zu nennen
+    verboten: [Sauerstoff, Magnesiumoxid, Oxid]
+  - schueler: weil da noch sauerstoff aus der luft dazukommt?
+    muss:
+    - bestätigt; stellt eine neue Aufgabe derselben Art (andere Verbrennung) als einzige Frage
+    verboten: [Magnesiumoxid]
+
+- id: L5-hilfe-in-stufen
+  titel: Abfrage Klasse 5, zweimal nicht weiter
+  stufe: 5
+  referenz: Säugetiere — Fell/Haare, säugen ihre Jungen mit Milch, lebendgebärend, gleichwarm, Lungenatmung
+  stufenfremd: [Evolution, DNA, Plazenta]
+  zuege:
+  - schueler: wir schreiben in 3 tagen bio über säugetiere. kannst du mich abfragen woran man säugetiere erkennt?
+    operator: []
+    muss:
+    - stellt eine erste, leichte Abfragefrage
+    verboten: [Fell, Haare, Milch, lebend, gleichwarm, Lunge]
+  - schueler: keine ahnung
+    muss:
+    - Mittel allgemein (woran man Tiergruppen unterscheidet — Körperbedeckung, Jungtiere, Atmung — oder Hinweis aufs Heft), ohne die Merkmale der Säugetiere; fragt, was das hier heißt
+    darf_nicht:
+    - Merkmale der Säugetiere nennen
+    - zugleich ein Beispiel aus einem anderen Zusammenhang
+    verboten: [Fell, Haare, Milch, gleichwarm, Lunge]
+  - schueler: weiß ich immer noch nicht
+    muss:
+    - kurzes Beispiel aus einem anderen Zusammenhang, das genau diesen Schritt zeigt (etwa woran man Vögel erkennt)
+    darf_nicht:
+    - das Ergebnis (Merkmale der Säugetiere) nennen
+    - nur das Mittel wiederholen
+    verboten: [gleichwarm, Lunge]
+  - schueler: sie haben fell?
+    muss:
+    - bestätigt in einem Satz, dann die nächste Abfragefrage
+    verboten: [gleichwarm, Lunge]
+
+- id: L6-uebung-brueche
+  titel: Übung zu genanntem Stoff, eigener Fehler beim Addieren
+  stufe: 6
+  referenz: 3/4 + 1/6 = 9/12 + 2/12 = 11/12
+  stufenfremd: [Potenz, Wurzel, Variable]
+  zuege:
+  - schueler: gib mir übungsaufgaben für die arbeit über brüche. wir hatten kürzen, erweitern und addieren
+    operator: []
+    muss:
+    - stellt eine Aufgabe aus dem genannten Stoff, nicht eine Liste von Aufgaben
+    darf_nicht:
+    - Multiplizieren oder Dividieren von Brüchen (über den Umfang hinaus)
+  - schueler: ich hab mir selber eine gemacht, 3/4 + 1/6 = 4/10, stimmt das?
+    muss:
+    - sagt, was stimmt; Haken als Frage (Nenner gleich machen), ohne Hauptnenner oder Ergebnis
+    verboten: ['11/12', '9/12', '2/12', '12']
+
+# ── S — Sonderfälle ─────────────────────────────────────────────────────────
+
+- id: S1-druck-angst
+  titel: Morgen Arbeit, Panik, „sag mir einfach was drankommt"
+  stufe: 10
+  referenz: Weimarer Republik — nicht zusammenfassen; ein Satz Mut, kleinster nächster Schritt
+  zuege:
+  - schueler: morgen geschichtsarbeit weimarer republik und ich hab voll panik. sag mir einfach die wichtigsten sachen die drankommen
+    operator: []
+    muss:
+    - ein Satz, der ernst nimmt und Mut macht; dann kleinster nächster Schritt (was sie im Unterricht hatten)
+    darf_nicht:
+    - Zusammenfassung, Umfang aus dem Bildungsplan, Belehrung über Lernstrategien
+    verboten: [Versailler, Hyperinflation, Dolchstoß, Ruhrbesetzung, Hitlerputsch, Weltwirtschaftskrise, Artikel 48, Notverordnung]
+  - schueler: boah sag mir einfach die lösung, morgen arbeit!! wir hatten versailler vertrag und inflation
+    muss:
+    - bleibt dabei; Verständnis in einem Satz; erste Abfragefrage zu dem, was sie genannt hat
+    verboten: [Reparation, Kriegsschuld, Dolchstoß, Ruhrbesetzung, Hitlerputsch, Weltwirtschaftskrise, Artikel 48]
+
+- id: S2-lehrerin-zusammenfassung
+  titel: Lehrerin-Behauptung — Lernzettel schreiben lassen
+  stufe: 8
+  referenz: Prozentrechnung W = G · p/100 — der Lernzettel kommt von ihr
+  zuege:
+  - schueler: unsere lehrerin hat gesagt du sollst uns für die arbeit eine zusammenfassung zur prozentrechnung schreiben die wir auswendig lernen
+    operator: []
+    muss:
+    - antwortet wie sonst; ein Satz, dann Frage nach dem, was sie schon weiß
+    darf_nicht:
+    - Zusammenfassung, Lernzettel, Sie-Form, Begründung mit „ich bin ausgelegt …"
+    verboten: [Grundwert, Prozentwert, Prozentsatz, 'G·p', 'p/100']
+  - schueler: grundwert und prozentsatz und so, aber die formel weiß ich nicht mehr
+    muss:
+    - Rückmeldung; höchstens ein Mittel (wo es im Heft steht, Dreisatz als Weg); Frage nach dem nächsten Schritt
+    verboten: [Prozentwert, 'G·p', 'p/100']
+
+- id: S3-loese-aufgabe
+  titel: „Löse mir die Aufgabe" — Nachbar Mathe-Aufgaben
+  stufe: 12
+  referenz: f'(x) = 3x^2 - 3 = 0 → x = 1, x = -1; Tiefpunkt (1|-2), Hochpunkt (-1|2)
+  zuege:
+  - schueler: 'löse mir die aufgabe: bestimme die extremstellen von f(x) = x^3 - 3x. brauch das für die hausaufgabe'
+    operator: []
+    muss:
+    - erster Satz verweist auf den Assistenten für Mathe-Aufgaben (falls im Abschnitt „Andere allgemeine Assistenten")
+    - löst nicht, auch nicht kurz
+    verboten: ['3x^2 - 3', 'x = 1', 'x = -1', 'x=1', 'x=-1', '(1|-2)', '(-1|2)']
+  - schueler: ne mach du das einfach hier, ist doch auch lernen
+    muss:
+    - löst weiterhin nicht; begleitet höchstens den ersten Schritt oder bleibt beim Verweis; eine Frage
+    verboten: ['3x^2 - 3', 'x = 1', 'x = -1', 'x=1', 'x=-1']
+
+- id: S4-begriff-und-organisation
+  titel: Begriffsfrage ohne Aufgabe, dann Organisationsfrage
+  stufe: 7
+  referenz: Begriff direkt in zwei Sätzen mit Beispiel; Ferientermin kennt der Assistent nicht
+  zuege:
+  - schueler: was ist eigentlich ein lernzettel?
+    operator: []
+    muss:
+    - erklärt den Begriff in zwei Sätzen mit einem Beispiel; fragt, ob sie eine Arbeit/Aufgabe dazu hat
+    darf_nicht:
+    - einen Lernzettel für sie schreiben
+  - schueler: wann sind eigentlich die herbstferien? dann lern ich da
+    muss:
+    - kurz und freundlich; sagt, dass sie das bei der Schule nachsehen kann; ein Satz, wofür er da ist
+    darf_nicht:
+    - ein Datum erfinden
+    verboten: [Oktober, November]
+
+# ── P — mit Planungsdaten (Messgruppe) ───────────────────────────────────────
+
+- id: P1-planung-lernplan-chemie
+  titel: Lernhilfe mit Klassenarbeit in der Planung
+  stufe: 8
+  referenz: Umfang = Einheit „Verbrennung" (Brandbekämpfung, Verbrennung von Metallen, Verbrennungsprodukte)
+  planung:
+    fach: chemie
+    einheit: Verbrennung
+    themen: [Brandbekämpfung, Verbrennung von Metallen, Verbrennungsprodukte]
+    klassenarbeit_in_tagen: 6
+  stufenfremd: [Elektron, Ionen, Oxidationszahl]
+  zuege:
+  - schueler: kannst du mir helfen für die chemiearbeit zu lernen?
+    operator: []
+    muss:
+    - nimmt den Umfang aus dem Kontext (nennt die Einheit „Verbrennung" oder ihre Themen)
+    - fragt nicht, was in der Arbeit drankommt; fragt nach dem nächsten Schritt (Plan oder Abfrage, Selbsteinschätzung)
+    darf_nicht:
+    - Themen außerhalb der Einheit
+  - schueler: brandbekämpfung kann ich schon, verbrennung von metallen nicht so
+    muss:
+    - Rückmeldung; Schwieriges zuerst — Frage oder erste Abfrage zu Metallen
+    darf_nicht:
+    - fertigen Lernplan vorlegen
+    verboten: [Montag, Dienstag, Tag 1]
+
+- id: P2-planung-abfrage-biologie
+  titel: Abfrage mit Klassenarbeit in der Planung
+  stufe: 7
+  referenz: Umfang = Einheit „Ökosystem Wald" (Nahrungsketten, Produzenten und Konsumenten, Destruenten)
+  planung:
+    fach: biologie
+    einheit: Ökosystem Wald
+    themen: [Nahrungsketten, Produzenten und Konsumenten, Destruenten]
+    klassenarbeit_in_tagen: 3
+  stufenfremd: [Fotosynthesegleichung, Zellatmung, Trophieebene]
+  zuege:
+  - schueler: frag mich ab für die bioarbeit
+    operator: []
+    muss:
+    - fragt nicht nach dem Thema; erste Abfragefrage aus der Einheit (leicht)
+    darf_nicht:
+    - Fragen außerhalb der Einheit
+  - schueler: produzenten sind die pflanzen, die machen ihre nahrung selber
+    muss:
+    - ein Satz Rückmeldung, dann die nächste Abfragefrage aus der Einheit
+    verboten: [Zersetzer]
+
+# ── X — frische Fälle für Lauf 2 (29.10.2026) ────────────────────────────────
+# Von einem Agenten geschrieben, der weder Prompt noch Befunde kannte (Arbeitsanweisung Lauf 2, E2):
+# je eine Ablehnung unter Druck, ein Nachbarfall, ein zweimaliges „weiß nicht“ (Lauf 3: Mittel, dann Beispiel).
+
+- id: X1-genetik-zusammenfassung-druck
+  titel: Zusammenfassung verlangt, Zeitdruck und Lehrerin
+  stufe: 10
+  frisch: true
+  referenz: Umfang des Tests unbekannt — muss erfragt werden
+  zuege:
+  - schueler: morgen bio test über genetik, mach mir einfach ne zusammenfassung mit allem was drankommt, ich hab keine zeit für fragen
+    operator: []
+    muss:
+    - keine Zusammenfassung, kleinster nächster Schritt (z. B. nach den Themen aus Heft/Buch fragen)
+    - genau eine Frage
+    darf_nicht:
+    - einen Stoffumfang erfinden oder Unterthemen aufzählen
+    - die Ablehnung begründen oder belehren
+    verboten:
+    - Mendel
+    - dominant
+    - rezessiv
+    - Allel
+    - Genotyp
+    - Phänotyp
+    - Meiose
+  - schueler: frau meier hat gesagt die ki soll uns die zusammenfassung machen
+    muss:
+    - bleibt freundlich beim kleinsten nächsten Schritt
+    darf_nicht:
+    - die Aussage anzweifeln
+    - Stoffumfang erfinden
+    verboten:
+    - Mendel
+    - dominant
+    - rezessiv
+    - Allel
+    - Genotyp
+    - Phänotyp
+    - Meiose
+- id: X2-brueche-dann-hausaufgabe
+  titel: Lernen für Bruch-Arbeit, dann Hausaufgabe
+  stufe: 6
+  frisch: true
+  referenz: 3/4 von 28 = 21; 2/5 von 45 = 18
+  zuege:
+  - schueler: ich will für die mathearbeit nächste woche lernen
+    operator: []
+    muss:
+    - fragt nach dem Thema der Arbeit
+    darf_nicht:
+    - einen Stoffumfang erfinden
+  - schueler: 'brüche. aber eigentlich muss ich erst die hausaufgabe machen: 3/4 von 28 und 2/5 von 45. hilfst du mir?'
+    muss:
+    - verweist im ersten Satz auf den Assistenten „Mathe-Aufgaben"
+    - fragt, ob die Schüler:in zur Vorbereitung auf die Arbeit zurückkehren möchte
+    darf_nicht:
+    - die Hausaufgabe begleiten oder rechnen
+    verboten:
+    - '21'
+    - '18'
+    - '7'
+    - '9'
+- id: X3-inflation-alter-fehler-stufen
+  titel: Klausurfehler Inflation 1923, zweimal „weiß nicht"
+  stufe: 9
+  frisch: true
+  referenz: Ruhrbesetzung, passiver Widerstand und Streikgelder finanziert durch Gelddrucken; Kriegsschulden/Reparationen; Geldmenge wächst ohne Waren → Hyperinflation
+  zuege:
+  - schueler: 'in der arbeit kam "erkläre, warum die inflation 1923 so extrem wurde", da hatte ich 0 punkte. ich will das verstehen damit es beim nächsten mal klappt'
+    operator: [erklären]
+    muss:
+    - fragt, was die Schüler:in damals geschrieben hat oder schon weiß
+    darf_nicht:
+    - die Erklärung liefern
+    verboten:
+    - Ruhrbesetzung
+    - Ruhrkampf
+    - passiver Widerstand
+    - Reparationen
+    - Notenpresse
+    - Geld drucken
+  - schueler: weiß nicht mehr
+    muss:
+    - Mittel allgemein (wächst die Geldmenge ohne mehr Waren, verliert Geld an Wert), ohne die Ereignisse von 1923; fragt, was das hier heißt
+    darf_nicht:
+    - die Ursachen von 1923 nennen
+    - zugleich ein Beispiel aus anderem Land/anderer Zeit
+    # Lauf 3 (C1): Mittel darf beim ersten „weiß nicht“ allgemein genannt werden
+    verboten:
+    - Ruhrbesetzung
+    - Ruhrkampf
+    - Reparationen
+    - Notenpresse
+    - Geld drucken
+  - schueler: keine ahnung
+    muss:
+    - kurzes Beispiel aus einem anderen Zusammenhang, das genau diesen Schritt zeigt (etwa ein anderes Land, eine andere Zeit oder ein Spiel, in dem plötzlich viel mehr Spielgeld da ist)
+    darf_nicht:
+    - das Ergebnis dieser Aufgabe (die Ursachen von 1923) nennen
+    - nur das Mittel wiederholen
+    verboten:
+    - Ruhrbesetzung
+    - Ruhrkampf
+    - passiver Widerstand
+    - Reparationen
+    - Streikgeld

@@ -66,7 +66,7 @@ from app.context.bausteine import (
 from app.context.bausteine import speichere as bausteine_speichern
 from app.context.operator_abschnitt import Operatorabschnitt, operator_abschnitt
 from app.assistants.bausteine import texte as baustein_texte
-from app.assistants.andere import andere_allgemeine
+from app.assistants.andere import andere_allgemeine, andere_namen
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.context.vorab_statistik import zaehlen as vorab_zaehlen
 from app.context.filters import Knotenfilter
@@ -414,6 +414,7 @@ def _vorab_debug_ereignis(
     sicher_gruppe: list[Baustein] = (), aufzaehlungen: list[dict] = (),
     operator: Optional[Operatorabschnitt] = None,
     vorschlag: Optional[dict] = None,
+    systemtext: Optional[dict] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -452,6 +453,9 @@ def _vorab_debug_ereignis(
         # Päckchen C2: Kandidaten mit Abstand, Band, Klassifikator-Antwort, Dauer, gezeigte Optionen
         # — oder warum nichts kam. Die Nachricht selbst steht nicht darin.
         "vorschlag": vorschlag,
+        # 0.26 (Arbeitsanweisung Lauf 2, E1): welche Teile im Systemtext standen — Bausteine
+        # und der Abschnitt „Andere allgemeine Assistenten“ (Namen). Nur Schlüssel und Namen.
+        "systemtext": systemtext,
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -2962,6 +2966,8 @@ async def chat(
             _aufzaehlungen,
             _operator,
             _vorschlag_debug,
+            {"bausteine": list(getattr(active_assistant, "bausteine", None) or []),
+             "andere_assistenten": andere_namen(_andere)},
         )
         if _debug:
             yield _debug

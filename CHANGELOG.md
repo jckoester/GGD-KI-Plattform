@@ -7,6 +7,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Zwölf allgemeine Assistenten**, je einer für eine Tätigkeit (Rechnen mit Größen, Mathe-Aufgaben, Versuche,
+  Diagramme, Analysieren, Argumentieren, Überarbeiten, Grammatik, Recherche und Referat, Projekte, Programmieren,
+  Lernen). Sie ersetzen den Assistenten für naturwissenschaftliche Aufgaben.
 - **Bausteine für Assistenten:** Feld „Bausteine hinter dem Prompt“ (Admin) mit den Bausteinen „Begleiten statt
   lösen“ und „Grundton“; sie kommen mit dem Release. Migration 0093.
 - **Rückfall-Assistenten** bekommen im Chat die übrigen Rückfall-Assistenten genannt, die die Schüler:in nutzen darf.
@@ -17,6 +20,38 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   letzten Antwort als Kontext, ob eine Nachricht eine neue Aufgabe für einen anderen Assistenten (auch einen Rückfall)
   ist; kein „Assistent beenden“ mehr. Neue Regeln für den Klassifikator.
 - **Jugendschutz-Guardrail:** prüft Klassifikator und Titelerzeugung nicht mehr (`ausgenommene_modelle`).
+- **Versuche für zu Hause** (`pedagogy.yaml`, Punkt 8): zu Hause kein Strom durch Flüssigkeiten, auch nicht mit Batterie;
+  9-Volt-Batterien nur für Stromkreise ohne Flüssigkeit. Im Unterricht begleiten die Assistenten solche Versuche.
+- **Assistenten-Seed:** Schüler-Assistenten nutzen `chat-komplex` (Programmieren: `chat-code`); mit `chat-standard` sagte
+  der Assistent fürs Überarbeiten in 14 von 36 Zügen vor.
+- **Antworten von Schüler-Assistenten** zeigen keinen Fettdruck.
+
+### Behoben
+
+- **Operator-Erkennung:** Ein Adjektiv wie „fertigen“ in „einen fertigen Versuchsplan“ gilt nicht mehr als Operator.
+
+### Bekannte Eigenschaften
+
+Gemessen mit `chat-komplex` (Plan „Rückfall-Assistenten“, Läufe 1–4):
+- Ablehnungen kommen oft mit Begründung; manche Antworten stellen zwei Fragen; „musst du“ kommt vor.
+- Hat die Schüler:in einen falschen Schritt geschickt, nennt der Assistent beim Benennen des Fehlers manchmal das
+  Richtige.
+- Bei Versuchen, Texten und Analysen verläuft die Grenze zwischen Hinweis und Vorsagen durch die Sprache; einzelne
+  Hinweise nehmen den Weg vorweg.
+- Der Assistent fürs Überarbeiten antwortet auf eine Nachricht in einer Fremdsprache auf Deutsch.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0093) — wie im regulären Update.
+- `config/pedagogy.yaml` wird nicht überschrieben: Punkt 8 aus `config/pedagogy.example.yaml` von Hand übernehmen.
+- `infra/litellm_config.yaml`: unter dem Jugendschutz-Guardrail `ausgenommene_modelle: ["system-vorschlag",
+  "system-titel"]` eintragen (siehe `litellm_config.example.yaml`), LiteLLM neu starten.
+- Seed laufen lassen; er legt die zwölf Assistenten an, Vorhandenes bleibt.
+- Wo der Assistent für naturwissenschaftliche Aufgaben schon angelegt ist: archivieren. Bei „stöchiometrische
+  Berechnungen“ und „Reaktionsgleichungen“ unter „Darunter anbieten“ den alten Rückfall ersetzen: Stöchiometrie →
+  Rechnen mit Größen und Einheiten; Reaktionsgleichungen → Rechnen mit Größen und Einheiten, Versuchsplanung und
+  -auswertung.
+- `/settings/models`: `chat-komplex` für die Stufen 5–13 und `chat-code` für Programmieren freischalten.
 
 ## [0.25.0] – 2026-10-28
 

@@ -97,3 +97,11 @@ def test_titel_lesarten():
 
 def test_titel_ohne_verb_ergibt_nichts():
     assert muster_aus_titel("an‑") == []
+
+
+def test_infinitiv_nach_begleiter_ist_kein_auftrag():
+    """0.26, Versuche S2: „einen fertigen Versuchsplan“ ist ein Adjektiv, kein Operator *fertigen*."""
+    index = Operatorindex.aus(["fertigen", "planen"])
+    assert erkenne("Unsere Lehrerin hat gesagt, du sollst uns einen fertigen Versuchsplan geben.", index) == []
+    assert erkenne("Wir sollen das Planen üben.", index) == []
+    assert erkenne("Wir sollen eine Skizze fertigen.", index) == ["fertigen"]

@@ -166,6 +166,10 @@
     // Zustand bleibt dann folgenlos.
     let legendeOffen = $state(false);
     let availableAssistants = $state([]);
+    // Antworten von Schüler-Assistenten zeigen keinen Fettdruck (0.26, B1).
+    const schuelerAssistenten = $derived(
+        new Set(availableAssistants.filter((a) => a.audience === "student").map((a) => a.id)),
+    );
     // Was die Auswahl zeigt — ohne `hidden` (0.22, C1). Direktlink und Einstiege lesen
     // weiter `availableAssistants`: Ein versteckter Assistent bleibt dort erreichbar.
     const angezeigteAssistenten = $derived(zurAnzeige(availableAssistants));
@@ -1490,6 +1494,7 @@
                             ? messages[i - 1].content
                             : null}
                         isStreaming={isStreaming && i === messages.length - 1}
+                        ohneFett={schuelerAssistenten.has(message.assistantId)}
                         kostenSichtbar={granularity === "message" ||
                             granularity === "both"}
                         kontextStufe={kontextAnzeige}

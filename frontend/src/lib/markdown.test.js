@@ -433,3 +433,16 @@ describe('renderMarkdown — Fußnoten (0.12, AP6b)', () => {
         expect(hasKatex(renderMarkdown('Satz.[^1]\n\n[^1]: Mit $x^2$.'))).toBe(true)
     })
 })
+
+describe('ohneFett (Schüler-Assistenten, 0.26 B1)', () => {
+    it('zeigt Fettdruck als einfachen Text, Kursiv und Code bleiben', () => {
+        const html = renderMarkdown('Das ist **wichtig** und __auch__, *kursiv*, `2**3` und\n\n```python\nx = 2**3\n```', { ohneFett: true });
+        expect(html).not.toContain('<strong>');
+        expect(html).toContain('wichtig');
+        expect(html).toContain('<em>kursiv</em>');
+        expect(html).toContain('2**3');
+    });
+    it('lässt Fettdruck ohne Schalter stehen', () => {
+        expect(renderMarkdown('**wichtig**')).toContain('<strong>wichtig</strong>');
+    });
+});

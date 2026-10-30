@@ -23,7 +23,7 @@ Die drei Stufen jedes Schritts heißen hier: **Weg** („Was willst du zuerst wi
 
 Die Angaben, die sichtbar dastehen (Titel, Achsenbeschriftung), darfst du wiederholen. Von der Schüler:in kommen zuerst: jeder **abgelesene Wert**, der beschriebene **Verlauf**, jeder **Vergleich**, jede **Deutung** und jede **Ursache**. „Steigt die Kurve ab 1990 stark an?“ beschreibt den Verlauf schon – das ist Vorsagen. Eine Beschreibung oder Auswertung schreibst du nicht, auch nicht teilweise, und rechnest keinen Mittelwert oder Anteil für sie aus.
 
-In der Hilfe in Stufen ist das **Mittel** (Stufe 2) eine allgemeine Leseregel (etwa, dass man erst den Gesamttrend und dann die Ausnahmen beschreibt), das **Beispiel** (Stufe 3) eine andere, einfache Darstellung, an der genau dieser Schritt zu sehen ist.
+In der Hilfe in Stufen ist das **Mittel** eine allgemeine Leseregel (etwa, dass man erst den Gesamttrend und dann die Ausnahmen beschreibt), das **Beispiel** eine andere, einfache Darstellung, an der genau dieser Schritt zu sehen ist.
 
 ## Fehler
 
@@ -39,7 +39,7 @@ Für eine Darstellung aus einem eigenen Versuch, bei dem es um den Versuch selbs
 
 ## Schreibweise
 
-Werte mit Einheit und Dezimalkomma: $15\,^\circ\mathrm{C}$, $80\,\mathrm{mm}$, $12{,}5\,\%$. Prozentpunkte sind keine Prozente. Eine Tabelle oder ein Diagramm zeichnest du nicht für sie. Keine Listen, keine Fettungen.
+Werte mit Einheit und Dezimalkomma: $15\,^\circ\mathrm{C}$, $80\,\mathrm{mm}$, $12{,}5\,\%$. Prozentpunkte sind keine Prozente. Eine Tabelle oder ein Diagramm zeichnest du nicht für sie. Keine Listen.
 
 ## Beispiele
 

@@ -96,6 +96,21 @@ renderer.link = ({ href, title, text }) => {
     return `<a href="${hilfepfad ?? href}"${titleAttr}${ziel}>${text}</a>`;
 };
 
+/**
+ * Ob Fettdruck als einfacher Text erscheint (0.26, Arbeitsanweisung Lauf 3, B1).
+ *
+ * Antworten von Schüler-Assistenten: Die Regel „keine Fettungen“ im Prompt hielt in den
+ * Messungen nicht; die Plattform erzwingt die Form, statt den Prompt zu verlängern. Nur
+ * `**…**`/`__…__` außerhalb von Code — Code-Blöcke und Inline-Code bleiben, wie sie sind
+ * (`2**3`, `__init__`), und Kursiv bleibt.
+ */
+let _ohneFett = false;
+
+renderer.strong = function({ tokens }) {
+    const inhalt = this.parser.parseInline(tokens);
+    return _ohneFett ? inhalt : `<strong>${inhalt}</strong>`;
+};
+
 function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -309,9 +324,10 @@ function escapeAttr(s) {
 // Anführungszeichen, `"[^"]*"` deckt sie deshalb ab.
 const TAG = '<(?:[^>"]|"[^"]*")*>';
 
-export function renderMarkdown(text, { dokuLinks = false } = {}) {
+export function renderMarkdown(text, { dokuLinks = false, ohneFett = false } = {}) {
     if (!text) return '';
     _dokuLinks = dokuLinks;
+    _ohneFett = ohneFett;
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
     _mathStore = {};
     _mathCount = 0;

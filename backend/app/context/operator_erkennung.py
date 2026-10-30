@@ -58,6 +58,17 @@ _FUELL = frozenset({"sich", "ein", "eine", "einen", "der", "die", "das", "den", 
 #: Modalverben, mit denen eine Aufgabe berichtet wird: „Das sollen wir erklären."
 _AUFTRAG = frozenset({"soll", "sollen", "sollst", "sollt", "muss", "müssen", "musst", "müsst"})
 
+#: Begleiter vor einem Nomen. Steht ein „Infinitiv“ direkt dahinter, ist er ein Adjektiv oder
+#: ein Nomen: „du sollst uns einen fertigen Versuchsplan geben“ nennt keinen Operator *fertigen*
+#: (0.26, Versuche S2 — der Assistent erklärte sonst eine Definition, die mit der Aufgabe nichts
+#: zu tun hatte), „das Planen“ keinen Auftrag.
+_BEGLEITER = frozenset({
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines",
+    "kein", "keine", "keinen", "keinem", "keiner", "mein", "meine", "meinen", "dein", "deine", "deinen",
+    "sein", "seine", "seinen", "ihr", "ihre", "ihren", "unser", "unsere", "unseren", "euer", "eure", "euren",
+    "diesen", "diese", "dieser", "dieses", "diesem",
+})
+
 #: Satzgrenzen. Anführungszeichen zählen mit: „In der Aufgabe steht ‚Erkläre den Verlauf'"
 #: enthält eine Aufgabe in der Mitte des Satzes.
 _SATZ = re.compile(r"[.!?;:\n„“”\"»«‚‘]+")
@@ -157,8 +168,8 @@ def _berichtet(woerter: list[str], index: Operatorindex) -> list[Muster]:
     if not _AUFTRAG & set(woerter):
         return []
     staemme = {stamm(w) for w in woerter}
-    treffer = [m for w in woerter for m in index.nach_infinitiv.get(w, ())
-               if all(o in staemme for o in m.objekte)]
+    treffer = [m for i, w in enumerate(woerter) for m in index.nach_infinitiv.get(w, ())
+               if not (i and woerter[i - 1] in _BEGLEITER) and all(o in staemme for o in m.objekte)]
     if not treffer:
         return []
     bestes = max(m.gewicht for m in treffer)

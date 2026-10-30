@@ -2431,6 +2431,7 @@
                             {#each testMessages as message, i}
                                 <MessageBubble
                                     {message}
+                                    ohneFett={form.audience === "student"}
                                     isStreaming={testIsStreaming &&
                                         i === testMessages.length - 1 &&
                                         message.role === "assistant"}

@@ -39,6 +39,8 @@
         kontextZurueck = null,
         // Nur an der letzten eigenen Nachricht gesetzt (0.19): öffnet das Bearbeiten.
         onBearbeiten = null,
+        // Antwort eines Schüler-Assistenten: Fettdruck erscheint als einfacher Text (0.26, B1).
+        ohneFett = false,
     } = $props();
 
     // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
@@ -54,7 +56,7 @@
     );
 
     let renderedContent = $derived(
-        message.role === 'assistant' ? renderMarkdown(message.content) : ''
+        message.role === 'assistant' ? renderMarkdown(message.content, { ohneFett }) : ''
     );
 
     // Die verwendete Bildart interessiert Lehrkräfte (greift das Routing sinnvoll?);
