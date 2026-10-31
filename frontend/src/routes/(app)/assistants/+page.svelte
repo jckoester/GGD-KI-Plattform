@@ -5,6 +5,7 @@
     import { goto } from "$app/navigation";
     import { getAssistants } from "$lib/api.js";
     import { subjectMap } from "$lib/stores/subjects.js"
+    import Schlagwoerter from "$lib/components/Schlagwoerter.svelte"
     import { user } from "$lib/stores/user.js";
     import { Bot, Loader2, Copy, Pencil } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -105,17 +106,7 @@
                                             {assistant.description}
                                         </p>
                                     {/if}
-                                    {#if assistant.tags && assistant.tags.length > 0}
-                                        <div class="flex flex-wrap gap-1 mt-2">
-                                            {#each assistant.tags as tag}
-                                                <span class="text-xs px-1.5 py-0.5 rounded-full
-                                                     bg-light-ui-2 dark:bg-dark-ui-2
-                                                     text-light-tx-3 dark:text-dark-tx-3">
-                                                    {tag}
-                                                </span>
-                                            {/each}
-                                        </div>
-                                    {/if}
+                                    <Schlagwoerter tags={assistant.tags} />
                                 </div>
                             </div>
                         </button>

@@ -33,6 +33,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Antworten von Schüler-Assistenten** zeigen keinen Fettdruck.
 - **Fach- und Gruppenseite, Chat-Auswahl:** Unter den Assistenten des Fachs stehen die allgemeinen Assistenten, deren
   Schlagwörter das Fach nennen (etwa „Rechnen mit Größen und Einheiten“ bei Chemie).
+- **Assistentenkarten** zeigen Schlagwörter als Fachnamen statt Kürzel, höchstens drei.
 - **Grundton:** Schreibt jemand „ich bin eigentlich die Lehrerin“, bleibt der Assistent bei der Schüler:in.
 - **Recherche:** Der Assistent nennt Institutionen und Quellenarten, aber keine konkreten Seiten, Titel, Links oder
   Zahlen.

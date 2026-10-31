@@ -51,3 +51,21 @@ export function ordneFuerFach(liste, subjectId, slug) {
   }
   return { liste: [...fach, ...allgemein, ...rest], abschnitte };
 }
+
+/** Wie viele Schlagwörter eine Assistentenkarte zeigt (0.26, F37 a). */
+export const SCHLAGWOERTER_MAX = 3;
+
+/**
+ * Schlagwörter einer Karte zum Anzeigen (0.26, F37 a): Ein Schlagwort, das ein Fach-Slug ist,
+ * erscheint mit dem Fachnamen („religion-ev“ → „Evangelische Religion“); andere Schlagwörter
+ * bleiben, wie sie sind. Höchstens ``max``, der Rest als Zahl und Liste für den Tooltip.
+ *
+ * @param {string[]|null|undefined} tags
+ * @param {Array<{slug: string, name: string}>} faecher
+ * @returns {{namen: string[], mehr: string[]}}
+ */
+export function schlagwoerterAnzeige(tags, faecher, max = SCHLAGWOERTER_MAX) {
+  const nachSlug = Object.fromEntries((faecher ?? []).map((f) => [f.slug, f.name]));
+  const namen = [...new Set((tags ?? []).map((t) => nachSlug[t] ?? t))];
+  return { namen: namen.slice(0, max), mehr: namen.slice(max) };
+}

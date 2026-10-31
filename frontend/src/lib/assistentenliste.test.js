@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { allgemeineImFach, ordneFuerFach, zurAnzeige } from './assistentenliste.js'
+import { allgemeineImFach, ordneFuerFach, schlagwoerterAnzeige, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -108,5 +108,16 @@ describe('allgemeine Assistenten eines Fachs (0.26, F37 b)', () => {
   it('ohne Fach-Assistenten steht „Allgemeine Assistenten“ oben, ohne Fachbezug keine Titel', () => {
     expect(ordneFuerFach(liste, 99, 'deutsch').abschnitte[0]).toEqual({ index: 0, titel: 'Allgemeine Assistenten' })
     expect(ordneFuerFach(liste, null, null)).toEqual({ liste, abschnitte: [] })
+  })
+})
+
+
+describe('Schlagwörter einer Karte (0.26, F37 a)', () => {
+  const faecher = [{ slug: 'religion-ev', name: 'Evangelische Religion' }, { slug: 'deutsch', name: 'Deutsch' }]
+  it('Fachnamen statt Slugs, fremde Schlagwörter unverändert, höchstens drei', () => {
+    expect(schlagwoerterAnzeige(['deutsch', 'religion-ev', 'Projekt', 'x', 'y'], faecher)).toEqual({
+      namen: ['Deutsch', 'Evangelische Religion', 'Projekt'], mehr: ['x', 'y'],
+    })
+    expect(schlagwoerterAnzeige(null, faecher)).toEqual({ namen: [], mehr: [] })
   })
 })
