@@ -36,6 +36,15 @@ describe('neuerChatPfad', () => {
     expect(p.get('assistant_id')).toBe('12')
     expect(p.get('q')).toBe('Erstelle Material für „Einstieg"')
   })
+
+  it('Assistentenkarte auf der Gruppenseite: Assistent und Gruppe zusammen', () => {
+    // Ohne `group_id` bekam ein allgemeiner Assistent (kein Fach) keinen Gruppenbezug.
+    const pfad = neuerChatPfad({ assistantId: 7, groupId: 3 })
+    expect(pfad).toBe('/chat?group_id=3&assistant_id=7')
+    expect(chatVorgaben(params(pfad.split('?')[1])).groupId).toBe(3)
+    // Ohne Gruppe (Fachseite der Lehrkraft) bleibt es beim Assistenten allein.
+    expect(neuerChatPfad({ assistantId: 7, groupId: null })).toBe('/chat?assistant_id=7')
+  })
 })
 
 describe('chatVorgaben', () => {

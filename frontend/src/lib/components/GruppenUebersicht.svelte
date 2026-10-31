@@ -370,7 +370,7 @@
     {#if gruppenAssistenten.length > 0}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {#each gruppenAssistenten as assistent (assistent.id)}
-          <AssistantCard assistant={assistent} {subject} groups={$myTeachingGroups} />
+          <AssistantCard assistant={assistent} {subject} groups={$myTeachingGroups} groupId={group?.id ?? null} />
         {/each}
       </div>
     {/if}
@@ -381,7 +381,7 @@
       </h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {#each allgemeineAssistenten as assistent (assistent.id)}
-          <AssistantCard assistant={assistent} groups={$myTeachingGroups} />
+          <AssistantCard assistant={assistent} groups={$myTeachingGroups} groupId={group?.id ?? null} />
         {/each}
       </div>
     {/if}

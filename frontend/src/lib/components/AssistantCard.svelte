@@ -2,11 +2,15 @@
   import { goto } from '$app/navigation'
   import { Bot } from 'lucide-svelte'
   import SubjectIcon from './SubjectIcon.svelte'
+  import { neuerChatPfad } from '$lib/chatziel.js'
 
-  let { assistant, subject = null, groups = [] } = $props()
+  // `groupId`: Auf der Gruppenseite gehört der Chat zu dieser Gruppe — wie bei „+ Neuer Chat".
+  // Ohne sie leitete der Server die Gruppe nur aus dem Fach des Assistenten ab; ein
+  // allgemeiner Assistent hat keins, und der Chat kannte den Unterricht der Gruppe nicht.
+  let { assistant, subject = null, groups = [], groupId = null } = $props()
 
   function startChat() {
-    goto(`/chat?assistant_id=${assistant.id}`)
+    goto(neuerChatPfad({ assistantId: assistant.id, groupId }))
   }
 
   function scopeLabel() {
