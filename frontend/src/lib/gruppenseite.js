@@ -254,3 +254,32 @@ export function zuletztEntstanden(bausteine = [], artefakte = [], limit = 6) {
     .sort((a, b) => new Date(b.datum) - new Date(a.datum))
     .slice(0, limit)
 }
+
+/**
+ * Scopes, die nicht an eine Gruppe gebunden sind — wie `OFFENE_SCOPES` im Backend
+ * (`app/assistants/sichtbarkeit.py`). Ob die Person sie sehen darf, hat `/assistants` schon
+ * entschieden; hier geht es nur darum, welche zu **dieser** Gruppe gehören.
+ */
+const OFFENE_SCOPES = new Set(['all', 'all_students', 'grade'])
+
+/**
+ * Die Assistenten, die die Gruppenseite als Einstieg zeigt: Fach der Gruppe, und entweder offen,
+ * für die Fachschaft oder an genau diese Gruppe gebunden.
+ *
+ * ⚠️ Bis 31.10.2026 kannte der Filter nur `all` und nicht `all_students`/`grade` — die Chemie-
+ * Assistenten (`all_students`) fehlten deshalb für Schüler:innen auf der Gruppenseite ganz.
+ *
+ * @param {Array<{subject_id?: number|null, scope?: string, scope_group_id?: number|null}>} liste
+ * @param {number|null|undefined} subjectId
+ * @param {number|null|undefined} groupId
+ */
+export function assistentenDerGruppe(liste, subjectId, groupId) {
+  if (subjectId == null) return []
+  return (liste ?? []).filter(
+    (a) =>
+      a.subject_id === subjectId &&
+      (OFFENE_SCOPES.has(a.scope) ||
+        a.scope === 'subject_department' ||
+        (groupId != null && a.scope_group_id === groupId)),
+  )
+}

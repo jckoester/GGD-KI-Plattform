@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   REITER,
+  assistentenDerGruppe,
   aktiverReiter,
   gruppenImFach,
   schuelerWeiche,
@@ -303,5 +304,27 @@ describe('zuletztEntstanden', () => {
   it('verträgt fehlende Listen', () => {
     expect(zuletztEntstanden()).toEqual([])
     expect(zuletztEntstanden(null, null)).toEqual([])
+  })
+})
+
+
+describe('assistentenDerGruppe', () => {
+  const liste = [
+    { id: 1, subject_id: 6, scope: 'all_students' },
+    { id: 2, subject_id: 6, scope: 'grade' },
+    { id: 3, subject_id: 6, scope: 'all' },
+    { id: 4, subject_id: 6, scope: 'subject_department' },
+    { id: 5, subject_id: 6, scope: 'teaching_group', scope_group_id: 10 },
+    { id: 6, subject_id: 6, scope: 'teaching_group', scope_group_id: 11 },
+    { id: 7, subject_id: 7, scope: 'all_students' },
+    { id: 8, subject_id: null, scope: 'all_students' },
+  ]
+  it('zeigt offene Assistenten des Fachs — auch all_students und grade (Chemie-Fall 31.10.2026)', () => {
+    expect(assistentenDerGruppe(liste, 6, 10).map((a) => a.id)).toEqual([1, 2, 3, 4, 5])
+  })
+  it('Gruppen-Assistenten nur in ihrer Gruppe, fremde Fächer und ohne Fach nie', () => {
+    expect(assistentenDerGruppe(liste, 6, 11).map((a) => a.id)).toEqual([1, 2, 3, 4, 6])
+    expect(assistentenDerGruppe(liste, 6, null).map((a) => a.id)).toEqual([1, 2, 3, 4])
+    expect(assistentenDerGruppe(liste, null, 10)).toEqual([])
   })
 })

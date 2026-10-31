@@ -32,6 +32,7 @@
     getLibrary,
   } from '$lib/api.js'
   import {
+    assistentenDerGruppe,
     fortschritt,
     stundenReihen,
     stundenDatum,
@@ -53,15 +54,7 @@
 
   // ── Assistenten dieser Gruppe ─────────────────────────────────────────────
   const gruppenAssistenten = $derived(
-    subject
-      ? zurAnzeige($assistants).filter(
-          (a) =>
-            a.subject_id === subject.id &&
-            (a.scope === 'all' ||
-              a.scope === 'subject_department' ||
-              a.scope_group_id === group?.id),
-        )
-      : [],
+    assistentenDerGruppe(zurAnzeige($assistants), subject?.id, group?.id),
   )
 
   // ── Jetzt (nur Lehrkraft) ─────────────────────────────────────────────────

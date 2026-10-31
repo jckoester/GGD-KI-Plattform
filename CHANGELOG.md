@@ -38,6 +38,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Behoben
 
 - **Operator-Erkennung:** Ein Adjektiv wie „fertigen“ in „einen fertigen Versuchsplan“ gilt nicht mehr als Operator.
+- **Gruppenseite:** Assistenten für alle Schüler:innen oder eine Klassenstufe erscheinen wieder als Einstieg (bisher fehlten
+  etwa die Chemie-Assistenten für Schüler:innen ganz).
 
 ### Bekannte Eigenschaften
 
