@@ -223,6 +223,8 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
 | `HOME_EXPERIMENT_TRIGGERS_PATH` | Pfad zur home_experiment_triggers.yaml | `config/home_experiment_triggers.yaml` |
+| `DRUCK_TRIGGERS_PATH` | Pfad zur druck_triggers.yaml (Muster der Zug-Auslöser) | `config/druck_triggers.yaml` |
+| `DRUCK_KORPUS_PATH` | Pfad zur druck_korpus.yaml (Beispielsätze und Schwellen) | `config/druck_korpus.yaml` |
 
 ### Anmeldung, Schule, Darstellung
 
@@ -655,6 +657,58 @@ Fehlermeldung ins Leere. Ein Test prüft die Liste darauf.
 Änderungen wirken nach **Backend-Neustart**. Die Startliste gehört wie `pedagogy.yaml` in
 der Einführungsphase gegengelesen: Was an Ihrer Schule als Hausversuch erlaubt ist, ist
 eine Entscheidung der Fachschaften.
+
+---
+
+## `config/druck_triggers.yaml` und `config/druck_korpus.yaml`
+
+Zwei Zug-Auslöser (0.26). Beide hängen für **eine** Antwort eine Anweisung an den Systemtext.
+
+**Lehrkraft-Behauptung** (`lehrkraft`): Schreibt jemand in einem Schüler-Chat, er oder sie sei
+Lehrkraft („ich bin eigentlich die Lehrerin …“), bekommt die Antwort die Anweisung, bei der
+Schüler:in zu bleiben: kein „Sie“, keine Unterrichtshilfe, kein Erwartungshorizont. Das gilt in
+allen Schüler-Chats und schon beim ersten Treffer. Lehrkräfte haben ein eigenes Konto; wer in
+einem Schüler-Konto schreibt, ist für die Plattform Schüler:in.
+
+**Nachsetzen** (`nachsetzen`): Bittet eine Schüler:in in einem Assistenten mit dem Baustein
+„Begleiten statt lösen“ **zum zweiten Mal hintereinander** um die Lösung, bekommt die Antwort
+eine zusätzliche Anweisung: kein Ergebnis, kein Lösungstext, keine Teilhilfe, höchstens zwei
+Sätze. Die erste Bitte hält der Baustein selbst; in den Messungen gaben die Assistenten erst
+beim zweiten Nachsetzen nach.
+
+Erkannt wird auf zwei Wegen, ODER-verknüpft:
+
+- `druck_triggers.yaml`, je Auslöser `patterns` (reguläre Ausdrücke auf der normalisierten
+  Nachricht) und `anweisung` (der angehängte Text).
+- `druck_korpus.yaml`: Beispielsätze je Art (`druck`, `kein_druck`, `lehrkraft`,
+  `kein_lehrkraft`) und je Auslöser eine `schwelle`. Eine Nachricht trifft, wenn ihr nächster
+  Beispielsatz näher liegt als die Schwelle und näher als der nächste Gegensatz. Die Sätze werden
+  beim ersten Gebrauch eingebettet; den Vektor der Nachricht hat die Vorab-Suche schon.
+
+Beim Nachsetzen gilt die Anweisung für die **beiden Antworten nach** einer erkannten Bitte um die
+Lösung — auch, wenn die nächste Bitte nur einen Teil der Lösung verlangt. Die erste Bitte selbst
+hält der Assistent ohne Anweisung. Die Lehrkraft-Behauptung wird auch Satz für Satz geprüft, damit
+sie in einer langen Nachricht mit Aufgabe nicht untergeht.
+
+**Zähler für den Betatest:** Jeder Treffer landet ohne Text in der Tabelle `zug_ausloeser`.
+
+```bash
+docker compose exec backend python scripts/zug_ausloeser_statistik.py --seit 2026-11-02
+```
+
+zeigt je Auslöser, wie oft je 100 Schüler-Gespräche die Anweisung gesetzt wurde und wie oft die
+Schüler:in danach weitergearbeitet hat. Die Zeilen gehen mit dem Gespräch (Lebenszyklus).
+
+Nur in der Schüler-Behandlung. Es ist **keine Sperre**. Fehlt `druck_triggers.yaml`, greifen
+beide Auslöser nicht; fehlt `druck_korpus.yaml`, gelten nur die Muster. Das Backend schreibt dann
+eine Warnung ins Log. Änderungen wirken nach einem Neustart.
+
+⚠️ **Startkuratierung.** Muster und Korpus sind ein Anfang. In der Betatestphase gegenlesen
+(Fachschaften und Schulleitung, wie bei den Hausversuchen): Welche Formulierungen nutzen Ihre
+Schüler:innen wirklich? Verpasste Formulierungen gehören in den Korpus, nicht in die Muster. Ein
+Fehltreffer — eine Anweisung bei einer Nachricht, die keine Bitte um die Lösung war — ist der
+Schaden, den die Schwelle begrenzen muss. Die Pfade lassen sich über `DRUCK_TRIGGERS_PATH` und
+`DRUCK_KORPUS_PATH` überschreiben.
 
 ---
 

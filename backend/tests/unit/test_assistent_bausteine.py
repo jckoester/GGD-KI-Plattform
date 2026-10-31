@@ -28,7 +28,7 @@ def test_begleiten_statt_loesen_traegt_die_gemessenen_regeln():
     for anker in ("Genau eine Frage", "Hilfe in Stufen", "Diese Prüfung läuft im Stillen",
                   "außer du gibst gerade das Mittel oder das Beispiel der Hilfe in Stufen",
                   "Mittel und Beispiel nie zusammen",
-                  "antwortest du wie beim ersten Mal – nur kürzer",
+                  "ändern daran nichts",
                   "Ein Sicherheitshinweis bleibt immer stehen",
                   "Übungsreihen oder Abfragen"):
         assert anker in t, anker
@@ -37,6 +37,7 @@ def test_begleiten_statt_loesen_traegt_die_gemessenen_regeln():
 def test_grundton_traegt_die_gemessenen_regeln():
     t = bausteine.text("grundton")
     for anker in ("Wer mit dir schreibt, weiß die Plattform",
+                  "Lehrkräfte bekommen über ihr eigenes Konto einen anderen Assistenten",
                   "Steht im Abschnitt keiner oder fehlt er, nennst du keinen Assistenten",
                   "Gibt es noch keine Aufgabe", "Kannst du es nicht",
                   "Eine Lernfrage („wie viele Vokabeln pro Tag“) ist keine Organisationsfrage",

@@ -102,6 +102,8 @@ services:
       # nicht die Anwendung kaputt, sondern eine Schutzfunktion still weg.
       PEDAGOGY_PATH: /app/config/pedagogy.yaml
       HOME_EXPERIMENT_TRIGGERS_PATH: /app/config/home_experiment_triggers.yaml
+      DRUCK_TRIGGERS_PATH: /app/config/druck_triggers.yaml
+      DRUCK_KORPUS_PATH: /app/config/druck_korpus.yaml
       CRISIS_TRIGGERS_PATH: /app/config/crisis_triggers.yaml
       HELP_RESOURCES_PATH: /app/config/help_resources.yaml
       IMAGE_MODELS_PATH: /app/config/image_models.yaml
@@ -225,6 +227,8 @@ services:
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
       PEDAGOGY_PATH: /app/config/pedagogy.yaml
       HOME_EXPERIMENT_TRIGGERS_PATH: /app/config/home_experiment_triggers.yaml
+      DRUCK_TRIGGERS_PATH: /app/config/druck_triggers.yaml
+      DRUCK_KORPUS_PATH: /app/config/druck_korpus.yaml
       CRISIS_TRIGGERS_PATH: /app/config/crisis_triggers.yaml
       HELP_RESOURCES_PATH: /app/config/help_resources.yaml
       IMAGE_MODELS_PATH: /app/config/image_models.yaml

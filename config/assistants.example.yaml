@@ -157,11 +157,12 @@ assistants:
   # der Prompt enthält nur die Tätigkeit. Sie ersetzen den früheren Sammel-Assistenten
   # „naturwissenschaftliche Aufgaben“ (Prompt und Szenario bleiben als Archiv der Messungen).
   #
-  # Modell `chat-komplex` für alle außer Programmieren (`chat-code`). Mit `chat-standard` hielt
+  # Modell `chat-komplex` für alle zwölf. Mit `chat-standard` hielt
   # „nicht vorsagen“ nicht (Plan, Schritt 7, Lauf 1: Lernen 8 von 12 Fällen, Überarbeiten). Die
-  # Schule kann umstellen; der Seed gibt das Modell vor, mit dem die Zusage hält. `chat-komplex`
-  # und `chat-code` sind für Schüler:innen nicht von selbst freigeschaltet: unter
-  # `/settings/models` für die Stufen 5–13 freischalten.
+  # Schule kann umstellen; der Seed gibt das Modell vor, mit dem die Zusage hält. Programmieren
+  # lief bis Schritt 9 auf `chat-code`, das in drei von elf Zügen Lösungscode gab; `chat-komplex`
+  # in keinem (D2, 31.10.2026). `chat-komplex` ist für Schüler:innen nicht von selbst
+  # freigeschaltet: unter `/settings/models` für die Stufen 5–13 freischalten.
   #
   # `operator_faecher`: kein `bnt` (entfällt mit V3); `nit` gibt es erst ab 2027/28, bis dahin
   # übergeht der Seed es mit Warnung.
@@ -623,7 +624,7 @@ assistants:
     status: active
     min_grade: 7
     max_grade: 13
-    model: chat-code
+    model: chat-komplex
     disabled_augmentations: [metacognitive_nudges]
     system_prompt_file: config/prompts/programmieren_assistent.md
     bausteine: [begleiten_statt_loesen, grundton]

@@ -525,6 +525,8 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                 "aufzaehlungen": (ergebnis.get("vorab_debug") or {}).get("aufzaehlungen", []),
                 "operator": (ergebnis.get("vorab_debug") or {}).get("operator"),
                 "systemtext": (ergebnis.get("vorab_debug") or {}).get("systemtext"),
+                "druck": (ergebnis.get("vorab_debug") or {}).get("druck"),
+                "lehrkraft": (ergebnis.get("vorab_debug") or {}).get("lehrkraft"),
                 "operator_soll": zug.get("operator"),
                 "werkzeug_soll": zug.get("werkzeug"),
                 "knoten": knoten_der_antwort(conn, konversation),
@@ -591,6 +593,12 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
                        (("musst", "„musst du“"), ("anhaengsel", "„Möchtest/Willst du“"), ("fett", "Fettdruck"))
                        if z.get(k)]
             t.append("- **Befund:** " + " · ".join(befund))
+            for feld, name in (("lehrkraft", "Lehrkraft-Auslöser"), ("druck", "Nachsetz-Auslöser")):
+                b = z.get(feld) or {}
+                if b.get("treffer") or b.get("anweisung"):
+                    t.append(f"- **{name}:** {'Anweisung gesetzt' if b.get('anweisung') else 'Treffer ohne Anweisung'}"
+                             f" (Quelle {b.get('quelle') or '—'}, Abstand {b.get('abstand')}, Gegen {b.get('gegen')},"
+                             f" Treffer in {b.get('zaehler')} der letzten drei)")
             if z.get("systemtext") is not None:
                 st = z["systemtext"]
                 t.append(f"- **Systemtext:** Bausteine {', '.join(st.get('bausteine') or []) or '—'} · "

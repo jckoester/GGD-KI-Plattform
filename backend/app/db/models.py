@@ -625,6 +625,26 @@ class Conversation(Base):
 
 
 # 6. messages
+class ZugAusloeser(Base):
+    """Treffer eines Zug-Auslösers je Schülernachricht (0.26, Migration 0094) — ohne Text.
+
+    Siehe `app/pedagogy/druck.py` und `scripts/zug_ausloeser_statistik.py`."""
+
+    __tablename__ = "zug_ausloeser"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    #: Die wievielte Schülernachricht des Gesprächs (wie in der Anfrage gezählt, 1 = erste).
+    nutzer_nachricht: Mapped[int] = mapped_column(nullable=False)
+    art: Mapped[str] = mapped_column(Text, nullable=False)              # druck | lehrkraft
+    quelle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # regex | korpus | korpus-satz
+    treffer: Mapped[bool] = mapped_column(nullable=False)
+    anweisung: Mapped[bool] = mapped_column(nullable=False)
+    erstellt: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False)
+
+
 class Message(Base):
     __tablename__ = "messages"
 

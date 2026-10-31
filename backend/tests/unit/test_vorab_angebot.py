@@ -133,6 +133,8 @@ def test_messkanal_ausserhalb_der_produktion():
         "operator": None,
         "vorschlag": None,
         "systemtext": None,
+        "druck": None,
+        "lehrkraft": None,
     }
 
 

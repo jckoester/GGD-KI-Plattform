@@ -32,7 +32,7 @@ cp infra/litellm_config.example.yaml     infra/litellm_config.yaml
 
 for f in auth budget_tiers subjects crisis_triggers help_resources \
          rate_limits pedagogy image_blocklist artifact_limits school_year \
-         home_experiment_triggers; do
+         home_experiment_triggers druck_triggers druck_korpus; do
   cp "config/$f.example.yaml" "config/$f.yaml"
 done
 ```
@@ -44,6 +44,8 @@ done
 > ⚠️ **`home_experiment_triggers` ebenfalls — aber erst beim ersten Schüler-Chat**,
 > nicht beim Start: Der Sicherheitsauslöser für Versuche zu Hause wird je Nachricht
 > gelesen. Ein Rauchtest mit einem Lehrkraft-Konto übersieht das.
+> `druck_triggers` und `druck_korpus` fehlen ohne Abbruch: Die Zug-Auslöser greifen dann nicht
+> oder nur über die Muster (Warnung im Log).
 > `rate_limits` und `artifact_limits` starten mit eingebauten Vorgaben und einer Warnung
 > im Log — was leicht übersehen wird. `config/subjects.yaml` braucht spätestens Schritt 6.
 >

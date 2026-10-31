@@ -88,6 +88,10 @@ from app.litellm.modell_eigenschaften import Eigenschaften, alle_eigenschaften
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
+from app.pedagogy.druck import (
+    anweisung as druck_anweisung, fruehere_druck_treffer, lehrkraft_fuer, nachsetzen_fuer,
+    speichere as zug_ausloeser_speichern,
+)
 from app.pedagogy.hausversuche import (
     anweisung as hausversuch_anweisung,
     gefahr_fuer as hausversuch_gefahr,
@@ -415,6 +419,8 @@ def _vorab_debug_ereignis(
     operator: Optional[Operatorabschnitt] = None,
     vorschlag: Optional[dict] = None,
     systemtext: Optional[dict] = None,
+    druck: Optional[dict] = None,
+    lehrkraft: Optional[dict] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -456,6 +462,10 @@ def _vorab_debug_ereignis(
         # 0.26 (Arbeitsanweisung Lauf 2, E1): welche Teile im Systemtext standen — Bausteine
         # und der Abschnitt „Andere allgemeine Assistenten“ (Namen). Nur Schlüssel und Namen.
         "systemtext": systemtext,
+        # 0.26 (Schritt 9 B): Nachsetz-Auslöser — Treffer, Zähler, Anweisung gesetzt.
+        "druck": druck,
+        # Schritt 10 A: Lehrkraft-Behauptung — Treffer, Quelle, Abstände, Anweisung gesetzt.
+        "lehrkraft": lehrkraft,
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
@@ -2272,6 +2282,29 @@ async def chat(
         llm_messages.append(
             {"role": "system", "content": hausversuch_anweisung(gefahr)}
         )
+    # Zug-Anweisungen (0.26, Schritt 9 B / Schritt 10): Lehrkraft-Behauptung in allen
+    # Schüler-Chats, Nachsetzen (zweite Bitte um die Lösung in Folge) in Assistenten mit
+    # „Begleiten statt lösen“ — erkannt über Muster und Korpus, nach der Hausversuchs-Anweisung.
+    _vorher_user = [_user_text(m) for m in request.messages[:-1] if m.role == "user"]
+    lehrkraft = druck = None
+    try:
+        lehrkraft = await lehrkraft_fuer(user_message, kontext.vektor, _vorher_user,
+                                         student_treatment=student_treatment)
+        druck = await nachsetzen_fuer(
+            user_message, kontext.vektor, _vorher_user,
+            await fruehere_druck_treffer(db, conversation_id, len(_vorher_user)),
+            student_treatment=student_treatment,
+            bausteine=getattr(active_assistant, "bausteine", None) if active_assistant is not None else None,
+        )
+    except Exception:
+        # Eine kaputte Auslöser-Datei darf den Chat nicht anhalten — die Antwort läuft ohne.
+        logger.exception("Zug-Auslöser nicht ausgewertet (Konversation %s)", conversation_id)
+    if lehrkraft is not None and lehrkraft.anweisung:
+        logger.info("Lehrkraft-Auslöser (%s): Konversation=%s", lehrkraft.erkennung.quelle, conversation_id)
+        llm_messages.append({"role": "system", "content": druck_anweisung("lehrkraft")})
+    if druck is not None and druck.anweisung:
+        logger.info("Nachsetz-Auslöser (%s): Konversation=%s", druck.erkennung.quelle, conversation_id)
+        llm_messages.append({"role": "system", "content": druck_anweisung("nachsetzen")})
     # Krisen-Anweisung (Paket 1 von 0.12, AP3) — **als allerletzte** Systemnachricht,
     # also nach der N12-Anweisung: Greifen beide (Dosisfrage mit Personenbezug), soll
     # die Krisen-Anweisung die äußere sein. Anders als N12 **nicht** auf die
@@ -2877,6 +2910,11 @@ async def chat(
 
         # Vorab-Statistik (0.16): nach dem Speichern, eigene Transaktion, wirft nie. Vorschauen
         # aus dem Editor zählen nicht (ADR-016) — sie sind kein Betrieb.
+        # Zug-Auslöser (0.26, Schritt 10): Treffer und Anweisungen ablegen — für das Nachsetzen
+        # in den nächsten Zügen und für die Zähler des Betatests. Eigene Transaktion, wirft nie.
+        if _nachricht_id is not None and not conversation_is_test:
+            await zug_ausloeser_speichern(conversation_id, len(_vorher_user) + 1,
+                                          {"druck": druck, "lehrkraft": lehrkraft})
         if _nachricht_id is not None and not conversation_is_test:
             await vorab_zaehlen(
                 db, kontext=kontext, werkzeug_bausteine=_werkzeug_bausteine,
@@ -2968,6 +3006,8 @@ async def chat(
             _vorschlag_debug,
             {"bausteine": list(getattr(active_assistant, "bausteine", None) or []),
              "andere_assistenten": andere_namen(_andere)},
+            druck.debug() if druck is not None else None,
+            lehrkraft.debug() if lehrkraft is not None else None,
         )
         if _debug:
             yield _debug

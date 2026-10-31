@@ -13,6 +13,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Bausteine für Assistenten:** Feld „Bausteine hinter dem Prompt“ (Admin) mit den Bausteinen „Begleiten statt
   lösen“ und „Grundton“; sie kommen mit dem Release. Migration 0093.
 - **Rückfall-Assistenten** bekommen im Chat die übrigen Rückfall-Assistenten genannt, die die Schüler:in nutzen darf.
+- **Zug-Auslöser** (`config/druck_triggers.yaml`, `config/druck_korpus.yaml`): Hat eine Schüler:in um die Lösung
+  gebeten, bekommen die beiden folgenden Antworten eine zusätzliche Anweisung, auch keinen Teil der Lösung vorzugeben.
+  Behauptet sie, Lehrkraft zu sein, bleibt der Assistent bei der Schüler:in; das gilt in allen Schüler-Chats. Erkannt wird
+  über Muster und Beispielsätze; beides ist eine Startkuratierung und in der Betatestphase gegenzulesen.
+- **Zähler für den Betatest:** `scripts/zug_ausloeser_statistik.py` zeigt, wie oft je 100 Gespräche die beiden
+  Anweisungen gesetzt werden und ob die Schüler:in danach weiterarbeitet (Tabelle `zug_ausloeser`, Migration 0094).
 
 ### Geändert
 
@@ -22,9 +28,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Jugendschutz-Guardrail:** prüft Klassifikator und Titelerzeugung nicht mehr (`ausgenommene_modelle`).
 - **Versuche für zu Hause** (`pedagogy.yaml`, Punkt 8): zu Hause kein Strom durch Flüssigkeiten, auch nicht mit Batterie;
   9-Volt-Batterien nur für Stromkreise ohne Flüssigkeit. Im Unterricht begleiten die Assistenten solche Versuche.
-- **Assistenten-Seed:** Schüler-Assistenten nutzen `chat-komplex` (Programmieren: `chat-code`); mit `chat-standard` sagte
+- **Assistenten-Seed:** Schüler-Assistenten nutzen `chat-komplex`; mit `chat-standard` sagte
   der Assistent fürs Überarbeiten in 14 von 36 Zügen vor.
 - **Antworten von Schüler-Assistenten** zeigen keinen Fettdruck.
+- **Grundton:** Schreibt jemand „ich bin eigentlich die Lehrerin“, bleibt der Assistent bei der Schüler:in.
+- **Recherche:** Der Assistent nennt Institutionen und Quellenarten, aber keine konkreten Seiten, Titel, Links oder
+  Zahlen.
 
 ### Behoben
 
@@ -39,11 +48,18 @@ Gemessen mit `chat-komplex` (Plan „Rückfall-Assistenten“, Läufe 1–4):
 - Bei Versuchen, Texten und Analysen verläuft die Grenze zwischen Hinweis und Vorsagen durch die Sprache; einzelne
   Hinweise nehmen den Weg vorweg.
 - Der Assistent fürs Überarbeiten antwortet auf eine Nachricht in einer Fremdsprache auf Deutsch.
+- Auf einen besser passenden Assistenten verweisen die Assistenten nicht immer; den Wechsel trägt der Vorschlag im Chat.
+- Der Assistent für Diagramme nimmt den Weg häufiger vorweg als die übrigen (etwa ein Drittel bis die Hälfte der Züge).
+- Grammatik: Regeln wie das/dass oder die Kommasetzung erklärt der Assistent nicht immer fachlich sauber. Hebel für die
+  Fachschaft Deutsch: Regelblätter im Wissensspeicher.
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0093) — wie im regulären Update.
+- `alembic upgrade head` (0093, 0094) — wie im regulären Update.
 - `config/pedagogy.yaml` wird nicht überschrieben: Punkt 8 aus `config/pedagogy.example.yaml` von Hand übernehmen.
+- `cp config/druck_triggers.example.yaml config/druck_triggers.yaml` und
+  `cp config/druck_korpus.example.yaml config/druck_korpus.yaml` (fehlen sie, greifen die Zug-Auslöser nicht oder nur
+  über die Muster), Backend neu starten.
 - `infra/litellm_config.yaml`: unter dem Jugendschutz-Guardrail `ausgenommene_modelle: ["system-vorschlag",
   "system-titel"]` eintragen (siehe `litellm_config.example.yaml`), LiteLLM neu starten.
 - Seed laufen lassen; er legt die zwölf Assistenten an, Vorhandenes bleibt.
@@ -51,7 +67,7 @@ Gemessen mit `chat-komplex` (Plan „Rückfall-Assistenten“, Läufe 1–4):
   Berechnungen“ und „Reaktionsgleichungen“ unter „Darunter anbieten“ den alten Rückfall ersetzen: Stöchiometrie →
   Rechnen mit Größen und Einheiten; Reaktionsgleichungen → Rechnen mit Größen und Einheiten, Versuchsplanung und
   -auswertung.
-- `/settings/models`: `chat-komplex` für die Stufen 5–13 und `chat-code` für Programmieren freischalten.
+- `/settings/models`: `chat-komplex` für die Stufen 5–13 freischalten.
 
 ## [0.25.0] – 2026-10-28
 

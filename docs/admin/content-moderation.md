@@ -8,6 +8,7 @@ Die Plattform kennt mehrere Schutz- und Steuerungsmechanismen, die sich ergänze
 | LiteLLM-Guardrails (Jugendschutz) | `infra/litellm_config.yaml` + `infra/guardrails/` + Deployment | Aktives Blocking harter Ausgaben für alle Rollen |
 | Krisen-Erkennung | `config/crisis_triggers.yaml` + `config/help_resources.yaml` | Lokale Stichwort-Erkennung in Nutzernachrichten → Hilfe-Banner, Flag **und Anweisung an das Modell** (seit 0.12), kein Blocking |
 | Benannte Sicherheitsauslöser | `config/home_experiment_triggers.yaml` | Konkrete Anweisung für **eine** Antwort, wenn eine Präambelregel erfahrungsgemäß nicht trägt — kein Blocking |
+| Zug-Auslöser | `config/druck_triggers.yaml`, `config/druck_korpus.yaml` | Anweisung für **eine** Antwort: bei der zweiten Bitte um die Lösung in Folge und bei der Behauptung, Lehrkraft zu sein — kein Blocking |
 | Pädagogische Leitplanken | `config/pedagogy.yaml` | Zielgruppenabhängige System-Prompt-Präambeln + Lernverhalten für Schüler:innen — formt den Dialog, kein Blocking |
 
 ---
