@@ -40,31 +40,51 @@ gewollt und hilft beim eigenen Verstehen. **Lehrkräfte** erhalten dagegen volls
 direkte Antworten (z. B. für die Unterrichtsvorbereitung). Manche Assistenten sind für
 beide Gruppen sichtbar und verhalten sich dann je nach angemeldeter Person unterschiedlich.
 
-## Assistenten für Naturwissenschaften
+## Assistenten für Schüler:innen
 
-Drei Assistenten bringt die Plattform für Schüler:innen mit. Sie heißen nach dem Muster
-„Assistent für …“:
+Die Plattform bringt **zwölf allgemeine Assistenten** mit, je einen für eine Tätigkeit. Sie
+passen zu vielen Fächern:
 
 | Assistent | Wobei er hilft | Klassen |
 |---|---|---|
-| **stöchiometrische Berechnungen** | Rechnen mit Massen, Stoffmengen, Volumina und Konzentrationen bei chemischen Reaktionen | 8–13 |
-| **Reaktionsgleichungen** | Gleichungen aufstellen und ausgleichen, von der Wortgleichung bis zur Redoxgleichung | 8–13 |
-| **naturwissenschaftliche Aufgaben** | Aufgaben aus Biologie, Chemie, Physik und NwT: rechnen, erklären, Versuche und Diagramme auswerten, Experimente planen, beurteilen | 5–13 |
+| **Rechnen mit Größen und Einheiten** | Rechenaufgaben in Physik, Chemie, Biologie und NwT: gegeben und gesucht, Formeln umstellen, Einheiten umrechnen, runden | 5–13 |
+| **Mathe-Aufgaben** | Brüche und Prozente, Gleichungen und Terme, Textaufgaben, Funktionen, Begründen und Beweisen | 5–13 |
+| **Versuchsplanung und -auswertung** | Versuche planen, beobachten, Messwerte festhalten, deuten, Fehlerquellen finden, Protokoll | 5–13 |
+| **Auswerten von Diagrammen, Tabellen und Statistiken** | Diagramme, Tabellen, Klimadiagramme und Umfragen lesen, beschreiben, deuten und prüfen | 5–13 |
+| **Analysieren von Texten, Quellen und Bildern** | Gedichte, Erzähltexte, Sachtexte, Quellen, Karikaturen und Bilder untersuchen und deuten | 5–13 |
+| **Argumentieren und Erörtern** | Argumente finden, prüfen und gewichten; Erörterung, Stellungnahme, Dilemma | 7–13 |
+| **Überarbeiten eigener Texte** | Rückmeldung zu deinem Text und Hilfe beim Planen, auch in Fremdsprachen; er schreibt nichts um | 5–13 |
+| **Grammatik und Rechtschreibung** | Regeln verstehen, eigene Fehler finden, üben, in Deutsch, Englisch, Französisch, Spanisch und Latein | 5–13 |
+| **Recherche, Referat und Präsentation** | Thema eingrenzen, Quellen prüfen, gliedern, Folien, Handout, Vortrag | 5–13 |
+| **Planen und Dokumentieren von Projekten** | Projekte in NwT, Seminarkurs, GFS oder Kunst: Ziel, Plan, Arbeitsteilung, Arbeitsjournal | 7–13 |
+| **Programmieren** | Programme planen, Schritt für Schritt entwickeln und Fehler suchen: Python, Scratch, Java, JavaScript, Arduino | 7–13 |
+| **Lernen und Prüfungsvorbereitung** | Für eine Klassenarbeit lernen: Lernplan, Stoffübersicht, Abfragen, Übungen, aus alten Fehlern lernen | 5–13 |
 
-Alle drei arbeiten gleich: **Du rechnest und schreibst selbst, der Assistent begleitet.** Er
+Dazu kommen Assistenten für **bestimmte Aufgaben**. Mit der Plattform kommen zwei für
+Chemie: **stöchiometrische Berechnungen** (rechnen mit Massen, Stoffmengen, Volumina und
+Konzentrationen) und **Reaktionsgleichungen** (aufstellen und ausgleichen, bis zur
+Redoxgleichung), beide ab Klasse 8. Deine Schule und deine Lehrkräfte können weitere anlegen.
+
+**Wo du sie findest:**
+
+- Unter **„Assistenten“** stehen sie in Abschnitten: zuerst die für bestimmte Aufgaben, dann
+  die allgemeinen.
+- Auf der **Seite deines Fachs** stehen zuerst die Assistenten des Fachs, darunter die
+  allgemeinen, die zum Fach passen. Startest du einen Assistenten dort, kennt er den
+  aktuellen Unterricht deiner Gruppe.
+
+**Alle arbeiten gleich: Du rechnest und schreibst selbst, der Assistent begleitet.** Er
 fragt nach dem nächsten Schritt, gibt einen Hinweis, wenn du nicht weiterkommst, und nennt
-das Ergebnis nicht vorab — auch nicht, wenn du darum bittest. Er erklärt auf dem Stand deiner
-Klasse: In Klasse 8 ist eine Oxidation eine Reaktion mit Sauerstoff, die Fassung mit Elektronen
-kommt später.
+das Ergebnis nicht vorab, auch nicht, wenn du darum bittest. Er erklärt auf dem Stand deiner
+Klasse: In Klasse 8 ist eine Oxidation eine Reaktion mit Sauerstoff, die Fassung mit
+Elektronen kommt später.
 
-Der Assistent für naturwissenschaftliche Aufgaben achtet außerdem auf den **Operator** der
-Aufgabe („Erläutere …“, „Werte … aus“, „Bewerte …“). Was der verlangt, entnimmt er dem
-Bildungsplan in der Fassung deiner Klasse, und er prüft deine Antwort daran: Fehlt bei
-„erläutern“ das Beispiel oder bei „bewerten“ der Maßstab, fragt er danach.
+Die Assistenten achten auch auf den **Operator** der Aufgabe („Erläutere …“, „Werte … aus“,
+„Bewerte …“) und prüfen deine Antwort daran: Fehlt bei „erläutern“ das Beispiel oder bei
+„bewerten“ der Maßstab, fragen sie danach. Schick deshalb am besten die Aufgabe im Wortlaut.
 
-Geht deine Aufgabe eher in das Gebiet eines anderen Assistenten — etwa eine Rechnung im
-Assistenten für Reaktionsgleichungen —, sagt er es dir; wechseln kannst du mit **`/`**
-im Eingabefeld, ohne den Chat zu verlieren.
+Geht deine Aufgabe eher in das Gebiet eines anderen Assistenten, sagt er es dir. Wechseln
+kannst du mit **`/`** im Eingabefeld, ohne den Chat zu verlieren.
 
 ### Vorschlag im Chat
 
@@ -120,6 +140,12 @@ versteckte Assistenten nie. Der **Satz im Vorschlag** steht unter dem Namen des 
 und sagt Schüler:innen in einem Satz, wobei er hilft; er hilft auch der Plattform beim
 Zuordnen. Leer gilt die Beschreibung. Vorgeschlagen wird zunächst nur Schüler:innen; wie es
 aussieht, siehst du im Vorschaumodus.
+
+Ein Assistent „Allgemein für ein Gebiet“ erscheint auf der Seite eines Fachs, wenn
+eines seiner **Tags** die Kennung des Fachs ist, etwa `chemie` oder `deutsch`.
+
+Wie du die Antworten der Assistenten für deine Klassen genauer machst (Fachbegriffe,
+Methodenblätter, eigene Assistenten), steht unter [Bessere Antworten](bessere-antworten.md).
 
 **Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange dein Entwurf eingereicht ist, kannst du ihn nicht ändern —

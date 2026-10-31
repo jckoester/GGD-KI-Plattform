@@ -15,7 +15,7 @@ Bewährt hat sich diese Staffel:
 | `chat-schnell` | Kurze Fragen, Vokabeln, Textvereinfachung. Günstig, antwortet sofort | alle |
 | `chat-standard` | Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback | alle |
 | `chat-code` | Programmieraufgaben | alle |
-| `chat-komplex` | Analyse, lange Texte, Unterrichtsplanung. Deutlich teurer | nur Lehrkräfte |
+| `chat-komplex` | Analyse, lange Texte, Unterrichtsplanung; Modell der mitgelieferten Schüler-Assistenten (seit 0.26). Deutlich teurer | Lehrkräfte; für Schüler:innen, sobald die Schüler-Assistenten genutzt werden, s. u. |
 | `system-titel` | Gesprächstitel — **muss in jeder Allowlist stehen**, s. u. | alle (ausgeblendet) |
 | `system-moderation` | Jugendschutz-Klassifikator | — (ausgeblendet) |
 | `embedding-standard` | Kontextspeicher, semantische Suche | — (ausgeblendet) |
@@ -213,6 +213,52 @@ oder Aufgabe. Admins und Lehrkräfte können Assistenten anlegen.
 **Test-Chat:** Beim Bearbeiten eines Assistenten steht direkt ein Test-Chat
 zur Verfügung. Änderungen am System-Prompt können so ausprobiert werden,
 bevor sie gespeichert werden.
+
+## Mitgelieferte Schüler-Assistenten
+
+Der Seed (`scripts/seed_assistants.py`) legt vierzehn Assistenten für Schüler:innen an. Er
+liest `config/assistants.yaml`, wenn es die Datei gibt, sonst `config/assistants.example.yaml`.
+Pflegen Sie eine eigene `assistants.yaml`, übernehmen Sie die neuen Einträge aus der
+Beispieldatei. Vorhandene Assistenten gleichen Namens überspringt er; er trägt nur leere
+Felder nach (Auslöser-Beispiele, „Darunter anbieten“). Bausteine hängt er nur beim Anlegen an.
+
+| Assistent | Art | Klassen | Tags (Fachseiten) |
+|---|---|---|---|
+| stöchiometrische Berechnungen | bestimmte Aufgabe, Fach Chemie | 8–13 | chemie |
+| Reaktionsgleichungen | bestimmte Aufgabe, Fach Chemie | 8–13 | chemie |
+| Rechnen mit Größen und Einheiten | allgemein | 5–13 | physik, chemie, nwt, biologie |
+| Mathe-Aufgaben | allgemein | 5–13 | mathematik |
+| Versuchsplanung und -auswertung | allgemein | 5–13 | biologie, chemie, physik, bnt, nwt |
+| Auswerten von Diagrammen, Tabellen und Statistiken | allgemein | 5–13 | geographie, gemeinschaftskunde, wirtschaft, biologie, mathematik |
+| Analysieren von Texten, Quellen und Bildern | allgemein | 5–13 | deutsch, geschichte, gemeinschaftskunde, bildende-kunst, englisch, franzoesisch, spanisch |
+| Argumentieren und Erörtern | allgemein | 7–13 | deutsch, ethik, religion-ev, religion-kath, religion-isl, gemeinschaftskunde |
+| Überarbeiten eigener Texte | allgemein | 5–13 | deutsch, englisch, franzoesisch, spanisch |
+| Grammatik und Rechtschreibung | allgemein | 5–13 | deutsch, englisch, franzoesisch, spanisch, latein |
+| Recherche, Referat und Präsentation | allgemein | 5–13 | deutsch, geschichte, geographie, biologie, englisch |
+| Planen und Dokumentieren von Projekten | allgemein | 7–13 | nwt, nwt-bf, bildende-kunst |
+| Programmieren | allgemein | 7–13 | informatik, ium, nwt |
+| Lernen und Prüfungsvorbereitung | allgemein | 5–13 | — |
+
+**Gemeinsam ist allen:**
+
+- **Modell `chat-komplex`.** Schalten Sie es unter `/settings/models` für die Jahrgänge 5 bis
+  13 frei. Ohne Freischaltung lehnt LiteLLM die Anfragen ab. Die Zusagen der Assistenten sind
+  an wenigen Modellen gemessen; dass ein anderes Modell hinter dem Alias sie ebenso hält, ist
+  damit nicht gesagt (siehe [Antworten der Assistenten verbessern](assistenten-verbessern.md#1-das-modell)).
+- **Bausteine „Begleiten statt lösen“ und „Grundton“** hinter dem Prompt. Der Prompt selbst
+  enthält nur, was den Assistenten ausmacht.
+- **Vorschlag im Chat:** „bestimmte Aufgabe“ bzw. „allgemein“, mit Auslöser-Beispielen. Die
+  beiden Chemie-Assistenten bieten unter „Darunter anbieten“ allgemeine an: Stöchiometrie
+  „Rechnen mit Größen und Einheiten“, Reaktionsgleichungen zusätzlich „Versuchsplanung und
+  -auswertung“.
+
+**Tags entscheiden über die Fachseiten.** Ein allgemeiner Assistent steht auf der Seite eines
+Fachs, wenn eines seiner Tags die `slug` des Fachs aus `config/subjects.yaml` ist. Weichen
+die Kennungen Ihrer Schule ab oder fehlt ein Fach, ergänzen Sie die Tags im Editor.
+„Lernen und Prüfungsvorbereitung“ hat keine Tags und steht nur unter `/assistants`.
+
+Der frühere Assistent für **naturwissenschaftliche Aufgaben** ist durch diese ersetzt. Wo er
+angelegt ist, archivieren Sie ihn (CHANGELOG 0.26.0, „Nach dem Update“).
 
 ## Unterrichtsplanung-Assistent einrichten
 

@@ -161,3 +161,28 @@
     Die Plattform spricht dich jetzt überall mit „du“ an — in Menüs, Meldungen und der Hilfe, so
     wie die Assistenten schon bisher. Außerdem stehen hier höchstens zwei Neuigkeiten offen; ältere
     findest du unter „Weitere Neuerungen“.
+
+- id: "0.26-assistenten-schueler"
+  version: "0.26.0"
+  datum: 2026-10-31
+  rollen: [student]
+  titel: "Zwölf neue Assistenten"
+  text: >-
+    Für viele Aufgaben gibt es jetzt einen passenden Assistenten: Rechnen, Mathe, Versuche,
+    Diagramme, Texte analysieren, Argumentieren, Texte überarbeiten, Grammatik, Referate,
+    Projekte, Programmieren und Lernen für Klassenarbeiten. Du findest sie unter „Assistenten“
+    und auf der Seite deines Fachs. Sie begleiten dich Schritt für Schritt; die Lösung findest du
+    selbst.
+  link: /help/assistenten
+
+- id: "0.26-assistenten-lehrkraefte"
+  version: "0.26.0"
+  datum: 2026-10-31
+  rollen: [teacher]
+  titel: "Zwölf Assistenten für deine Schüler:innen"
+  text: >-
+    Deine Schüler:innen haben jetzt zwölf allgemeine Assistenten, von Rechnen bis Erörtern; sie
+    ersetzen den Assistenten für naturwissenschaftliche Aufgaben. Wie sie genauer auf deinen
+    Unterricht antworten, etwa mit Fachbegriffen an deinen Stunden oder Methodenblättern deiner
+    Fachschaft, steht in der neuen Hilfe „Bessere Antworten“.
+  link: /help/bessere-antworten

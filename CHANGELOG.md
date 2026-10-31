@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.26.0] – 2026-10-31
+
+Zwölf allgemeine Assistenten für Schüler:innen ersetzen den Assistenten für naturwissenschaftliche Aufgaben.
+Zwei Migrationen (0093, 0094).
+
 ### Neu
 
 - **Zwölf allgemeine Assistenten**, je einer für eine Tätigkeit (Rechnen mit Größen, Mathe-Aufgaben, Versuche,
@@ -72,12 +77,18 @@ Gemessen mit `chat-komplex` (Plan „Rückfall-Assistenten“, Läufe 1–4):
   über die Muster), Backend neu starten.
 - `infra/litellm_config.yaml`: unter dem Jugendschutz-Guardrail `ausgenommene_modelle: ["system-vorschlag",
   "system-titel"]` eintragen (siehe `litellm_config.example.yaml`), LiteLLM neu starten.
-- Seed laufen lassen; er legt die zwölf Assistenten an, Vorhandenes bleibt.
+- Seed laufen lassen; er legt die zwölf Assistenten an, Vorhandenes bleibt. Wer eine eigene
+  `config/assistants.yaml` pflegt, übernimmt die neuen Einträge vorher aus `config/assistants.example.yaml`.
+- „stöchiometrische Berechnungen“ und „Reaktionsgleichungen“, wo schon angelegt: im Editor die Bausteine „Begleiten
+  statt lösen“ und „Grundton“ anhängen und den System-Prompt aus `config/prompts/stoechiometrie_assistent.md` bzw.
+  `config/prompts/reaktionsgleichung_assistent.md` übernehmen (der Seed ändert vorhandene Assistenten nicht).
 - Wo der Assistent für naturwissenschaftliche Aufgaben schon angelegt ist: archivieren. Bei „stöchiometrische
   Berechnungen“ und „Reaktionsgleichungen“ unter „Darunter anbieten“ den alten Rückfall ersetzen: Stöchiometrie →
   Rechnen mit Größen und Einheiten; Reaktionsgleichungen → Rechnen mit Größen und Einheiten, Versuchsplanung und
   -auswertung.
 - `/settings/models`: `chat-komplex` für die Stufen 5–13 freischalten.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.25.0] – 2026-10-28
 
