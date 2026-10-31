@@ -64,6 +64,9 @@ class AssistantSummary(BaseModel):
     max_grade: Optional[int]
     created_by: Optional[str]
     tool_groups: list[str] = []
+    #: `specific` | `fallback` | `never` — die Fach- und Gruppenseiten zeigen die Rückfälle,
+    #: deren `tags` das Fach nennen, als „Allgemeine Assistenten“ (0.26, F37 b).
+    suggest: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

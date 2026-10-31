@@ -1,5 +1,5 @@
 <script>
-    import { zurAnzeige } from "$lib/assistentenliste.js";
+    import { allgemeineImFach, zurAnzeige } from "$lib/assistentenliste.js";
     /**
      * Die Fachseite — zwei grundverschiedene Aufgaben, je nach Rolle.
      *
@@ -70,6 +70,8 @@
     const subjectAssistants = $derived(
         subject ? zurAnzeige($assistants).filter((a) => a.subject_id === subject.id) : [],
     );
+    // Rückfälle, deren Schlagwörter das Fach nennen (0.26, F37 b).
+    const allgemeineAssistenten = $derived(allgemeineImFach(zurAnzeige($assistants), subject?.slug));
 
     // ── Frühere Gruppen dieses Fachs (nur die Zahl, für den Hinweis) ──────────
     let fruehereGruppen = $state(0);
@@ -260,20 +262,33 @@
                 </section>
 
                 <!-- Assistenten des Fachs -->
-                {#if subjectAssistants.length > 0}
+                {#if subjectAssistants.length > 0 || allgemeineAssistenten.length > 0}
                     <section class="py-6 first:pt-0 last:pb-0">
                         <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-4">
                             Assistenten
                         </h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {#each subjectAssistants as assistant (assistant.id)}
-                                <AssistantCard
-                                    {assistant}
-                                    {subject}
-                                    groups={myGroupsForSubject}
-                                />
-                            {/each}
-                        </div>
+                        {#if subjectAssistants.length > 0}
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {#each subjectAssistants as assistant (assistant.id)}
+                                    <AssistantCard
+                                        {assistant}
+                                        {subject}
+                                        groups={myGroupsForSubject}
+                                    />
+                                {/each}
+                            </div>
+                        {/if}
+                        {#if allgemeineAssistenten.length > 0}
+                            <h3 class="text-sm font-medium text-light-tx-2 dark:text-dark-tx-2
+                                       {subjectAssistants.length > 0 ? 'mt-5' : ''} mb-3">
+                                Allgemeine Assistenten
+                            </h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {#each allgemeineAssistenten as assistant (assistant.id)}
+                                    <AssistantCard {assistant} groups={myGroupsForSubject} />
+                                {/each}
+                            </div>
+                        {/if}
                     </section>
                 {/if}
 

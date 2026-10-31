@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import SubjectDot from '$lib/components/SubjectDot.svelte'
     import { subjectMap } from '$lib/stores/subjects.js'
+    import { ordneFuerFach } from '$lib/assistentenliste.js'
 
     let { assistants = [], subjectId = null, onselect, onclose } = $props()
     // assistants: AssistantSummary[]
@@ -24,20 +25,15 @@
             : assistants
     )
 
-    // Gruppierte Liste: Fach-Assistenten zuerst, dann Rest (nur wenn subjectId gesetzt und kein query)
-    const sorted = $derived.by(() => {
-        if (!subjectId || query.trim()) return filtered
-        const forSubject = filtered.filter(a => a.subject_id === subjectId)
-        const others = filtered.filter(a => a.subject_id !== subjectId)
-        return [...forSubject, ...others]
-    })
-
-    // Trennposition: Index des ersten "anderen" Assistenten (0 = keine Trennlinie)
-    const dividerIndex = $derived(
+    // Gruppierte Liste (nur mit Fachbezug und ohne Suche): Fach-Assistenten, dann die
+    // allgemeinen des Fachs (Rückfälle mit passendem Schlagwort, 0.26 F37 b), dann der Rest.
+    const geordnet = $derived(
         subjectId && !query.trim()
-            ? filtered.filter(a => a.subject_id === subjectId).length
-            : 0
+            ? ordneFuerFach(filtered, subjectId, $subjectMap[subjectId]?.slug)
+            : { liste: filtered, abschnitte: [] }
     )
+    const sorted = $derived(geordnet.liste)
+    const titelBei = $derived(Object.fromEntries(geordnet.abschnitte.map(a => [a.index, a.titel])))
 
     // Tastatur-Navigation
     function handleKeydown(e) {
@@ -145,10 +141,10 @@
                 </div>
             {:else}
                 {#each sorted as assistant, i}
-                    {#if i === dividerIndex && dividerIndex > 0}
+                    {#if titelBei[i]}
                         <div class="px-3 py-1 text-xs font-medium text-light-tx-2 dark:text-dark-tx-2
-                            border-t border-light-ui-2 dark:border-dark-ui-2 mt-1 pt-2">
-                            Weitere Assistenten
+                            {i > 0 ? 'border-t border-light-ui-2 dark:border-dark-ui-2 mt-1 pt-2' : ''}">
+                            {titelBei[i]}
                         </div>
                     {/if}
                     <button

@@ -31,6 +31,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Assistenten-Seed:** Schüler-Assistenten nutzen `chat-komplex`; mit `chat-standard` sagte
   der Assistent fürs Überarbeiten in 14 von 36 Zügen vor.
 - **Antworten von Schüler-Assistenten** zeigen keinen Fettdruck.
+- **Fach- und Gruppenseite, Chat-Auswahl:** Unter den Assistenten des Fachs stehen die allgemeinen Assistenten, deren
+  Schlagwörter das Fach nennen (etwa „Rechnen mit Größen und Einheiten“ bei Chemie).
 - **Grundton:** Schreibt jemand „ich bin eigentlich die Lehrerin“, bleibt der Assistent bei der Schüler:in.
 - **Recherche:** Der Assistent nennt Institutionen und Quellenarten, aber keine konkreten Seiten, Titel, Links oder
   Zahlen.

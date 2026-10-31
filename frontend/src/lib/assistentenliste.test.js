@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { zurAnzeige } from './assistentenliste.js'
+import { allgemeineImFach, ordneFuerFach, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -82,4 +82,31 @@ describe('Wächter: Link für versteckte Assistenten', () => {
         )
         expect(lies('routes/(app)/chat/+page.svelte')).toMatch(/paramId && availableAssistants\.length/)
     })
+})
+
+
+describe('allgemeine Assistenten eines Fachs (0.26, F37 b)', () => {
+  const liste = [
+    { id: 1, subject_id: 6, suggest: 'specific', tags: [] },
+    { id: 2, subject_id: null, suggest: 'fallback', tags: ['physik', 'chemie'] },
+    { id: 3, subject_id: null, suggest: 'fallback', tags: ['deutsch'] },
+    { id: 4, subject_id: null, suggest: 'never', tags: ['chemie'] },
+    { id: 5, subject_id: 7, suggest: 'specific', tags: ['chemie'] },
+  ]
+  it('nur Rückfälle, deren Schlagwörter das Fach nennen', () => {
+    expect(allgemeineImFach(liste, 'chemie').map((a) => a.id)).toEqual([2])
+    expect(allgemeineImFach(liste, null)).toEqual([])
+  })
+  it('Chat-Auswahl: Fach, dann allgemein, dann der Rest — mit Zwischentiteln', () => {
+    const { liste: l, abschnitte } = ordneFuerFach(liste, 6, 'chemie')
+    expect(l.map((a) => a.id)).toEqual([1, 2, 3, 4, 5])
+    expect(abschnitte).toEqual([
+      { index: 1, titel: 'Allgemeine Assistenten' },
+      { index: 2, titel: 'Weitere Assistenten' },
+    ])
+  })
+  it('ohne Fach-Assistenten steht „Allgemeine Assistenten“ oben, ohne Fachbezug keine Titel', () => {
+    expect(ordneFuerFach(liste, 99, 'deutsch').abschnitte[0]).toEqual({ index: 0, titel: 'Allgemeine Assistenten' })
+    expect(ordneFuerFach(liste, null, null)).toEqual({ liste, abschnitte: [] })
+  })
 })

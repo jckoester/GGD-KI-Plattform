@@ -1,5 +1,5 @@
 <script>
-  import { zurAnzeige } from '$lib/assistentenliste.js'
+  import { allgemeineImFach, zurAnzeige } from '$lib/assistentenliste.js'
   /**
    * Die Übersicht einer Unterrichtsgruppe — für **beide** Rollen dieselbe Seite.
    *
@@ -56,6 +56,8 @@
   const gruppenAssistenten = $derived(
     assistentenDerGruppe(zurAnzeige($assistants), subject?.id, group?.id),
   )
+  // Rückfälle, deren Schlagwörter das Fach nennen (0.26, F37 b) — sie haben kein Fach.
+  const allgemeineAssistenten = $derived(allgemeineImFach(zurAnzeige($assistants), subject?.slug))
 
   // ── Jetzt (nur Lehrkraft) ─────────────────────────────────────────────────
   // Der Endpunkt hängt an `require_group_teacher`; für Schüler:innen wird er gar
@@ -360,16 +362,29 @@
 </section>
 
 <!-- ── 3. Assistenten ─────────────────────────────────────────────────────── -->
-{#if gruppenAssistenten.length > 0}
+{#if gruppenAssistenten.length > 0 || allgemeineAssistenten.length > 0}
   <section class="py-6 first:pt-0 last:pb-0">
     <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-4">
       Assistenten
     </h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {#each gruppenAssistenten as assistent (assistent.id)}
-        <AssistantCard assistant={assistent} {subject} groups={$myTeachingGroups} />
-      {/each}
-    </div>
+    {#if gruppenAssistenten.length > 0}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {#each gruppenAssistenten as assistent (assistent.id)}
+          <AssistantCard assistant={assistent} {subject} groups={$myTeachingGroups} />
+        {/each}
+      </div>
+    {/if}
+    {#if allgemeineAssistenten.length > 0}
+      <h3 class="text-sm font-medium text-light-tx-2 dark:text-dark-tx-2
+                 {gruppenAssistenten.length > 0 ? 'mt-5' : ''} mb-3">
+        Allgemeine Assistenten
+      </h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {#each allgemeineAssistenten as assistent (assistent.id)}
+          <AssistantCard assistant={assistent} groups={$myTeachingGroups} />
+        {/each}
+      </div>
+    {/if}
   </section>
 {/if}
 
