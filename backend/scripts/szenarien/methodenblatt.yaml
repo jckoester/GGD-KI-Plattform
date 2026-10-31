@@ -1,0 +1,88 @@
+# Methodenblatt finden und befolgen — Variante 1 (Plan „Rückfall-Assistenten“, Schritt 9 des
+# ursprünglichen Plans; Landkarte, Abwägung „Methodenblatt finden“, 28.10.2026).
+#
+#   cd backend && venv/bin/python scripts/methodenblatt_messung.py anlegen
+#   cd backend && venv/bin/python scripts/methodenblatt_messung.py finden  --ziel "<Vault>/Plaene/Messungen-Methodenblatt"
+#   cd backend && venv/bin/python scripts/methodenblatt_messung.py chat    --ziel "<Vault>/Plaene/Messungen-Methodenblatt"
+#   cd backend && venv/bin/python scripts/methodenblatt_messung.py aufraeumen
+#
+# **Variante 1 = nichts Neues:** Die Vorab-Suche soll das Blatt aus der Schülernachricht finden.
+# Gemessen wird (a) ob sie es findet — als sicheren Baustein im Prompt oder nur als Angebot —, aus
+# Nachrichten, die die Methode nennen, und solchen, die sie nicht nennen; (b) ob der Assistent ihm
+# folgt, erkennbar an einem Merkmal, das nur im Blatt steht.
+#
+# ⚠️ **Testmaterial, wird nicht ausgeliefert** (Jan, 31.10.2026). Die Blätter entstehen nur auf Dev
+# und werden mit `aufraeumen` wieder entfernt; erkennbar an `metadata.messung = methodenblatt`.
+
+blaetter:
+  - schluessel: protokoll
+    titel: Versuchsprotokoll
+    fach: chemie
+    merkmale: [Forschungsfrage, Vermutung]
+    content: |
+      So schreibst du an unserer Schule ein Versuchsprotokoll.
+
+      1. Forschungsfrage: Was wollt ihr mit dem Versuch herausfinden? Formuliere sie als Frage.
+      2. Vermutung: Was erwartest du, und warum? (Wir schreiben „Vermutung“, nicht „Hypothese“.)
+      3. Material und Skizze: Alle Geräte und Stoffe; die Skizze mit Bleistift und Lineal, beschriftet.
+      4. Durchführung: in ganzen Sätzen, im Präsens, Schritt für Schritt.
+      5. Beobachtung: nur, was du siehst, hörst, riechst oder misst — noch ohne „weil“.
+      6. Deutung: Was bedeutet deine Beobachtung? Hier gehört das „weil“ hin.
+      7. Fehlerbetrachtung: Was könnte das Ergebnis verfälscht haben?
+
+      Kopfzeile: Name, Datum, Versuchsnummer.
+
+  - schluessel: gedicht
+    titel: Gedichtanalyse
+    fach: deutsch
+    merkmale: [TATTE, Deutungshypothese]
+    content: |
+      So schreibst du eine Gedichtanalyse.
+
+      Einleitung nach TATTE: Titel, Autor, Textsorte, Thema, Entstehungszeit — in einem oder zwei
+      Sätzen. Am Ende der Einleitung steht deine Deutungshypothese: Was will das Gedicht deiner
+      Meinung nach aussagen?
+
+      Hauptteil: Gehe Strophe für Strophe vor. Zu jeder Strophe: Inhalt, sprachliche Mittel und ihre
+      Wirkung. Belege jede Aussage mit einem Zitat und der Versangabe in Klammern: (V. 3).
+
+      Schluss: Prüfe deine Deutungshypothese — bestätigt, ergänzt oder widerlegt?
+
+  - schluessel: eroerterung
+    titel: Erörterung
+    fach: deutsch
+    merkmale: [Sanduhr, Argumentationsdreieck]
+    content: |
+      So schreibst du eine dialektische Erörterung.
+
+      Einleitung: Hinführung zum Thema und die Fragestellung.
+
+      Hauptteil nach dem Sanduhr-Prinzip: Beginne mit dem stärksten Argument der Gegenseite, ende
+      mit dem schwächsten. Dann folgt deine Seite: vom schwächsten zum stärksten Argument.
+
+      Jedes Argument baust du als Argumentationsdreieck: Behauptung — Begründung — Beleg oder
+      Beispiel.
+
+      Schluss: dein begründetes Urteil und ein Ausblick.
+
+# Nachrichten für (a). `nennt: true` = die Nachricht nennt die Methode; `assistent` = der
+# Assistent, in dessen Chat sie steht. Stufe je Nachricht.
+nachrichten:
+  - {blatt: protokoll, nennt: true,  stufe: 8, assistent: "Versuchsplanung und -auswertung", text: "wie schreibe ich ein versuchsprotokoll?"}
+  - {blatt: protokoll, nennt: true,  stufe: 7, assistent: "Versuchsplanung und -auswertung", text: "Wir sollen zum Versuch mit der Kerze ein Protokoll schreiben, wie fange ich an?"}
+  - {blatt: protokoll, nennt: true,  stufe: 9, assistent: "Versuchsplanung und -auswertung", text: "was gehört alles in ein protokoll in chemie"}
+  - {blatt: protokoll, nennt: false, stufe: 8, assistent: "Versuchsplanung und -auswertung", text: "wir haben gemessen wie schnell sich zucker in warmem und kaltem wasser löst. wie schreib ich das jetzt auf?"}
+  - {blatt: protokoll, nennt: false, stufe: 7, assistent: "Versuchsplanung und -auswertung", text: "Ich muss den Versuch von heute ins Heft eintragen, Magnesium verbrennen. Was kommt zuerst?"}
+  - {blatt: protokoll, nennt: false, stufe: 9, assistent: "Versuchsplanung und -auswertung", text: "unser lehrer will dass wir den versuch ordentlich dokumentieren, wie macht man das"}
+  - {blatt: gedicht, nennt: true,  stufe: 9, assistent: "Analysieren von Texten, Quellen und Bildern", text: "wie schreibe ich eine gedichtanalyse?"}
+  - {blatt: gedicht, nennt: true,  stufe: 10, assistent: "Analysieren von Texten, Quellen und Bildern", text: "Ich soll „Mondnacht“ von Eichendorff analysieren. Wie fange ich die Analyse an?"}
+  - {blatt: gedicht, nennt: true,  stufe: 8, assistent: "Analysieren von Texten, Quellen und Bildern", text: "was muss in die einleitung von einer gedichtanalyse"}
+  - {blatt: gedicht, nennt: false, stufe: 9, assistent: "Analysieren von Texten, Quellen und Bildern", text: "Hier ist mein Gedicht: „Es war, als hätt der Himmel / die Erde still geküsst …“ Was soll ich dazu schreiben?"}
+  - {blatt: gedicht, nennt: false, stufe: 10, assistent: "Analysieren von Texten, Quellen und Bildern", text: "wir haben ein gedicht von goethe bekommen und sollen einen aufsatz dazu schreiben, keine ahnung wie"}
+  - {blatt: gedicht, nennt: false, stufe: 8, assistent: "Überarbeiten eigener Texte", text: "kannst du meinen text zum gedicht anschauen? mein erster satz ist: In dem Gedicht geht es um den Mond."}
+  - {blatt: eroerterung, nennt: true,  stufe: 10, assistent: "Argumentieren und Erörtern", text: "wie schreibe ich eine erörterung?"}
+  - {blatt: eroerterung, nennt: true,  stufe: 9, assistent: "Argumentieren und Erörtern", text: "Wir schreiben eine dialektische Erörterung über das Handyverbot. In welcher Reihenfolge kommen die Argumente?"}
+  - {blatt: eroerterung, nennt: true,  stufe: 11, assistent: "Überarbeiten eigener Texte", text: "Hier ist meine Erörterung, passt der Aufbau so?"}
+  - {blatt: eroerterung, nennt: false, stufe: 10, assistent: "Argumentieren und Erörtern", text: "Ich soll aufschreiben, ob Schuluniformen sinnvoll sind, mit Pro und Contra. Wie mache ich das?"}
+  - {blatt: eroerterung, nennt: false, stufe: 9, assistent: "Argumentieren und Erörtern", text: "wie ordne ich meine argumente am besten an, wir sollen beide seiten abwägen"}
+  - {blatt: eroerterung, nennt: false, stufe: 11, assistent: "Argumentieren und Erörtern", text: "Sollte das Wahlalter auf 16 gesenkt werden? Ich muss dazu einen Text mit meiner Meinung und Gegenargumenten schreiben."}
