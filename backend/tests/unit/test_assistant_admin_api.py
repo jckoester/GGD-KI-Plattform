@@ -734,8 +734,28 @@ class TestExportAssistant:
 
     async def test_returns_attachment(self, client_with_admin):
         """GET /assistants/{id}/export → 200 + Content-Disposition: attachment."""
-        # Würde DB benötigen
+        # Würde DB benötigen — siehe tests/integration/test_assistent_export.py
         pass
+
+
+class TestExportDateiname:
+    """Dateinamen im Export: ASCII (Content-Disposition) und im ZIP eindeutig (0.27)."""
+
+    def test_umlaute_und_sonderzeichen(self):
+        from app.api.assistants import export_dateiname
+
+        assert export_dateiname("Überarbeiten eigener Texte", 3) == "ueberarbeiten-eigener-texte.yaml"
+        assert export_dateiname("Versuchsplanung und -auswertung", 4) == "versuchsplanung-und-auswertung.yaml"
+        assert export_dateiname("Größen / Einheiten", 5) == "groessen-einheiten.yaml"
+        assert export_dateiname("???", 6) == "assistent.yaml"
+
+    def test_gleicher_name_bekommt_die_kennung(self):
+        from app.api.assistants import export_dateiname
+
+        vergeben: set[str] = set()
+        assert export_dateiname("Test", 1, vergeben) == "test.yaml"
+        assert export_dateiname("Test", 2, vergeben) == "test-2.yaml"
+        assert vergeben == {"test.yaml", "test-2.yaml"}
 
 
 class TestAssistantModelOptional:

@@ -214,6 +214,15 @@ oder Aufgabe. Admins und Lehrkräfte können Assistenten anlegen.
 zur Verfügung. Änderungen am System-Prompt können so ausprobiert werden,
 bevor sie gespeichert werden.
 
+**Export und Import:** Jeder Assistent lässt sich als YAML-Datei exportieren (Editor oder
+Zeile in `/assistants/manage`) und auf einer anderen Installation wieder einspielen
+(„Importieren“). „Alle exportieren“ lädt ein ZIP mit je einer Datei; sind in der Liste
+Status oder Zielgruppe gefiltert, heißt der Knopf „Auswahl exportieren“ und nimmt genau
+diese. Die Dateien sind dieselben wie beim Einzelexport, samt Auslöser-Beispielen und
+Rückfällen (diese mit Namen, nicht mit Kennung). **Kontext-Dokumente gehen nicht mit:** Ihre
+Dateinamen stehen als Kommentar am Ende der YAML-Datei; nach dem Import hängen Sie sie im
+Editor von Hand wieder an.
+
 ## Mitgelieferte Schüler-Assistenten
 
 Der Seed (`scripts/seed_assistants.py`) legt vierzehn Assistenten für Schüler:innen an. Er

@@ -12,11 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.assistants import (
     AssistantResponse,
     AssistantFullListResponse,
-    _assistant_to_yaml,
+    export_dateiname,
+    export_yaml,
 )
 from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
-from app.db.models import Assistant, Subject
+from app.db.models import Assistant
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -267,48 +268,36 @@ async def deactivate_assistant(
 
 @router.get("/export-all")
 async def export_all_assistants(
-    status: Optional[str] = "active",
+    status: Optional[str] = None,
+    audience: Optional[str] = None,
     _: JwtPayload = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Exportiert alle aktiven (oder gefilterten) Assistenten als ZIP-Datei."""
-    # Assistenten abrufen
+    """Exportiert Assistenten als ZIP, je einer als YAML-Datei.
+
+    Filtert wie die Liste in `/assistants/manage` (``status``, ``audience``; leer = alle) —
+    exportiert wird, was dort gerade steht. Jede Datei ist dieselbe wie beim Einzelexport
+    (`export_yaml`), samt Auslöser-Beispielen und Rückfällen.
+    """
     stmt = select(Assistant)
-    if status is not None:
+    if status:
         stmt = stmt.where(Assistant.status == status)
-    stmt = stmt.order_by(Assistant.name.asc())
-    
-    result = await db.execute(stmt)
-    assistants = result.scalars().all()
-    
+    if audience:
+        stmt = stmt.where(Assistant.audience == audience)
+    assistants = (await db.execute(stmt.order_by(Assistant.name.asc(), Assistant.id.asc()))).scalars().all()
+
     if not assistants:
         raise HTTPException(status_code=404, detail="Keine Assistenten zum Exportieren gefunden")
-    
-    # Subject-Slugs für alle Assistenten vorab laden
-    subject_ids = {a.subject_id for a in assistants if a.subject_id}
-    subject_slugs = {}
-    if subject_ids:
-        subj_result = await db.execute(
-            select(Subject.id, Subject.slug).where(Subject.id.in_(subject_ids))
-        )
-        for subj_id, slug in subj_result:
-            subject_slugs[subj_id] = slug
-    
-    # ZIP-Datei im Speicher erstellen
+
+    vergeben: set[str] = set()
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
         for assistant in assistants:
-            subject_slug = subject_slugs.get(assistant.subject_id)
-            yaml_content = _assistant_to_yaml(assistant, subject_slug)
-            
-            # Dateiname: name kleingeschrieben, Leerzeichen → Bindestrich
-            slug = assistant.name.lower().replace(" ", "-")
-            filename = f"{slug}.yaml"
-            
-            zipf.writestr(filename, yaml_content.encode("utf-8"))
-    
-    zip_buffer.seek(0)
-    
+            zipf.writestr(
+                export_dateiname(assistant.name, assistant.id, vergeben),
+                (await export_yaml(db, assistant)).encode("utf-8"),
+            )
+
     return Response(
         content=zip_buffer.getvalue(),
         media_type="application/zip",

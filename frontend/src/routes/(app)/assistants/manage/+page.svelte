@@ -201,7 +201,9 @@
 
     async function doExportAll() {
         try {
-            await exportAllAssistants("active");
+            // Exportiert, was die Liste gerade zeigt (0.27) — bis dahin fest „aktiv“,
+            // gleich welcher Filter darüber stand.
+            await exportAllAssistants({ status: filterStatus, audience: filterAudience });
         } catch (e) {
             error = e.message;
         }
@@ -369,11 +371,12 @@
         <div class="flex items-center gap-2">
             <button
                 onclick={doExportAll}
+                title="Exportiert die Assistenten der aktuellen Auswahl (Status und Zielgruppe) als ZIP"
                 class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors flex items-center gap-2"
             >
                 <Download class="w-4 h-4" />
-                Alle exportieren
+                {filterStatus || filterAudience ? "Auswahl exportieren" : "Alle exportieren"}
             </button>
             <button
                 onclick={openImport}

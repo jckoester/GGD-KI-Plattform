@@ -1204,10 +1204,11 @@ export async function importMyAssistant(file, modelOverride = null) {
   return importAssistant(file, modelOverride);
 }
 
-// Export aller Assistenten (Admin-only, ZIP)
-export async function exportAllAssistants(status = "active") {
+// Export als ZIP (Admin-only). Filter wie die Liste in /assistants/manage; leer = alle.
+export async function exportAllAssistants({ status = "", audience = "" } = {}) {
   const url = new URL(`${BASE}/admin/assistants/export-all`, location.href);
   if (status) url.searchParams.set("status", status);
+  if (audience) url.searchParams.set("audience", audience);
   const res = await fetch(url, {
     credentials: "include",
   });

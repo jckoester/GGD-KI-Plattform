@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Assistenten exportieren:** Das ZIP enthält dieselben Dateien wie der Einzelexport, samt Auslöser-Beispielen und
+  Rückfällen; gleichnamige Assistenten bekommen eindeutige Dateinamen. Exportiert wird, was die Liste in
+  `/assistants/manage` gerade zeigt („Auswahl exportieren“); bisher immer nur die aktiven. Die Namen der
+  Kontext-Dokumente stehen als Kommentar im YAML.
 - **`backend/config/assistant_schema.json` entfernt:** Die App liest nur `config/assistant_schema.json`.
 
 ### Behoben

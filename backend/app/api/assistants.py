@@ -339,6 +339,63 @@ def _assistant_to_yaml(
     return yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
+_UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def export_dateiname(name: str, kennung: int, vergeben: Optional[set[str]] = None) -> str:
+    """Dateiname eines exportierten Assistenten — ASCII, und im ZIP eindeutig.
+
+    ASCII, weil der Name auch im `Content-Disposition`-Kopf steht. Eindeutig, weil zwei
+    Assistenten gleichen Namens sich im ZIP bis 0.27 gegenseitig überschrieben; der zweite
+    bekommt seine Kennung angehängt. ``vergeben`` wird dabei ergänzt.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower().translate(_UMLAUTE)).strip("-") or "assistent"
+    datei = f"{slug}.yaml"
+    if vergeben is not None:
+        if datei in vergeben:
+            datei = f"{slug}-{kennung}.yaml"
+        vergeben.add(datei)
+    return datei
+
+
+async def export_yaml(db: AsyncSession, assistant: Assistant) -> str:
+    """Ein Assistent als YAML — **eine** Funktion für Einzel- und Gesamtexport.
+
+    ⚠️ Bis 0.27 baute der Gesamtexport (`/admin/assistants/export-all`) das YAML selbst und
+    ließ Auslöser-Beispiele und Rückfälle weg; ein Import aus dem ZIP verlor sie still.
+
+    Kontext-Dokumente gehen nicht mit — der Import kann sie nicht wieder anhängen. Ihre
+    Namen stehen als Kommentar am Ende, damit beim Einspielen auffällt, was fehlt.
+    """
+    subject_slug = None
+    if assistant.subject_id:
+        subject_slug = (
+            await db.execute(select(Subject.slug).where(Subject.id == assistant.subject_id))
+        ).scalar_one_or_none()
+    fallback_namen: list[str] = []
+    if assistant.fallbacks:
+        namen = dict(
+            (await db.execute(
+                select(Assistant.id, Assistant.name).where(Assistant.id.in_(assistant.fallbacks))
+            )).all()
+        )
+        fallback_namen = [namen[i] for i in assistant.fallbacks if i in namen]
+    text_ = _assistant_to_yaml(
+        assistant, subject_slug, await ausloeser.lade(db, assistant.id), fallback_namen
+    )
+    dokumente = (
+        await db.execute(
+            select(AssistantDocument.filename)
+            .where(AssistantDocument.assistant_id == assistant.id)
+            .order_by(AssistantDocument.id)
+        )
+    ).scalars().all()
+    if dokumente:
+        text_ += "# Kontext-Dokumente — nicht im Export, nach dem Import von Hand anhängen:\n"
+        text_ += "".join(f"#   - {d}\n" for d in dokumente)
+    return text_
+
+
 def bekannte_faehigkeiten() -> set[str]:
     """Fähigkeiten, die es gibt (`app.chat.tools.FAEHIGKEITEN`).
 
@@ -1541,34 +1598,13 @@ async def export_assistant(
     assistant = result.scalar_one_or_none()
     if assistant is None:
         raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-    
+
     is_admin = "admin" in current_user.roles
     _check_assistant_access(assistant, current_user, is_admin)
-    
-    # Subject-Slug fuer Export
-    subject_slug = None
-    if assistant.subject_id:
-        subj_result = await db.execute(
-            select(Subject.slug).where(Subject.id == assistant.subject_id)
-        )
-        subject_slug = subj_result.scalar_one_or_none()
-    
-    fallback_namen: list[str] = []
-    if assistant.fallbacks:
-        namen = dict(
-            (await db.execute(
-                select(Assistant.id, Assistant.name).where(Assistant.id.in_(assistant.fallbacks))
-            )).all()
-        )
-        fallback_namen = [namen[i] for i in assistant.fallbacks if i in namen]
-    yaml_content = _assistant_to_yaml(
-        assistant, subject_slug, await ausloeser.lade(db, assistant.id), fallback_namen
-    )
-    
-    # Dateiname: name kleingeschrieben, Leerzeichen -> Bindestrich
-    slug = assistant.name.lower().replace(" ", "-")
-    filename = f"{slug}.yaml"
-    
+
+    yaml_content = await export_yaml(db, assistant)
+    filename = export_dateiname(assistant.name, assistant.id)
+
     return Response(
         content=yaml_content,
         media_type="application/x-yaml",
