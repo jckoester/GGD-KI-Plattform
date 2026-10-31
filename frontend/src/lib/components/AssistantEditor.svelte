@@ -1843,9 +1843,12 @@
                           </ul>
                         {/if}
 
-                        <!-- Upload-Button (ausgeblendet wenn Limit erreicht) -->
+                        <!-- Upload-Button (ausgeblendet wenn Limit erreicht).
+                             ⚠️ `relative` hält das `sr-only`-Feld im Rahmen: Ohne positionierten
+                             Vorfahren lag es absolut zur Seite und verlängerte sie um ein paar
+                             hundert Pixel leeren Raum (0.27, Schritt 1). -->
                         {#if documents.length < MAX_DOCS}
-                          <label class="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed
+                          <label class="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed
                          border-light-ui-3 dark:border-dark-ui-3 cursor-pointer
                          hover:border-primary dark:hover:border-primary-dark
                          text-sm text-light-tx-2 dark:text-dark-tx-2 transition-colors

@@ -149,9 +149,9 @@ def _aufloesen_in(paket: Path, pfad: str) -> str:
 def test_entwicklungsbaum_verankert_in_der_repo_wurzel(tmp_path):
     """`<repo>/backend/app/…` → `<repo>/config/…`, nicht `<repo>/backend/config/…`.
 
-    Die Unterscheidung ist nicht theoretisch: `backend/config/` existiert (mit
-    `assistant_schema.json`). Eine Suche, die beim ersten `config/` haltmacht, bliebe hier
-    eine Ebene zu tief hängen.
+    Die Unterscheidung war nicht theoretisch: Bis 0.27 existierte `backend/config/` (mit einer
+    Kopie von `assistant_schema.json`). Eine Suche, die beim ersten `config/` haltmacht,
+    bliebe hier eine Ebene zu tief hängen; der Köder liegt deshalb im Testbaum.
     """
     paket = _layout(
         tmp_path, mit_backend_ebene=True,

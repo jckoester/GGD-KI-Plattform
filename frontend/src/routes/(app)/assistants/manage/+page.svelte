@@ -575,7 +575,7 @@
                                             </div>
                                         {/if}
                                     </td>
-                                    <td class="py-3 pr-4">
+                                    <td class="py-3 pr-4 text-light-tx dark:text-dark-tx">
                                         {AUDIENCE_LABELS[assistant.audience] ||
                                             assistant.audience}
                                     </td>

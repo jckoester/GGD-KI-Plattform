@@ -861,15 +861,15 @@ class TestFaehigkeitenImRoundTrip:
         )
         jsonschema.validate(instance=yaml.safe_load(voll), schema=schema)
 
-    def test_beide_schemakopien_gleich(self):
-        """`config/` liest die App (Prod: Mount nach `/app/config`); die Kopie unter
-        `backend/config/` darf nicht davon abweichen, solange es sie gibt."""
+    def test_keine_schemakopie_unter_backend(self):
+        """Die App liest nur `config/assistant_schema.json` (Prod: Mount nach `/app/config`).
+        Eine Kopie unter `backend/config/` las niemand und musste trotzdem gleich bleiben;
+        entfernt in 0.27. Kommt sie zurück, ist sie wieder eine Falle."""
         from pathlib import Path
 
         wurzel = Path(__file__).resolve().parents[3]
-        assert (wurzel / "config" / "assistant_schema.json").read_text(encoding="utf-8") == (
-            wurzel / "backend" / "config" / "assistant_schema.json"
-        ).read_text(encoding="utf-8")
+        assert (wurzel / "config" / "assistant_schema.json").is_file()
+        assert not (wurzel / "backend" / "config" / "assistant_schema.json").exists()
 
 
 class TestVorschlagImRoundTrip:

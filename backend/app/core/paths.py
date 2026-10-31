@@ -12,9 +12,10 @@ das, im Container ergab dieselbe Rechnung `/` — aus `config/pedagogy.yaml` wur
 `/config/pedagogy.yaml`. Nichts stürzte ab; die Dateien galten schlicht als nicht
 vorhanden, und mit ihnen fielen Jugendschutz, Krisenerkennung und Leitplanken still aus.
 
-**Warum die Suche nach einem `config`-Verzeichnis nicht genügt:** `backend/config/` gibt es
-ebenfalls (mit `assistant_schema.json`). Ein Aufstieg, der beim ersten `config/` haltmacht,
-bliebe im Entwicklungsbaum eine Ebene zu tief hängen.
+**Warum die Suche nach einem `config`-Verzeichnis nicht genügt:** Bis 0.27 gab es
+`backend/config/` ebenfalls (mit einer ungelesenen Kopie von `assistant_schema.json`). Ein
+Aufstieg, der beim ersten `config/` haltmacht, bliebe im Entwicklungsbaum dann eine Ebene zu
+tief hängen — und so ein Verzeichnis entsteht schnell wieder.
 
 Entschieden wird die **Anordnung**, einmal beim Import — nicht der einzelne Pfad:
 

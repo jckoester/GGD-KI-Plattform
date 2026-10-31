@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- **`backend/config/assistant_schema.json` entfernt:** Die App liest nur `config/assistant_schema.json`.
+
+### Behoben
+
+- **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
+  seines Rahmens).
+- **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.
+
 ## [0.26.0] – 2026-10-31
 
 Zwölf allgemeine Assistenten für Schüler:innen ersetzen den Assistenten für naturwissenschaftliche Aufgaben.
