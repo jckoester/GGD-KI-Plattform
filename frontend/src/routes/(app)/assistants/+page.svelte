@@ -1,5 +1,5 @@
 <script>
-    import { zurAnzeige } from "$lib/assistentenliste.js";
+    import { abschnitteUebersicht, zurAnzeige } from "$lib/assistentenliste.js";
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -11,6 +11,8 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let assistants = $state([])
+    // F37 c (0.26): spezifische, allgemeine, weitere — Überschriften nur ab zwei Abschnitten.
+    const abschnitte = $derived(abschnitteUebersicht(assistants))
     let loading = $state(true)
     let error = $state(null)
 
@@ -65,8 +67,14 @@
                 <p class="text-lg">Derzeit sind keine Assistenten für dich verfügbar.</p>
             </div>
         {:else}
+          {#each abschnitte as abschnitt (abschnitt.titel)}
+            {#if abschnitt.titel}
+                <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-3 mt-6 first:mt-0">
+                    {abschnitt.titel}
+                </h2>
+            {/if}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {#each assistants as assistant}
+                {#each abschnitt.liste as assistant (assistant.id)}
                     {@const subjectColor = assistant.subject_id != null
                         ? ($subjectMap[assistant.subject_id]?.color ?? null)
                         : null}
@@ -147,6 +155,7 @@
                     </div>
                 {/each}
             </div>
+          {/each}
         {/if}
     </div>
 </PageBody>

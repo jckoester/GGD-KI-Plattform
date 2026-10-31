@@ -69,3 +69,23 @@ export function schlagwoerterAnzeige(tags, faecher, max = SCHLAGWOERTER_MAX) {
   const namen = [...new Set((tags ?? []).map((t) => nachSlug[t] ?? t))];
   return { namen: namen.slice(0, max), mehr: namen.slice(max) };
 }
+
+/**
+ * Abschnitte der Übersicht `/assistants` (0.26, F37 c): „Für bestimmte Aufgaben“ (`suggest:
+ * specific`), „Allgemein“ (`fallback`), dann „Weitere Assistenten“ (alles andere — etwa Assistenten
+ * für Lehrkräfte oder eigene, die nicht vorgeschlagen werden). Leere Abschnitte entfallen;
+ * ``titel`` ist ``null``, wenn nur ein Abschnitt übrig bleibt — eine einzelne Überschrift
+ * gliedert nichts.
+ *
+ * @param {Array<{suggest?: string|null}>} liste
+ * @returns {Array<{titel: string|null, liste: Array}>}
+ */
+export function abschnitteUebersicht(liste) {
+  const alle = liste ?? [];
+  const abschnitte = [
+    { titel: "Für bestimmte Aufgaben", liste: alle.filter((a) => a?.suggest === "specific") },
+    { titel: "Allgemein", liste: alle.filter((a) => a?.suggest === "fallback") },
+    { titel: "Weitere Assistenten", liste: alle.filter((a) => a?.suggest !== "specific" && a?.suggest !== "fallback") },
+  ].filter((a) => a.liste.length > 0);
+  return abschnitte.length > 1 ? abschnitte : abschnitte.map((a) => ({ ...a, titel: null }));
+}

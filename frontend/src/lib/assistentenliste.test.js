@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { allgemeineImFach, ordneFuerFach, schlagwoerterAnzeige, zurAnzeige } from './assistentenliste.js'
+import { abschnitteUebersicht, allgemeineImFach, ordneFuerFach, schlagwoerterAnzeige, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -119,5 +119,21 @@ describe('Schlagwörter einer Karte (0.26, F37 a)', () => {
       namen: ['Deutsch', 'Evangelische Religion', 'Projekt'], mehr: ['x', 'y'],
     })
     expect(schlagwoerterAnzeige(null, faecher)).toEqual({ namen: [], mehr: [] })
+  })
+})
+
+
+describe('Abschnitte der Übersicht (0.26, F37 c)', () => {
+  it('spezifisch, allgemein, weitere — leere entfallen', () => {
+    const a = abschnitteUebersicht([
+      { id: 1, suggest: 'fallback' }, { id: 2, suggest: 'specific' }, { id: 3, suggest: 'never' }, { id: 4 },
+    ])
+    expect(a.map((x) => [x.titel, x.liste.map((y) => y.id)])).toEqual([
+      ['Für bestimmte Aufgaben', [2]], ['Allgemein', [1]], ['Weitere Assistenten', [3, 4]],
+    ])
+  })
+  it('ein einziger Abschnitt ohne Überschrift', () => {
+    expect(abschnitteUebersicht([{ id: 1, suggest: 'never' }])).toEqual([{ titel: null, liste: [{ id: 1, suggest: 'never' }] }])
+    expect(abschnitteUebersicht([])).toEqual([])
   })
 })
