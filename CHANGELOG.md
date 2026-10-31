@@ -19,6 +19,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   über Muster und Beispielsätze; beides ist eine Startkuratierung und in der Betatestphase gegenzulesen.
 - **Zähler für den Betatest:** `scripts/zug_ausloeser_statistik.py` zeigt, wie oft je 100 Gespräche die beiden
   Anweisungen gesetzt werden und ob die Schüler:in danach weiterarbeitet (Tabelle `zug_ausloeser`, Migration 0094).
+- **Hilfe „Bessere Antworten“** für Lehrkräfte und Admin-Seite „Antworten der Assistenten verbessern“: wie
+  Gruppenbezug, Aufgabentext, Fachbegriffe, Methodenblätter und speziellere Assistenten die Antworten genauer machen.
 
 ### Geändert
 

@@ -65,6 +65,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Nutzerverwaltung & Rollen](nutzerverwaltung.md) — SSO, Gruppen, Rollen, Jahrgänge
 - [Budget-System](budget.md) — Wochenmodell, Währung, Hochrechnung, Schuljahreswechsel
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Modelle freischalten, Assistenten verwalten
+- [Antworten der Assistenten verbessern](assistenten-verbessern.md) — Modell, Schulinhalt, Schlagwörter und Bausteine, Zug-Auslöser
 - [Embedding-Modell wechseln](../runbooks/modellwechsel.md) — Runbook: Schema angleichen + Re-Embedding
 - [Bildungsplan-Import](bildungsplan-import.md) — Fachkontext in das Docker-Produktivsystem importieren
 - [Schuljahreswechsel](../runbooks/schuljahreswechsel.md) — Runbook: `school_year.yaml`, Unterrichtswochen prüfen, Budget-Rücksetzung

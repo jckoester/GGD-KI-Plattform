@@ -41,6 +41,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Fachbegriffe pflegen](fachbegriffe-pflegen.md) — *(Lehrkräfte)* Dateiformat, Einspielen mit Vorschau, Export
+- [Bessere Antworten](bessere-antworten.md) — *(Lehrkräfte)* wie die Assistenten genauer auf deinen Unterricht antworten
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?
 - [Feedback geben](feedback.md) — Fehler melden und den Stand der eigenen Meldungen sehen
