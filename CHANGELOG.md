@@ -9,7 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Audit-Log** (ADR-010 Teil 2): Tabelle `audit_log` für sicherheitsrelevante Ereignisse, nur zum Anhängen (Trigger).
   Bei der Kontolöschung verlieren Anmelde- und Moderationsereignisse das Pseudonym; Verwaltungsereignisse behalten es
-  bis zum Ende ihrer Frist. Migration 0097.
+  bis zum Ende ihrer Frist. Ein täglicher Lauf (`cleanup_audit_log`, 02:55 Uhr) löscht nach Frist je Klasse. Migration
+  0097.
 
 ## [0.27.1] – 2026-11-01
 
