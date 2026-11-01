@@ -484,7 +484,7 @@ def _yaml_to_assistant_fields(
 VALID_AUDIENCES = {"student", "teacher", "all"}
 VALID_SCOPES = {
     "private", "subject_department", "teachers", "activity_group",
-    "teaching_group", "grade", "all_students", "all",
+    "teaching_group", "all_students", "all",
 }
 VALID_VISIBILITIES = {"public", "private", "hidden"}
 VALID_SUGGEST = {"specific", "fallback", "never"}
@@ -499,7 +499,7 @@ GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 # wo sie über Bearbeitbarkeit und Löschen entscheidet. Laufen die beiden auseinander, bietet die
 # Oberfläche ein Feld an, das der Server ablehnt — genau der Fall, der bis zum 25.09.2026
 # bestand. Ein Wächter hält sie zusammen (`tests/unit/test_assistant_lebenszyklus.py`).
-SCHOOLWIDE_SCOPES = {"teachers", "grade", "all_students", "all"}
+SCHOOLWIDE_SCOPES = {"teachers", "all_students", "all"}
 
 
 def _is_student_visible_image_assistant(

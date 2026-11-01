@@ -148,7 +148,7 @@ eines seiner **Tags** die Kennung des Fachs ist, etwa `chemie` oder `deutsch`.
 Wie du die Antworten der Assistenten für deine Klassen genauer machst (Fachbegriffe,
 Methodenblätter, eigene Assistenten), steht unter [Bessere Antworten](bessere-antworten.md).
 
-**Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
+**Alle Lehrkräfte, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange dein Entwurf eingereicht ist, kannst du ihn nicht ändern —
 aber du kannst die **Einreichung zurückziehen** und weiterarbeiten. Ist er freigegeben,
 bleibt er so, wie er geprüft wurde: Änderungen und Löschen laufen dann über die

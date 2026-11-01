@@ -260,7 +260,7 @@ export function zuletztEntstanden(bausteine = [], artefakte = [], limit = 6) {
  * (`app/assistants/sichtbarkeit.py`). Ob die Person sie sehen darf, hat `/assistants` schon
  * entschieden; hier geht es nur darum, welche zu **dieser** Gruppe gehören.
  */
-const OFFENE_SCOPES = new Set(['all', 'all_students', 'grade'])
+const OFFENE_SCOPES = new Set(['all', 'all_students'])
 
 /**
  * Die Assistenten, die die Gruppenseite als Einstieg zeigt: Fach der Gruppe, und entweder offen,

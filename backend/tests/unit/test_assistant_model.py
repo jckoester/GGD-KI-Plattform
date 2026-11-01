@@ -20,7 +20,7 @@ class TestAssistantEnums:
         assert AssistantScope.TEACHERS.value == "teachers"
         assert AssistantScope.ACTIVITY_GROUP.value == "activity_group"
         assert AssistantScope.TEACHING_GROUP.value == "teaching_group"
-        assert AssistantScope.GRADE.value == "grade"
+        assert not hasattr(AssistantScope, "GRADE")  # entfallen in 0.27 (Migration 0095)
         assert AssistantScope.ALL_STUDENTS.value == "all_students"
         assert AssistantScope.ALL.value == "all"
 

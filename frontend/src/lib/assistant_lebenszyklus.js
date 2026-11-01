@@ -10,7 +10,7 @@
  * bietet die Oberfläche an, was der Server mit 409 ablehnt. Ein Wächter hält sie zusammen
  * (`test_frontend_kennt_dieselben_schulweiten_reichweiten`).
  */
-export const SCHOOLWIDE_SCOPES = new Set(["teachers", "grade", "all_students", "all"]);
+export const SCHOOLWIDE_SCOPES = new Set(["teachers", "all_students", "all"]);
 
 /** Reichweiten, mit denen ein Assistent geteilt ist — wer ihn dort nutzt, verliert ihn beim Löschen. */
 export const GETEILT_SCOPES = new Set(["subject_department", "activity_group", "teaching_group"]);

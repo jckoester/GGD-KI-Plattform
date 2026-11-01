@@ -69,7 +69,6 @@ class AssistantScope(enum.Enum):
     TEACHERS = "teachers"
     ACTIVITY_GROUP = "activity_group"
     TEACHING_GROUP = "teaching_group"
-    GRADE = "grade"
     ALL_STUDENTS = "all_students"
     ALL = "all"
 
@@ -481,13 +480,13 @@ class Assistant(Base):
         ),
         CheckConstraint(
             "scope IN ('private','subject_department','teachers','activity_group',"
-            "          'teaching_group','grade','all_students','all')",
+            "          'teaching_group','all_students','all')",
             name="check_assistant_scope",
         ),
         CheckConstraint(
             "scope_pending IS NULL OR scope_pending IN "
             "('private','subject_department','teachers','activity_group',"
-            " 'teaching_group','grade','all_students','all')",
+            " 'teaching_group','all_students','all')",
             name="check_assistant_scope_pending",
         ),
         CheckConstraint(

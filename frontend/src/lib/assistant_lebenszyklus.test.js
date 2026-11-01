@@ -18,7 +18,7 @@ describe("loeschsperre", () => {
     },
   );
 
-  it.each(["teachers", "grade", "all_students", "all"])("%s: nur vor der Freigabe", (scope) => {
+  it.each(["teachers", "all_students", "all"])("%s: nur vor der Freigabe", (scope) => {
     expect(loeschsperre({ scope, status: "draft" })).toBeNull();
     expect(loeschsperre({ scope, status: "pending_review" })).toBeNull();
     expect(loeschsperre({ scope, status: "active" })).toMatch(/beantragt/);

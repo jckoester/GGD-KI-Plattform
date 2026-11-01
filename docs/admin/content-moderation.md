@@ -765,7 +765,7 @@ Assistenten mit der Fähigkeit **Bildgenerierung** (`image_generation`) sind
 sensibler als reine Text-Assistenten. Daher gilt zusätzlich:
 
 - **Schulweite, für Schüler:innen sichtbare Bild-Assistenten** (Zielgruppe „Schüler:innen"
-  oder „Alle" mit schulweitem Geltungsbereich — `grade`, `all_students`, `all`) gehen
+  oder „Alle" mit schulweitem Geltungsbereich — `all_students`, `all`) gehen
   **immer** in `pending_review` und werden erst nach **Admin-Freigabe** aktiv —
   **unabhängig** davon, ob der allgemeine Schalter „schulweites Teilen erfordert
   Admin-Freigabe" gesetzt ist.

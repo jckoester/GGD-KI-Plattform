@@ -311,7 +311,7 @@ describe('zuletztEntstanden', () => {
 describe('assistentenDerGruppe', () => {
   const liste = [
     { id: 1, subject_id: 6, scope: 'all_students' },
-    { id: 2, subject_id: 6, scope: 'grade' },
+    { id: 2, subject_id: 6, scope: 'all_students', min_grade: 8, max_grade: 13 },
     { id: 3, subject_id: 6, scope: 'all' },
     { id: 4, subject_id: 6, scope: 'subject_department' },
     { id: 5, subject_id: 6, scope: 'teaching_group', scope_group_id: 10 },
@@ -319,7 +319,7 @@ describe('assistentenDerGruppe', () => {
     { id: 7, subject_id: 7, scope: 'all_students' },
     { id: 8, subject_id: null, scope: 'all_students' },
   ]
-  it('zeigt offene Assistenten des Fachs — auch all_students und grade (Chemie-Fall 31.10.2026)', () => {
+  it('zeigt offene Assistenten des Fachs — auch all_students mit Klassenstufen (Chemie-Fall 31.10.2026)', () => {
     expect(assistentenDerGruppe(liste, 6, 10).map((a) => a.id)).toEqual([1, 2, 3, 4, 5])
   })
   it('Gruppen-Assistenten nur in ihrer Gruppe, fremde Fächer und ohne Fach nie', () => {

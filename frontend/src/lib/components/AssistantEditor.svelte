@@ -379,14 +379,14 @@
         JSON.stringify(form) !== JSON.stringify(savedForm) || isNew,
     );
 
-    // Scope-Optionen (alle 8 Werte für alle Rollen)
+    // Scope-Optionen für alle Rollen. „Jahrgang“ (`grade`) entfiel in 0.27: Klassenstufen
+    // wirken seit 0.22 bei jeder Freigabe, „Jahrgang“ war „Alle Schüler:innen“ mit Stufen.
     const SCOPE_OPTIONS = [
         { value: "private", label: "Privat (Entwurf)" },
         { value: "subject_department", label: "Fachschaft" },
         { value: "teachers", label: "Alle Lehrkräfte" },
         { value: "activity_group", label: "AG / Kursgruppe" },
         { value: "teaching_group", label: "Unterrichtsgruppe" },
-        { value: "grade", label: "Jahrgang" },
         { value: "all_students", label: "Alle Schüler:innen" },
         { value: "all", label: "Alle" },
     ];

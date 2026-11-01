@@ -18,11 +18,6 @@
       const g = groups.find(g => g.id === assistant.scope_group_id)
       return g?.name ?? 'Klasse'
     }
-    if (assistant.scope === 'grade' && assistant.min_grade != null) {
-      return assistant.min_grade === assistant.max_grade
-        ? `Jahrgang ${assistant.min_grade}`
-        : `Jahrgang ${assistant.min_grade}–${assistant.max_grade}`
-    }
     return 'alle'
   }
 </script>

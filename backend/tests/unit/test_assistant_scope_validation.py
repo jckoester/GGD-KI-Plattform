@@ -58,7 +58,7 @@ def test_group_scope_without_scope_group_id_raises(scope):
 
 # ── _validate_assistant_fields: scope_group_id bei Nicht-Gruppen-Scope ────────
 
-@pytest.mark.parametrize("scope", ["private", "teachers", "grade", "all_students", "all"])
+@pytest.mark.parametrize("scope", ["private", "teachers", "all_students", "all"])
 def test_non_group_scope_with_scope_group_id_raises(scope):
     with pytest.raises(HTTPException) as exc:
         _validate_assistant_fields(scope=scope, scope_group_id=42)
@@ -73,6 +73,6 @@ def test_group_scope_with_scope_group_id_valid(scope):
     _validate_assistant_fields(scope=scope, scope_group_id=1)  # darf nicht werfen
 
 
-@pytest.mark.parametrize("scope", ["private", "teachers", "grade", "all_students", "all"])
+@pytest.mark.parametrize("scope", ["private", "teachers", "all_students", "all"])
 def test_non_group_scope_without_scope_group_id_valid(scope):
     _validate_assistant_fields(scope=scope, scope_group_id=None)  # darf nicht werfen

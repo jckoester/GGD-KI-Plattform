@@ -241,9 +241,6 @@
     if (assistant.scope === "teaching_group" && assistant.scope_group_id) {
       return "Unterrichtsgruppe";
     }
-    if (assistant.scope === "grade") {
-      return `Jahrgang ${assistant.min_grade || "?"}${assistant.max_grade && assistant.min_grade !== assistant.max_grade ? `–${assistant.max_grade}` : ""}`;
-    }
     const labels = {
       private: "Privat",
       subject_department: "Fachschaft",
@@ -252,7 +249,12 @@
       all_students: "Alle Schüler:innen",
       all: "Alle",
     };
-    return labels[assistant.scope] || assistant.scope;
+    const name = labels[assistant.scope] || assistant.scope;
+    // Klassenstufen dazu, wie früher beim Scope „Jahrgang“ (bis 0.27).
+    const von = assistant.min_grade, bis = assistant.max_grade;
+    if (von == null && bis == null) return name;
+    const stufen = von != null && bis != null ? (von === bis ? `${von}` : `${von}–${bis}`) : von != null ? `ab ${von}` : `bis ${bis}`;
+    return `${name}, Kl. ${stufen}`;
   }
 </script>
 

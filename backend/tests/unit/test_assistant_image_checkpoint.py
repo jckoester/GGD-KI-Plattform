@@ -58,7 +58,7 @@ def test_schoolwide_student_image_forces_review_even_when_switch_off(monkeypatch
     # Ohne Bild wäre es 'active' (Schalter aus) — der Bild-Prüfpunkt überschreibt das.
     assert _initial_status("all_students", "teacher", "student", ["image_generation"]) == "pending_review"
     assert _initial_status("all", "teacher", "all", ["image_generation"]) == "pending_review"
-    assert _initial_status("grade", "teacher", "student", ["image_generation"]) == "pending_review"
+    assert _initial_status("all_students", "teacher", "student", ["image_generation"]) == "pending_review"
 
 
 def test_schoolwide_non_image_follows_switch(monkeypatch):
@@ -72,7 +72,7 @@ def test_schoolwide_non_image_follows_switch(monkeypatch):
 def test_schoolwide_image_but_teacher_audience_follows_switch(monkeypatch):
     # Bild-Assistent nur für Lehrkräfte → nicht schülersichtbar → kein Sonder-Gate
     monkeypatch.setattr(settings, "teacher_schoolwide_sharing_requires_admin", False)
-    assert _initial_status("grade", "teacher", "teacher", ["image_generation"]) == "active"
+    assert _initial_status("teachers", "teacher", "teacher", ["image_generation"]) == "active"
 
 
 def test_schoolwide_image_default_switch_on_is_review(monkeypatch):

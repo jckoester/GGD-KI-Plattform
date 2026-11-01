@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Kontext-Dokumente stehen als Kommentar im YAML.
 - **Fach bei Gruppen-Freigabe:** Ein Assistent für eine Unterrichtsgruppe oder Fachschaft trägt das Fach der Gruppe;
   der Editor zeigt es nur an. Migration 0095 gleicht den Bestand an.
+- **Freigabe „Jahrgang“ entfällt:** Sie war dasselbe wie „Alle Schüler:innen“ mit Klassenstufen. Migration 0095 stellt
+  vorhandene Assistenten darauf um; die Klassenstufen bleiben.
 - **`backend/config/assistant_schema.json` entfernt:** Die App liest nur `config/assistant_schema.json`.
 
 ### Behoben

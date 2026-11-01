@@ -56,7 +56,7 @@ from app.db.models import Assistant, GroupMembership
 GRUPPENSCOPES = frozenset({"subject_department", "activity_group", "teaching_group"})
 
 #: Scopes, die niemanden ausschließen; über sie entscheidet allein die Zielgruppe.
-OFFENE_SCOPES = frozenset({"grade", "all_students", "all"})
+OFFENE_SCOPES = frozenset({"all_students", "all"})
 
 
 @dataclass(frozen=True)
