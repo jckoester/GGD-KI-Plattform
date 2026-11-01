@@ -755,7 +755,8 @@ beantwortet — keine einzige Absage in 50 Antworten. Nachstellbar mit
 
 Ein falsch gesetztes `audience`-Feld hat **pädagogische Folgen** (Schüler:innen-
 Sichtbarkeit **und** Präambel-/Augmentierungs-Auswahl). Der Freigabe-Workflow macht die
-Zielgruppe daher sichtbar (Badge in der „Offene Freigaben"-Liste) und verlangt beim
+Zielgruppe daher sichtbar (Badge in der Liste „Offene Freigaben“ unter Einstellungen →
+Assistenten-Freigabe) und verlangt beim
 Freigeben eines für Schüler:innen sichtbaren Assistenten eine **bewusste Bestätigung**;
 die Freigabe wird mit `audience` protokolliert.
 

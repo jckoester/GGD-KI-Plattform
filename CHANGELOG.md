@@ -7,8 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Assistenten-Freigabe:** Die Warteschlange „Offene Freigaben“ nennt das Stundenplan-Kürzel der einreichenden
-  Lehrkraft, falls hinterlegt. Hinweis dazu beim Kürzel auf der Seite „Unterricht“.
+- **Assistenten-Freigabe:** „Offene Freigaben“ (Freigeben, Ablehnen) steht jetzt unter Einstellungen →
+  Assistenten-Freigabe, mit Klassenstufen und dem Stundenplan-Kürzel der einreichenden Lehrkraft, falls hinterlegt
+  (Hinweis dazu beim Kürzel auf der Seite „Unterricht“). „Assistenten verwalten“ steht in der Admin-Seitenleiste daneben.
+- **Assistenten verwalten:** Die Spalte Zielgruppe nennt die Klassenstufen.
 
 ### Geändert
 
@@ -28,6 +30,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   stand, lief auch ohne Freischaltung. Jetzt lehnt der Chat es ab, und Assistenten mit einem nicht freigeschalteten
   Modell sind in den betreffenden Stufen unsichtbar. `/assistants/manage` nennt die betroffenen Assistenten.
 - **Chat:** Lehnte der KI-Dienst eine Anfrage mit 401 ab, wurde man abgemeldet; jetzt erscheint eine Meldung.
+- **Admin-Seiten neu laden:** Einstellungen, Statistiken, Budget und „Assistenten verwalten“ leiteten beim Neuladen oder
+  über einen Link auf die Startseite bzw. die Assistenten-Übersicht um.
+- **Seitentitel** „Manage/New/Edit Assistant“ auf Deutsch.
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
   seines Rahmens).
 - **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.

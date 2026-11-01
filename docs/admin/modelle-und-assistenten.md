@@ -489,11 +489,18 @@ Gruppenbezug und vorbefülltem Anliegen — ein freigeschalteter Assistent mit
 ## Assistenten freigeben (`/settings/assistants`)
 
 Neu angelegte Assistenten sind zunächst nicht öffentlich sichtbar. Die
-Freigabe erfolgt unter `/settings/assistants`:
+Freigabe erfolgt unter **Einstellungen → Assistenten-Freigabe** (`/settings/assistants`):
 
-- **Aktiviert:** Der Assistent ist für Nutzer:innen sichtbar und startbar.
-- **Deaktiviert:** Der Assistent ist nur für Admins und Lehrkräfte sichtbar
-  (z. B. für Assistenten in Entwicklung).
+- **Offene Freigaben** oben: Assistenten, die Lehrkräfte für eine schulweite Reichweite
+  eingereicht haben, mit Zielgruppe, Klassenstufen und dem Stundenplan-Kürzel der Lehrkraft,
+  falls hinterlegt. „Freigeben“ fragt bei Schüler-Zielgruppen eine Bestätigung ab;
+  „Ablehnen“ nimmt eine Begründung auf, die die Lehrkraft im Editor sieht. Die Zahl offener
+  Einreichungen steht in der Seitenleiste am Menüpunkt.
+- **Alle Assistenten** darunter: **Aktiviert** heißt für Nutzer:innen sichtbar und startbar,
+  **Deaktiviert** nur für Admins und Lehrkräfte (z. B. Assistenten in Entwicklung).
+
+Bearbeiten, exportieren und löschen lassen sich Assistenten unter **Einstellungen →
+Assistenten verwalten** (`/assistants/manage`). Bis 0.27 stand die Warteschlange dort.
 
 Wer einen Assistenten nutzen darf, legt im Editor **„Freigabe für“** fest (Scope).
 Zwei weitere Felder engen das ein:

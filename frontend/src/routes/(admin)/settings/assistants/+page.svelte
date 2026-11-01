@@ -3,6 +3,8 @@
     import { Bot, Loader2 } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import FreigabeWarteschlange from "$lib/components/FreigabeWarteschlange.svelte";
+    import { stufenText } from "$lib/assistentenliste.js";
     import {
         getAdminAssistants,
         activateAssistant,
@@ -19,11 +21,13 @@
         active: "bg-light-gr/15 dark:bg-dark-gr/15 text-light-gr dark:text-dark-gr",
         draft: "bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2",
         disabled: "bg-light-re/15 dark:bg-dark-re/15 text-light-re dark:text-dark-re",
+        pending_review: "bg-light-ye/15 dark:bg-dark-ye/15 text-light-ye dark:text-dark-ye",
     };
     const STATUS_LABEL = {
         active: "Aktiv",
         draft: "Entwurf",
         disabled: "Deaktiviert",
+        pending_review: "Eingereicht",
     };
 
     // Audience-Labels
@@ -86,9 +90,15 @@
             <h1 class="text-2xl font-semibold">Assistenten-Freigabe</h1>
         </div>
 
-        <div class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Wer welche Assistenten sehen und nutzen kann
+        <div class="mb-6 text-sm text-light-tx-2 dark:text-dark-tx-2">
+            Eingereichte Assistenten freigeben oder ablehnen — und für alle übrigen festlegen, ob
+            sie aktiv sind. Bearbeiten und exportieren unter
+            <a href="/assistants/manage" class="text-light-bl dark:text-dark-bl hover:underline">Assistenten verwalten</a>.
         </div>
+
+        <FreigabeWarteschlange onGeaendert={loadAllAssistants} />
+
+        <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-3">Alle Assistenten</h2>
 
         {#if error}
             <div class="mb-4">
@@ -135,7 +145,7 @@
                                         {item.description ?? ''}
                                     </td>
                                     <td class="py-3 pr-4 text-light-tx-2 dark:text-dark-tx-2">
-                                        {AUDIENCE_LABELS[item.audience] ?? item.audience ?? ''}
+                                        {AUDIENCE_LABELS[item.audience] ?? item.audience ?? ''}{#if stufenText(item)} · <span class="whitespace-nowrap">{stufenText(item)}</span>{/if}
                                     </td>
                                     <td class="py-3 pr-4">
                                         <span class="px-2 py-1 rounded-full text-xs {STATUS_CLASS[item.status] ?? STATUS_CLASS.draft}">

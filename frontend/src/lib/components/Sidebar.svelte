@@ -21,6 +21,7 @@
         Search,
         Wrench,
         Library,
+    Check,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -279,14 +280,25 @@
                                 <span class="flex items-center gap-2">
                                     <Settings class="w-4 h-4" />
                                     Verwalten
-                                    {#if $pendingCount > 0}
+                                </span>
+                            </button>
+                            <!-- Offene Freigaben stehen seit 0.27 unter Einstellungen → Assistenten-Freigabe. -->
+                            {#if $pendingCount > 0}
+                                <button
+                                    onclick={() => goto('/settings/assistants')}
+                                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                >
+                                    <span class="flex items-center gap-2">
+                                        <Check class="w-4 h-4" />
+                                        Freigaben
                                         <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
                                              bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
                                             {$pendingCount}
                                         </span>
-                                    {/if}
-                                </span>
-                            </button>
+                                    </span>
+                                </button>
+                            {/if}
                         {/if}
                     </div>
                 {/if}

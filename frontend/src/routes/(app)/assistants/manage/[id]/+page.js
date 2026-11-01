@@ -1,3 +1,3 @@
 export function load({ params }) {
-    return { id: params.id, title: 'Edit Assistant' }
+    return { id: params.id, title: 'Assistent bearbeiten' }
 }

@@ -115,7 +115,7 @@ Die Übernahme ist **freiwillig**: Ohne eingetragenes Kürzel ruft die Plattform
 Person nichts ab.
 
 **Zweiter Zweck seit 0.27: Urheber in der Assistenten-Freigabe.** In der Warteschlange
-„Offene Freigaben“ (`/assistants/manage`) sehen Admins bei einem eingereichten Assistenten das
+„Offene Freigaben“ (`/settings/assistants`) sehen Admins bei einem eingereichten Assistenten das
 Kürzel der Lehrkraft, falls sie eins hinterlegt hat — sonst „ohne Stundenplan-Kürzel“. Die
 Plattform speichert keine Namen; ohne diese Angabe wäre jede Rückfrage nur über eine Ablehnung
 möglich. Die Lehrkraft wird beim Kürzel auf der Seite „Unterricht“ darauf hingewiesen. Für das

@@ -1,9 +1,8 @@
-import { get } from "svelte/store";
 import { redirect } from "@sveltejs/kit";
-import { user } from "$lib/stores/user.js";
+import { nutzer } from "$lib/zugang.js";
 
-export function load() {
-  const $user = get(user);
+export async function load() {
+  const $user = await nutzer();
   if (!$user?.roles.some((r) => ["budget", "admin"].includes(r))) {
     redirect(302, "/");
   }

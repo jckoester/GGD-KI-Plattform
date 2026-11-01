@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { abschnitteUebersicht, allgemeineImFach, gesperrtHinweis, ordneFuerFach, schlagwoerterAnzeige, stufenBereiche, zurAnzeige } from './assistentenliste.js'
+import { abschnitteUebersicht, allgemeineImFach, gesperrtHinweis, ordneFuerFach, schlagwoerterAnzeige, stufenBereiche, stufenText, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -160,5 +160,15 @@ describe('gesperrtHinweis (0.27)', () => {
     expect(text).toContain('chat-komplex · Kl. 5–7: „Mathe“, „Rechnen“')
     expect(text).toContain('chat-komplex · Kl. 8–9: „Stöchiometrie“')
     expect(text).toContain('Modell-Freischaltung')
+  })
+})
+
+describe('stufenText', () => {
+  it('alle vier Formen und leer', () => {
+    expect(stufenText({ min_grade: 8, max_grade: 13 })).toBe('Kl. 8–13')
+    expect(stufenText({ min_grade: 9, max_grade: 9 })).toBe('Kl. 9')
+    expect(stufenText({ min_grade: 8 })).toBe('ab Kl. 8')
+    expect(stufenText({ max_grade: 7 })).toBe('bis Kl. 7')
+    expect(stufenText({})).toBe('')
   })
 })

@@ -1,3 +1,3 @@
 export function load() {
-  return { title: 'New Assistant' }
+  return { title: 'Neuer Assistent' }
 }

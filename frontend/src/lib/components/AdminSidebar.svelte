@@ -20,12 +20,14 @@
         ShieldCheck,
         PiggyBank,
         Bot,
+        Check,
         CalendarDays,
         Inbox,
         BookOpen,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import { hasAnyRole } from "$lib/stores/user.js";
+    import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import { onMount } from "svelte";
     import {
         calendarConfigured,
@@ -43,6 +45,7 @@
     // Statuswechsel selbst nach. Eine Abfrageschleife wäre für Rückmeldungen,
     // die einzeln über den Tag eintreffen, verschwendete Last.
     onMount(refreshFeedbackAlerts);
+    onMount(refreshPendingCount);
 
     const canSeeSettings   = hasAnyRole(['admin']);
     const canSeeStatistics = hasAnyRole(['statistics', 'admin']);
@@ -121,51 +124,8 @@
             </div>
         </div>
 
-        <!-- Assistenten -->
-        {#if $canSeeSettings}
-        <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
-            >
-                <button
-                    onclick={() => {
-                        toggleOpenSection('assistants');
-                        goto('/assistants');
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <Bot class="w-4 h-4 text-light-bl dark:text-dark-bl" />
-                        Assistenten
-                    </span>
-                </button>
-                <button
-                    onclick={() => toggleOpenSection('assistants')}
-                >
-                    <span class="flex items-center gap-2">
-                        {#if openSection === 'assistants'}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </span>
-                </button>
-            </div>
-        </div>
-        {#if openSection === 'assistants'}
-            <div class="mt-1 space-y-1 pl-2">
-                <button
-                    onclick={() => goto('/assistants/manage')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <Settings class="w-4 h-4" />
-                        Verwalten
-                    </span>
-                </button>
-            </div>
-        {/if}
-        {/if}
+        <!-- Assistenten: seit 0.27 unter Einstellungen (Plan F8 a) — Verwalten und Freigabe
+             stehen nebeneinander, die Freigabe mit der Zahl offener Einreichungen. -->
 
         <!-- Einstellungen -->
         {#if $canSeeSettings}
@@ -224,13 +184,29 @@
                     </div>
                 </button>
                 <button
-                    onclick={() => goto('/settings/assistants')}
+                    onclick={() => goto('/assistants/manage')}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                            hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                 >
                     <span class="flex items-center gap-2">
                         <Bot class="w-4 h-4" />
+                        Assistenten verwalten
+                    </span>
+                </button>
+                <button
+                    onclick={() => goto('/settings/assistants')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <Check class="w-4 h-4" />
                         Assistenten-Freigabe
+                        {#if $pendingCount > 0}
+                            <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
+                                {$pendingCount}
+                            </span>
+                        {/if}
                     </span>
                 </button>
                 <button

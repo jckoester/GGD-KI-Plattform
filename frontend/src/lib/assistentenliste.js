@@ -127,3 +127,15 @@ export function gesperrtHinweis(gesperrt) {
   const anzahl = gesperrt.length === 1 ? "Ein Assistent ist" : `${gesperrt.length} Assistenten sind`;
   return `${anzahl} für einen Teil ihrer Zielgruppe unsichtbar, weil ihr Modell dort nicht freigeschaltet ist — ${teile.join("; ")}. Freischalten unter Einstellungen → Modell-Freischaltung.`;
 }
+
+/**
+ * Klassenstufen eines Assistenten als kurze Angabe — „Kl. 8–13“, „ab Kl. 8“, „bis Kl. 7“,
+ * „Kl. 9“; leer ohne Grenzen (0.27: sichtbar in Verwaltung, Freigabe und auf Karten).
+ * @param {{min_grade?: number|null, max_grade?: number|null}} a
+ */
+export function stufenText(a) {
+  const von = a?.min_grade ?? null, bis = a?.max_grade ?? null;
+  if (von == null && bis == null) return "";
+  if (von != null && bis != null) return von === bis ? `Kl. ${von}` : `Kl. ${von}–${bis}`;
+  return von != null ? `ab Kl. ${von}` : `bis Kl. ${bis}`;
+}
