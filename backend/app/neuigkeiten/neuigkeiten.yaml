@@ -186,3 +186,26 @@
     Unterricht antworten, etwa mit Fachbegriffen an deinen Stunden oder Methodenblättern deiner
     Fachschaft, steht in der neuen Hilfe „Bessere Antworten“.
   link: /help/bessere-antworten
+
+- id: "0.27-assistenten-kosten"
+  version: "0.27.0"
+  datum: 2026-11-01
+  rollen: [student, teacher]
+  titel: "Was kostet ein Assistent?"
+  text: >-
+    Neben dem Namen eines Assistenten steht jetzt, was eine Nachricht an ihn ungefähr kostet,
+    etwa „~60 🪙“. Assistenten mit langen Anleitungen oder eigenen Dokumenten kosten mehr als der
+    normale Chat. Der Info-Knopf daneben zeigt, welche Dokumente der Assistent kennt.
+  link: /help/assistenten
+
+- id: "0.27-assistenten-lehrkraefte"
+  version: "0.27.0"
+  datum: 2026-11-01
+  rollen: [teacher]
+  titel: "Eigene Assistenten: Fach, Dokumente, Freigabe"
+  text: >-
+    Gibst du einen Assistenten für eine Unterrichtsgruppe oder Fachschaft frei, übernimmt er das
+    Fach der Gruppe. Kontext-Dokumente sehen alle im Chat mit ihrem Dateinamen; wähle ihn so, dass
+    er sagt, was drinsteht. Reichst du einen Assistenten zur Freigabe ein, sehen die Admins dein
+    Stundenplan-Kürzel, falls du eins hinterlegt hast.
+  link: /help/assistenten

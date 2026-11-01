@@ -5,13 +5,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.27.0] – 2026-11-01
+
+Assistenten-Pflege: Die Modell-Freischaltung gilt jetzt wirklich, Freigabe und Verwaltung liegen im Admin-Bereich,
+Kosten und Kontext-Dokumente sind im Chat sichtbar. Eine Migration (0095).
+
 ### Neu
 
 - **Assistenten-Freigabe:** „Offene Freigaben“ (Freigeben, Ablehnen) steht jetzt unter Einstellungen →
   Assistenten-Freigabe, mit Klassenstufen und dem Stundenplan-Kürzel der einreichenden Lehrkraft, falls hinterlegt
   (Hinweis dazu beim Kürzel auf der Seite „Unterricht“). „Assistenten verwalten“ steht in der Admin-Seitenleiste daneben.
-- **Assistenten verwalten** samt Editor liegt im Admin-Bereich (Adressen unverändert).
-- **Assistenten verwalten:** Die Spalte Zielgruppe nennt die Klassenstufen.
+- **Assistenten verwalten** samt Editor liegt im Admin-Bereich (Adressen unverändert); die Spalte Zielgruppe nennt die
+  Klassenstufen.
 - **Kosten je Assistent:** Neben dem Namen im Chat und auf den Assistentenkarten steht, was eine Nachricht etwa kostet
   („~62 🪙“) — samt Prompt, Bausteinen und Kontext-Dokumenten, nicht nur das Modell.
 - **Kontext-Dokumente im Chat:** Ein Info-Knopf neben dem Assistenten nennt Kosten und die Dokumente, die er bei jeder
@@ -55,7 +60,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `alembic upgrade head` (0095) — wie im regulären Update.
 - **`/settings/models` prüfen, bevor Schüler:innen weiterarbeiten:** Die Freischaltung gilt jetzt wirklich.
   `chat-komplex` muss für die Stufen der Schüler-Assistenten freigeschaltet sein (5–13), sonst sind diese dort
-  unsichtbar. Den Stand zeigt der Hinweis oben in `/assistants/manage`.
+  unsichtbar. Dasselbe gilt für jedes Modell, das ein Assistent fest gewählt hat. Den Stand zeigt der Hinweis oben in
+  „Assistenten verwalten“.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.26.0] – 2026-10-31
 
