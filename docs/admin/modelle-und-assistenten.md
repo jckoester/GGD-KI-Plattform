@@ -390,7 +390,8 @@ Rolle.
 ### Fähigkeiten (`tool_groups`)
 
 Eine **Fähigkeit** ist das, was ein Assistent im Chat kann. Gesteuert wird sie über das
-Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
+Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten* — mit einer Ausnahme:
+`student_planning` hat dort keinen Schalter (siehe unten).
 
 > **Nicht verwechseln:** Ein **Werkzeug** ist ein *Assistent*, der etwas herstellt — die
 > Sammlung dieser Assistenten steht für Nutzer:innen unter `/tools`. Eine **Funktion**
@@ -404,9 +405,15 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
 | `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
-Schreibende Planungs-Funktionen bleiben damit strikt an die Lehrkraft-Rolle gebunden;
-für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt
-`student_planning`.
+Schreibende Planungs-Funktionen bleiben damit strikt an die Lehrkraft-Rolle gebunden.
+
+**`student_planning` ist nur per YAML setzbar** (Import oder Seed), nicht im Editor, und kein
+mitgelieferter Assistent nutzt sie — auch „Lernen und Prüfungsvorbereitung“ nicht. Sie liefert
+zur nächsten Klassenarbeit der Gruppe Termin, Einheiten, Themenliste und die Kompetenzen aus
+nachbereiteten Stunden. Termin und Einheiten stehen ohnehin in jedem Chat mit Gruppenbezug im
+Block „Aktueller Unterricht“; die Fähigkeit fügt also nur Themen und Kompetenzen hinzu. Ob ein
+Lern-Assistent sie braucht, ist noch nicht gemessen; die Entscheidung (Schalter im Editor,
+streichen oder lassen) fällt mit der Arbeit am Lern-Assistenten.
 
 ### Operatoren aus diesen Fächern (`operator_faecher`)
 
@@ -416,9 +423,10 @@ Bildungsplan — in der Fassung, die für die Klasse gilt — als Abschnitt im S
 aus.** Sinnvoll nur mit einem Prompt, der Antworten gegen den Operator prüft; ohne eine solche
 Regel ändert die Definition die Antworten nicht (gemessen).
 
-- Der Assistent für naturwissenschaftliche Aufgaben bringt `biologie, chemie, physik, nwt, nit`
-  mit. Ein Fach, das es an der Schule nicht gibt, übergeht der Seed mit Warnung; `nit` gibt es
-  erst ab 2027/28.
+- Die mitgelieferten allgemeinen Assistenten bringen die Fächer ihres Gebiets mit, etwa
+  „Versuchsplanung und -auswertung“ `biologie, chemie, physik, nwt, nit` (siehe
+  `config/assistants.example.yaml`). Ein Fach, das es an der Schule nicht gibt, übergeht der
+  Seed mit Warnung; `nit` gibt es erst ab 2027/28.
 - ⚠️ **Nachgetragen wird nur ein leeres Feld.** Kommt später ein Fach dazu (etwa NiT), ergänzt
   man es im Editor; der Seed lässt ein gesetztes Feld stehen.
 - Ein Fach, das es nicht (mehr) gibt, steht im Editor kursiv; der YAML-Import übergeht es mit
