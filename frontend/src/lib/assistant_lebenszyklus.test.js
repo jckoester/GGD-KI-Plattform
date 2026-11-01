@@ -40,7 +40,8 @@ describe("Wächter: Editor und „Meine Assistenten“ (0.15)", () => {
 
   it("der Editor einer Lehrkraft zeigt ihre Fächer, die Verwaltung alle", () => {
     const quelle = lies(EDITOR);
-    expect(quelle).toMatch(/isAdmin \? subjects : eigeneFaecher\(subjects, groups, savedForm\.subject_id\)/);
+    // Seit 0.27 gilt bei Gruppen-Scope das Fach der Gruppe, sonst das gespeicherte.
+    expect(quelle).toMatch(/isAdmin \? subjects : eigeneFaecher\(subjects, groups, gruppenFach \?\? savedForm\.subject_id\)/);
     expect(quelle).toMatch(/\{#each faecherAuswahl as subject/);
     expect(quelle).not.toMatch(/\{#each subjects as subject/);
   });

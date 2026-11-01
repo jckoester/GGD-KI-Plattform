@@ -19,7 +19,7 @@ from app.config import settings
 from app.core.paths import aufloesen
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility
+from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility, Group
 from app.db.session import get_db
 from app.upload.extractor import extract_pdf, extract_plaintext
 
@@ -593,6 +593,21 @@ def validate_assistant_fields(
             )
 
 
+async def fach_der_gruppe(db: AsyncSession, scope: Optional[str], scope_group_id: Optional[int]) -> Optional[int]:
+    """Bei Gruppen-Scope das Fach der Gruppe — ``None``, wenn die Eingabe gilt.
+
+    Eine Unterrichtsgruppe oder Fachschaft hat ein Fach; das Fach des Assistenten ergibt sich
+    daraus (0.27, Plan F2 a). ⚠️ Bis 0.27 speicherte der Server, was kam: Ein Assistent für
+    eine Chemiegruppe konnte das Fach Deutsch tragen, und die Fachseite stellte ihn dorthin.
+    Eine Gruppe ohne Fach (AG) lässt die Eingabe stehen.
+    """
+    if scope not in GROUP_SCOPES or scope_group_id is None:
+        return None
+    return (
+        await db.execute(select(Group.subject_id).where(Group.id == scope_group_id))
+    ).scalar_one_or_none()
+
+
 # ── Vorschlag: Auslöser-Beispiele und Rückfälle (Päckchen C1, Schritt 3) ─────
 
 
@@ -1019,7 +1034,7 @@ async def create_assistant(
     assistant = Assistant(
         name=request.name,
         description=request.description,
-        subject_id=request.subject_id,
+        subject_id=await fach_der_gruppe(db, request.scope, request.scope_group_id) or request.subject_id,
         system_prompt=request.system_prompt,
         model=request.model,
         temperature=request.temperature,
@@ -1121,6 +1136,16 @@ async def update_assistant(
         # Wechsel von schulweit → privat/gruppe: reject_reason loeschen
         if new_status == "active" and assistant.reject_reason:
             update_data["reject_reason"] = None
+
+    # Fach aus der Gruppe (F2 a) — auch, wenn nur das Fach geändert werden sollte.
+    if {"scope", "scope_group_id", "subject_id"} & update_data.keys():
+        fach = await fach_der_gruppe(
+            db,
+            update_data.get("scope", assistant.scope),
+            update_data.get("scope_group_id", assistant.scope_group_id),
+        )
+        if fach is not None:
+            update_data["subject_id"] = fach
 
     # `model: null` würde die NOT-NULL-Spalte verletzen; zum Zurücksetzen auf den
     # schulweiten Standard ist der leere String vorgesehen.

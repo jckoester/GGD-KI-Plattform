@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
 import { readFileSync } from "node:fs"
-import { auswahlMitBestand, eigeneFaecher, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gruppenMitFach, gueltigeGruppenwahl } from "./myGroups.js"
+import { auswahlMitBestand, eigeneFaecher, fachDerGruppe, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gruppenMitFach, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -304,5 +304,24 @@ describe("eigeneFaecher (Assistenten-Editor, 0.15)", () => {
 
   it("ohne eigenes Fach die ganze Liste", () => {
     expect(ids(eigeneFaecher(FAECHER, [], null))).toEqual([1, 2, 3, 4])
+  })
+})
+
+describe("fachDerGruppe (Assistenten-Editor, 0.27)", () => {
+  const GRUPPEN = [
+    { id: 10, type: "teaching_group", subject_id: 2 },
+    { id: 12, type: "subject_department", subject_id: 3 },
+    { id: 14, type: "activity_group", subject_id: null },
+  ]
+
+  it("Gruppen-Scope: das Fach der Gruppe, auch wenn die ID als String kommt", () => {
+    expect(fachDerGruppe("teaching_group", "10", GRUPPEN)).toBe(2)
+    expect(fachDerGruppe("subject_department", 12, GRUPPEN)).toBe(3)
+  })
+
+  it("frei wählbar: kein Gruppen-Scope, keine Gruppe gewählt oder eine Gruppe ohne Fach", () => {
+    expect(fachDerGruppe("private", "10", GRUPPEN)).toBeNull()
+    expect(fachDerGruppe("teaching_group", "", GRUPPEN)).toBeNull()
+    expect(fachDerGruppe("activity_group", 14, GRUPPEN)).toBeNull()
   })
 })

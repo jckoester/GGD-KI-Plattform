@@ -209,6 +209,24 @@ export function eigeneFaecher(faecher, gruppen, gesetztId) {
   return (faecher ?? []).filter((f) => eigene.has(f.id) || f.id === gesetztId)
 }
 
+/**
+ * Bei Gruppen-Scope das Fach der gewählten Gruppe — `null`, wenn das Fach frei wählbar ist.
+ *
+ * Spiegel von `fach_der_gruppe` im Backend (0.27, F2 a): Der Server setzt das Fach aus der
+ * Gruppe und überschreibt eine Eingabe; der Editor zeigt es deshalb nur an. Eine Gruppe ohne
+ * Fach (AG) lässt die Wahl frei.
+ *
+ * @param {string} scope
+ * @param {number|string|null} gruppenId  aus dem Formular, oft als String
+ * @param {Array} gruppen
+ */
+export function fachDerGruppe(scope, gruppenId, gruppen) {
+  if (!['teaching_group', 'subject_department', 'activity_group'].includes(scope)) return null
+  if (gruppenId == null || gruppenId === '') return null
+  const g = (gruppen ?? []).find((x) => String(x.id) === String(gruppenId))
+  return g?.subject_id ?? null
+}
+
 export function gueltigeGruppenwahl(id, gruppen) {
     return (gruppen ?? []).some((g) => g.id === id) ? id : null
 }

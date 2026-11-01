@@ -3,7 +3,7 @@
     import ModellWahl from "./ModellWahl.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
-    import { auswahlMitBestand, eigeneFaecher } from "$lib/stores/myGroups.js";
+    import { auswahlMitBestand, eigeneFaecher, fachDerGruppe } from "$lib/stores/myGroups.js";
     import { GETEILT_SCOPES, SCHOOLWIDE_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
     import {
         Bot,
@@ -90,10 +90,17 @@
     let models = $state([]);
     let subjects = $state([]);
     let groups = $state([]);
-    // Lehrkräfte wählen aus ihren eigenen Fächern (plus dem schon gesetzten); die
-    // Verwaltung braucht alle — sie pflegt auch schulweite Assistenten.
+    // Bei Gruppen-Scope bestimmt die Gruppe das Fach (0.27, F2 a); das Feld zeigt es nur an.
+    const gruppenFach = $derived(fachDerGruppe(form.scope, form.scope_group_id, groups));
+    $effect(() => {
+        if (gruppenFach !== null && String(form.subject_id) !== String(gruppenFach)) {
+            form.subject_id = gruppenFach;
+        }
+    });
+    // Lehrkräfte wählen aus ihren eigenen Fächern (plus dem schon gesetzten bzw. dem der
+    // Gruppe); die Verwaltung braucht alle — sie pflegt auch schulweite Assistenten.
     let faecherAuswahl = $derived(
-        isAdmin ? subjects : eigeneFaecher(subjects, groups, savedForm.subject_id),
+        isAdmin ? subjects : eigeneFaecher(subjects, groups, gruppenFach ?? savedForm.subject_id),
     );
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
     let bausteine = $state([]); // [{ key, label, beschreibung }] — hinter dem Prompt (0.26)
@@ -1369,7 +1376,8 @@
                         <select
                             id="ae-subject"
                             bind:value={form.subject_id}
-                            disabled={!canEdit}
+                            disabled={!canEdit || gruppenFach !== null}
+                            aria-describedby={gruppenFach !== null ? "ae-subject-hinweis" : undefined}
                             class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                      px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1381,6 +1389,11 @@
                                 >
                             {/each}
                         </select>
+                        {#if gruppenFach !== null}
+                            <p id="ae-subject-hinweis" class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Kommt aus der gewählten Gruppe.
+                            </p>
+                        {/if}
                     </div>
 
                     <!-- System-Prompt -->

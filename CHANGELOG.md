@@ -11,6 +11,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Rückfällen; gleichnamige Assistenten bekommen eindeutige Dateinamen. Exportiert wird, was die Liste in
   `/assistants/manage` gerade zeigt („Auswahl exportieren“); bisher immer nur die aktiven. Die Namen der
   Kontext-Dokumente stehen als Kommentar im YAML.
+- **Fach bei Gruppen-Freigabe:** Ein Assistent für eine Unterrichtsgruppe oder Fachschaft trägt das Fach der Gruppe;
+  der Editor zeigt es nur an. Migration 0095 gleicht den Bestand an.
 - **`backend/config/assistant_schema.json` entfernt:** Die App liest nur `config/assistant_schema.json`.
 
 ### Behoben
@@ -18,6 +20,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
   seines Rahmens).
 - **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0095) — wie im regulären Update.
 
 ## [0.26.0] – 2026-10-31
 

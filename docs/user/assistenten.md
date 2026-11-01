@@ -121,7 +121,8 @@ Assistent verschwindet aus ihnen. Ist er mit einer Gruppe oder Fachschaft geteil
 die anderen dort den Zugang — die Rückfrage sagt es dir.
 
 Als **Fach** stehen im Editor deine eigenen Fächer zur Wahl: die deiner Unterrichtsgruppen und
-Fachschaften. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.
+Fachschaften. Gibst du den Assistenten für eine Unterrichtsgruppe oder Fachschaft frei, kommt das
+Fach aus der Gruppe; das Feld zeigt es dann nur an. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.
 Einen eigenen **Stundenassistenten** legst du mit einem Klick als Kopie des schulweiten an —
 siehe [Unterrichtsplanung](unterrichtsplanung.md#ein-eigener-stundenassistent).
 
