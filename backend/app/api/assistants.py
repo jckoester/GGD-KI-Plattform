@@ -596,6 +596,14 @@ def validate_assistant_fields(
             )
 
 
+#: Felder, die im Editor nur Admins sehen — und die der Server deshalb nur von Admins annimmt
+#: (0.27). ⚠️ Bis dahin galt das nur in der Oberfläche: Über die Schnittstelle konnte eine
+#: Lehrkraft Bausteine, Rückfälle und Operator-Fächer an eigenen Assistenten setzen. Wie bei
+#: `sort_order` wird die Eingabe von Nicht-Admins übergangen, nicht abgewiesen — der Editor
+#: schickt die Felder ohnehin mit, und ein 403 legte das Speichern lahm.
+ADMIN_FELDER = ("bausteine", "fallbacks", "operator_faecher")
+
+
 async def fach_der_gruppe(db: AsyncSession, scope: Optional[str], scope_group_id: Optional[int]) -> Optional[int]:
     """Bei Gruppen-Scope das Fach der Gruppe — ``None``, wenn die Eingabe gilt.
 
@@ -1025,8 +1033,9 @@ async def create_assistant(
         suggest=request.suggest,
     )
     listen = _bereinigte_ausloeser(request.trigger_examples, request.trigger_counterexamples)
-    fallbacks = await _gepruefte_fallbacks(db, request.fallbacks, None)
-    operator_faecher = await _gepruefte_operator_faecher(db, request.operator_faecher)
+    ist_admin = "admin" in current_user.roles
+    fallbacks = await _gepruefte_fallbacks(db, request.fallbacks if ist_admin else [], None)
+    operator_faecher = await _gepruefte_operator_faecher(db, request.operator_faecher if ist_admin else [])
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     sort_order = request.sort_order if "admin" in current_user.roles else 0
@@ -1057,7 +1066,7 @@ async def create_assistant(
         disabled_augmentations=request.disabled_augmentations,
         image_kinds=request.image_kinds,
         operator_faecher=operator_faecher,
-        bausteine=_gepruefte_bausteine(request.bausteine),
+        bausteine=_gepruefte_bausteine(request.bausteine if ist_admin else []),
         suggest=request.suggest,
         suggestion_text=(request.suggestion_text or "").strip() or None,
         fallbacks=fallbacks,
@@ -1105,6 +1114,9 @@ async def update_assistant(
         update_data.pop("trigger_examples", None),
         update_data.pop("trigger_counterexamples", None),
     )
+    if not is_admin:
+        for feld in ADMIN_FELDER:
+            update_data.pop(feld, None)
     if "fallbacks" in update_data:
         update_data["fallbacks"] = await _gepruefte_fallbacks(
             db, update_data["fallbacks"] or [], assistant.id
@@ -1587,7 +1599,18 @@ async def import_assistant(
     )
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
-    
+    if creator_role != "admin":
+        uebergangen = [f for f in ADMIN_FELDER if fields.get(f)]
+        for feld in ADMIN_FELDER:
+            fields[feld] = []
+        if uebergangen:
+            hinweise.append(
+                "Nicht übernommen (nur Admins): " + ", ".join(
+                    {"bausteine": "Bausteine", "fallbacks": "Darunter anbieten",
+                     "operator_faecher": "Fächer für Operatoren"}[f] for f in uebergangen
+                ) + "."
+            )
+
     # Assistent erstellen
     assistant = Assistant(
         **fields,

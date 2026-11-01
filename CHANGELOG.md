@@ -36,6 +36,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Seitentitel** „Manage/New/Edit Assistant“ auf Deutsch.
 - **Assistenten-Editor der Verwaltung** (`/assistants/manage/<ID>`) prüfte die Admin-Rolle nicht; eine Lehrkraft mit der
   Adresse sah die Admin-Schalter. Jetzt geht es zu „Meine Assistenten“.
+- **Admin-Felder am Assistenten** (Bausteine, „Darunter anbieten“, Fächer für Operatoren) nimmt der Server nur noch von
+  Admins an, auch beim YAML-Import; bisher ließen sie sich über die Schnittstelle von Lehrkräften setzen.
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
   seines Rahmens).
 - **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.
