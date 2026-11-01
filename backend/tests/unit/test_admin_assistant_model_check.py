@@ -118,7 +118,7 @@ def test_all_healthy_yields_empty_list():
         _assistant(2, "B", "chat-komplex"),
     ])
 
-    assert data == {"checked": True, "orphaned": []}
+    assert data == {"checked": True, "orphaned": [], "gesperrt": []}
 
 
 def test_unreachable_litellm_is_distinguishable_from_all_clear():
@@ -150,3 +150,27 @@ def test_system_models_count_as_known():
     data = _get([_assistant(1, "Titel-Sonderfall", "system-titel")])
 
     assert data["orphaned"] == []
+
+
+def test_gesperrt_nennt_stufen_ohne_freischaltung(monkeypatch):
+    """0.27: Aktive Assistenten, deren Modell in Stufen ihrer Zielgruppe nicht frei ist."""
+    from app.litellm import team_models
+    from app.litellm.teams import VALID_GRADES
+
+    def freigabe(team_id):
+        if team_id == "lehrkraefte":
+            return {"models": ["chat-standard", "chat-komplex"]}
+        stufe = int(team_id.split("-")[1])
+        return {"models": ["chat-standard"] + (["chat-komplex"] if stufe >= 10 else [])}
+
+    team_models.invalidate_team_models_cache()
+    monkeypatch.setattr(team_models._client, "get_team_info", AsyncMock(side_effect=freigabe))
+    komplex = SimpleNamespace(id=1, name="Rechnen", model="chat-komplex", status="active",
+                              audience="student", min_grade=8, max_grade=None)
+    standard = SimpleNamespace(id=2, name="Standard", model="chat-standard", status="active",
+                               audience="all", min_grade=None, max_grade=None)
+    daten = _get([komplex, standard])
+    team_models.invalidate_team_models_cache()
+    erwartet = [s for s in sorted(VALID_GRADES) if 8 <= s < 10]
+    assert daten["gesperrt"] == [{"id": 1, "name": "Rechnen", "model": "chat-komplex",
+                                  "stufen": erwartet, "lehrkraefte": False}]

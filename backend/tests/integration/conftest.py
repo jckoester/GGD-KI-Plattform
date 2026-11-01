@@ -321,3 +321,22 @@ async def test_client(async_engine, seed_test_assistant):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _modellfreigaben_unbekannt(monkeypatch):
+    """Tests laufen so, als wären die Modell-Freigaben je Team nicht zu erfahren (0.27).
+
+    Sonst fragte jede Sichtbarkeitsprüfung und jeder Chat den lokalen LiteLLM-Proxy nach den
+    Teams — das Ergebnis hinge davon ab, ob er läuft und was auf diesem Rechner freigeschaltet
+    ist. ``None`` heißt „unbekannt": nicht filtern. Tests, die Freigaben brauchen, setzen
+    `Zugang.modelle` selbst oder patchen `get_team_info` im Test (das gewinnt).
+    """
+    from unittest.mock import AsyncMock
+
+    from app.litellm import team_models
+
+    team_models.invalidate_team_models_cache()
+    monkeypatch.setattr(team_models._client, "get_team_info", AsyncMock(return_value=None))
+    yield
+    team_models.invalidate_team_models_cache()

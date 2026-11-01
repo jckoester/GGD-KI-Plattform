@@ -19,6 +19,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Modell-Freischaltung wird durchgesetzt:** Sie galt bisher nur für den Modellwähler; ein Modell, das im Request
+  stand, lief auch ohne Freischaltung. Jetzt lehnt der Chat es ab, und Assistenten mit einem nicht freigeschalteten
+  Modell sind in den betreffenden Stufen unsichtbar. `/assistants/manage` nennt die betroffenen Assistenten.
+- **Chat:** Lehnte der KI-Dienst eine Anfrage mit 401 ab, wurde man abgemeldet; jetzt erscheint eine Meldung.
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
   seines Rahmens).
 - **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.
@@ -26,6 +30,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Nach dem Update
 
 - `alembic upgrade head` (0095) — wie im regulären Update.
+- **`/settings/models` prüfen, bevor Schüler:innen weiterarbeiten:** Die Freischaltung gilt jetzt wirklich.
+  `chat-komplex` muss für die Stufen der Schüler-Assistenten freigeschaltet sein (5–13), sonst sind diese dort
+  unsichtbar. Den Stand zeigt der Hinweis oben in `/assistants/manage`.
 
 ## [0.26.0] – 2026-10-31
 

@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import time
 import json
 import logging
@@ -1268,8 +1269,9 @@ def bildarten_fuer(
        ein Fehler, den die Schülerin nicht auflösen kann.
 
     ``erlaubte_modelle=None`` heißt **unbekannt** (Proxy nicht erreichbar) und filtert
-    nicht: Der Filter ist Ergonomie, die Durchsetzung bleibt beim Proxy. Ein Filter, der
-    bei einer Störung alles wegnimmt, machte aus einem Anzeigeproblem einen Totalausfall.
+    nicht. Ein Filter, der bei einer Störung alles wegnimmt, machte aus einem
+    Anzeigeproblem einen Totalausfall. (Durchgesetzt wird die Freigabe im Backend, nicht
+    im Proxy — siehe `litellm/team_models.py`.)
 
     Bliebe nach Filter 2 nichts übrig, wird ebenfalls nicht gefiltert: Ein Bild-Assistent
     ohne jede Bildart könnte gar nichts, und die Fehlermeldung des Proxys ist dann immer
@@ -1858,7 +1860,12 @@ async def assistent_fuer_chat(
                 )
         return assistant
 
-    if not darf_nutzen(assistant, await lade_zugang(db, user)):
+    zugang = await lade_zugang(db, user)
+    if not darf_nutzen(assistant, zugang):
+        # Liegt es nur am Modell (0.27), sagt die Meldung das — sonst wüsste niemand, dass
+        # eine Freischaltung genügt.
+        if zugang.modelle is not None and darf_nutzen(assistant, dataclasses.replace(zugang, modelle=None)):
+            raise HTTPException(status_code=403, detail=modell_gesperrt_text(user, assistant))
         raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
     return assistant
 
@@ -1913,6 +1920,16 @@ async def _einzige_gruppe_im_fach(db: AsyncSession, subject_id: int, pseudonym: 
         )
     ).scalars().all()
     return gruppen[0] if len(gruppen) == 1 else None
+
+
+def modell_gesperrt_text(user: JwtPayload, assistant: Optional[Assistant]) -> str:
+    """Die Meldung, wenn das Modell für diese Person nicht freigeschaltet ist (0.27)."""
+    if assistant is not None:
+        wer = "deine Klassenstufe" if "student" in (user.roles or []) and not _ist_lehrkraft(user) else "dich"
+        return (f"Der Assistent „{assistant.name}“ ist für {wer} noch nicht freigeschaltet. "
+                "Wähle einen anderen Assistenten oder wende dich an die Administration.")
+    return ("Dieses Modell ist für dich nicht freigeschaltet. "
+            "Wähle im Modellwähler ein anderes Modell.")
 
 
 @router.post("/chat")
@@ -2115,6 +2132,19 @@ async def chat(
         # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
         if request.model_id:
             model_used = request.model_id
+
+    # Modell-Freigabe durchsetzen (0.27, Plan Schritt 6). ⚠️ Der Proxy tut es nicht: Die
+    # Schlüssel der Nutzer:innen tragen kein Team, LiteLLM prüft die Team-Modelle dann nicht —
+    # bis 0.27 lief jedes Modell, auch ein reines Lehrkräfte-Modell, sobald es im Request
+    # stand. `None` = Freigaben nicht zu erfahren → nicht sperren (der Proxy-Ausfall soll
+    # nicht den Chat lahmlegen). Die neue Konversation ist erst geflusht; die Ausnahme rollt
+    # sie zurück.
+    _erlaubte_modelle = await erlaubte_modelle_fuer(
+        current_user.roles, getattr(current_user, "grade", None)
+    )
+    if _erlaubte_modelle is not None and model_used not in _erlaubte_modelle:
+        await client.aclose()
+        raise HTTPException(status_code=403, detail=modell_gesperrt_text(current_user, active_assistant))
 
     # Letzte Nachricht bearbeiten (0.19): Welche Zeilen die neue ersetzt, steht **vor** der
     # Krisen-Erkennung fest — die schreibt die neue Nachricht womöglich schon, und dann wäre
@@ -2341,13 +2371,8 @@ async def chat(
         )
         _is_group_teacher = _mbr.scalar_one_or_none() is not None
 
-    # Modell-Freigaben der Nutzer:in — einmal je Anfrage, aus einem Cache mit kurzer TTL.
-    # Damit bietet das Werkzeug-Schema nur Bildarten an, deren Modell für diesen Jahrgang
-    # freigeschaltet ist. None = nicht zu erfahren → es wird nicht gefiltert; die
-    # Durchsetzung bleibt ohnehin beim Proxy.
-    _erlaubte_modelle = await erlaubte_modelle_fuer(
-        current_user.roles, getattr(current_user, "grade", None)
-    )
+    # Modell-Freigaben (oben geholt, beim Durchsetzen): Das Werkzeug-Schema bietet nur
+    # Bildarten an, deren Modell für diesen Jahrgang freigeschaltet ist.
 
     _active_tools = tools_for(
         active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle,
@@ -2407,6 +2432,11 @@ async def chat(
             # 429 statt des LiteLLM-Status: Für die Oberfläche ist das die Kategorie
             # „gedrosselt/aufgebraucht", und der Status ist versionsabhängig (s. errors.py).
             raise HTTPException(status_code=429, detail=BUDGET_MELDUNG)
+        # ⚠️ 401/403 des **Proxys** sind keine abgelaufene Anmeldung bei der Plattform. Bis
+        # 0.27 ging der Status durch, und die Chatseite schickte die Person bei 401 zur
+        # Anmeldung. Jetzt: 403 mit eigenem Satz — das Backend kennt die Ursache nicht genauer.
+        if response.status_code in (401, 403):
+            raise HTTPException(status_code=403, detail=modell_gesperrt_text(current_user, active_assistant))
         raise HTTPException(
             status_code=response.status_code,
             detail=f"LiteLLM Fehler: {error_body.decode()}" if error_body else "LiteLLM Fehler",

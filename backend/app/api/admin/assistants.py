@@ -38,6 +38,17 @@ class OrphanedAssistant(BaseModel):
     status: str
 
 
+class GesperrterAssistent(BaseModel):
+    """Ein aktiver Assistent, dessen Modell für einen Teil seiner Zielgruppe nicht frei ist."""
+    id: int
+    name: str
+    model: str
+    #: Klassenstufen, in denen das Modell nicht freigeschaltet ist.
+    stufen: list[int] = []
+    #: Für Lehrkräfte nicht freigeschaltet (Zielgruppe Lehrkräfte oder alle).
+    lehrkraefte: bool = False
+
+
 class ModelCheckResponse(BaseModel):
     """Assistenten, deren fest gewähltes Modell es in LiteLLM nicht (mehr) gibt.
 
@@ -48,6 +59,9 @@ class ModelCheckResponse(BaseModel):
 
     checked: bool
     orphaned: list[OrphanedAssistant]
+    #: Seit 0.27: aktive Assistenten, die wegen fehlender Modell-Freischaltung für Teile ihrer
+    #: Zielgruppe unsichtbar sind.
+    gesperrt: list[GesperrterAssistent] = []
 
 
 # ── Admin-only Endpoints ─────────────────────────────────────────────────────
@@ -134,7 +148,46 @@ async def check_assistant_models(
             "%d Assistent(en) verweisen auf unbekannte Modelle: %s",
             len(orphaned), ", ".join(sorted({o.model for o in orphaned})),
         )
-    return ModelCheckResponse(checked=True, orphaned=orphaned)
+    return ModelCheckResponse(checked=True, orphaned=orphaned, gesperrt=await _gesperrte(db))
+
+
+async def _gesperrte(db: AsyncSession) -> list[GesperrterAssistent]:
+    """Aktive Assistenten, deren Modell für Stufen ihrer Zielgruppe nicht freigeschaltet ist.
+
+    Seit 0.27 sind sie dort unsichtbar und nicht benutzbar (`sichtbarkeit.py`). Ohne diesen
+    Hinweis fiele das niemandem auf — die Schüler:innen sehen den Assistenten einfach nicht.
+    Unbekannte Freigaben (Team nicht abrufbar) gelten nicht als gesperrt.
+    """
+    from app.assistants.sichtbarkeit import modell_des_assistenten
+    from app.litellm.team_models import erlaubte_modelle
+    from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID, VALID_GRADES
+
+    freigaben = {s: await erlaubte_modelle(f"{STUDENT_TEAM_PREFIX}{s}") for s in sorted(VALID_GRADES)}
+    lehrkraefte = await erlaubte_modelle(TEACHER_TEAM_ID)
+    if lehrkraefte is None and all(f is None for f in freigaben.values()):
+        return []  # nichts zu erfahren — kein Grund, die Assistenten zu laden
+    assistenten = (await db.execute(
+        select(Assistant).where(Assistant.status == "active").order_by(Assistant.name.asc())
+    )).scalars().all()
+    ergebnis = []
+    for a in assistenten:
+        modell = modell_des_assistenten(a)
+        stufen = []
+        if a.audience in ("student", "all"):
+            stufen = [
+                s for s, erlaubt in freigaben.items()
+                if erlaubt is not None and modell not in erlaubt
+                and (a.min_grade is None or a.min_grade <= s)
+                and (a.max_grade is None or a.max_grade >= s)
+            ]
+        fuer_lehrkraefte = (
+            a.audience in ("teacher", "all") and lehrkraefte is not None and modell not in lehrkraefte
+        )
+        if stufen or fuer_lehrkraefte:
+            ergebnis.append(GesperrterAssistent(
+                id=a.id, name=a.name, model=modell, stufen=stufen, lehrkraefte=fuer_lehrkraefte,
+            ))
+    return ergebnis
 
 
 @router.get("/pending", response_model=AssistantFullListResponse)

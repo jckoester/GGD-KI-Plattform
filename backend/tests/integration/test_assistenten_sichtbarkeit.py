@@ -286,6 +286,47 @@ class TestKlassenstufe:
         assert darf_nutzen(a, await _zugang(db_session, GRUPPENLEHRKRAFT, "teacher"))
 
 
+class TestModellfreigabe:
+    """0.27 (Plan Schritt 6, F5 a): Ein Assistent, dessen Modell für Rolle und Jahrgang nicht
+    freigeschaltet ist, ist unsichtbar und nicht benutzbar — auch für seine Erstellerin.
+    `modelle=None` (Freigaben unbekannt) filtert nicht."""
+
+    @staticmethod
+    def _mit(zugang, *modelle):
+        from dataclasses import replace
+        return replace(zugang, modelle=frozenset(modelle))
+
+    async def test_gesperrtes_modell_ausgeblendet(self, db_session, welt, monkeypatch):
+        from app.config import settings
+        monkeypatch.setattr(settings, "chat_default_model", "chat-standard")
+        komplex = await _assistent(db_session, scope="all", audience="all", model="chat-komplex",
+                                   created_by="wer-anders")
+        standard = await _assistent(db_session, scope="all", audience="all", model="",
+                                    created_by="wer-anders")
+        eigener = await _assistent(db_session, scope="private", model="chat-komplex")
+        bestand = [komplex, standard, eigener]
+        ids = [a.id for a in bestand]
+
+        for zugang, soll in (
+            (self._mit(await _zugang(db_session, SCHUELERIN, "student", grade="7"), "chat-standard"),
+             {standard.id}),
+            (self._mit(await _zugang(db_session, ERSTELLERIN, "teacher"), "chat-standard"),
+             {standard.id}),
+            (self._mit(await _zugang(db_session, ERSTELLERIN, "teacher"), "chat-standard", "chat-komplex"),
+             {komplex.id, standard.id, eigener.id}),
+            (self._mit(await _zugang(db_session, SCHUELERIN, "student", grade="7"), "chat-komplex"),
+             {komplex.id}),       # Standardmodell nicht frei → auch der Assistent ohne Modell nicht
+            (await _zugang(db_session, SCHUELERIN, "student", grade="7"),   # unbekannt
+             {komplex.id, standard.id}),
+        ):
+            aus_der_funktion = {a.id for a in bestand if darf_nutzen(a, zugang)}
+            aus_der_abfrage = set((await db_session.execute(
+                sa.select(Assistant.id).where(Assistant.id.in_(ids), sichtbar_klausel(zugang))
+            )).scalars().all())
+            assert aus_der_funktion == soll, (zugang.modelle, aus_der_funktion)
+            assert aus_der_abfrage == soll, (zugang.modelle, aus_der_abfrage)
+
+
 class TestChatWeg:
     """Das Gegenstück am Chat — nicht nur an der Liste.
 

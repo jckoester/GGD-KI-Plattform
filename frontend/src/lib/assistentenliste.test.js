@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { abschnitteUebersicht, allgemeineImFach, ordneFuerFach, schlagwoerterAnzeige, zurAnzeige } from './assistentenliste.js'
+import { abschnitteUebersicht, allgemeineImFach, gesperrtHinweis, ordneFuerFach, schlagwoerterAnzeige, stufenBereiche, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -135,5 +135,30 @@ describe('Abschnitte der Übersicht (0.26, F37 c)', () => {
   it('ein einziger Abschnitt ohne Überschrift', () => {
     expect(abschnitteUebersicht([{ id: 1, suggest: 'never' }])).toEqual([{ titel: null, liste: [{ id: 1, suggest: 'never' }] }])
     expect(abschnitteUebersicht([])).toEqual([])
+  })
+})
+
+describe('stufenBereiche', () => {
+  it('fasst zusammenhängende Stufen zusammen', () => {
+    expect(stufenBereiche([7, 5, 6, 9, 10, 12])).toBe('5–7, 9–10, 12')
+    expect(stufenBereiche([8])).toBe('8')
+    expect(stufenBereiche([])).toBe('')
+  })
+})
+
+describe('gesperrtHinweis (0.27)', () => {
+  it('nichts gesperrt → kein Hinweis', () => {
+    expect(gesperrtHinweis([])).toBeNull()
+  })
+  it('gruppiert nach Modell und Stufen', () => {
+    const text = gesperrtHinweis([
+      { name: 'Mathe', model: 'chat-komplex', stufen: [5, 6, 7], lehrkraefte: false },
+      { name: 'Rechnen', model: 'chat-komplex', stufen: [5, 6, 7], lehrkraefte: false },
+      { name: 'Stöchiometrie', model: 'chat-komplex', stufen: [8, 9], lehrkraefte: false },
+    ])
+    expect(text).toContain('3 Assistenten sind')
+    expect(text).toContain('chat-komplex · Kl. 5–7: „Mathe“, „Rechnen“')
+    expect(text).toContain('chat-komplex · Kl. 8–9: „Stöchiometrie“')
+    expect(text).toContain('Modell-Freischaltung')
   })
 })

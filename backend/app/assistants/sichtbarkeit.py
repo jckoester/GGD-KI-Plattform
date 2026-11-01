@@ -49,7 +49,9 @@ from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
+from app.config import settings
 from app.db.models import Assistant, GroupMembership
+from app.litellm.team_models import erlaubte_modelle_fuer
 
 #: Scopes, die an einer Gruppe hängen. Deckungsgleich mit `GROUP_SCOPES` im Router —
 #: dort entscheidet sie über die Pflichtangabe beim Anlegen, hier über den Zugang.
@@ -75,6 +77,9 @@ class Zugang:
     lehrgruppen: frozenset[int]
     #: Klassenstufe aus dem Schulkonto; ``None``, wenn unbekannt (C1, F2).
     stufe: int | None = None
+    #: Für Rolle und Jahrgang freigeschaltete Modelle (`/settings/models`); ``None``, wenn
+    #: nicht zu erfahren (Proxy nicht erreichbar) — dann wird nicht nach Modell gefiltert.
+    modelle: frozenset[str] | None = None
 
     @property
     def lehrkraft(self) -> bool:
@@ -92,13 +97,32 @@ async def lade_zugang(db: AsyncSession, user: JwtPayload) -> Zugang:
         sa.select(GroupMembership.group_id, GroupMembership.role_in_group)
         .where(GroupMembership.pseudonym == user.sub)
     )).all()
+    modelle = await erlaubte_modelle_fuer(user.roles or [], getattr(user, "grade", None))
     return Zugang(
         pseudonym=user.sub,
         rollen=frozenset(user.roles or ()),
         gruppen=frozenset(g for g, _r in zeilen),
         lehrgruppen=frozenset(g for g, r in zeilen if r == "teacher"),
         stufe=_stufe(getattr(user, "grade", None)),
+        modelle=frozenset(modelle) if modelle is not None else None,
     )
+
+
+def modell_des_assistenten(assistant: Assistant) -> str:
+    """Das Modell, mit dem der Assistent tatsächlich läuft — leer heißt schulweiter Standard."""
+    return assistant.model or settings.chat_default_model
+
+
+def _modell_passt(assistant: Assistant, zugang: Zugang) -> bool:
+    """Ist das Modell des Assistenten für diese Person freigeschaltet? (0.27, F5 a)
+
+    ⚠️ Bis 0.27 galt die Freigabe-Matrix nur für den Modellwähler. Der Proxy setzt sie nicht
+    durch — die Schlüssel der Nutzer:innen tragen kein Team (`litellm/client.py`,
+    `generate_key`), und LiteLLM prüft die Team-Modelle dann nicht. Ein Assistent mit
+    `chat-komplex` lief deshalb auch in Jahrgängen ohne Freigabe. Seither wird er dort
+    ausgeblendet, und der Chat lehnt das Modell ab (`chat/router.py`).
+    """
+    return zugang.modelle is None or modell_des_assistenten(assistant) in zugang.modelle
 
 
 def _stufe(roh) -> int | None:
@@ -139,6 +163,11 @@ def darf_nutzen(assistant: Assistant, zugang: Zugang, *, jetzt=None) -> bool:
     if assistant.available_from and assistant.available_from > jetzt:
         return False
     if assistant.available_until and assistant.available_until < jetzt:
+        return False
+
+    # Vor der Ersteller-Ausnahme: Ein eigener Assistent mit gesperrtem Modell ist auch für
+    # die Erstellerin nicht benutzbar — der Chat lehnt das Modell ab.
+    if not _modell_passt(assistant, zugang):
         return False
 
     if assistant.created_by == zugang.pseudonym:
@@ -211,10 +240,20 @@ def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
         or_(Assistant.min_grade.is_(None), Assistant.min_grade <= zugang.stufe),
         or_(Assistant.max_grade.is_(None), Assistant.max_grade >= zugang.stufe),
     )
+    if zugang.modelle is None:
+        modell = sa.true()
+    else:
+        erlaubt = sorted(zugang.modelle)
+        modell = or_(
+            and_(Assistant.model.is_not(None), Assistant.model != "", Assistant.model.in_(erlaubt)),
+            and_(or_(Assistant.model.is_(None), Assistant.model == ""),
+                 sa.literal(settings.chat_default_model in zugang.modelle)),
+        )
     # Positivliste, spiegelbildlich zu `darf_nutzen`: `private` steht nicht darin und
     # ist damit ausgeschlossen, ohne dass es eigens verboten werden müsste.
     return and_(
         aktiv,
+        modell,
         or_(
             Assistant.created_by == zugang.pseudonym,
             and_(

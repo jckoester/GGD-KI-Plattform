@@ -51,6 +51,18 @@ Die Modell-Freischaltungsmatrix legt fest, welche KI-Modelle welchen
 Nutzergruppen zur Verfügung stehen. Zeilen entsprechen den in LiteLLM
 konfigurierten Modellen, Spalten den Nutzergruppen (Jahrgänge und Rollen).
 
+**Die Plattform setzt die Matrix durch** (seit 0.27): Der Chat lehnt ein Modell ab, das
+für Rolle und Jahrgang nicht freigeschaltet ist, und blendet Assistenten mit einem solchen
+Modell aus — auch für ihre Ersteller:innen. Ein Assistent ohne eigenes Modell zählt mit
+`CHAT_DEFAULT_MODEL`. Welche aktiven Assistenten deshalb für einen Teil ihrer Zielgruppe
+unsichtbar sind, meldet `/assistants/manage` oben in einem Hinweis. Ist der Proxy nicht
+erreichbar, wird nicht gesperrt.
+
+> ⚠️ **Der Proxy allein tut es nicht.** Die Schlüssel der Nutzer:innen gehören keinem Team;
+> LiteLLM prüft die Modelle des Teams dann nicht. Bis 0.27 galt die Matrix deshalb nur für den
+> Modellwähler — wer die Anfrage selbst baute, erreichte jedes Modell, und ein Assistent mit
+> `chat-komplex` lief auch in Jahrgängen ohne Freischaltung.
+
 **Solange die Matrix leer ist, können Nutzer:innen keine Anfragen stellen.**
 Nach jeder Erstinstallation und nach dem Anlegen neuer LiteLLM-Teams daher
 immer zuerst die Matrix befüllen.

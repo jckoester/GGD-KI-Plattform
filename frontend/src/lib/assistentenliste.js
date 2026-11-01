@@ -89,3 +89,41 @@ export function abschnitteUebersicht(liste) {
   ].filter((a) => a.liste.length > 0);
   return abschnitte.length > 1 ? abschnitte : abschnitte.map((a) => ({ ...a, titel: null }));
 }
+
+/**
+ * Klassenstufen als Bereiche: `[5, 6, 7, 9, 10]` → „5–7, 9–10“.
+ * @param {number[]} stufen
+ */
+export function stufenBereiche(stufen) {
+  const s = [...new Set(stufen ?? [])].sort((a, b) => a - b);
+  const teile = [];
+  for (let i = 0; i < s.length; i++) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    teile.push(i === j ? `${s[i]}` : `${s[i]}–${s[j]}`);
+    i = j;
+  }
+  return teile.join(", ");
+}
+
+/**
+ * Hinweis für Admins: Assistenten, die wegen fehlender Modell-Freischaltung für einen Teil
+ * ihrer Zielgruppe unsichtbar sind (0.27, `GET /admin/assistants/model-check`, `gesperrt`).
+ * Zusammengefasst nach Modell und Stufen, sonst stünden 14 fast gleiche Zeilen untereinander.
+ *
+ * @param {Array<{name: string, model: string, stufen: number[], lehrkraefte: boolean}>} gesperrt
+ * @returns {string|null}
+ */
+export function gesperrtHinweis(gesperrt) {
+  if (!gesperrt?.length) return null;
+  const gruppen = new Map();
+  for (const g of gesperrt) {
+    const wer = [g.stufen?.length ? `Kl. ${stufenBereiche(g.stufen)}` : null, g.lehrkraefte ? "Lehrkräfte" : null]
+      .filter(Boolean).join(", ");
+    const schluessel = `${g.model} · ${wer}`;
+    gruppen.set(schluessel, [...(gruppen.get(schluessel) ?? []), `„${g.name}“`]);
+  }
+  const teile = [...gruppen].map(([schluessel, namen]) => `${schluessel}: ${namen.join(", ")}`);
+  const anzahl = gesperrt.length === 1 ? "Ein Assistent ist" : `${gesperrt.length} Assistenten sind`;
+  return `${anzahl} für einen Teil ihrer Zielgruppe unsichtbar, weil ihr Modell dort nicht freigeschaltet ist — ${teile.join("; ")}. Freischalten unter Einstellungen → Modell-Freischaltung.`;
+}

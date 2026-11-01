@@ -19,6 +19,7 @@
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import { gesperrtHinweis } from "$lib/assistentenliste.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import {
         getAdminAssistants,
@@ -36,6 +37,8 @@
     // Assistenten, deren fest gewähltes Modell in LiteLLM fehlt (Schritt 11).
     let orphanedModels = $state([]); // [{ id, name, model, status }]
     const orphanedIds = $derived(new Set(orphanedModels.map((o) => o.id)));
+    let gesperrt = $state([]); // 0.27: Modell für einen Teil der Zielgruppe nicht freigeschaltet
+    const gesperrtText = $derived(gesperrtHinweis(gesperrt));
 
     // State-Variablen
     let assistants = $state([]);
@@ -341,6 +344,7 @@
         // leere Liste hieße dann „ungeprüft", nicht „unauffällig".
         if (modelCheck.status === "fulfilled" && modelCheck.value.checked) {
             orphanedModels = modelCheck.value.orphaned;
+            gesperrt = modelCheck.value.gesperrt ?? [];
         }
     });
     $effect(() => {
@@ -506,6 +510,12 @@
             <WarningBanner
                 message={`${orphanedModels.length === 1 ? "Ein Assistent verweist" : `${orphanedModels.length} Assistenten verweisen`} auf ein Modell, das es in der Modell-Konfiguration nicht mehr gibt: ${orphanedModels.map((o) => `„${o.name}" (${o.model})`).join(", ")}. Diese Assistenten schlagen beim Chatten fehl. Im Assistenten ein verfügbares Modell wählen — oder das Feld leeren, damit er dem schulweiten Standard folgt.`}
             />
+        </div>
+    {/if}
+
+    {#if gesperrtText}
+        <div class="px-6 pt-4">
+            <WarningBanner message={gesperrtText} />
         </div>
     {/if}
 

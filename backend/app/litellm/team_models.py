@@ -13,9 +13,15 @@ ein Chat langsam wird.
 
 **Warum der Cache nie zur Ausfallquelle wird.** Ist der Proxy nicht erreichbar, liefert
 dieses Modul ``None`` — „unbekannt", nicht „nichts erlaubt". Der Aufrufer filtert dann
-nicht. Das ist Absicht: Der Filter ist Ergonomie, die **Durchsetzung** bleibt beim Proxy,
-der jede unerlaubte Anfrage ohnehin abweist. Ein Filter, der bei einer Störung alles
-wegnimmt, machte aus einem Anzeigeproblem einen Totalausfall.
+nicht. Das ist Absicht: Ein Filter, der bei einer Störung alles wegnimmt, machte aus einem
+Anzeigeproblem einen Totalausfall.
+
+⚠️ **Der Proxy setzt die Freigaben nicht durch** (festgestellt 01.11.2026, 0.27): Die
+Schlüssel der Nutzer:innen tragen kein Team (`client.generate_key`), und LiteLLM prüft die
+Team-Modelle dann nicht — bis 0.27 lief jedes Modell, das im Request stand. Seither setzt
+das **Backend** sie durch: `chat/router.py` lehnt ein nicht freigeschaltetes Modell vor dem
+Aufruf ab, `assistants/sichtbarkeit.py` blendet Assistenten mit solchem Modell aus. Bei
+``None`` (Proxy nicht erreichbar) sperren beide nicht.
 """
 
 from __future__ import annotations
