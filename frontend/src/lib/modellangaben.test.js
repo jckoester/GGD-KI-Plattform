@@ -3,6 +3,7 @@ import {
     kostenMarke,
     eintragsText,
     angaben,
+    assistentKosten,
     tokenKurz,
     MARKE_KOSTEN,
     MARKE_WERKZEUGE,
@@ -117,5 +118,19 @@ describe("tokenKurz", () => {
     it("schweigt ohne Angabe", () => {
         expect(tokenKurz(null)).toBeNull();
         expect(tokenKurz(0)).toBeNull();
+    });
+});
+
+describe("assistentKosten (0.27)", () => {
+    it("Marke, Gesamttext und Anteil der Dokumente", () => {
+        // 0,0073 USD → 62,4 Einheiten; Dokumente 0,00064 USD → 5,5 Einheiten.
+        const k = assistentKosten({ usd_je_nachricht: 0.0073, usd_dokumente: 0.00064 }, KURS, FAKTOR);
+        expect(k.marke).toBe(`~62 ${MARKE_KOSTEN}`);
+        expect(k.gesamt).toBe(`62 ${BEZEICHNUNG.plural}`);
+        expect(k.dokumente).toBe(`5 ${BEZEICHNUNG.plural}`);
+    });
+    it("ohne Preis keine Zahl, ohne Dokumente kein Anteil", () => {
+        expect(assistentKosten({ usd_je_nachricht: null }, KURS, FAKTOR)).toEqual({ marke: null, gesamt: null, dokumente: null });
+        expect(assistentKosten({ usd_je_nachricht: 0.0073 }, KURS, FAKTOR).dokumente).toBeNull();
     });
 });

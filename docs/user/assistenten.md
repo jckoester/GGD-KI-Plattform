@@ -19,6 +19,11 @@ Assistenten werden von Lehrkräften oder Administratoren angelegt und für besti
 
 Du kannst auch direkt im Chat-Eingabefeld **`/`** tippen, um den Assistenten-Picker zu öffnen — das funktioniert sowohl vor dem ersten Senden als auch mitten in einem laufenden Gespräch.
 
+Unter dem Eingabefeld steht der Name des Assistenten, daneben etwa „~62 🪙“: So viele Einheiten
+kostet eine Nachricht an ihn ungefähr. Der Info-Knopf ⓘ daneben sagt, welche Dokumente der
+Assistent kennt. Assistenten mit langen Anleitungen oder Dokumenten kosten mehr als der
+normale Chat.
+
 Wenn du den Assistenten während eines Gesprächs wechselst, bleibt der bisherige Verlauf erhalten und bleibt Teil des Kontexts für den neuen Assistenten. Im Verlauf erscheint ein Trenner, der den Wechsel markiert.
 
 ## Unterschied zum normalen Chat
@@ -125,6 +130,18 @@ Fachschaften. Gibst du den Assistenten für eine Unterrichtsgruppe oder Fachscha
 Fach aus der Gruppe; das Feld zeigt es dann nur an. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.
 Einen eigenen **Stundenassistenten** legst du mit einem Klick als Kopie des schulweiten an —
 siehe [Unterrichtsplanung](unterrichtsplanung.md#ein-eigener-stundenassistent).
+
+**Kontext-Dokumente:** Im Editor kannst du einem Assistenten bis zu drei Dateien anhängen
+(PDF, TXT oder Markdown, je höchstens 2 MB, zusammen höchstens 15 000 Token), etwa eine Tabelle
+mit den Werten, mit denen deine Klasse rechnet. Der Assistent bekommt sie **bei jeder
+Nachricht vollständig** mit. Das ist der Unterschied zum Wissensspeicher: Dessen Bausteine
+kommen nur dazu, wenn eine Frage passt. Dokumente sind deshalb für Kurzes gedacht, das immer
+gilt. Für viel Stoff ist der Wissensspeicher der bessere Weg, weil jedes Dokument jede
+Nachricht teurer macht.
+
+Im Chat zeigt ein Info-Knopf ⓘ neben dem Namen des Assistenten, welche Dokumente er kennt und
+was eine Nachricht etwa kostet. Das sehen alle, auch Schüler:innen. Wähle die Dateinamen
+deshalb so, dass sie sagen, was drinsteht, etwa „PSE mit Schulwerten“.
 
 **Klassenstufe und Sichtbarkeit:** Neben „Freigabe für“ kannst du die **Klassenstufen**
 eingrenzen, etwa 8 bis 10 — jüngere und ältere Schüler:innen sehen den Assistenten dann

@@ -5,6 +5,8 @@
   import { neuerChatPfad } from '$lib/chatziel.js'
   import { stufenText } from '$lib/assistentenliste.js'
   import { BADGE } from '$lib/badges.js'
+  import { assistentKosten } from '$lib/modellangaben.js'
+  import { budget } from '$lib/stores/budget.js'
 
   // `groupId`: Auf der Gruppenseite gehört der Chat zu dieser Gruppe — wie bei „+ Neuer Chat".
   // Ohne sie leitete der Server die Gruppe nur aus dem Fach des Assistenten ab; ein
@@ -43,6 +45,10 @@
     <span class="font-medium text-sm text-light-tx dark:text-dark-tx truncate flex-1">
       {assistant.name}
     </span>
+    {#if assistentKosten(assistant, $budget?.eur_usd_rate, $budget?.einheiten_je_euro).marke}
+      <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+            title="Geschätzte Kosten je Nachricht, samt Prompt und Dokumenten">{assistentKosten(assistant, $budget?.eur_usd_rate, $budget?.einheiten_je_euro).marke}</span>
+    {/if}
     <span class="{BADGE} shrink-0">
       {scopeLabel()}
     </span>

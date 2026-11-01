@@ -1730,6 +1730,14 @@
                           </span>
                         </div>
 
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                          Gehen bei jeder Nachricht vollständig mit — anders als Bausteine aus dem
+                          Wissensspeicher, die nur bei passender Frage dazukommen. Das kostet bei
+                          jeder Nachricht mit. Im Chat sehen alle, auch Schüler:innen, die
+                          Dateinamen: Wähle sie so, dass sie sagen, was drinsteht
+                          (etwa „PSE mit Schulwerten“).
+                        </p>
+
                         <!-- Token-Fortschrittsbalken -->
                         <div class="h-1.5 w-full rounded-full bg-light-ui-2 dark:bg-dark-ui-2 overflow-hidden">
                           <div

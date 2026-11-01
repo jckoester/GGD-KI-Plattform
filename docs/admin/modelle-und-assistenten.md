@@ -226,6 +226,15 @@ oder Aufgabe. Admins und Lehrkräfte können Assistenten anlegen.
 zur Verfügung. Änderungen am System-Prompt können so ausprobiert werden,
 bevor sie gespeichert werden.
 
+**Kontext-Dokumente:** Bis zu 3 Dateien je Assistent (PDF, TXT, Markdown; je 2 MB, zusammen
+15 000 Token, geschätzt als Zeichen ÷ 4; `MAX_DOCS`, `MAX_TOTAL_TOKENS` in
+`backend/app/api/assistants.py`). Sie gehen bei **jeder** Nachricht als eigene Systemnachricht
+mit, unabhängig von der Frage — anders als Bausteine aus dem Wissensspeicher, die die
+Vorab-Suche nur bei passender Frage beilegt. Im Chat sieht jede:r über den Info-Knopf, welche
+Dokumente ein Assistent kennt und was eine Nachricht etwa kostet (Schätzung: mittlere
+Nachricht plus Prompt, Bausteine und Dokumente, mal Modellpreis; `app/assistants/kosten.py`).
+Dieselbe Marke steht auf den Assistentenkarten.
+
 **Export und Import:** Jeder Assistent lässt sich als YAML-Datei exportieren (Editor oder
 Zeile in `/assistants/manage`) und auf einer anderen Installation wieder einspielen
 („Importieren“). „Alle exportieren“ lädt ein ZIP mit je einer Datei; sind in der Liste

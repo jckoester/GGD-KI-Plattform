@@ -179,6 +179,16 @@ class TestIsVisibleForUser:
 # =============================================================================
 
 class TestListAssistantsEndpoint:
+    @pytest.fixture(autouse=True)
+    def _ohne_kosten(self, monkeypatch):
+        """Die Kostenschätzung (0.27) fragt Modellpreise und Dokumente ab — hier nicht Thema;
+        sie hat eigene Tests (`tests/integration/test_assistent_kosten.py`)."""
+        from app.assistants import kosten
+
+        async def leer(_db, assistenten):
+            return {a.id: kosten.Kosten() for a in assistenten}
+        monkeypatch.setattr(kosten, "kosten_je_assistent", leer)
+
     def test_no_auth_returns_401_or_403(self):
         app = FastAPI()
         app.include_router(assistants_router)

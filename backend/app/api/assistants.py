@@ -50,6 +50,11 @@ def _get_assistant_schema() -> dict:
 
 # ── Common Schemas ───────────────────────────────────────────────────────────
 
+class DokumentKurz(BaseModel):
+    name: str
+    groesse_bytes: int
+
+
 class AssistantSummary(BaseModel):
     id: int
     name: str
@@ -67,6 +72,13 @@ class AssistantSummary(BaseModel):
     #: `specific` | `fallback` | `never` — die Fach- und Gruppenseiten zeigen die Rückfälle,
     #: deren `tags` das Fach nennen, als „Allgemeine Assistenten“ (0.26, F37 b).
     suggest: Optional[str] = None
+    #: Geschätzte Kosten einer Nachricht samt Prompt, Bausteinen und Dokumenten (0.27, F7′);
+    #: `None`, wenn der Preis des Modells unbekannt ist.
+    usd_je_nachricht: Optional[float] = None
+    #: Davon die Kontext-Dokumente.
+    usd_dokumente: Optional[float] = None
+    #: Kontext-Dokumente, die der Assistent bei jeder Nachricht mitbekommt (F9).
+    dokumente: list[DokumentKurz] = []
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -846,9 +858,17 @@ async def list_assistants(
     result = await db.execute(stmt)
     assistants = result.scalars().all()
 
-    return AssistantListResponse(
-        items=[AssistantSummary.model_validate(a) for a in assistants]
-    )
+    from app.assistants.kosten import kosten_je_assistent
+    kosten = await kosten_je_assistent(db, list(assistants))
+    return AssistantListResponse(items=[
+        AssistantSummary.model_validate(a).model_copy(update={
+            "usd_je_nachricht": kosten[a.id].usd_je_nachricht,
+            "usd_dokumente": kosten[a.id].usd_dokumente,
+            "dokumente": [DokumentKurz(name=d.name, groesse_bytes=d.groesse_bytes)
+                          for d in kosten[a.id].dokumente],
+        })
+        for a in assistants
+    ])
 
 
 # ── Eigene Assistenten ───────────────────────────────────────────────────────

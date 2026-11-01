@@ -12,7 +12,7 @@
  * Auskunft. Unbekanntes wird deshalb weggelassen, nicht verneint.
  */
 
-import { ausUsd, zahl as einheitenZahl, BEZEICHNUNG } from "./einheiten.js";
+import { ausUsd, zahl as einheitenZahl, text as einheitenText, BEZEICHNUNG } from "./einheiten.js";
 
 /**
  * Münze für die Kosten, Zahnrad für die Fähigkeiten — die Marken im Auswahlfeld.
@@ -103,4 +103,22 @@ export function tokenKurz(token) {
     const seiten = Math.round(genau);
     const wort = seiten === 1 ? "Seite" : "Seiten";
     return `${zahl} Token (ca. ${seiten.toLocaleString("de-DE")} ${wort})`;
+}
+
+/**
+ * Kosten eines Assistenten für Badge und Info-Knopf (0.27, Plan F7′).
+ *
+ * Grundlage ist `usd_je_nachricht` aus der Assistentenliste: mittlere Nachricht **plus**
+ * Prompt, Bausteine und Kontext-Dokumente des Assistenten (`backend/app/assistants/kosten.py`).
+ * Die Marke des Modells allein läge bei Assistenten mit Dokumenten zu niedrig.
+ *
+ * @returns {{ marke: string|null, gesamt: string|null, dokumente: string|null }}
+ */
+export function assistentKosten(assistent, kurs, faktor) {
+    const marke = kostenMarke({ usd_je_nachricht: assistent?.usd_je_nachricht }, kurs, faktor);
+    const gesamt = einheitenText(ausUsd(assistent?.usd_je_nachricht, kurs, faktor));
+    const dokumente = assistent?.usd_dokumente
+        ? einheitenText(ausUsd(assistent.usd_dokumente, kurs, faktor))
+        : null;
+    return { marke, gesamt, dokumente };
 }

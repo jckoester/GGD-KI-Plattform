@@ -12,6 +12,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (Hinweis dazu beim Kürzel auf der Seite „Unterricht“). „Assistenten verwalten“ steht in der Admin-Seitenleiste daneben.
 - **Assistenten verwalten** samt Editor liegt im Admin-Bereich (Adressen unverändert).
 - **Assistenten verwalten:** Die Spalte Zielgruppe nennt die Klassenstufen.
+- **Kosten je Assistent:** Neben dem Namen im Chat und auf den Assistentenkarten steht, was eine Nachricht etwa kostet
+  („~62 🪙“) — samt Prompt, Bausteinen und Kontext-Dokumenten, nicht nur das Modell.
+- **Kontext-Dokumente im Chat:** Ein Info-Knopf neben dem Assistenten nennt Kosten und die Dokumente, die er bei jeder
+  Nachricht mitbekommt. Der Editor weist auf aussagekräftige Dateinamen hin.
 - **Assistentenkarten:** Das Fach steht zusätzlich zum Farbstreifen als farbiges Etikett, die Klassenstufen als
   „Kl. 8–13“ statt „alle“.
 

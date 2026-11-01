@@ -2,6 +2,10 @@
     import { abschnitteUebersicht, stufenText, zurAnzeige } from "$lib/assistentenliste.js";
     import { BADGE } from "$lib/badges.js";
     import FachBadge from "$lib/components/FachBadge.svelte";
+    import { assistentKosten } from "$lib/modellangaben.js";
+    import { budget } from "$lib/stores/budget.js";
+
+    const kostenText = (a) => assistentKosten(a, $budget?.eur_usd_rate, $budget?.einheiten_je_euro).marke;
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -106,6 +110,10 @@
                                         {/if}
                                         {#if stufenText(assistant)}
                                             <span class={BADGE}>{stufenText(assistant)}</span>
+                                        {/if}
+                                        {#if kostenText(assistant)}
+                                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                                  title="Geschätzte Kosten je Nachricht, samt Prompt und Dokumenten">{kostenText(assistant)}</span>
                                         {/if}
                                     </div>
                                     {#if assistant.description}

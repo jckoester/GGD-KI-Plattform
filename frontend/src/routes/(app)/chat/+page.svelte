@@ -73,6 +73,7 @@
     import { chatKontextText } from "$lib/gruppenmarke.js";
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import ModellWahl from "$lib/components/ModellWahl.svelte";
+    import AssistentInfo from "$lib/components/AssistentInfo.svelte";
     import {
         pageTitle,
         activeConversationId,
@@ -1835,6 +1836,13 @@
                     >
                         <Bot class="w-3.5 h-3.5" />
                         {selectedAssistant?.name || conversationAssistant?.name}
+                        <!-- Kosten und Dokumente (0.27): Die laufende Konversation kennt nur Kennung
+                             und Namen; die vollen Angaben stehen in der Assistentenliste. -->
+                        <AssistentInfo
+                            assistent={availableAssistants.find(
+                                (a) => a.id === (selectedAssistant?.id ?? conversationAssistant?.id),
+                            )}
+                        />
                     </span>
                 {:else}
                     <!-- Modell-Auswahl -->
