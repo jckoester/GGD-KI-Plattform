@@ -5,10 +5,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.27.1] – 2026-11-01
+
+Umbenannte Stundenentwürfe erscheinen mit ihrem neuen Namen in der Jahresplanung. Eine Migration (0096).
+
+### Behoben
+
+- **Jahresplanung:** Ein im Stundenentwurf umbenannter Entwurf behielt in der Übersicht den alten Namen oder zeigte
+  „Thema eingeben …“. Das Thema des Termins folgt jetzt dem Titel, sofern es leer ist oder noch den alten Titel trägt;
+  Migration 0096 füllt leere Themen verknüpfter Termine einmalig.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0096) — wie im regulären Update.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+
 ## [0.27.0] – 2026-11-01
 
 Assistenten-Pflege: Die Modell-Freischaltung gilt jetzt wirklich, Freigabe und Verwaltung liegen im Admin-Bereich,
-Kosten und Kontext-Dokumente sind im Chat sichtbar. Zwei Migrationen (0095, 0096).
+Kosten und Kontext-Dokumente sind im Chat sichtbar. Eine Migration (0095).
 
 ### Neu
 
@@ -38,9 +54,6 @@ Kosten und Kontext-Dokumente sind im Chat sichtbar. Zwei Migrationen (0095, 0096
 
 ### Behoben
 
-- **Jahresplanung:** Ein im Stundenentwurf umbenannter Entwurf behielt in der Übersicht den alten Namen oder zeigte
-  „Thema eingeben …“. Das Thema des Termins folgt jetzt dem Titel, sofern es leer ist oder noch den alten Titel trägt;
-  Migration 0096 füllt leere Themen verknüpfter Termine einmalig.
 - **Modell-Freischaltung wird durchgesetzt:** Sie galt bisher nur für den Modellwähler; ein Modell, das im Request
   stand, lief auch ohne Freischaltung. Jetzt lehnt der Chat es ab, und Assistenten mit einem nicht freigeschalteten
   Modell sind in den betreffenden Stufen unsichtbar. `/assistants/manage` nennt die betroffenen Assistenten.
@@ -60,7 +73,7 @@ Kosten und Kontext-Dokumente sind im Chat sichtbar. Zwei Migrationen (0095, 0096
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0095, 0096) — wie im regulären Update.
+- `alembic upgrade head` (0095) — wie im regulären Update.
 - **`/settings/models` prüfen, bevor Schüler:innen weiterarbeiten:** Die Freischaltung gilt jetzt wirklich.
   `chat-komplex` muss für die Stufen der Schüler-Assistenten freigeschaltet sein (5–13), sonst sind diese dort
   unsichtbar. Dasselbe gilt für jedes Modell, das ein Assistent fest gewählt hat. Den Stand zeigt der Hinweis oben in
