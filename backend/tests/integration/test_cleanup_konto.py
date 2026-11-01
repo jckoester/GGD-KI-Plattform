@@ -167,6 +167,18 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
                 (seed_test_group, code, wer),
             )
             ids[f"code_{wer}"] = cur.fetchone()[0]
+
+        # ── Audit-Log (0.28, ADR-010 §2.5) ──
+        # Je eine Zeile in `admin`, `auth`, `moderation`; dazu eine des aktiven Kontos.
+        ids["audit"] = {}
+        for wer, kategorie in ((VERLASSEN, "admin"), (VERLASSEN, "auth"),
+                               (VERLASSEN, "moderation"), (AKTIV, "auth")):
+            cur.execute(
+                "INSERT INTO audit_log (category, event_type, actor_pseudonym, actor_role,"
+                " retention_class) VALUES (%s,'test_konto',%s,'teacher',%s) RETURNING id",
+                (kategorie, wer, kategorie),
+            )
+            ids["audit"][(wer, kategorie)] = cur.fetchone()[0]
     sync_conn.commit()
     yield ids
     sync_conn.rollback()
@@ -182,6 +194,8 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
         # Über die ID, nicht über das Pseudonym: Nach dem Lauf steht dort NULL.
         for schluessel in ("feedback", "feedback_fremd"):
             cur.execute("DELETE FROM feedback WHERE id = %s", (str(ids[schluessel]),))
+        cur.execute("SET LOCAL audit.aufraeumen = 'on'")
+        cur.execute("DELETE FROM audit_log WHERE event_type = 'test_konto'")
         cur.execute("DELETE FROM subjects WHERE id = %s", (SUBJECT_ID,))
         cur.execute("DELETE FROM pseudonym_audit WHERE pseudonym IN (%s,%s)",
                     (VERLASSEN, AKTIV))
@@ -365,3 +379,17 @@ def test_beitrittscode_verliert_nur_das_pseudonym(sync_conn, gelaufen):
     assert set(zeilen) == {"TEST-AAAA", "TEST-BBBB"}, "Ein Code wurde mitgelöscht"
     assert zeilen["TEST-AAAA"] is None, "Das Pseudonym der gegangenen Lehrkraft steht noch"
     assert zeilen["TEST-BBBB"] == AKTIV, "Fremdes Pseudonym wurde mitgenullt"
+
+
+def test_audit_log_admin_bleibt_auth_und_moderation_ohne_pseudonym(sync_conn, gelaufen):
+    """0.28, ADR-010 §2.5: Die Revisionsspur bleibt; nur `auth`/`moderation` verlieren das
+    Pseudonym (Rolle bleibt). Das aktive Konto bleibt unberührt."""
+    def akteur(wer, kategorie):
+        return _zaehle(sync_conn, "SELECT actor_pseudonym FROM audit_log WHERE id = %s",
+                       gelaufen["audit"][(wer, kategorie)])
+    assert akteur(VERLASSEN, "admin") == VERLASSEN
+    assert akteur(VERLASSEN, "auth") is None
+    assert akteur(VERLASSEN, "moderation") is None
+    assert akteur(AKTIV, "auth") == AKTIV
+    assert _zaehle(sync_conn, "SELECT actor_role FROM audit_log WHERE id = %s",
+                   gelaufen["audit"][(VERLASSEN, "auth")]) == "teacher"

@@ -1033,7 +1033,8 @@ class BudgetGrant(Base):
 
     **Append-only.** Jede Vergabe ist eine Zeile; geändert oder gelöscht wird nichts
     (außer mit dem Konto, s. u.). Damit ist die Tabelle das Protokoll, das die Roadmap
-    verlangt — ein eigenes `audit_log` braucht es dafür nicht (ADR-010 Teil 2 ist offen).
+    verlangt — ein eigenes `audit_log` braucht es dafür nicht (seit 0.28 gibt es eins; die
+    Zuschläge bleiben hier, weil die Tabelle zugleich die Grundlage der Budgetrechnung ist).
 
     **Warum eine eigene Tabelle und nicht einfach `max_budget` anheben.** Die
     Wochenaufstockung deckelt die Grenze auf `verbrauch + vorsprung × wochenbetrag`. Ein
@@ -1122,6 +1123,46 @@ class PseudonymAudit(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
     litellm_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class AuditLog(Base):
+    """Audit-Log (0.28, ADR-010 Teil 2, Nachtrag §2.5) — sicherheitsrelevante Ereignisse.
+
+    **Nur anhängen.** Ein Trigger weist `UPDATE`, `DELETE` und `TRUNCATE` ab, außer die
+    Transaktion hat `SET LOCAL audit.aufraeumen = 'on'` gesetzt (Aufräum-Lauf, Kontolöschung).
+    Geschrieben wird nur über `app/core/audit.py` — dort steht, welche Ereignisse es gibt und
+    welche Felder nie hineingehören.
+
+    Keine Inhalte: kein Chattext, kein Meldungstext, keine Tokens (ADR-010 §2.1).
+    """
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actor_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    retention_class: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('auth','admin','access','moderation','secret','system')",
+            name="check_audit_log_category",
+        ),
+        CheckConstraint(
+            "retention_class IN ('auth','admin','access','moderation','secret','system')",
+            name="check_audit_log_retention_class",
+        ),
+        Index("audit_log_occurred_at_idx", text("occurred_at DESC")),
+        Index("audit_log_category_idx", "category", text("occurred_at DESC")),
+        Index("audit_log_actor_idx", "actor_pseudonym", text("occurred_at DESC")),
+    )
 
 
 # 9. jwt_revocations

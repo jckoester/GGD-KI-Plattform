@@ -8,6 +8,7 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
+    AuditLog,
     Artifact,
     BudgetAccrual,
     BudgetGrant,
@@ -304,6 +305,27 @@ async def cleanup_inactive_accounts(
                                 NodeEngagement.pseudonym == pseudonym
                             )
                         )
+                        # ── Audit-Log (0.28, ADR-010 §2.5, Entscheidung 01.11.2026) ──
+                        #
+                        # Die Revisionsspur bleibt bis zum Ende ihrer Frist (§2.3) — das
+                        # ist ihr Zweck. Ausnahme `auth` und `moderation`: Dort ist der
+                        # Akteur meist eine Schüler:in, und die Frist sichert keine
+                        # Revision von Verwaltungsakten. Das Pseudonym wird NULL, die
+                        # Rolle bleibt (unterscheidet es von Systemereignissen ohne
+                        # Akteur). `admin`-Ereignisse behalten es — Akteur ist dort eine
+                        # Lehrkraft oder ein Admin, und genau das soll nachvollziehbar
+                        # bleiben. Der Trigger lässt die Änderung nur mit der
+                        # Sitzungsvariablen zu, und nur für diese eine Anweisung.
+                        await db.execute(select(func.set_config("audit.aufraeumen", "on", True)))
+                        await db.execute(
+                            update(AuditLog)
+                            .where(
+                                AuditLog.actor_pseudonym == pseudonym,
+                                AuditLog.category.in_(("auth", "moderation")),
+                            )
+                            .values(actor_pseudonym=None)
+                        )
+                        await db.execute(select(func.set_config("audit.aufraeumen", "off", True)))
                         # ── Gruppenmitgliedschaften (Entscheidung 08.09.2026) ──
                         #
                         # `sync_groups` schreibt sie **beim Login** fort. Wer die
