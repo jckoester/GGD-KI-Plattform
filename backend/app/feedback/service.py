@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Feedback
 from app.feedback import snapshot
 from app.feedback.schemas import FeedbackCreate, FeedbackOut
+from app.core.audit import audit, audit_getrennt
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,8 @@ async def pruefe_grenzen(
     ende = await gesperrt_bis(db, pseudonym, jetzt=jetzt)
     if ende is not None:
         logger.info("feedback_blocked pseudonym=%s bis=%s", pseudonym, ende.isoformat())
+        await audit_getrennt("admin", "feedback_blocked", akteur=pseudonym,
+                             daten={"gesperrt_bis": ende.isoformat()})
         raise HTTPException(
             status_code=403,
             detail=f"Feedback vorübergehend gesperrt bis {ende.strftime('%d.%m.%Y')}.",
@@ -308,6 +311,9 @@ async def aendere(
             eintrag.contact = None
             if not keep_snapshot:
                 eintrag.conversation_snapshot = None
+        await audit(db, "admin", "feedback_status_changed", akteur=admin_pseudonym, rolle="admin",
+                    ziel=("feedback", feedback_id),
+                    daten={"von": vorher, "nach": ziel, "anhang_behalten": bool(keep_snapshot)})
 
     await db.commit()
     await db.refresh(eintrag)

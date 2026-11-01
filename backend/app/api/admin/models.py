@@ -8,6 +8,8 @@ from app.auth.jwt import JwtPayload
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX, VALID_GRADES
 from pydantic import BaseModel
+from app.core.audit import audit_getrennt
+from app.litellm.team_models import invalidate_team_models_cache
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,7 @@ async def get_model_matrix(
 @router.post("/matrix", response_model=ModelMatrixResponse)
 async def save_model_matrix(
     update: ModelMatrixUpdate,
-    _: JwtPayload = Depends(require_role("admin")),
+    current_user: JwtPayload = Depends(require_role("admin")),
 ) -> ModelMatrixResponse:
     """
     Speichert die Chat-Modell-Freischaltung für alle Phase-1-Teams.
@@ -105,4 +107,9 @@ async def save_model_matrix(
         for team_id, models in updates.items()
     ])
     # Aktualisierten Zustand zurückliefern
+    # Seit 0.27 hängt die Sichtbarkeit von Assistenten an diesen Freigaben — der Cache darf
+    # danach nicht fünf Minuten lang den alten Stand zeigen.
+    invalidate_team_models_cache()
+    await audit_getrennt("admin", "model_access_changed", akteur=current_user,
+                         daten={"art": "chat", "teams": {t: sorted(m) for t, m in updates.items()}})
     return await _fetch_matrix()

@@ -105,6 +105,7 @@ from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
+from app.core.audit import audit
 
 
 class ConversationItem(BaseModel):
@@ -1743,6 +1744,7 @@ async def _record_crisis(
     user_message: str,
     attachments: list[AttachmentMeta],
     pseudonym: str,
+    rollen: Optional[list[str]] = None,
 ) -> Optional[_CrisisRecord]:
     """Krisen-Erkennung (ADR-008 Teil 3) — OHNE Blockieren des Chats.
 
@@ -1789,6 +1791,11 @@ async def _record_crisis(
         trigger_rule=hit.trigger_rule,
         coreviewer_role=hit.coreviewer_role,
     ))
+    # Nur Kategorie und Schwere — nie der Text der Nachricht (ADR-010 §2.1).
+    await audit(db, "moderation", "crisis_flag_created", akteur=pseudonym,
+                rolle="teacher" if {"teacher", "admin"} & set(rollen or []) else "student",
+                ziel=("conversation", conversation_id),
+                daten={"kategorie": hit.category, "schwere": hit.severity})
     await db.commit()
     logger.warning(
         "Krisen-Flag angelegt: kategorie=%s severity=%s pseudonym=%s conv=%s",
@@ -2167,6 +2174,7 @@ async def chat(
             user_message,
             request.messages[-1].attachments if request.messages else [],
             current_user.sub,
+            current_user.roles,
         )
         crisis_hit = crisis_record.hit if crisis_record is not None else None
     else:

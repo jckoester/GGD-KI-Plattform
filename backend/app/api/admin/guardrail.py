@@ -16,6 +16,7 @@ from app.core.paths import aufloesen
 from app.db.models import SiteConfig
 from app.db.session import get_db
 from app.litellm.client import LiteLLMClient
+from app.core.audit import audit
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,7 @@ async def update_guardrail_prompt(
         )
     )
     await db.execute(stmt)
+    await audit(db, "admin", "guardrail_changed", akteur=current_user)
     await db.commit()
 
     # Chat-Router-Cache invalidieren

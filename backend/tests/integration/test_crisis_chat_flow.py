@@ -48,6 +48,14 @@ async def test_record_crisis_creates_flag_and_message(_commit_as_flush):
     # Die früh persistierte User-Nachricht existiert und hängt am Flag
     msg = await db.scalar(select(Message).where(Message.id == flag.message_id))
     assert msg is not None
+
+    # Audit-Log (0.28): Kategorie und Schwere, nie der Text.
+    from app.db.models import AuditLog
+    eintrag = await db.scalar(select(AuditLog).where(
+        AuditLog.event_type == "crisis_flag_created", AuditLog.target_id == str(conv.id)))
+    assert eintrag is not None and eintrag.category == "moderation"
+    assert eintrag.payload == {"kategorie": "suizidalitaet", "schwere": "alert"}
+    assert "umbringen" not in str(eintrag.payload)
     assert msg.role == "user"
 
 

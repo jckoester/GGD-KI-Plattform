@@ -63,7 +63,7 @@ async def test_resolve_marks_flag_resolved(db):
         request_id=req.id,
         body=ResolveRequest(outcome="resolved", note=NOTE),
         db=db,
-        _=ADMIN,
+        current_user=ADMIN,
     )
     assert resp.request_status == "expired"
     assert resp.flag_status == "resolved"
@@ -82,7 +82,7 @@ async def test_resolve_dismissed(db):
         request_id=req.id,
         body=ResolveRequest(outcome="dismissed", note="Fehlalarm."),
         db=db,
-        _=ADMIN,
+        current_user=ADMIN,
     )
     assert resp.flag_status == "dismissed"
     await db.refresh(flag)
@@ -97,7 +97,7 @@ async def test_resolve_pending_request_allowed(db):
         request_id=req.id,
         body=ResolveRequest(outcome="dismissed", note="Kein Anlass."),
         db=db,
-        _=ADMIN,
+        current_user=ADMIN,
     )
     assert resp.request_status == "expired"
     assert resp.flag_status == "dismissed"
@@ -110,7 +110,7 @@ async def test_resolve_already_closed_409(db):
             request_id=req.id,
             body=ResolveRequest(outcome="resolved", note=NOTE),
             db=db,
-            _=ADMIN,
+            current_user=ADMIN,
         )
     assert exc.value.status_code == 409
 
@@ -121,7 +121,7 @@ async def test_resolve_unknown_404(db):
             request_id=uuid.uuid4(),
             body=ResolveRequest(outcome="resolved", note=NOTE),
             db=db,
-            _=ADMIN,
+            current_user=ADMIN,
         )
     assert exc.value.status_code == 404
 

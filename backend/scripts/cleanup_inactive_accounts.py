@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.crons.cleanup_service import cleanup_inactive_accounts
 from app.db.session import AsyncSessionLocal
+from app.core.audit import audit_getrennt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,6 +62,9 @@ async def run_cleanup(
         stats.errors,
         stats.duration_ms,
     )
+    if not dry_run:
+        await audit_getrennt("system", "accounts_cleaned", daten={
+            "gefunden": stats.found, "geloescht": stats.deleted_local, "fehler": stats.errors})
     return 0
 
 

@@ -8,6 +8,8 @@ from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 from app.litellm.client import LiteLLMClient
 from app.api.admin.models import phase1_team_ids
+from app.core.audit import audit_getrennt
+from app.litellm.team_models import invalidate_team_models_cache
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ async def get_image_model_matrix(
 @router.post("/matrix", response_model=ImageModelMatrixResponse)
 async def save_image_model_matrix(
     update: ImageModelMatrixUpdate,
-    _: JwtPayload = Depends(require_role("admin")),
+    current_user: JwtPayload = Depends(require_role("admin")),
 ) -> ImageModelMatrixResponse:
     """
     Speichert die Bild-Modell-Freischaltung für alle Phase-1-Teams.
@@ -95,4 +97,9 @@ async def save_image_model_matrix(
         _client.update_team_models(team_id, models)
         for team_id, models in updates.items()
     ])
+    # Seit 0.27 hängt die Sichtbarkeit von Assistenten an diesen Freigaben — der Cache darf
+    # danach nicht fünf Minuten lang den alten Stand zeigen.
+    invalidate_team_models_cache()
+    await audit_getrennt("admin", "model_access_changed", akteur=current_user,
+                         daten={"art": "bild", "teams": {t: sorted(m) for t, m in updates.items()}})
     return await _fetch_matrix()

@@ -28,6 +28,7 @@ from app.crons.node_lifecycle_service import (
     loesche_alte_archivierte,
 )
 from app.db.session import AsyncSessionLocal
+from app.core.audit import audit_getrennt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +47,7 @@ def _parse_now(raw: str | None) -> datetime | None:
 
 
 async def run(*, dry_run: bool, archivieren: bool, loeschen: bool, jetzt: datetime | None) -> int:
+    ergebnis: dict[str, int] = {}
     async with AsyncSessionLocal() as db:
         if archivieren:
             lauf = await archiviere_abgelaufene(
@@ -55,6 +57,7 @@ async def run(*, dry_run: bool, archivieren: bool, loeschen: bool, jetzt: dateti
                 "node_lifecycle archivieren: faellig=%d archiviert=%d dry_run=%s",
                 lauf.geprueft, lauf.archiviert, dry_run,
             )
+            ergebnis["archiviert"] = lauf.archiviert
 
         if loeschen:
             lauf = await loesche_alte_archivierte(db, dry_run=dry_run, jetzt=jetzt)
@@ -64,6 +67,9 @@ async def run(*, dry_run: bool, archivieren: bool, loeschen: bool, jetzt: dateti
                 lauf.faellig, lauf.geloescht, lauf.geschuetzt_global,
                 lauf.geschuetzt_ausgesetzt, dry_run,
             )
+            ergebnis["geloescht"] = lauf.geloescht
+    if not dry_run and ergebnis:
+        await audit_getrennt("system", "node_lifecycle_run", daten=ergebnis)
     return 0
 
 

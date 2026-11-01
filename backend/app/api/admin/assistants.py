@@ -19,6 +19,7 @@ from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 from app.db.models import Assistant
 from app.db.session import get_db
+from app.core.audit import audit
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,8 @@ async def approve_assistant(
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
 
+    await audit(db, "admin", "assistant_approved", akteur=current_user, ziel=("assistant", assistant.id),
+                daten={"audience": assistant.audience, "scope": assistant.scope})
     await db.commit()
     await db.refresh(assistant)
     # Zielgruppe ist ein bewusster Prüfpunkt (Phase 13): eine Fehlkonfiguration hat
@@ -278,6 +281,8 @@ async def reject_assistant(
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
 
+    await audit(db, "admin", "assistant_rejected", akteur=current_user, ziel=("assistant", assistant.id),
+                daten={"mit_begruendung": bool(body.reason)})
     await db.commit()
     await db.refresh(assistant)
     return AssistantResponse.model_validate(assistant)
@@ -299,6 +304,7 @@ async def activate_assistant(
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
 
+    await audit(db, "admin", "assistant_activated", akteur=current_user, ziel=("assistant", assistant.id))
     await db.commit()
     await db.refresh(assistant)
 
@@ -321,6 +327,7 @@ async def deactivate_assistant(
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
 
+    await audit(db, "admin", "assistant_deactivated", akteur=current_user, ziel=("assistant", assistant.id))
     await db.commit()
     await db.refresh(assistant)
 

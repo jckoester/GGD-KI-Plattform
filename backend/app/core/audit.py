@@ -31,13 +31,19 @@ from app.db.models import AuditLog
 
 logger = logging.getLogger(__name__)
 
+#: Woher `audit_getrennt` seine Sitzung nimmt. `None` = die Anwendungsdatenbank
+#: (`AsyncSessionLocal`). Die Integrationstests setzen hier ihre Test-Datenbank ein, die
+#: Unit-Tests schalten das Schreiben ab (`SCHREIBEN = False`) — sonst landeten Einträge aus
+#: Testläufen in der Datenbank der Entwicklungsinstanz (so geschehen am 01.11.2026).
+SITZUNGSFABRIK = None
+SCHREIBEN = True
+
 #: Kategorie → erlaubte Ereignisse. `access` bleibt in `conversation_access_audit` (§2.5).
 EREIGNISSE: dict[str, frozenset[str]] = {
     "auth": frozenset({
         "login_failed",
         "stepup_denied",
         "rate_limit_locked",
-        "session_revoked",
         # Vorschaumodus (ADR-016, 0.29)
         "preview_entered",
         "preview_exited",
@@ -48,7 +54,6 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "assistant_activated",
         "assistant_deactivated",
         "assistant_deleted",
-        "assistant_deletion_decided",
         "model_access_changed",
         "budget_changed",
         "budget_granted",
@@ -163,10 +168,14 @@ async def audit_getrennt(kategorie: str, ereignis: str, **kwargs) -> None:
     Ereignisname soll im Test auffallen, nicht im Betrieb still verschwinden.
     """
     zeile = eintrag(kategorie, ereignis, **kwargs)
-    from app.db.session import AsyncSessionLocal
+    if not SCHREIBEN:
+        return
+    fabrik = SITZUNGSFABRIK
+    if fabrik is None:
+        from app.db.session import AsyncSessionLocal as fabrik
 
     try:
-        async with AsyncSessionLocal() as db:
+        async with fabrik() as db:
             db.add(zeile)
             await db.commit()
     except Exception:

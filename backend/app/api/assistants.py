@@ -22,6 +22,7 @@ from app.config import settings
 from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility, Group
 from app.db.session import get_db
 from app.upload.extractor import extract_pdf, extract_plaintext
+from app.core.audit import audit
 
 logger = logging.getLogger(__name__)
 
@@ -1223,6 +1224,8 @@ async def delete_assistant(
         ),
         {"id": assistant_id},
     )
+    await audit(db, "admin", "assistant_deleted", akteur=current_user, ziel=("assistant", assistant_id),
+                daten={"auf_antrag": assistant.deletion_requested_at is not None, "scope": assistant.scope})
     await db.delete(assistant)
     await db.commit()
 

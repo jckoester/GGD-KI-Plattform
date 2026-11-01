@@ -340,3 +340,13 @@ def _modellfreigaben_unbekannt(monkeypatch):
     monkeypatch.setattr(team_models._client, "get_team_info", AsyncMock(return_value=None))
     yield
     team_models.invalidate_team_models_cache()
+
+
+@pytest.fixture(autouse=True)
+def _audit_in_die_testdatenbank(async_engine, monkeypatch):
+    """`audit_getrennt` öffnet eine eigene Sitzung — hier über die Test-Datenbank, nicht über
+    `AsyncSessionLocal` (die Datenbank aus der `.env`)."""
+    from app.core import audit
+
+    monkeypatch.setattr(audit, "SITZUNGSFABRIK",
+                        async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False))

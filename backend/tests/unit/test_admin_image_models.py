@@ -92,8 +92,8 @@ async def test_image_matrix_save_preserves_chat_models():
     mock.get_team_info.return_value = {"models": ["gpt-4o-mini", "gpt-image-1"]}
     mock.update_team_models.return_value = None
     update = im.ImageModelMatrixUpdate(allowlists={"lehrkraefte": ["gpt-image-1.5"]})
-    with patch.object(im, "_client", mock):
-        await im.save_image_model_matrix(update, _=None)
+    with patch.object(im, "_client", mock), patch.object(im, "audit_getrennt", AsyncMock()):
+        await im.save_image_model_matrix(update, current_user=None)
 
     # update_team_models für lehrkraefte mit gemergter Liste aufgerufen
     calls = [c for c in mock.update_team_models.call_args_list if c.args[0] == "lehrkraefte"]
@@ -115,8 +115,8 @@ async def test_image_matrix_save_ignores_unknown_teams_and_non_image_models():
         "fremdes-team": ["gpt-image-1"],       # unbekannt → ignoriert
         "lehrkraefte": ["gpt-4o-mini"],        # kein Bild-Modell → ignoriert
     })
-    with patch.object(im, "_client", mock):
-        await im.save_image_model_matrix(update, _=None)
+    with patch.object(im, "_client", mock), patch.object(im, "audit_getrennt", AsyncMock()):
+        await im.save_image_model_matrix(update, current_user=None)
 
     updated_teams = {c.args[0] for c in mock.update_team_models.call_args_list}
     assert "fremdes-team" not in updated_teams
@@ -152,8 +152,8 @@ async def test_chat_matrix_save_preserves_image_models():
     mock.get_team_info.return_value = {"models": ["gpt-4o-mini", "gpt-image-1"]}
     mock.update_team_models.return_value = None
     update = cm.ModelMatrixUpdate(allowlists={"lehrkraefte": ["gpt-4o"]})
-    with patch.object(cm, "_client", mock):
-        await cm.save_model_matrix(update, _=None)
+    with patch.object(cm, "_client", mock), patch.object(cm, "audit_getrennt", AsyncMock()):
+        await cm.save_model_matrix(update, current_user=None)
 
     calls = [c for c in mock.update_team_models.call_args_list if c.args[0] == "lehrkraefte"]
     assert len(calls) == 1

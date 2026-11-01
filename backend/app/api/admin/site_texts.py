@@ -8,6 +8,7 @@ from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 from app.db.models import SiteConfig
 from app.db.session import get_db
+from app.core.audit import audit
 
 router = APIRouter(prefix="/site-texts", tags=["admin-site-texts"])
 
@@ -58,6 +59,7 @@ async def update_site_text(
             updated_by=current_user.sub,
         )
     )
+    await audit(db, "admin", "site_text_changed", akteur=current_user, ziel=("site_text", key))
     await db.commit()
     
     # Fetch updated record to get the precise updated_at timestamp

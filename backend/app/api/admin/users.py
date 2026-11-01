@@ -19,6 +19,7 @@ from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 from app.db.models import PseudonymAudit
 from app.db.session import get_db
+from app.core.audit import audit
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ async def revoke_sessions(
     )
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden.")
+    await audit(db, "admin", "user_sessions_revoked", akteur=current_user, ziel=("user", pseudonym))
     await db.commit()
     logger.info(
         "Admin %s hat alle Sitzungen von %s beendet (revoked_all_before=%s)",

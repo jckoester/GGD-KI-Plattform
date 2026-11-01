@@ -31,6 +31,7 @@ from app.planning.calendar import load_school_year
 from app.litellm import systemkonto
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID, VALID_GRADES
+from app.core.audit import audit_getrennt
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ async def _hochrechnung(
 @router.post("/grades", response_model=BudgetGradesUpdateResult)
 async def update_budget_grades(
     body: BudgetGradesUpdateRequest,
-    _: JwtPayload = Depends(require_any_role(["budget", "admin"])),
+    current_user: JwtPayload = Depends(require_any_role(["budget", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetGradesUpdateResult:
     """
@@ -367,6 +368,9 @@ async def update_budget_grades(
 
     logger.info("Budget-Update abgeschlossen: %d/%d Nutzer erfolgreich aktualisiert", success, len(tasks))
 
+    await audit_getrennt("admin", "budget_changed", akteur=current_user,
+                         daten={"wochenbetrag_eur": {g.key: g.max_budget_eur for g in body.grades},
+                                "konten_aktualisiert": success})
     return BudgetGradesUpdateResult(ok=True, updated_users=success)
 
 
@@ -516,6 +520,11 @@ async def zuschlag_buchen(
         len(ergebnis.gebucht), len(ergebnis.fehlgeschlagen), len(ergebnis.unbegrenzt),
         anfrage.gruppe_id, anfrage.betrag_eur,
     )
+    # Der Zuschlag selbst steht in `budget_grants`; hier die Handlung, ohne den Freitext `grund`.
+    await audit_getrennt("admin", "budget_granted", akteur=current_user,
+                         ziel=("group", anfrage.gruppe_id) if anfrage.gruppe_id else None,
+                         daten={"betrag_eur": anfrage.betrag_eur, "gebucht": len(ergebnis.gebucht),
+                                "fehlgeschlagen": len(ergebnis.fehlgeschlagen)})
     return ZuschlagErgebnis(
         gebucht=len(ergebnis.gebucht),
         fehlgeschlagen=ergebnis.fehlgeschlagen,

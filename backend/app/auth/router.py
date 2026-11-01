@@ -27,6 +27,8 @@ from app.config import settings
 from app.db.session import get_db
 from app.litellm.user_service import ensure_litellm_team_membership, ensure_litellm_user
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.audit import audit_getrennt
+from app.core.hintergrund import im_hintergrund
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -99,6 +101,7 @@ async def auth_callback(
             request.query_params.get("error_description"),
             state is not None,
         )
+        await audit_getrennt("auth", "login_failed", daten={"grund": "provider", "fehler": str(error)[:60]})
         raise HTTPException(
             status_code=400, detail=f"Anmeldung vom Schulkonto abgelehnt: {error}"
         )
@@ -121,17 +124,20 @@ async def auth_callback(
     cookie = request.cookies.get(_OAUTH_LOGIN_COOKIE)
     if not cookie or "|" not in cookie:
         logger.warning("OAuth-Callback ohne gültiges Login-Bindungs-Cookie")
+        await audit_getrennt("auth", "login_failed", daten={"grund": "bindung"})
         raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
     # Drittes Feld (seit 0.18.3): Rücksprungziel; ältere Cookies haben es nicht.
     cookie_state, code_verifier, *rest = cookie.split("|", 2)
     ziel = _safe_return_to(rest[0]) if rest and rest[0] else "/welcome"
     if not secrets.compare_digest(cookie_state, state):
         logger.warning("OAuth-Callback: State stimmt nicht mit dem Browser-Cookie überein")
+        await audit_getrennt("auth", "login_failed", daten={"grund": "state"})
         raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
     try:
         identity = await adapter.exchange_code(code, state, code_verifier)
     except Exception:
         logger.exception("OAuth-Callback: exchange_code/Identity-Aufbau fehlgeschlagen")
+        await audit_getrennt("auth", "login_failed", daten={"grund": "austausch"})
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     old_role, old_grade = await upsert_pseudonym_audit(db, pseudonym, identity)
@@ -213,6 +219,8 @@ def _stepup_abgelehnt(grund: str, return_to: str, detail: str) -> RedirectRespon
     und im Log stand nicht, warum.
     """
     logger.warning("Step-up abgelehnt (%s): %s", grund, detail)
+    im_hintergrund(lambda: audit_getrennt("auth", "stepup_denied", daten={"grund": grund}),
+                   was="Audit stepup_denied")
     ziel = _safe_return_to(return_to)
     trenner = "&" if "?" in ziel else "?"
     return RedirectResponse(url=f"{ziel}{trenner}stepup_fehler={grund}", status_code=303)
@@ -350,8 +358,10 @@ async def step_up_direct(
         raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     identity = await adapter.authenticate_direct(username, password)
     if identity is None:
+        await audit_getrennt("auth", "stepup_denied", akteur=current_user, daten={"grund": "anmeldedaten"})
         raise HTTPException(status_code=401, detail="Re-Authentifizierung fehlgeschlagen")
     if pseudonymize(identity.external_id, settings.school_secret) != current_user.sub:
+        await audit_getrennt("auth", "stepup_denied", akteur=current_user, daten={"grund": "anderes_konto"})
         raise HTTPException(status_code=401, detail="Re-Authentifizierung als anderer Nutzer")
     token = issue_stepup_token(settings.jwt_secret, current_user.sub, action, resource_id)
     secure = settings.environment != "development"
@@ -380,6 +390,9 @@ async def login_direct(
         raise HTTPException(status_code=400, detail="Missing username or password")
     identity = await adapter.authenticate_direct(username, password)
     if identity is None:
+        # Ohne Benutzernamen: Er ist der Klarname-nahe Teil, und ein Tippfehler im
+        # Passwortfeld landete sonst im Protokoll.
+        await audit_getrennt("auth", "login_failed", daten={"grund": "anmeldedaten"})
         raise HTTPException(status_code=401, detail="Falsche Anmeldedaten")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     old_role, old_grade = await upsert_pseudonym_audit(db, pseudonym, identity)

@@ -25,6 +25,7 @@ from app.calendar.holidays import (
 from app.calendar.service import get_adapter, is_configured
 from app.core.schreibbar import schreibschutz
 from app.planning.calendar import _DEFAULT_PATH, SchoolYearConfig, load_school_year
+from app.core.audit import audit_getrennt
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ async def holiday_proposal(
 @router.post("/apply")
 async def holiday_apply(
     payload: ApplyRequest,
-    _: JwtPayload = Depends(require_role("admin")),
+    current_user: JwtPayload = Depends(require_role("admin")),
 ) -> dict:
     """`school_year.yaml` schreiben. Die bisherige Fassung wird daneben gesichert."""
     if not is_configured():
@@ -214,6 +215,9 @@ async def holiday_apply(
         "school_year.yaml geschrieben: %s Ferien, %s Feiertage, %s unterrichtsfreie Tage",
         len(neu.ferien), len(neu.feiertage), len(neu.unterrichtsfreie_tage),
     )
+    await audit_getrennt("admin", "holidays_changed", akteur=current_user,
+                         daten={"schuljahr": payload.schuljahr, "ferien": len(neu.ferien),
+                                "feiertage": len(neu.feiertage)})
     return {
         "geschrieben": True,
         "pfad": str(_DEFAULT_PATH),

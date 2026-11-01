@@ -11,6 +11,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Bei der Kontolöschung verlieren Anmelde- und Moderationsereignisse das Pseudonym; Verwaltungsereignisse behalten es
   bis zum Ende ihrer Frist. Ein täglicher Lauf (`cleanup_audit_log`, 02:55 Uhr) löscht nach Frist je Klasse. Migration
   0097.
+- **Protokollierte Ereignisse:** Freigabe, Aktivieren, Deaktivieren und Löschen von Assistenten; Modell-Freischaltung;
+  Budget und Zuschläge; Guardrail-Prompt, Site-Texte, Ferienkalender; beendete Sitzungen; Feedback-Status und
+  gesperrte Meldungen; Krisen-Flags angelegt und erledigt (ohne Text); gescheiterte Anmeldungen und Step-ups (ohne
+  Benutzernamen); Sperren der Drossel; Ergebnisse der Lösch- und Lebenszyklus-Läufe.
+
+### Behoben
+
+- **Modell-Freischaltung:** Nach dem Speichern sah die Sichtbarkeit der Assistenten bis zu fünf Minuten den alten Stand.
 
 ## [0.27.1] – 2026-11-01
 

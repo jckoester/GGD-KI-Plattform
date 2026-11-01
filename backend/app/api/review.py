@@ -29,6 +29,7 @@ from app.db.models import (
 from app.config import settings
 from app.core.client_ip import client_ip
 from app.db.session import get_db
+from app.core.audit import audit
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +358,7 @@ async def resolve_access_request(
     request_id: UUID,
     body: ResolveRequest,
     db: AsyncSession = Depends(get_db),
-    _: JwtPayload = Depends(require_role("admin")),
+    current_user: JwtPayload = Depends(require_role("admin")),
 ) -> ResolveResponse:
     req = await db.get(ConversationAccessRequest, request_id)
     if req is None:
@@ -375,6 +376,8 @@ async def resolve_access_request(
         flag.status = body.outcome  # 'resolved' | 'dismissed'
         flag.resolved_at = now  # startet die 180-Tage-Aufbewahrung
         flag_status = flag.status
+        await audit(db, "moderation", "crisis_flag_resolved", akteur=current_user,
+                    ziel=("flag", flag.id), daten={"ergebnis": flag.status, "antrag_id": str(req.id)})
 
     await db.commit()
     logger.info(

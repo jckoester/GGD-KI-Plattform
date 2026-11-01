@@ -57,3 +57,13 @@ def _modellfreigaben_unbekannt(monkeypatch):
     monkeypatch.setattr(team_models._client, "get_team_info", AsyncMock(return_value=None))
     yield
     team_models.invalidate_team_models_cache()
+
+
+@pytest.fixture(autouse=True)
+def _audit_ohne_datenbank(monkeypatch):
+    """Unit-Tests haben keine Datenbank — `audit_getrennt` prüft den Eintrag, schreibt ihn aber
+    nicht. Ohne diese Fixture schrieb es in die Datenbank aus der lokalen `.env`, also die der
+    Entwicklungsinstanz (0.28, 01.11.2026)."""
+    from app.core import audit
+
+    monkeypatch.setattr(audit, "SCHREIBEN", False)
