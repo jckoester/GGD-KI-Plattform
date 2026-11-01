@@ -72,7 +72,7 @@
     import { studentPickerItems } from "$lib/stores/subjectPickerItems.js";
     import { chatKontextText } from "$lib/gruppenmarke.js";
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
-    import { eintragsText } from "$lib/modellangaben.js";
+    import ModellWahl from "$lib/components/ModellWahl.svelte";
     import {
         pageTitle,
         activeConversationId,
@@ -1838,44 +1838,14 @@
                     </span>
                 {:else}
                     <!-- Modell-Auswahl -->
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <label
-                            for="chat-model"
-                            class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
-                        >
-                            Modell
-                        </label>
-                        <select
-                            id="chat-model"
-                            bind:value={selectedModelId}
-                            disabled={isStreaming || modelsLoading}
-                            onchange={handleModelChange}
-                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                   bg-light-bg-2 dark:bg-dark-bg-2
-                                   px-1.5 py-0.5 text-xs disabled:opacity-60
-                                   {availableModels.length === 0 &&
-                            !selectedModelId
-                                ? 'text-light-re dark:text-dark-re'
-                                : 'text-light-tx dark:text-dark-tx'}"
-                        >
-                            {#if availableModels.length > 0}
-                                {#each availableModels as model}
-                                    <option value={model.id}
-                                        >{eintragsText(
-                                            model,
-                                            $budget?.eur_usd_rate,
-                                            $budget?.einheiten_je_euro,
-                                        )}</option
-                                    >
-                                {/each}
-                            {:else}
-                                <option value={selectedModelId || ""}>
-                                    {selectedModelId ||
-                                        "Nur Assistenten verfügbar"}
-                                </option>
-                            {/if}
-                        </select>
-                    </div>
+                    <ModellWahl
+                        id="chat-model"
+                        modelle={availableModels}
+                        bind:wert={selectedModelId}
+                        disabled={isStreaming || modelsLoading}
+                        onchange={handleModelChange}
+                        leerText="Nur Assistenten verfügbar"
+                    />
                 {/if}
 
                 <!-- Modell-Statustexte (Laden / Fehler) -->

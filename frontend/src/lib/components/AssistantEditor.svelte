@@ -1,8 +1,6 @@
 <script>
     import { onMount, onDestroy } from "svelte";
-    import { budget } from "$lib/stores/budget.js";
-    import { angaben, eintragsText } from "$lib/modellangaben.js";
-    import { kurshinweis } from "$lib/einheiten.js";
+    import ModellWahl from "./ModellWahl.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { auswahlMitBestand, eigeneFaecher } from "$lib/stores/myGroups.js";
@@ -90,13 +88,6 @@
 
     // Daten für Dropdowns
     let models = $state([]);
-    let modellAngaben = $derived(
-        angaben(
-            models.find((m) => m.id === form.model),
-            $budget?.eur_usd_rate,
-            $budget?.einheiten_je_euro,
-        ),
-    );
     let subjects = $state([]);
     let groups = $state([]);
     // Lehrkräfte wählen aus ihren eigenen Fächern (plus dem schon gesetzten); die
@@ -1419,83 +1410,15 @@
 
                     <!-- Modell & Parameter -->
                     <div class="space-y-2">
-                        <label
-                            for="ae-model"
-                            class="block text-sm font-medium text-light-tx dark:text-dark-tx"
-                        >
-                            Modell
-                        </label>
-                        {#if models.length > 0}
-                            <select
-                                id="ae-model"
-                                bind:value={form.model}
-                                disabled={!canEdit}
-                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
-                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
-                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <option value=""
-                                    >Schulweiter Standard</option
-                                >
-                                {#each models as model}
-                                    <option value={model.id}
-                                        >{eintragsText(
-                                            model,
-                                            $budget?.eur_usd_rate,
-                                            $budget?.einheiten_je_euro,
-                                        )}</option
-                                    >
-                                {/each}
-                            </select>
-                            <!-- Angaben zum **gewählten** Modell. Ein `<option>` erlaubt
-                                 keine Gestaltung, deshalb steht hier, was man zum
-                                 Entscheiden braucht — und nur, was bekannt ist. -->
-                            {#if modellAngaben.length > 0}
-                                <ul
-                                    class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs
-                                           text-light-tx-2 dark:text-dark-tx-2"
-                                >
-                                    {#each modellAngaben as a (a.was)}
-                                        <li><span class="font-medium">{a.was}:</span> {a.wert}</li>
-                                    {/each}
-                                </ul>
-                                <details class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    <summary class="cursor-pointer">Was bedeuten diese Angaben?</summary>
-                                    <div class="mt-1 space-y-1">
-                                        <p>
-                                            <strong>Kosten</strong> sind eine Schätzung an einer
-                                            mittleren Nachricht — abgerechnet wird nach
-                                            tatsächlichem Verbrauch. {kurshinweis(
-                                                $budget?.einheiten_je_euro,
-                                            )}.
-                                        </p>
-                                        <p>
-                                            Das <strong>Kontextfenster</strong> sagt, wie viel
-                                            Vorgeschichte das Modell auf einmal sehen kann. Fehlt
-                                            die Angabe, meldet der Proxy sie nicht — sie lässt
-                                            sich in der LiteLLM-Konfiguration eintragen.
-                                        </p>
-                                        <p>
-                                            Sind die <strong>Fähigkeiten</strong> nicht nutzbar,
-                                            wirken die Schalter weiter unten nicht: Der
-                                            Assistent kann dann weder im Wissensspeicher suchen
-                                            noch Unterricht planen.
-                                        </p>
-                                    </div>
-                                </details>
-                            {/if}
-                        {:else}
-                            <input
-                                id="ae-model"
-                                bind:value={form.model}
-                                disabled={!canEdit}
-                                type="text"
-                                placeholder="leer = schulweiter Standard"
-                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
-                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
-                       px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                        {/if}
+                        <ModellWahl
+                            id="ae-model"
+                            variante="voll"
+                            modelle={models}
+                            bind:wert={form.model}
+                            disabled={!canEdit}
+                            vorgabe="Schulweiter Standard"
+                            platzhalter="leer = schulweiter Standard"
+                        />
                         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                             Ohne Auswahl nutzt der Assistent das schulweit eingestellte
                             Standardmodell und folgt einem späteren Wechsel automatisch. Ein
