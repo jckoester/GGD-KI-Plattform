@@ -1056,6 +1056,14 @@ export async function getAdminAssistants(params = {}) {
   return res.json(); // { items: AssistantResponse[], total: int }
 }
 
+// Freigabe-Warteschlange (Admin): eingereichte Assistenten, mit Kürzel der Lehrkraft (0.27).
+export async function getPendingAssistants() {
+  const res = await fetch(`${BASE}/admin/assistants/pending?limit=100`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { items: AssistantResponse[] (+ urheber_kuerzel), total: int }
+}
+
 // Assistenten, deren fest gewähltes Modell es in LiteLLM nicht mehr gibt.
 // `checked: false` heißt „Proxy nicht erreichbar" — NICHT „alles in Ordnung".
 export async function getAssistantModelCheck() {

@@ -206,8 +206,16 @@ async def list_pending_assistants(
     stmt = stmt.order_by(Assistant.updated_at.asc()).limit(limit).offset(offset)
     assistants = (await db.execute(stmt)).scalars().all()
 
+    # Wer hat eingereicht? Das Pseudonym sagt Admins nichts; das Kürzel, wenn hinterlegt (F4).
+    from app.preferences.service import stundenplan_kuerzel
+    kuerzel = await stundenplan_kuerzel(db, [a.created_by for a in assistants if a.created_by])
     return AssistantFullListResponse(
-        items=[AssistantResponse.model_validate(a) for a in assistants],
+        items=[
+            AssistantResponse.model_validate(a).model_copy(
+                update={"urheber_kuerzel": kuerzel.get(a.created_by)}
+            )
+            for a in assistants
+        ],
         total=total,
     )
 

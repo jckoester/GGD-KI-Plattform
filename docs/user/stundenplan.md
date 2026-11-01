@@ -26,8 +26,10 @@ ausgeschlossen.
 
 **Was mit dem Kürzel geschieht:**
 
-- Es wird **ausschließlich** verwendet, um deinen Stundenplan abzurufen.
+- Es wird verwendet, um deinen Stundenplan abzurufen.
 - Es wird **nie an eine KI übergeben** — weder im Chat noch bei der Unterrichtsplanung.
+- Reichst du einen Assistenten zur Freigabe ein, sehen die Admins dort dein Kürzel — damit
+  sie wissen, wen sie bei einer Rückfrage ansprechen können (seit 0.27).
 - Du kannst es jederzeit wieder entfernen. Dann entfällt die Übernahme, sonst ändert sich
   nichts. Das Leeren funktioniert auch dann, wenn der Stundenplan gerade nicht erreichbar
   ist.

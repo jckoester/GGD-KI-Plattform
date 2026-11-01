@@ -23,6 +23,7 @@
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import {
         getAdminAssistants,
+        getPendingAssistants,
         deleteAssistant,
         exportAssistant,
         exportAllAssistants,
@@ -139,7 +140,7 @@
 
     async function loadPending() {
         try {
-            const result = await getAdminAssistants({ status: 'pending_review', limit: 100 });
+            const result = await getPendingAssistants();
             pendingItems = result.items;
         } catch (e) {
             // Fehler ignorieren - Pending-Queue ist optional
@@ -422,6 +423,9 @@
                                 title="Zielgruppe"
                             >
                                 {AUDIENCE_LABELS[item.audience] || item.audience}
+                            </span>
+                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                {item.urheber_kuerzel ? `von ${item.urheber_kuerzel}` : "ohne Stundenplan-Kürzel"}
                             </span>
                             {#if item.description}
                                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate">{item.description}</p>

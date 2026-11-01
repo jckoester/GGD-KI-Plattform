@@ -114,6 +114,14 @@ Kontext- und Pädagogik-Modulen nicht vorkommt.
 Die Übernahme ist **freiwillig**: Ohne eingetragenes Kürzel ruft die Plattform für diese
 Person nichts ab.
 
+**Zweiter Zweck seit 0.27: Urheber in der Assistenten-Freigabe.** In der Warteschlange
+„Offene Freigaben“ (`/assistants/manage`) sehen Admins bei einem eingereichten Assistenten das
+Kürzel der Lehrkraft, falls sie eins hinterlegt hat — sonst „ohne Stundenplan-Kürzel“. Die
+Plattform speichert keine Namen; ohne diese Angabe wäre jede Rückfrage nur über eine Ablehnung
+möglich. Die Lehrkraft wird beim Kürzel auf der Seite „Unterricht“ darauf hingewiesen. Für das
+Verarbeitungsverzeichnis: Zweck „Rückfrage zu eingereichten Assistenten“, Empfänger Admins
+der Plattform, keine Übermittlung nach außen.
+
 ## Automatische Läufe (Cron-Jobs)
 
 **Alle** nächtlichen Läufe, nicht nur die löschenden — wer wissen will, was der Server

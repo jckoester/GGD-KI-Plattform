@@ -91,3 +91,25 @@ async def neuigkeit_gelesen_merken(db: AsyncSession, pseudonym: str, kennung: st
     if kennung in gelesen:
         return
     await patch_preferences(db, pseudonym, {NEUIGKEITEN_SCHLUESSEL: sorted(gelesen | {kennung})})
+
+
+# ── Urheber in der Assistenten-Freigabe (0.27, Plan F4) ──────────────────────
+#
+# Admins sehen bei eingereichten Assistenten das Stundenplan-Kürzel der Lehrkraft, falls sie
+# eins hinterlegt hat (Jan, 31.10.2026). Ein zweiter Zweck für eine freiwillige Angabe —
+# deshalb steht er beim Kürzel auf der Seite „Unterricht“ und in der Admin-Doku. Wie die
+# übrigen Leser hier: nur der eine Wert, nie das Dict, und nichts davon geht an ein Modell.
+
+
+async def stundenplan_kuerzel(db: AsyncSession, pseudonyme: list[str]) -> dict[str, str]:
+    """Kürzel je Pseudonym — nur, wer eins hinterlegt hat."""
+    from app.calendar.service import KUERZEL_PREFERENCE_KEY
+
+    if not pseudonyme:
+        return {}
+    zeilen = (await db.execute(
+        text("SELECT pseudonym, preferences ->> :schluessel FROM user_preferences "
+             "WHERE pseudonym = ANY(:pseudonyme)"),
+        {"schluessel": KUERZEL_PREFERENCE_KEY, "pseudonyme": list(pseudonyme)},
+    )).all()
+    return {p: k.strip() for p, k in zeilen if k and k.strip()}

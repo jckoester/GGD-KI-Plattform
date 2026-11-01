@@ -263,8 +263,9 @@
             Dein Kürzel wird ausschließlich verwendet, um deinen Stundenplan abzurufen
             (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
             KI-Modelle übermittelt und erscheint in keinem Chat, keinem
-            Assistenten-Kontext und keinem Wissensknoten. Du kannst es jederzeit
-            entfernen; dann entfällt die Stundenplan-Übernahme.
+            Assistenten-Kontext und keinem Wissensknoten. Reichst du einen Assistenten zur
+            Freigabe ein, sehen die Admins dort dein Kürzel, damit sie wissen, wen sie fragen
+            können. Du kannst es jederzeit entfernen; dann entfällt die Stundenplan-Übernahme.
         </p>
 
         {#if kuerzelFehler}

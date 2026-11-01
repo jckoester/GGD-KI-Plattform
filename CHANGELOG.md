@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Assistenten-Freigabe:** Die Warteschlange „Offene Freigaben“ nennt das Stundenplan-Kürzel der einreichenden
+  Lehrkraft, falls hinterlegt. Hinweis dazu beim Kürzel auf der Seite „Unterricht“.
+
 ### Geändert
 
 - **Assistenten exportieren:** Das ZIP enthält dieselben Dateien wie der Einzelexport, samt Auslöser-Beispielen und

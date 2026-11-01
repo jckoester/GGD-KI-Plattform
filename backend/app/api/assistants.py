@@ -189,6 +189,9 @@ class AssistantUpdate(BaseModel):
 class AssistantResponse(BaseModel):
     id: int
     name: str
+    #: Nur in der Freigabe-Warteschlange gefüllt (`/admin/assistants/pending`, 0.27, F4):
+    #: das Stundenplan-Kürzel der einreichenden Lehrkraft, falls hinterlegt.
+    urheber_kuerzel: Optional[str] = None
     description: Optional[str]
     subject_id: Optional[int]
     system_prompt: str
