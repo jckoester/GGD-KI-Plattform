@@ -10,6 +10,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Assistenten-Freigabe:** „Offene Freigaben“ (Freigeben, Ablehnen) steht jetzt unter Einstellungen →
   Assistenten-Freigabe, mit Klassenstufen und dem Stundenplan-Kürzel der einreichenden Lehrkraft, falls hinterlegt
   (Hinweis dazu beim Kürzel auf der Seite „Unterricht“). „Assistenten verwalten“ steht in der Admin-Seitenleiste daneben.
+- **Assistenten verwalten** samt Editor liegt im Admin-Bereich (Adressen unverändert).
 - **Assistenten verwalten:** Die Spalte Zielgruppe nennt die Klassenstufen.
 
 ### Geändert
@@ -33,6 +34,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Admin-Seiten neu laden:** Einstellungen, Statistiken, Budget und „Assistenten verwalten“ leiteten beim Neuladen oder
   über einen Link auf die Startseite bzw. die Assistenten-Übersicht um.
 - **Seitentitel** „Manage/New/Edit Assistant“ auf Deutsch.
+- **Assistenten-Editor der Verwaltung** (`/assistants/manage/<ID>`) prüfte die Admin-Rolle nicht; eine Lehrkraft mit der
+  Adresse sah die Admin-Schalter. Jetzt geht es zu „Meine Assistenten“.
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
   seines Rahmens).
 - **Assistenten verwalten:** Die Zielgruppe war im dunklen Modus kaum lesbar.
