@@ -1,5 +1,7 @@
 <script>
-    import { abschnitteUebersicht, zurAnzeige } from "$lib/assistentenliste.js";
+    import { abschnitteUebersicht, stufenText, zurAnzeige } from "$lib/assistentenliste.js";
+    import { BADGE } from "$lib/badges.js";
+    import FachBadge from "$lib/components/FachBadge.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
@@ -75,24 +77,21 @@
             {/if}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {#each abschnitt.liste as assistant (assistant.id)}
-                    {@const subjectColor = assistant.subject_id != null
-                        ? ($subjectMap[assistant.subject_id]?.color ?? null)
-                        : null}
-                    <div class="relative group bg-light-bg-2 dark:bg-dark-bg-2
+                    {@const fach = assistant.subject_id != null ? $subjectMap[assistant.subject_id] : null}
+                    <!-- Kachel = Klickfläche = Hover-Fläche (0.27): Die Kachel ist Flex-Spalte, der
+                         Knopf füllt sie — sonst färbte sich bei kurzer Beschreibung nur ein Teil. -->
+                    <div class="relative group flex flex-col bg-light-bg-2 dark:bg-dark-bg-2
                                border border-light-ui-3 dark:border-dark-ui-3
                                rounded-lg overflow-hidden">
-                        <!-- Farbiger Top-Streifen (nur wenn Fach mit Farbe) -->
-                        {#if subjectColor}
-                            <span
-                                class="block h-[3px] w-full"
-                                style="background-color: {subjectColor}"
-                            ></span>
+                        <!-- Farbiger Streifen oben (nur bei Fach mit Farbe) — zusammen mit dem
+                             Fach-Etikett; allein war er nicht eindeutig (Jan, 01.11.2026). -->
+                        {#if fach?.color}
+                            <span class="block h-[3px] w-full shrink-0" style="background-color: {fach.color}"></span>
                         {/if}
-
                         <!-- Hauptklickbereich → Chat -->
                         <button
                             onclick={() => goto(`/chat?assistant_id=${assistant.id}`)}
-                            class="w-full text-left p-4 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            class="flex-1 w-full text-left p-4 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                         >
                             <div class="flex items-start gap-3">
                                 <Bot class="w-5 h-5 text-light-bl dark:text-dark-bl shrink-0 mt-0.5" />
@@ -101,12 +100,12 @@
                                         <span class="font-medium text-light-tx dark:text-dark-tx">
                                             {assistant.name}
                                         </span>
+                                        <FachBadge {fach} />
                                         {#if assistant.audience}
-                                            <span class="text-xs px-1.5 py-0.5 rounded-full
-                                                 bg-light-ui-3 dark:bg-dark-ui-3
-                                                 text-light-tx-2 dark:text-dark-tx-2">
-                                                {getAudienceLabel(assistant.audience)}
-                                            </span>
+                                            <span class={BADGE}>{getAudienceLabel(assistant.audience)}</span>
+                                        {/if}
+                                        {#if stufenText(assistant)}
+                                            <span class={BADGE}>{stufenText(assistant)}</span>
                                         {/if}
                                     </div>
                                     {#if assistant.description}
@@ -114,7 +113,8 @@
                                             {assistant.description}
                                         </p>
                                     {/if}
-                                    <Schlagwoerter tags={assistant.tags} />
+                                    <!-- Das Fach steht schon als Badge — nicht noch einmal als Schlagwort. -->
+                                    <Schlagwoerter tags={(assistant.tags ?? []).filter((t) => t !== fach?.slug)} />
                                 </div>
                             </div>
                         </button>

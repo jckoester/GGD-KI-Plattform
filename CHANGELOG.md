@@ -12,6 +12,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (Hinweis dazu beim Kürzel auf der Seite „Unterricht“). „Assistenten verwalten“ steht in der Admin-Seitenleiste daneben.
 - **Assistenten verwalten** samt Editor liegt im Admin-Bereich (Adressen unverändert).
 - **Assistenten verwalten:** Die Spalte Zielgruppe nennt die Klassenstufen.
+- **Assistentenkarten:** Das Fach steht zusätzlich zum Farbstreifen als farbiges Etikett, die Klassenstufen als
+  „Kl. 8–13“ statt „alle“.
 
 ### Geändert
 
@@ -36,6 +38,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Seitentitel** „Manage/New/Edit Assistant“ auf Deutsch.
 - **Assistenten-Editor der Verwaltung** (`/assistants/manage/<ID>`) prüfte die Admin-Rolle nicht; eine Lehrkraft mit der
   Adresse sah die Admin-Schalter. Jetzt geht es zu „Meine Assistenten“.
+- **Assistentenkarten:** Bei kurzer Beschreibung färbte sich beim Überfahren nur ein Teil der Kachel; die Etiketten
+  waren im dunklen Modus kaum lesbar.
 - **Admin-Felder am Assistenten** (Bausteine, „Darunter anbieten“, Fächer für Operatoren) nimmt der Server nur noch von
   Admins an, auch beim YAML-Import; bisher ließen sie sich über die Schnittstelle von Lehrkräften setzen.
 - **Assistenten-Editor:** Unter der Seite stand mehrere hundert Pixel leerer Raum (unsichtbares Upload-Feld außerhalb
