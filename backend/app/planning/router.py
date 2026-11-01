@@ -1423,7 +1423,23 @@ async def patch_lesson(
     vektor_vorher = eingabe_ohne_aliase(lesson)
     now = datetime.now(timezone.utc)
     if payload.titel is not None:
+        alter_titel = lesson.title
         lesson.title = payload.titel
+        # ⚠️ Die Jahresplanung zeigt das Thema des Termins (`lesson_slots.thema`), nicht den
+        # Titel des Entwurfs. Übernommen wurde es nur beim Anlegen; danach blieb ein
+        # umbenannter Entwurf in der Übersicht beim alten Namen — oder bei „Thema eingeben …“,
+        # wenn der Termin keins hatte. Von Hand nachziehen ging nicht: Mit verknüpfter Stunde ist
+        # das Thema ein Link (Befund Prod, Jan 01.11.2026). Jetzt folgt es dem Titel, sofern es
+        # leer ist oder noch den alten Titel trägt — ein bewusst anderes Thema bleibt stehen.
+        await db.execute(
+            sa.update(LessonSlot)
+            .where(
+                LessonSlot.stunde_node_id == lesson.id,
+                sa.or_(LessonSlot.thema.is_(None), sa.func.btrim(LessonSlot.thema) == "",
+                       LessonSlot.thema == alter_titel),
+            )
+            .values(thema=payload.titel, updated_at=datetime.now(timezone.utc))
+        )
 
     meta = dict(lesson.metadata_ or {})
     if payload.stundenziel is not None:
