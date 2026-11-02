@@ -70,6 +70,7 @@ async def get_current_user(
         if await jwt_service.is_revoked(db, payload):
             raise HTTPException(status_code=401, detail="Token revoziert")
         vorschau.fuer_anfrage(payload)
+        vorschau.pruefe_schreibsperre(request.scope, request.method, payload)
         return payload
 
     kopfzeile = request.headers.get("authorization") or ""

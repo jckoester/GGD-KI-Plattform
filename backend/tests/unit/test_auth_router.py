@@ -614,6 +614,24 @@ class TestStepupCallback:
         assert r.status_code == 303 and r.headers["location"] == "/profile"
         assert "stepup=" in r.headers.get("set-cookie", "")
 
+    def test_in_der_vorschau_abgelehnt(self, client, jwt_service):
+        """0.29: Die Krisen-Einsicht gehört nicht in die Vorschau — auch nicht über den
+        Rückweg vom Anmeldedienst, der das Sitzungs-Token selbst liest."""
+        from app.auth.vorschau import Vorschau
+
+        jetzt = self._jetzt()
+        token, _ = jwt_service.issue(
+            pseudonymize("lehrer_1", _SCHOOL_SECRET), ["student"], "9",
+            preview=Vorschau(echte_rollen=["teacher"], beginn=jetzt, sitzung_ablauf=jetzt + 9999),
+            exp=jetzt + 3600,
+        )
+        client.cookies.set("session", token)
+        self.adapter.exchange_code_fresh = AsyncMock(return_value=self.fresh(jetzt - 5))
+        r = client.get(f"/callback?code=c&state={self._state()}", follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/welcome?stepup_fehler=vorschau"
+        assert "stepup=" not in r.headers.get("set-cookie", "")
+
     def test_alt_nennt_alter_und_diagnose(self, client, caplog):
         diagnose = {"id_token": True, "signatur": "ungeprueft", "claims": ["auth_time", "sub"]}
         self.adapter.exchange_code_fresh = AsyncMock(

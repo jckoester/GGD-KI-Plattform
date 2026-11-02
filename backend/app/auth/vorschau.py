@@ -115,3 +115,57 @@ def eintrittsassistent(pseudonym: str) -> int | None:
     """Der Assistent, mit dem die Vorschau aus dem Editor begann (F6), sonst ``None``."""
     vorschau = aktive(pseudonym)
     return vorschau.assistent_id if vorschau is not None else None
+
+
+# ── Schreibsperre (0.29, Schritt 3) ─────────────────────────────────────────────
+#
+# In der Vorschau ändert sich nichts am Konto der Lehrkraft. Rollengeprüfte Wege sperrt die
+# Rolle `student` von selbst; offen blieben die rund vierzig schreibenden Wege, die auch
+# Schüler:innen benutzen dürfen — sie schrieben in Einstellungen, Bibliothek, Zugangstoken,
+# Gruppenbeitritte der Lehrkraft. Deshalb hier **eine** Regel für alle: Schreibendes ist
+# gesperrt, außer was auf der Liste steht. `get_current_user` ruft sie bei jeder Anfrage,
+# also erreicht sie jeden angemeldeten Weg ohne Zutun der Route.
+#
+# Geführt über die Endpunkt-Funktion, nicht über den Pfad: Mit verschachtelt eingebundenen
+# Routern fehlt in der Pfadvorlage das äußere Präfix (`/auth`), der Name der Funktion
+# dagegen ist eindeutig. `tests/unit/test_vorschau_schreibsperre.py` prüft, dass es jeden
+# Namen gibt.
+
+SCHREIBEND = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+#: Schreibende Wege, die in der Vorschau offen bleiben.
+ERLAUBT: dict[str, str] = {
+    "app.chat.router.chat": "Ausprobieren ist der Zweck der Vorschau",
+    "app.chat.router.variiere_generiertes_bild": "Bild im Chat abwandeln — Teil des Chats",
+    "app.upload.router.upload_session": "Datei für den Chat",
+    "app.feedback.router.create_feedback": "Rückmeldung aus der Vorschau (ADR-020, feedback.preview)",
+    "app.context.router.search_context_nodes": "rechnet nur",
+    "app.api.pii.pii_scan": "rechnet nur",
+    "app.render.router.render_block": "rechnet nur (Cache)",
+    "app.auth.router.logout": "Abmelden beendet auch die Vorschau",
+    "app.auth.vorschau_router.vorschau_betreten": "weist selbst ab (409, keine Verschachtelung)",
+}
+
+#: Wege, die in der Vorschau auch lesend gesperrt sind.
+AUCH_LESEND_GESPERRT: dict[str, str] = {
+    "app.auth.router.step_up_challenge": "erneute Anmeldung für die Krisen-Einsicht",
+}
+
+GESPERRT_TEXT = "In der Vorschau lässt sich nichts ändern."
+
+
+def endpunkt_name(endpunkt) -> str | None:
+    if endpunkt is None:
+        return None
+    return f"{endpunkt.__module__}.{endpunkt.__qualname__}"
+
+
+def pruefe_schreibsperre(scope: dict, methode: str, user: "JwtPayload") -> None:
+    """403, wenn eine Vorschau einen gesperrten Weg nimmt."""
+    if not ist_vorschau(user):
+        return
+    name = endpunkt_name(scope.get("endpoint"))
+    if name in AUCH_LESEND_GESPERRT or (methode in SCHREIBEND and name not in ERLAUBT):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=403, detail=GESPERRT_TEXT)

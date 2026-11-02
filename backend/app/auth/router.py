@@ -248,6 +248,10 @@ async def _handle_stepup_callback(
     if await jwt_service.is_revoked(db, current):
         logger.warning("Step-up abgelehnt (sitzung): Sitzung beendet")
         return RedirectResponse(url="/", status_code=303)
+    if current.preview is not None:
+        # Die Krisen-Einsicht gehört nicht in die Vorschau (0.29); Challenge und Direktweg
+        # sperrt `pruefe_schreibsperre`, dieser Rückweg liest das Token selbst.
+        return _stepup_abgelehnt("vorschau", "/welcome", "in der Vorschau")
 
     parsed = parse_stepup_state(settings.school_secret, state)
     if parsed is None:

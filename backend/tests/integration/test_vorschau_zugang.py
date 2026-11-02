@@ -125,3 +125,36 @@ async def test_vorschau_ueberdauert_keine_anfrage(test_client, jwt_service, welt
     await test_client.get("/groups/me", headers=_kopf(jwt_service, vorschau_gruppe=welt["g"]))
     normal = await test_client.get("/groups/me", headers=_kopf(jwt_service, normal=True))
     assert {welt["g"], welt["andere"]} <= {x["id"] for x in normal.json()["items"]}
+
+
+# ── Schreibsperre (Schritt 3) ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("methode,pfad,rumpf", [
+    ("PATCH", "/preferences", {"ui_level": 1}),
+    ("POST", "/tokens", {"name": "x"}),
+    ("POST", "/groups/join", {"code": "ABCDEF"}),
+    ("POST", "/neuigkeiten/0.28-audit-log/gelesen", None),
+    ("POST", "/artifacts/document", {"title": "x", "content": "y"}),
+    ("GET", "/auth/step-up?action=read&resource_id=00000000-0000-0000-0000-0000000000aa", None),
+])
+async def test_gesperrt(test_client, jwt_service, welt, methode, pfad, rumpf):
+    antwort = await test_client.request(methode, pfad, json=rumpf,
+                                        headers=_kopf(jwt_service, vorschau_gruppe=welt["g"]))
+    assert antwort.status_code == 403, antwort.text
+    assert antwort.json()["detail"] == "In der Vorschau lässt sich nichts ändern."
+
+
+async def test_einstellungen_ausserhalb_der_vorschau_offen(test_client, jwt_service, welt):
+    antwort = await test_client.patch("/preferences", json={"ui_level": 3},
+                                      headers=_kopf(jwt_service, normal=True))
+    assert antwort.status_code == 200, antwort.text
+
+
+async def test_rueckmeldung_und_suche_bleiben_offen(test_client, jwt_service, welt):
+    kopf = _kopf(jwt_service, vorschau_gruppe=welt["g"])
+    meldung = await test_client.post("/feedback", headers=kopf, json={
+        "category": "bug", "content": "Aus der Vorschau gemeldet, ein Test.",
+        "app_version": "0.29.0"})
+    assert meldung.status_code == 201, meldung.text
+    suche = await test_client.post("/context/search", headers=kopf, json={"query": "Energie"})
+    assert suche.status_code != 403, suche.text
