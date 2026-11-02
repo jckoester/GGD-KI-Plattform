@@ -106,8 +106,8 @@ async def list_groups(
     Normalfall, eine Fachschaft hat ohnehin nur welche. Ein Treffer ist deshalb immer ein
     Befund, kein Rauschen.
 
-    Reparieren lässt er sich mit `POST /admin/groups/{id}/members` (Pseudonym aus dem
-    Audit-Log); beschrieben in `docs/admin/nutzerverwaltung.md`.
+    Reparieren lässt er sich mit `POST /admin/groups/{id}/members` (Pseudonym zur Kennung,
+    die die Lehrkraft im Profil abliest); beschrieben in `docs/admin/nutzerverwaltung.md`.
     """
     stmt = select(Group).order_by(Group.type, Group.name)
 

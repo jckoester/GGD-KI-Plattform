@@ -288,16 +288,39 @@ keine Oberfläche**: Mitgliederpflege von Hand ist im Regelbetrieb ausgeschlosse
 die Plattform keine Klarnamen zeigt — eine Liste aus Pseudonymen wäre nicht bedienbar
 (ADR-003, Ebene 2).
 
-Für die **Reparatur** ist das etwas anderes. Dort liegt genau ein Pseudonym vor, und es
-kommt aus dem Audit-Log: Sie wissen, wen Sie eintragen wollen, und Sie tragen genau den
-ein.
+Für die **Reparatur** ist das etwas anderes: Es geht um genau eine Person, und die meldet
+sich selbst. Der typische Fall ist eine verwaiste Unterrichtsgruppe (siehe oben), die eine
+Lehrkraft übernehmen soll. Die Plattform kennt keine Namen; das Pseudonym muss deshalb von
+der Lehrkraft kommen:
 
-```bash
-# Lehrkraft einer verwaisten Gruppe zuordnen
-curl -s -X POST -b "session=$TOKEN" -H 'Content-Type: application/json' \
-  -d '{"pseudonym": "<aus dem Audit-Log>", "role_in_group": "teacher"}' \
-  "https://.../api/admin/groups/<id>/members"
-```
+1. Die Lehrkraft liest im **Profil** unter „Budget" ihre **Kennung** ab. Das sind die ersten
+   zwölf Zeichen ihres Pseudonyms, angezeigt in Vierergruppen (etwa `a3f9 c2b8 1e04`). Sie
+   nennt sie Ihnen.
+2. Sie suchen das volle Pseudonym zur Kennung. In der Oberfläche geht das unter
+   **Einstellungen → Nutzer & Sitzungen**: Die Suche findet die Kennung ohne Leerzeichen,
+   das volle Pseudonym steht im Tooltip. Auf der Kommandozeile:
+
+   ```bash
+   curl -s -b "session=$TOKEN" "https://.../api/admin/users?role=teacher" \
+     | jq -r '.users[].pseudonym | select(startswith("a3f9c2b81e04"))'
+   ```
+
+   Kommt keine Zeile zurück, ist die Kennung vertippt, oder die Lehrkraft hat gerade kein
+   Konto (etwa nach 90 Tagen ohne Anmeldung gelöscht; nach der nächsten Anmeldung ist es
+   wieder da, mit demselben Pseudonym). Kommen zwei, fragen Sie nach mehr Zeichen.
+3. Sie tragen genau dieses Pseudonym ein:
+
+   ```bash
+   # Lehrkraft einer verwaisten Gruppe zuordnen
+   curl -s -X POST -b "session=$TOKEN" -H 'Content-Type: application/json' \
+     -d '{"pseudonym": "<volles Pseudonym aus Schritt 2>", "role_in_group": "teacher"}' \
+     "https://.../api/admin/groups/<id>/members"
+   ```
+
+⚠️ **Der Endpunkt prüft das Pseudonym nicht.** Anders als das Aufbuchen von Budget nimmt er
+keine Kennung an und fragt nicht nach, ob es das Konto gibt. Ein vertipptes oder gekürztes
+Pseudonym ergibt eine Mitgliedschaft, die niemandem gehört. Deshalb Schritt 2 nicht
+überspringen und das Pseudonym vollständig (64 Zeichen) einsetzen.
 
 Die so entstandene Mitgliedschaft trägt `herkunft = 'manuell'` und wird von **keinem**
 Aufräumlauf entfernt — auch nicht von der Rücknahme einer Beitrittscode-Runde. Das ist
