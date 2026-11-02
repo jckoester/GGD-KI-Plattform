@@ -144,3 +144,37 @@ export function kostenErklaerung(status) {
     }
     return null;
 }
+
+/**
+ * Der Budgetbalken: Rest gemessen am **erreichbaren Höchststand** (0.28.2).
+ *
+ * ⚠️ Bis 0.28.1 maß der Balken den Rest an der Obergrenze des Proxys. Die wächst im
+ * Wochenmodell das ganze Schuljahr — wer viel nutzte, sah gleich nach der Aufbuchung
+ * einen fast leeren roten Balken (Woche 8, alles verbraucht: 1 von 8 Wochenbeträgen), wer
+ * wenig nutzte, sah nie eine Bewegung. Beides las sich wie eine ausgefallene Aufbuchung.
+ *
+ * Höchststand ist, was die Aufbuchung zulässt: `vorsprung_wochen` Wochenbeträge. Ein
+ * Zuschlag geht bewusst nicht ein — wer einen hat, liegt darüber und sieht einen vollen
+ * Balken; ein verbrauchter Zuschlag vom September hielte den Balken sonst das ganze Jahr
+ * unter voll.
+ *
+ * Fehlen Wochenbetrag oder Vorsprung, gilt wie bisher die Obergrenze — halb ist besser als
+ * kein Balken.
+ *
+ * @returns {{ anteil: number, knapp: boolean } | null} `anteil` in Prozent, 0–100
+ */
+export function budgetBalken(b) {
+    const rest = b?.remaining_usd;
+    if (typeof rest !== "number") return null;
+
+    let hoechst = null;
+    if (b?.wochenbetrag_eur > 0 && b?.vorsprung_wochen >= 1 && b?.eur_usd_rate > 0) {
+        hoechst = b.wochenbetrag_eur * b.vorsprung_wochen * b.eur_usd_rate;
+    } else if (b?.max_budget_usd > 0) {
+        hoechst = b.max_budget_usd;
+    }
+    if (!hoechst) return null;
+
+    const anteil = Math.max(0, Math.min(100, Math.round((rest / hoechst) * 100)));
+    return { anteil, knapp: anteil <= 20 };
+}

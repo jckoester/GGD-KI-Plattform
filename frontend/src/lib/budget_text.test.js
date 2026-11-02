@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+    budgetBalken,
     zuwachsText,
     zuwachsKurz,
     uebertragText,
@@ -154,5 +155,36 @@ describe("zuschlagText", () => {
 
     it("schweigt ohne Kurs, statt eine falsche Zahl zu nennen", () => {
         expect(zuschlagText({ zuschlag_usd: 0.55 })).toBeNull();
+    });
+});
+
+describe("budgetBalken", () => {
+    // Wochenbetrag 1 €, drei Wochen Vorsprung, Kurs 1,1 → Höchststand 3,30 $.
+    const basis = { wochenbetrag_eur: 1, vorsprung_wochen: 3, eur_usd_rate: 1.1 };
+
+    it("ist voll, wer den Höchststand hat — egal, wie hoch die Jahresgrenze ist", () => {
+        expect(budgetBalken({ ...basis, remaining_usd: 3.3, max_budget_usd: 30 }))
+            .toEqual({ anteil: 100, knapp: false });
+    });
+
+    it("zeigt nach der Aufbuchung ein Drittel, wer alles verbraucht hatte", () => {
+        // Bis 0.28.1: 1 von 8 Wochenbeträgen → 12 % in Rot.
+        expect(budgetBalken({ ...basis, remaining_usd: 1.1, max_budget_usd: 8.8 }).anteil)
+            .toBe(33);
+    });
+
+    it("deckelt bei 100 % — ein Zuschlag hebt den Rest über den Höchststand", () => {
+        expect(budgetBalken({ ...basis, remaining_usd: 5.5 }).anteil).toBe(100);
+    });
+
+    it("wird knapp ab einem Fünftel und nie negativ", () => {
+        expect(budgetBalken({ ...basis, remaining_usd: 0.66 }).knapp).toBe(true);
+        expect(budgetBalken({ ...basis, remaining_usd: -0.1 }).anteil).toBe(0);
+    });
+
+    it("fällt ohne Wochenbetrag auf die Obergrenze zurück", () => {
+        expect(budgetBalken({ remaining_usd: 2, max_budget_usd: 4 }).anteil).toBe(50);
+        expect(budgetBalken({ remaining_usd: 2 })).toBe(null);
+        expect(budgetBalken({})).toBe(null);
     });
 });

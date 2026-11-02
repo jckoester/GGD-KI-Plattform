@@ -1,12 +1,8 @@
 <script>
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
-    import { zuwachsKurz } from "$lib/budget_text.js";
-    import {
-        ausUsd,
-        zahl as einheitenZahl,
-        text as einheitenText,
-    } from "$lib/einheiten.js";
+    import { budgetBalken, zuwachsKurz } from "$lib/budget_text.js";
+    import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import { crisisAlertTotal } from "$lib/stores/crisisAlerts.js";
     import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
     import UserMenu from "./UserMenu.svelte";
@@ -38,20 +34,10 @@
     let restEinheiten = $derived(
         ausUsd($budget?.remaining_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
     );
-    let grenzeEinheiten = $derived(
-        ausUsd($budget?.max_budget_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
-    );
-
-    let pct = $derived(
-        $budget?.max_budget_eur && $budget?.spend_eur != null
-            ? Math.min(
-                  100,
-                  Math.round(
-                      ($budget.spend_eur / $budget.max_budget_eur) * 100,
-                  ),
-              )
-            : null,
-    );
+    // Gemessen am erreichbaren Höchststand, nicht an der Jahresgrenze (0.28.2) — siehe
+    // `budgetBalken`. Die Jahresgrenze steht auch nicht mehr im Text: Sie wächst das ganze
+    // Schuljahr und sagt niemandem etwas.
+    let balken = $derived(budgetBalken($budget));
 </script>
 
 <div
@@ -61,21 +47,19 @@
     <div class="flex items-center text-xs mb-2">
         <Coins class="w-3 h-3 mr-2 text-light-tx-2 dark:text-dark-tx-2" />
         <span class="text-light-tx-2 dark:text-dark-tx-2"
-            >{einheitenZahl(restEinheiten)} / {einheitenText(grenzeEinheiten)}</span
+            >Noch {einheitenText(restEinheiten)}</span
         >
-        {#if pct != null}
-            <span class="ml-auto text-xs text-light-tx-3 dark:text-dark-tx-3"
-                >{100 - pct} %</span
-            >
-        {/if}
     </div>
-    {#if pct != null}
-        <div class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 {zuwachs ? 'mb-1' : 'mb-3'}">
+    {#if balken}
+        <div
+            class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 {zuwachs ? 'mb-1' : 'mb-3'}"
+            title="Gemessen an dem, was sich höchstens ansammelt"
+        >
             <div
-                class="h-1 rounded transition-all {pct >= 80
-                    ? 'bg-red-500'
-                    : 'bg-primary'}"
-                style="width: {100 - pct}%"
+                class="h-1 rounded transition-all {balken.knapp
+                    ? 'bg-light-re dark:bg-dark-re'
+                    : 'bg-primary dark:bg-primary-dark'}"
+                style="width: {balken.anteil}%"
             ></div>
         </div>
     {/if}

@@ -6,11 +6,10 @@
     import { budget } from "$lib/stores/budget.js";
     import {
         ausUsd,
-        zahl as einheitenZahl,
         text as einheitenText,
         kurshinweis,
     } from "$lib/einheiten.js";
-    import { zuwachsText, uebertragText, zuschlagText } from "$lib/budget_text.js";
+    import { budgetBalken, zuwachsText, uebertragText, zuschlagText } from "$lib/budget_text.js";
     import { eigeneKennung } from "$lib/zuschlag.js";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -140,20 +139,9 @@
     let restEinheiten = $derived(
         ausUsd($budget?.remaining_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
     );
-    let grenzeEinheiten = $derived(
-        ausUsd($budget?.max_budget_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
-    );
-
-    let pct = $derived(
-        $budget?.max_budget_eur && $budget?.spend_eur != null
-            ? Math.min(
-                  100,
-                  Math.round(
-                      ($budget.spend_eur / $budget.max_budget_eur) * 100,
-                  ),
-              )
-            : null,
-    );
+    // Gemessen am erreichbaren Höchststand, nicht an der Jahresgrenze (0.28.2) — siehe
+    // `budgetBalken`. Wie viel das höchstens ist, sagt `uebertragText` darunter.
+    let balken = $derived(budgetBalken($budget));
 
     // „Wann kommt wieder etwas dazu?" — ohne die Antwort wirkt ein leeres Budget
     // endgültig, obwohl am Montag wieder Guthaben da ist.
@@ -188,15 +176,16 @@
             </h2>
             {#if $budget && $budget.max_budget_eur != null}
                 <div>
-                    {#if pct != null}
+                    {#if balken}
                         <div
                             class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 mb-3"
+                            title="Gemessen an dem, was sich höchstens ansammelt"
                         >
                             <div
-                                class="h-1 rounded transition-all {pct >= 80
-                                    ? 'bg-red-500'
-                                    : 'bg-primary'}"
-                                style="width: {100 - pct}%"
+                                class="h-1 rounded transition-all {balken.knapp
+                                    ? 'bg-light-re dark:bg-dark-re'
+                                    : 'bg-primary dark:bg-primary-dark'}"
+                                style="width: {balken.anteil}%"
                             ></div>
                         </div>
                     {/if}
@@ -204,16 +193,8 @@
 
                 <div class="flex items-center text-sm mb-2">
                     <span class="text-light-tx-2 dark:text-dark-tx-2">
-                        Noch {einheitenZahl(restEinheiten)} von {einheitenText(
-                            grenzeEinheiten,
-                        )} verfügbar.
+                        Noch {einheitenText(restEinheiten)} verfügbar.
                     </span>
-                    {#if pct != null}
-                        <span
-                            class="ml-auto text-sm text-light-tx-2 dark:text-dark-tx-2"
-                            >{100 - pct} %</span
-                        >
-                    {/if}
                 </div>
                 <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">
                     {#if zuwachs}

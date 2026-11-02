@@ -18,9 +18,10 @@ Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das die tatsäch
 
 Auf der Profilseite siehst du:
 - Wie viel Budget noch übrig ist
-- Wie viel insgesamt zur Verfügung steht
 - **Wann das nächste Mal etwas dazukommt und wie viel**
-- Einen Fortschrittsbalken, der sich rot färbt, wenn das Budget knapp wird
+- Wie viel sich höchstens ansammelt
+- Einen Balken: Voll ist er, wenn du so viel hast, wie sich höchstens ansammeln kann. Er
+  färbt sich rot, wenn weniger als ein Fünftel davon übrig ist
 
 Dieselben Angaben stehen verkürzt unten in der Seitenleiste, damit du nicht extra ins Profil wechseln musst.
 

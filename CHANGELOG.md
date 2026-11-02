@@ -5,6 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.28.2] – 2026-11-02
+
+Der Budgetbalken misst am erreichbaren Höchststand. Keine Migration.
+
+### Geändert
+
+- **Budgetbalken** in Seitenleiste und Profil: Voll heißt jetzt „so viel, wie sich höchstens ansammelt“ (Wochenbetrag ×
+  `vorsprung_wochen`), nicht mehr „die bisher aufgelaufene Grenze des Schuljahres“. Rot ab weniger als einem Fünftel.
+- **Budgetanzeige:** „Noch 9.606 Einheiten“ statt „9.606 / 9.996 Einheiten“; die Prozentzahl entfällt.
+
+### Nach dem Update
+
+- Backend **und** Frontend neu bauen und starten (das Backend meldet sonst die alte Version); offene Browser-Tabs
+  einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+
 ## [0.28.1] – 2026-11-02
 
 Rückmeldungen aus dem Chat nennen das Modell. Eine Migration (0098).
