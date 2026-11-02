@@ -57,7 +57,11 @@ def _eigener_bestand(pseudonym: str):
     Was mit dem Pseudonym auf fremdbesessenen Dokumenten geschieht, ist eine andere
     Frage (Kontolöschung, M2) und wird nicht hier beantwortet.
     """
+    from app.auth.vorschau import eigenes_zaehlt
+
+    # In der Vorschau (0.29) leer — eine Schüler:in hat die Bausteine ihrer Lehrkraft nicht.
     return sa.and_(
+        sa.literal(eigenes_zaehlt(pseudonym)),
         ContextNode.owner_pseudonym == pseudonym,
         ContextNode.content_type.in_(PERSOENLICHE_CONTENT_TYPES),
     )

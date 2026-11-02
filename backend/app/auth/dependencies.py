@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Path, Request
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import vorschau
 from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
@@ -68,6 +69,7 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Ungültiger Token")
         if await jwt_service.is_revoked(db, payload):
             raise HTTPException(status_code=401, detail="Token revoziert")
+        vorschau.fuer_anfrage(payload)
         return payload
 
     kopfzeile = request.headers.get("authorization") or ""
@@ -87,6 +89,7 @@ async def get_current_user(
         # aussperrt. `planning` und `context` tragen selbst keine Drossel; für
         # Browser-Verkehr bleibt das bewusst so.
         drossel_pruefe("token", str(zeile.id), payload.roles)
+        vorschau.fuer_anfrage(payload)
         return payload
 
     raise HTTPException(status_code=401, detail="Nicht authentifiziert")

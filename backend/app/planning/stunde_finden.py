@@ -27,6 +27,7 @@ from app.db.models import ContextNode, Conversation, Group, GroupMembership, Les
 from app.planning.mein_tag import MAX_VORLAUF_TAGE, stundenbezeichnung
 from app.planning.permissions import ist_gruppenlehrkraft
 from app.planning.service import entwurf_am_termin
+from app.auth.vorschau import mitglied
 
 WANN = ("heute", "morgen", "naechste", "diese_woche", "naechste_woche", "letzte_woche", "datum")
 WOCHENTAGE = ("mo", "di", "mi", "do", "fr", "sa", "so")
@@ -134,8 +135,7 @@ async def finde_stunden(db: AsyncSession, pseudonym: str, suche: Suche, *, heute
 
     # ⚠️ Die Zugriffsregel: nur Gruppen, in denen die Person Lehrkraft ist.
     eigene = sa.select(GroupMembership.group_id).where(
-        GroupMembership.pseudonym == pseudonym,
-        GroupMembership.role_in_group == "teacher",
+        mitglied(pseudonym, "teacher"),
     )
     zeilen = (
         await db.execute(

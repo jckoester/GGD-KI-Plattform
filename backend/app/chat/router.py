@@ -106,6 +106,7 @@ from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 from app.core.audit import audit
+from app.auth.vorschau import mitglied
 
 
 class ConversationItem(BaseModel):
@@ -1896,7 +1897,7 @@ async def _eigene_unterrichtsgruppe(db: AsyncSession, group_id: int, pseudonym: 
             .where(
                 Group.id == group_id,
                 Group.type == "teaching_group",
-                GroupMembership.pseudonym == pseudonym,
+                mitglied(pseudonym),
             )
         )
     ).scalar_one_or_none()
@@ -1921,7 +1922,7 @@ async def _einzige_gruppe_im_fach(db: AsyncSession, subject_id: int, pseudonym: 
             .where(
                 Group.subject_id == subject_id,
                 Group.type == "teaching_group",
-                GroupMembership.pseudonym == pseudonym,
+                mitglied(pseudonym),
             )
             .limit(2)
         )

@@ -98,6 +98,7 @@ from app.planning.reflow_service import OverhangFinding, detect_overhang
 from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
+from app.auth.vorschau import mitglied
 
 logger = logging.getLogger(__name__)
 
@@ -1695,8 +1696,7 @@ async def list_planungsgruppen(
     """
     cfg = load_school_year()
     eigene = sa.select(GroupMembership.group_id).where(
-        GroupMembership.pseudonym == user.sub,
-        GroupMembership.role_in_group == "teacher",
+        mitglied(user.sub, "teacher"),
     )
     paare = (
         await db.execute(
@@ -1837,8 +1837,7 @@ async def get_mein_tag(
     tage = [d for d in (heute, naechster) if d is not None]
 
     eigene = sa.select(GroupMembership.group_id).where(
-        GroupMembership.pseudonym == user.sub,
-        GroupMembership.role_in_group == "teacher",
+        mitglied(user.sub, "teacher"),
     )
     zeilen = await db.execute(
         sa.select(
@@ -1986,8 +1985,7 @@ async def get_mein_tag_schueler(
     tage = [d for d in (heute, naechster) if d is not None]
 
     eigene = sa.select(GroupMembership.group_id).where(
-        GroupMembership.pseudonym == user.sub,
-        GroupMembership.role_in_group == "student",
+        mitglied(user.sub, "student"),
     )
 
     bedingungen = [LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage)]

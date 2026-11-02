@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Iterable, Optional, Protocol
 from uuid import UUID
+from app.auth.vorschau import mitglied
 
 #: Wer die Markierung gesetzt hat. Der Stundenplan-Abgleich darf die Kategorie nur
 #: überschreiben, wo er selbst die Quelle ist — dieselbe Regel wie bei
@@ -185,8 +186,7 @@ async def lade_slots_am_tag(
     from app.db.models import GroupMembership, LessonSlot
 
     eigene = sa.select(GroupMembership.group_id).where(
-        GroupMembership.pseudonym == pseudonym,
-        GroupMembership.role_in_group == "teacher",
+        mitglied(pseudonym, "teacher"),
     )
     stmt = sa.select(LessonSlot).where(
         LessonSlot.group_id.in_(eigene), LessonSlot.date == datum

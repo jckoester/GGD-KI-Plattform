@@ -67,3 +67,14 @@ def _audit_ohne_datenbank(monkeypatch):
     from app.core import audit
 
     monkeypatch.setattr(audit, "SCHREIBEN", False)
+
+
+@pytest.fixture(autouse=True)
+def _keine_vorschau():
+    """Die Vorschau gilt je Anfrage (`app.auth.vorschau`, ContextVar). Ein Test, der sie
+    setzt, soll sie nicht an den nächsten weitergeben."""
+    from app.auth import vorschau
+
+    marke = vorschau._AKTIV.set(None)
+    yield
+    vorschau._AKTIV.reset(marke)

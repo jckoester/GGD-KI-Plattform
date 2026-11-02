@@ -33,6 +33,7 @@ from app.context.search import (
 )
 from app.context.stufen import bp_baender_zu, vermerke as stufen_vermerke
 from app.context.schemas import CurriculumDraftConfirmed
+from app.auth.vorschau import mitglied
 from app.db.models import (
     AssistantContextAnchor,
     ChatContextNode,
@@ -190,7 +191,7 @@ async def _faecher_der_person(db: AsyncSession, pseudonym: str) -> tuple[int, ..
         sa.select(Group.subject_id)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
         .where(
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
             Group.type == "teaching_group",
             Group.subject_id.is_not(None),
         )
@@ -763,7 +764,7 @@ async def is_subject_department_member(
         .where(
             Group.subject_id == subject_id,
             Group.type == "subject_department",
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
         )
         .limit(1)
     )
@@ -786,7 +787,7 @@ async def fachschafts_faecher(db: AsyncSession, pseudonym: str) -> set[int]:
         .where(
             Group.type == "subject_department",
             Group.subject_id.isnot(None),
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
         )
         .distinct()
     )

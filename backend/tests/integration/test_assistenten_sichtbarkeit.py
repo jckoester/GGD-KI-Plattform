@@ -399,3 +399,110 @@ class TestChatWeg:
                 db_session, 999_999, _jwt(SCHUELERIN, "student"), testlauf=False
             )
         assert fehler.value.status_code == 404
+
+
+# ── Vorschau (0.29, ADR-016, Ansatz C) ──────────────────────────────────────────
+
+def _vorschau_jwt(pseudonym, gruppe_id, *, grade="9", assistent_id=None) -> JwtPayload:
+    """Ein Vorschau-Token: Rolle `student`, echte Rollen nur im Merkmal."""
+    from app.auth.vorschau import Vorschau
+
+    return JwtPayload(
+        sub=pseudonym, roles=["student"], grade=grade,
+        jti="00000000-0000-4000-8000-000000000001", iat=0, exp=2**31,
+        preview=Vorschau(echte_rollen=["teacher"], gruppe_id=gruppe_id,
+                         assistent_id=assistent_id, beginn=0, sitzung_ablauf=2**31),
+    )
+
+
+async def _vorschau_zugang(db_session, pseudonym, gruppe_id, **kw) -> Zugang:
+    from app.auth import vorschau
+
+    jwt = _vorschau_jwt(pseudonym, gruppe_id, **kw)
+    vorschau.fuer_anfrage(jwt)  # wie `get_current_user` je Anfrage
+    return await lade_zugang(db_session, jwt)
+
+
+class TestVorschau:
+    """Die Lehrkraft der Gruppe sieht in der Vorschau, was ihre Schüler:innen sehen."""
+
+    async def test_eigener_entwurf_und_eigener_privater_sind_unsichtbar(self, db_session, welt):
+        entwurf = await _assistent(db_session, scope="all", audience="student",
+                                   status="draft", created_by=GRUPPENLEHRKRAFT)
+        privat = await _assistent(db_session, scope="private", audience="all",
+                                  created_by=GRUPPENLEHRKRAFT)
+        zugang = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id)
+        assert not darf_nutzen(entwurf, zugang)
+        assert not darf_nutzen(privat, zugang)
+
+    async def test_gruppenassistent_fuer_schuelerinnen_ist_sichtbar(self, db_session, welt):
+        a = await _assistent(db_session, scope="teaching_group",
+                             scope_group_id=welt["gruppe"].id, audience="student",
+                             created_by="irgendeine-kollegin")
+        zugang = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id)
+        assert zugang.gruppen == {welt["gruppe"].id}
+        assert zugang.lehrgruppen == frozenset(), "In der Vorschau keine Lehrkraft der Gruppe"
+        assert darf_nutzen(a, zugang)
+
+    async def test_lehrkraeftefreigabe_der_eigenen_gruppe_ist_unsichtbar(self, db_session, welt):
+        """Als Lehrkraft der Gruppe sähe sie einen Assistenten für Lehrkräfte — als
+        Schüler:in nicht."""
+        a = await _assistent(db_session, scope="teaching_group",
+                             scope_group_id=welt["gruppe"].id, audience="teacher",
+                             created_by="irgendeine-kollegin")
+        zugang = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id)
+        assert not darf_nutzen(a, zugang)
+
+    async def test_ohne_gruppe_keine_gruppenassistenten(self, db_session, welt):
+        a = await _assistent(db_session, scope="teaching_group",
+                             scope_group_id=welt["gruppe"].id, audience="student",
+                             created_by="irgendeine-kollegin")
+        zugang = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, None)
+        assert zugang.gruppen == frozenset()
+        assert not darf_nutzen(a, zugang)
+
+    async def test_eintritt_aus_dem_editor_laesst_den_entwurf_zu(self, db_session, welt):
+        """F6: Wer aus dem Editor eintritt, testet genau diesen Assistenten — auch als
+        Entwurf. Die übrigen Regeln gelten trotzdem."""
+        passt = await _assistent(db_session, scope="all", audience="student",
+                                 status="draft", created_by=GRUPPENLEHRKRAFT)
+        zu_alt = await _assistent(db_session, scope="all", audience="student",
+                                  status="draft", min_grade=11, created_by=GRUPPENLEHRKRAFT)
+        z1 = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id,
+                                    assistent_id=passt.id)
+        assert darf_nutzen(passt, z1)
+        z2 = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id,
+                                    assistent_id=zu_alt.id)
+        assert not darf_nutzen(zu_alt, z2), "Klasse 9 sieht einen Assistenten ab Klasse 11 nicht"
+
+    async def test_fremder_entwurf_wird_durch_den_eintritt_nicht_frei(self, db_session, welt):
+        fremd = await _assistent(db_session, scope="all", audience="student",
+                                 status="draft", created_by="irgendeine-kollegin")
+        zugang = await _vorschau_zugang(db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id,
+                                        assistent_id=fremd.id)
+        assert not darf_nutzen(fremd, zugang)
+
+    @pytest.mark.parametrize("mit_gruppe,mit_eintritt", [
+        (True, False), (False, False), (True, True),
+    ])
+    async def test_funktion_und_abfrage_sagen_dasselbe(self, db_session, welt, mit_gruppe, mit_eintritt):
+        bestand = await TestFunktionUndAbfrageSagenDasselbe()._bestand(db_session, welt)
+        bestand += [
+            await _assistent(db_session, scope="all", audience="student", status="draft",
+                             created_by=GRUPPENLEHRKRAFT),
+            await _assistent(db_session, scope="private", audience="all",
+                             created_by=GRUPPENLEHRKRAFT),
+            await _assistent(db_session, scope="teaching_group", audience="teacher",
+                             scope_group_id=welt["gruppe"].id, created_by="irgendeine-kollegin"),
+        ]
+        ids = [a.id for a in bestand]
+        zugang = await _vorschau_zugang(
+            db_session, GRUPPENLEHRKRAFT, welt["gruppe"].id if mit_gruppe else None,
+            assistent_id=bestand[-3].id if mit_eintritt else None,
+        )
+        aus_der_funktion = {a.id for a in bestand if darf_nutzen(a, zugang)}
+        aus_der_abfrage = set((await db_session.execute(
+            sa.select(Assistant.id).where(Assistant.id.in_(ids), sichtbar_klausel(zugang))
+        )).scalars().all())
+        assert aus_der_funktion == aus_der_abfrage
+        assert aus_der_funktion, "Ein Vergleich zweier leerer Mengen belegt nichts"

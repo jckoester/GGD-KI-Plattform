@@ -25,6 +25,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.models import ContextNode, Conversation, Group, GroupMembership
 from app.db.session import get_db
+from app.auth.vorschau import eigenes_zaehlt, mitglied
 
 router = APIRouter(prefix="/archive", tags=["archive"])
 
@@ -49,7 +50,7 @@ class ArchivAntwort(BaseModel):
 def _eigene_gruppen_unterabfrage(pseudonym: str):
     return (
         sa.select(GroupMembership.group_id)
-        .where(GroupMembership.pseudonym == pseudonym)
+        .where(mitglied(pseudonym))
         .scalar_subquery()
     )
 
@@ -68,7 +69,12 @@ async def list_former_groups(
     Spalte an `groups`: Die Gruppe selbst weiß nicht, wann sie gelebt hat, ihre
     Jahrespläne schon. Fehlt die Angabe, bleibt das Feld leer — eine geratene
     Jahreszahl wäre schlechter als keine.
+
+    In der Vorschau (0.29) leer: Dort gilt nur die simulierte Gruppe als eigene — alle
+    übrigen Gruppen der Lehrkraft erschienen sonst als „frühere“.
     """
+    if not eigenes_zaehlt(current_user.sub):
+        return ArchivAntwort(items=[])
     eigene = _eigene_gruppen_unterabfrage(current_user.sub)
 
     # Eigene Planungsknoten je Gruppe. `write_scope_group_id` ist der Träger — dort

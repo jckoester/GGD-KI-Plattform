@@ -99,6 +99,7 @@ from app.db.models import (
     Subject,
 )
 from app.db.session import get_db
+from app.auth.vorschau import eigenes_zaehlt, mitglied
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,9 @@ async def _check_anchor_permission(
     assistant = await db.get(Assistant, assistant_id)
     if assistant is None:
         raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-    if "admin" not in current_user.roles and assistant.created_by != current_user.sub:
+    if "admin" not in current_user.roles and (
+        assistant.created_by != current_user.sub or not eigenes_zaehlt(current_user.sub)
+    ):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     return assistant
 
@@ -133,7 +136,7 @@ async def _check_write_permission(
     """
     if "admin" in user.roles:
         return
-    if node.owner_pseudonym == user.sub:
+    if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
         return
     if (
         node.write_scope == "subject"
@@ -152,8 +155,7 @@ async def _check_write_permission(
         result = await db.execute(
             sa.select(sa.literal(1)).where(
                 GroupMembership.group_id == node.write_scope_group_id,
-                GroupMembership.pseudonym == user.sub,
-                GroupMembership.role_in_group == "teacher",
+                mitglied(user.sub, "teacher"),
             )
         )
         if result.scalar_one_or_none() is not None:
@@ -171,7 +173,8 @@ async def _check_read_permission(
     `subject`/`school`/`global` → für alle eingeloggten Nutzer:innen lesbar. (Vorher prüfte der
     Lesepfad **nur** `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Audit #1.)
     """
-    if node.owner_pseudonym == user.sub:
+    # Eigentum zählt in der Vorschau nicht (0.29) — wie in `read_scope_clause`.
+    if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
         return
     # Privat ist owner-only — bewusst VOR der Admin-Ausnahme, damit Admins fremde private
     # Knoten nicht lesen können (deckt sich mit `_read_scope_clause`, das private ausschließt).
@@ -190,7 +193,7 @@ async def _check_read_permission(
         result = await db.execute(
             sa.select(sa.literal(1)).where(
                 GroupMembership.group_id == node.read_scope_group_id,
-                GroupMembership.pseudonym == user.sub,
+                mitglied(user.sub),
             )
         )
         if result.scalar_one_or_none() is None:
@@ -254,7 +257,7 @@ async def _require_curriculum_write(
             sa.select(1).where(
                 sa.exists().where(
                     GroupMembership.group_id == node.write_scope_group_id,
-                    GroupMembership.pseudonym == user.sub,
+                    mitglied(user.sub),
                 )
             )
         )
@@ -323,8 +326,7 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
     if braucht_gruppen and "teacher" in user.roles:
         rows = await db.execute(
             sa.select(GroupMembership.group_id).where(
-                GroupMembership.pseudonym == user.sub,
-                GroupMembership.role_in_group == "teacher",
+                mitglied(user.sub, "teacher"),
             )
         )
         eigene_gruppen = {gid for (gid,) in rows}
@@ -345,10 +347,11 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
 
         eigene_fachschaften = await fachschafts_faecher(db, user.sub)
 
+    eigenes = eigenes_zaehlt(user.sub)
     for node in nodes:
         node.darf_schreiben = (
             ist_admin
-            or node.owner_pseudonym == user.sub
+            or (eigenes and node.owner_pseudonym == user.sub)
             or (
                 node.write_scope == "group"
                 and node.write_scope_group_id in eigene_gruppen
@@ -1607,7 +1610,7 @@ async def get_curriculum(
             sa.select(1).where(
                 sa.exists().where(
                     GroupMembership.group_id == tree["write_scope_group_id"],
-                    GroupMembership.pseudonym == user.sub,
+                    mitglied(user.sub),
                 )
             )
         )
@@ -1771,7 +1774,10 @@ async def list_curricula_by_subject(
             ContextNode.status == "active",
             sa.or_(
                 ContextNode.read_scope.in_(["global", "school", "subject"]),
-                ContextNode.owner_pseudonym == user.sub,
+                sa.and_(
+                    sa.literal(eigenes_zaehlt(user.sub)),
+                    ContextNode.owner_pseudonym == user.sub,
+                ),
             ),
         ).order_by(ContextNode.metadata_["jahrgangsstufe"])
     )

@@ -28,6 +28,7 @@ from app.groups.aktualitaet import (
 )
 from app.db.session import get_db
 from app.planning.calendar import SchoolYearConfig, load_school_year
+from app.auth.vorschau import mitglied
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -137,7 +138,7 @@ async def list_my_groups(
     stmt = (
         select(Group)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
-        .where(GroupMembership.pseudonym == current_user.sub)
+        .where(mitglied(current_user.sub))
         .order_by(Group.type, Group.name)
     )
     result = await db.execute(stmt)
@@ -220,7 +221,7 @@ async def list_potential_teaching_groups(
         select(Group)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
         .where(
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
             Group.type.in_(["school_class", "subject_department"]),
         )
     )
@@ -244,7 +245,7 @@ async def list_potential_teaching_groups(
         .join(GroupMembership, GroupMembership.group_id == Group.id)
         .join(GroupSourceClass, GroupSourceClass.group_id == Group.id)
         .where(
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
             Group.type == "teaching_group",
         )
     )
@@ -345,7 +346,7 @@ async def create_teaching_group(
     # Lehrkraft muss in der Klasse sein
     stmt = select(GroupMembership).where(
         GroupMembership.group_id == body.class_group_id,
-        GroupMembership.pseudonym == pseudonym,
+        mitglied(pseudonym),
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise HTTPException(403, "Keine Mitgliedschaft in dieser Klasse")
@@ -355,7 +356,7 @@ async def create_teaching_group(
         select(Group)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
         .where(
-            GroupMembership.pseudonym == pseudonym,
+            mitglied(pseudonym),
             Group.type == "teaching_group",
             Group.subject_id == body.subject_id,
             Group.id.in_(
@@ -436,8 +437,7 @@ async def delete_teaching_group(
     # Eigene Mitgliedschaft prüfen
     stmt = select(GroupMembership).where(
         GroupMembership.group_id == group_id,
-        GroupMembership.pseudonym == pseudonym,
-        GroupMembership.role_in_group == "teacher",
+        mitglied(pseudonym, "teacher"),
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise HTTPException(403, "Keine Berechtigung")

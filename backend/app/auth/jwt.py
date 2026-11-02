@@ -5,6 +5,7 @@ from uuid import uuid4
 from jose import jwt, JWTError
 from pydantic import BaseModel
 
+from app.auth.vorschau import Vorschau
 from app.db.models import JwtRevocation, PseudonymAudit
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,10 @@ class JwtPayload(BaseModel):
     # Liste heißt „nur diese Scopes, und nur auf Routern, die sie führen"
     # (`app.auth.scopes`). Aus einem JWT kommt das Feld nie — Sitzungen tragen es nicht.
     token_scopes: list[str] | None = None
+    # Vorschaumodus (0.29, ADR-016, Ansatz C): In einem Vorschau-Token stehen in `roles`
+    # und `grade` die **simulierten** Werte (`student`, gewählter Jahrgang); die echten
+    # stehen hier. `None` heißt: keine Vorschau. Siehe `app.auth.vorschau`.
+    preview: Vorschau | None = None
 
 
 class JwtService:
@@ -37,8 +42,16 @@ class JwtService:
         display_name: str | None = None,
         sso_groups: list[str] | None = None,
         sso_roles: list[str] | None = None,
+        *,
+        preview: Vorschau | None = None,
+        exp: int | None = None,
     ) -> tuple[str, str]:
-        """Gibt (token, jti) zurück."""
+        """Gibt (token, jti) zurück.
+
+        ``exp`` setzt den Ablauf fest (Unix-Zeit) statt ``jetzt + ttl`` — für das
+        Vorschau-Token und den Rückweg aus ihm, der die alte Sitzung nicht verlängern darf
+        (0.29, F1). ``preview`` ist das Vorschau-Merkmal (`app.auth.vorschau`).
+        """
         now = datetime.now(timezone.utc)
         jti = str(uuid4())
         payload = {
@@ -50,8 +63,10 @@ class JwtService:
             "sso_roles": sso_roles or [],
             "jti": jti,
             "iat": int(now.timestamp()),
-            "exp": int((now + self._ttl).timestamp()),
+            "exp": exp if exp is not None else int((now + self._ttl).timestamp()),
         }
+        if preview is not None:
+            payload["preview"] = preview.model_dump()
         token = jwt.encode(payload, self._secret, algorithm=self._algorithm)
         return token, jti
 

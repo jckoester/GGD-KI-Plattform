@@ -52,6 +52,7 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.db.models import Assistant, GroupMembership
 from app.litellm.team_models import erlaubte_modelle_fuer
+from app.auth.vorschau import eigenes_zaehlt, eintrittsassistent, mitglied, rolle_in_gruppe
 
 #: Scopes, die an einer Gruppe hängen. Deckungsgleich mit `GROUP_SCOPES` im Router —
 #: dort entscheidet sie über die Pflichtangabe beim Anlegen, hier über den Zugang.
@@ -80,6 +81,13 @@ class Zugang:
     #: Für Rolle und Jahrgang freigeschaltete Modelle (`/settings/models`); ``None``, wenn
     #: nicht zu erfahren (Proxy nicht erreichbar) — dann wird nicht nach Modell gefiltert.
     modelle: frozenset[str] | None = None
+    #: Gilt „eigene immer“? In der Vorschau nicht (0.29): Eine Schüler:in sieht die
+    #: Entwürfe und privaten Assistenten ihrer Lehrkraft nicht.
+    eigene: bool = True
+    #: Vorschau aus dem Editor (F6): Dieser eigene Assistent darf auch als Entwurf laufen —
+    #: sonst ließe er sich nicht als Schüler:in testen. Die übrigen Regeln (Zielgruppe,
+    #: Scope, Stufe, Modell) gelten für ihn wie für alle; genau das soll die Vorschau zeigen.
+    eintritt: int | None = None
 
     @property
     def lehrkraft(self) -> bool:
@@ -95,17 +103,27 @@ async def lade_zugang(db: AsyncSession, user: JwtPayload) -> Zugang:
     """Die Mitgliedschaften einer Person — **eine** Abfrage für beide Wege."""
     zeilen = (await db.execute(
         sa.select(GroupMembership.group_id, GroupMembership.role_in_group)
-        .where(GroupMembership.pseudonym == user.sub)
+        .where(mitglied(user.sub))
     )).all()
     modelle = await erlaubte_modelle_fuer(user.roles or [], getattr(user, "grade", None))
     return Zugang(
         pseudonym=user.sub,
         rollen=frozenset(user.roles or ()),
         gruppen=frozenset(g for g, _r in zeilen),
-        lehrgruppen=frozenset(g for g, r in zeilen if r == "teacher"),
+        lehrgruppen=frozenset(
+            g for g, r in zeilen if rolle_in_gruppe(user.sub, r) == "teacher"
+        ),
         stufe=_stufe(getattr(user, "grade", None)),
         modelle=frozenset(modelle) if modelle is not None else None,
+        eigene=eigenes_zaehlt(user.sub),
+        eintritt=eintrittsassistent(user.sub),
     )
+
+
+def _ist_eintritt(assistant: Assistant, zugang: Zugang) -> bool:
+    """Der eigene Assistent, mit dem die Vorschau aus dem Editor begann."""
+    return (zugang.eintritt is not None and assistant.id == zugang.eintritt
+            and assistant.created_by == zugang.pseudonym)
 
 
 def modell_des_assistenten(assistant: Assistant) -> str:
@@ -158,19 +176,20 @@ def _zielgruppe_passt(audience: str, zugang: Zugang) -> bool:
 def darf_nutzen(assistant: Assistant, zugang: Zugang, *, jetzt=None) -> bool:
     """Die Regel als Funktion — für einen einzelnen Assistenten (Chat, Detailansicht)."""
     jetzt = jetzt or datetime.now(timezone.utc)
-    if assistant.status != "active":
-        return False
-    if assistant.available_from and assistant.available_from > jetzt:
-        return False
-    if assistant.available_until and assistant.available_until < jetzt:
-        return False
+    if not _ist_eintritt(assistant, zugang):
+        if assistant.status != "active":
+            return False
+        if assistant.available_from and assistant.available_from > jetzt:
+            return False
+        if assistant.available_until and assistant.available_until < jetzt:
+            return False
 
     # Vor der Ersteller-Ausnahme: Ein eigener Assistent mit gesperrtem Modell ist auch für
     # die Erstellerin nicht benutzbar — der Chat lehnt das Modell ab.
     if not _modell_passt(assistant, zugang):
         return False
 
-    if assistant.created_by == zugang.pseudonym:
+    if zugang.eigene and assistant.created_by == zugang.pseudonym:
         return True
 
     if not _stufe_passt(assistant, zugang):
@@ -221,6 +240,9 @@ def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
         or_(Assistant.available_from.is_(None), Assistant.available_from <= jetzt),
         or_(Assistant.available_until.is_(None), Assistant.available_until >= jetzt),
     )
+    if zugang.eintritt is not None:
+        aktiv = or_(aktiv, and_(Assistant.id == zugang.eintritt,
+                                Assistant.created_by == zugang.pseudonym))
     zielgruppe = or_(
         Assistant.audience == "all",
         and_(Assistant.audience == "student", zugang.schuelerin),
@@ -255,7 +277,7 @@ def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
         aktiv,
         modell,
         or_(
-            Assistant.created_by == zugang.pseudonym,
+            and_(sa.literal(zugang.eigene), Assistant.created_by == zugang.pseudonym),
             and_(
                 stufe,
                 or_(

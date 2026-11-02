@@ -797,6 +797,16 @@ def _kandidaten(frage: str) -> list[str]:
     return [k for k in dict.fromkeys([begriff, roh]) if k]
 
 
+def _eigen(profil: Suchprofil):
+    """„Gehört der suchenden Person“ — in der Vorschau nie (0.29): Eine Schüler:in bekommt
+    keinen Vorrang für die Bausteine ihrer Lehrkraft."""
+    from app.auth.vorschau import eigenes_zaehlt
+
+    if not eigenes_zaehlt(profil.pseudonym):
+        return sa.false()
+    return ContextNode.owner_pseudonym == profil.pseudonym
+
+
 def _vorrang(profil: Suchprofil) -> list:
     """Eigenes zuerst, dann das Fach der Konversation.
 
@@ -804,7 +814,7 @@ def _vorrang(profil: Suchprofil) -> list:
     Bausteine verschwinden nicht, sie rücken nach. Wer nach „seinem" Merkblatt sucht,
     soll es oben finden, ohne dass die Handreichung der Fachschaft unauffindbar wird.
     """
-    stufen = [sa.case((ContextNode.owner_pseudonym == profil.pseudonym, 0), else_=1)]
+    stufen = [sa.case((_eigen(profil), 0), else_=1)]
     aus_dem_fach = _aus_dem_fach(profil)
     if aus_dem_fach is not None:
         stufen.append(sa.case((aus_dem_fach, 0), else_=1))
@@ -1103,9 +1113,7 @@ async def thematisch(
         aus_eigenem_fach = _aus_eigenem_fach(profil)
         if aus_eigenem_fach is not None:
             naehe = naehe - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
-        naehe = naehe - _bonus(
-            ContextNode.owner_pseudonym == profil.pseudonym, _EIGENTUEMER_BONUS
-        )
+        naehe = naehe - _bonus(_eigen(profil), _EIGENTUEMER_BONUS)
         typ_bonus = _typ_bonus(profil)
         if typ_bonus is not None:
             naehe = naehe - typ_bonus

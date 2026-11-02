@@ -350,3 +350,14 @@ def _audit_in_die_testdatenbank(async_engine, monkeypatch):
 
     monkeypatch.setattr(audit, "SITZUNGSFABRIK",
                         async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False))
+
+
+@pytest.fixture(autouse=True)
+def _keine_vorschau():
+    """Die Vorschau gilt je Anfrage (`app.auth.vorschau`, ContextVar). Ein Test, der sie
+    setzt, soll sie nicht an den nächsten weitergeben."""
+    from app.auth import vorschau
+
+    marke = vorschau._AKTIV.set(None)
+    yield
+    vorschau._AKTIV.reset(marke)

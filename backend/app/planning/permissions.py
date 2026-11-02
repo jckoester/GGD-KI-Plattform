@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
 from app.db.models import Group, GroupMembership
+from app.auth.vorschau import eigenes_zaehlt, mitglied
 
 
 async def require_group_teacher(
@@ -31,8 +32,7 @@ async def require_group_teacher(
     result = await db.execute(
         sa.select(GroupMembership).where(
             GroupMembership.group_id == group_id,
-            GroupMembership.pseudonym == user.sub,
-            GroupMembership.role_in_group == "teacher",
+            mitglied(user.sub, "teacher"),
         )
     )
     if result.scalar_one_or_none() is None:
@@ -50,8 +50,7 @@ async def ist_gruppenlehrkraft(
     result = await db.execute(
         sa.select(GroupMembership).where(
             GroupMembership.group_id == group_id,
-            GroupMembership.pseudonym == user.sub,
-            GroupMembership.role_in_group == "teacher",
+            mitglied(user.sub, "teacher"),
         )
     )
     return result.scalar_one_or_none() is not None
@@ -87,6 +86,7 @@ async def zugang_zur_stunde(
     group_id = lesson.write_scope_group_id
     if group_id is not None and await ist_gruppenlehrkraft(group_id, user, db):
         return True
-    if lesson.owner_pseudonym is not None and lesson.owner_pseudonym == user.sub:
+    if (lesson.owner_pseudonym is not None and lesson.owner_pseudonym == user.sub
+            and eigenes_zaehlt(user.sub)):
         return False
     raise HTTPException(status_code=403, detail="Keine Berechtigung")

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calendar.patterns import GroupKey
 from app.db.models import Group, GroupMembership, GroupSourceClass, Subject
+from app.auth.vorschau import mitglied
 
 logger = logging.getLogger(__name__)
 
@@ -404,8 +405,7 @@ async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
         .outerjoin(Subject, Subject.id == Group.subject_id)
         .where(
             Group.type == "teaching_group",
-            GroupMembership.pseudonym == pseudonym,
-            GroupMembership.role_in_group == "teacher",
+            mitglied(pseudonym, "teacher"),
         )
     )
     # `Kandidat` ist frozen — erst die Klassennamen je Gruppe sammeln, dann bauen.

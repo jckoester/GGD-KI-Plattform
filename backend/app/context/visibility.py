@@ -33,6 +33,7 @@ import sqlalchemy as sa
 from sqlalchemy import and_, or_
 
 from app.db.models import ContextNode, GroupMembership
+from app.auth.vorschau import eigenes_zaehlt, mitglied
 
 # Scopes, die jede angemeldete Person lesen darf. `private` fehlt hier absichtlich und
 # `group` ebenso — beide hängen an der Person, nicht am Scope allein.
@@ -55,7 +56,7 @@ def read_scope_clause(pseudonym: str, rollen: Iterable[str] = ()):
 
     eigene_gruppen = (
         sa.select(GroupMembership.group_id)
-        .where(GroupMembership.pseudonym == pseudonym)
+        .where(mitglied(pseudonym))
         .scalar_subquery()
     )
     # ⚠️ **`group_teachers` nur mit Lehrkraft-Rolle.** Bis zum 24.09.2026 gab es den Wert
@@ -64,9 +65,14 @@ def read_scope_clause(pseudonym: str, rollen: Iterable[str] = ()):
     # verlangte die Rolle längst; nur das Lesen tat es nicht.
     lehrkraft = "teacher" in rollen
     gruppenscopes = ["group", "group_teachers"] if lehrkraft else ["group"]
+    # Eigentum zählt in der Vorschau nicht (0.29): Eine Schüler:in liest die privaten
+    # Knoten ihrer Lehrkraft nicht.
+    eigene = (
+        ContextNode.owner_pseudonym == pseudonym if eigenes_zaehlt(pseudonym) else sa.false()
+    )
     return or_(
         ContextNode.read_scope.in_(OFFENE_SCOPES),
-        ContextNode.owner_pseudonym == pseudonym,
+        eigene,
         and_(
             ContextNode.read_scope.in_(gruppenscopes),
             ContextNode.read_scope_group_id.in_(eigene_gruppen),

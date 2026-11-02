@@ -19,6 +19,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.vorschau import mitglied
 from app.db.models import (
     Conversation,
     Group,
@@ -119,8 +120,7 @@ async def kandidaten(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
         .outerjoin(stunden, stunden.c.group_id == Group.id)
         .outerjoin(chats, chats.c.group_id == Group.id)
         .where(
-            GroupMembership.pseudonym == pseudonym,
-            GroupMembership.role_in_group == "teacher",
+            mitglied(pseudonym, "teacher"),
             Group.type == "teaching_group",
             Group.sso_group_id.is_(None),
         )
@@ -171,8 +171,7 @@ async def ordne_zu(
     eigene = await db.execute(
         select(GroupMembership).where(
             GroupMembership.group_id == group_id,
-            GroupMembership.pseudonym == pseudonym,
-            GroupMembership.role_in_group == "teacher",
+            mitglied(pseudonym, "teacher"),
         )
     )
     if eigene.scalar_one_or_none() is None:

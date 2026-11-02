@@ -771,8 +771,16 @@ async def _load_and_authorize_assistant(assistant_id: int, current_user: JwtPayl
 
 
 def _check_assistant_access(assistant: Assistant, current_user: JwtPayload, is_admin: bool) -> None:
-    """Prueft Zugriffsrechte auf einen Assistenten."""
-    if not is_admin and assistant.created_by != current_user.sub:
+    """Prueft Zugriffsrechte auf einen Assistenten (Editor, Export).
+
+    In der Vorschau (0.29) gilt Eigentum nicht: Eine Schüler:in öffnet den Editor der
+    Lehrkraft nicht — die Vorschau auch nicht. Lesen ist hier ohne Rollenprüfung offen.
+    """
+    from app.auth.vorschau import eigenes_zaehlt
+
+    if not is_admin and (
+        assistant.created_by != current_user.sub or not eigenes_zaehlt(current_user.sub)
+    ):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
