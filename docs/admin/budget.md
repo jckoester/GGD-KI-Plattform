@@ -291,9 +291,9 @@ Im Admin-Bereich zeigt `/budget` eine aggregierte Übersicht der Ausgaben —
 aufgeschlüsselt nach Nutzergruppen und Jahrgängen. Die Anzeige ist
 pseudonymisiert: es sind keine Klarnamen sichtbar.
 
-Für rechtlich begründete Einzelfälle (z. B. Missbrauchsverdacht) ist eine
-De-Anonymisierung über das Audit-Log möglich — dies wird protokolliert.
-Details dazu in [Datenschutz & Betrieb](datenschutz-betrieb.md).
+Eine Funktion, ein Pseudonym einer Person zuzuordnen, hat die Plattform nicht. Was in
+begründeten Einzelfällen möglich ist, steht in
+[Datenschutz & Betrieb](datenschutz-betrieb.md#ein-pseudonym-einer-person-zuordnen).
 
 ## Zuschläge von Hand
 

@@ -44,6 +44,10 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "login_failed",
         "stepup_denied",
         "rate_limit_locked",
+        # Abgewiesene Rückmeldung einer gesperrten Person (ADR-020 §3). Akteur ist die
+        # gesperrte Person, kein Admin — deshalb hier und nicht unter `admin`, wo das
+        # Pseudonym die Kontolöschung überlebte.
+        "feedback_blocked",
         # Vorschaumodus (ADR-016, 0.29)
         "preview_entered",
         "preview_exited",
@@ -62,7 +66,6 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "holidays_changed",
         "user_sessions_revoked",
         "feedback_status_changed",
-        "feedback_blocked",
     }),
     "access": frozenset(),
     "moderation": frozenset({

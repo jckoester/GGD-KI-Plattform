@@ -209,3 +209,14 @@
     er sagt, was drinsteht. Reichst du einen Assistenten zur Freigabe ein, sehen die Admins dein
     Stundenplan-Kürzel, falls du eins hinterlegt hast.
   link: /help/assistenten
+
+- id: "0.28-audit-log"
+  version: "0.28.0"
+  datum: 2026-11-02
+  rollen: [admin]
+  titel: "Audit-Log"
+  text: >-
+    Unter Einstellungen → Audit-Log siehst du, wer wann einen Assistenten freigegeben, ein
+    Budget geändert oder Sitzungen beendet hat, dazu gescheiterte Anmeldungen, Krisen-Flags und
+    die nächtlichen Löschläufe. Ohne Inhalte, Personen nur als Pseudonym; die Einträge lassen
+    sich nicht ändern.

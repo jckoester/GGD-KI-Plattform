@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.28.0] – 2026-11-02
+
+Audit-Log: Sicherheitsrelevante Ereignisse werden protokolliert, Admins lesen sie unter Einstellungen. Eine Migration
+(0097).
+
 ### Neu
 
 - **Audit-Log** (ADR-010 Teil 2): Tabelle `audit_log` für sicherheitsrelevante Ereignisse, nur zum Anhängen (Trigger).
@@ -21,6 +26,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Behoben
 
 - **Modell-Freischaltung:** Nach dem Speichern sah die Sichtbarkeit der Assistenten bis zu fünf Minuten den alten Stand.
+
+### Dokumentation
+
+- `docs/admin/datenschutz-betrieb.md`: Abschnitt Audit-Log mit Fristen und einem Absatz für den
+  Datenschutzbeauftragten. Die Aussage, Admins könnten ein Pseudonym über das Audit-Log einer Person zuordnen, ist
+  entfernt; eine solche Funktion gab es nie.
+- `docs/dev/audit-log.md`: Audit-Log oder Logger, Ereignisse schreiben.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0097) — wie im regulären Update.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden. Der neue Lauf
+  `cleanup_audit_log` (02:55 Uhr) kommt mit der `docker-compose.yml`; `docker compose up -d` startet ihn.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+- Den Absatz „Für den Datenschutzbeauftragten: Audit-Log und Kontolöschung" in `docs/admin/datenschutz-betrieb.md`
+  dem DSB vorlegen.
 
 ## [0.27.1] – 2026-11-01
 

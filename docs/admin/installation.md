@@ -303,8 +303,9 @@ docker compose exec backend python scripts/check_production.py
 
 Sie kommt ohne Netz und Datenbank aus und meldet die Einstellungen, deren Fehlen
 **nichts auslöst**: `ALLOWED_HOSTS` auf `*` heißt Host-Schutz aus, ein
-Loopback-`TRUSTED_PROXIES` hinter dem nginx-Container heißt, dass im Audit-Log für jede
-Anfrage die Adresse des Proxys statt der Nutzer:in steht. Beides läuft sonst jahrelang
+Loopback-`TRUSTED_PROXIES` hinter dem nginx-Container heißt, dass im Protokoll der
+Krisen-Einsicht (`conversation_access_audit`) die Adresse des Proxys statt der lesenden
+Person steht. Beides läuft sonst jahrelang
 unbemerkt.
 
 Was auch dieses Skript nicht sehen kann, sagt es am Ende selbst — allen voran, ob die

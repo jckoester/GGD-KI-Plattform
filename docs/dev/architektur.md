@@ -44,7 +44,7 @@ Cron-Container (separat):
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
 | `api/` | Übrige Endpunkt-Module neben `api/admin/`: Gruppen, Fächer, Bildarten, Zugangstoken, Leitplanken, PII-Prüfung, Krisen-Freigabe (`review.py`), Archiv |
 | `artifacts/` | Artefaktbibliothek (Phase 18): Speicher (`store.py`), Übernahme aus dem Chat (`promote.py`, `uebernahme.py`), GeoGebra-Export, Mengengrenzen |
-| `core/` | Querschnitt ohne eigene Fachlichkeit: Client-IP, Hintergrundaufgaben, Pfade, Produktions-Selbstprüfung |
+| `core/` | Querschnitt ohne eigene Fachlichkeit: Client-IP, Hintergrundaufgaben, Pfade, Produktions-Selbstprüfung, Audit-Log schreiben (`audit.py`, [audit-log.md](audit-log.md)) |
 | `crisis/` | Krisenerkennung (ADR-008): Schlüsselwort-Erkennung (`detector.py`), Benachrichtigung, Erinnerungen an unerledigte Fälle |
 | `export/` | Ausgabeformate: PDF (weasyprint), DOCX/ODT (Pandoc), Vorlagen, Prärendern von Diagrammen |
 | `mail/` | SMTP-Versand — einzige Stelle, die Mails verschickt |
@@ -76,12 +76,13 @@ Eine Verletzung dieser Invariante ist ein kritischer Datenschutz-Bug.
 
 | Tabelle | Primärschlüssel | Enthält |
 |---------|----------------|---------|
-| `pseudonym_audit` | `pseudonym` | Rolle(n), Jahrgang, letzter Login, De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel. ⚠️ Eine Tabelle `users` gibt es nicht — hier stand sie bis zum 25.09.2026 |
+| `pseudonym_audit` | `pseudonym` | Rolle(n), Jahrgang, letzter Login, Massen-Revokations-Zeitstempel. ⚠️ Eine Tabelle `users` gibt es nicht — hier stand sie bis zum 25.09.2026 |
 | `conversations` | UUID | `pseudonym`, Modell, Assistent-Ref, Titel, Kostensum |
 | `messages` | UUID | `conversation_id`, Rolle, Inhalt (Text/JSON), Kosten |
 | `assistants` | int | Name, System-Prompt, Modell, Status, Audience, Scope |
 | `exchange_rates` | id | EUR→USD-Kurs, Quelle, Datum |
 | `jwt_revocations` | `jti` | Revozierte Token-IDs |
+| `audit_log` | id | Sicherheitsrelevante Ereignisse: Kategorie, Ereignis, Akteur (Pseudonym, Rolle), Ziel, Angaben ohne Inhalte; nur anhängen ([audit-log.md](audit-log.md)) |
 | `site_texts` | `key` | Verwaltete Texte (impressum, datenschutz, regeln) |
 | `group_source_classes` | (group_id, class_group_id) | Aus welchen Klassen sich eine Unterrichtsgruppe speist — Herkunft, nicht Mitgliedschaft |
 | `group_join_codes` | UUID | Beitrittscode je Gruppe: Code, Gültigkeit, Widerruf, ausgebendes Pseudonym |

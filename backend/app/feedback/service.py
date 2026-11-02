@@ -115,7 +115,7 @@ async def pruefe_grenzen(
     ende = await gesperrt_bis(db, pseudonym, jetzt=jetzt)
     if ende is not None:
         logger.info("feedback_blocked pseudonym=%s bis=%s", pseudonym, ende.isoformat())
-        await audit_getrennt("admin", "feedback_blocked", akteur=pseudonym,
+        await audit_getrennt("auth", "feedback_blocked", akteur=pseudonym,
                              daten={"gesperrt_bis": ende.isoformat()})
         raise HTTPException(
             status_code=403,

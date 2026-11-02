@@ -189,7 +189,7 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 ### Was die Kontolöschung abräumt
 
 `cleanup_inactive_accounts` entfernt **dreizehn** Datenkategorien und macht **drei**
-weitere personenbezugsfrei. Die Unterscheidung ist Absicht: Was nur der Person gehört,
+weitere personenbezugsfrei; im Audit-Log fällt das Pseudonym in einem Teil der Einträge. Die Unterscheidung ist Absicht: Was nur der Person gehört,
 fällt; was mit anderen geteilt wurde oder als Beleg gebraucht wird, verliert den
 Personenbezug und bleibt.
 
@@ -212,6 +212,7 @@ Personenbezug und bleibt.
 | `context_nodes` (geteilt) | **bleibt**, `owner_pseudonym` wird `NULL` — sonst verschwänden Bausteine, mit denen eine Fachschaft arbeitet |
 | `feedback` | **bleibt**, Pseudonym und Kontaktangabe fallen (siehe unten) |
 | `group_join_codes.erstellt_von` | auf `NULL` — der Code gehört der Gruppe, nicht der Person |
+| `audit_log` | **bleibt** bis zum Ende der Frist; bei Anmelde- und Moderationsereignissen wird das Pseudonym `NULL`, die Rolle bleibt. Verwaltungsereignisse behalten es (siehe [Audit-Log](#audit-log-seit-028)) |
 
 ⚠️ **Diese Tabelle wird geprüft, nicht gepflegt.** `test_pseudonym_deletion_coverage.py`
 erzwingt für jede neue Tabelle mit Pseudonym-Spalte eine Entscheidung im **Code**, und
@@ -379,16 +380,76 @@ der Liste der Verarbeitungen für die DSFA steht sie der Vollständigkeit halber
 
 Bedeutung der Zahlen: [Vorab-Suche beobachten](vorab-statistik.md).
 
-## De-Anonymisierung und Audit-Log
+## Audit-Log (seit 0.28)
 
-Für begründete Ausnahmefälle (z. B. richterliche Anordnung, Missbrauchsverdacht)
-kann ein Admin über den Admin-Bereich ein Pseudonym seiner realen Nutzer-ID
-zuordnen. Jeder De-Anonymisierungsvorgang wird im Audit-Log mit Zeitstempel
-und handelnder Person protokolliert.
+Die Tabelle `audit_log` hält sicherheitsrelevante Ereignisse fest, damit sich später
+nachvollziehen lässt, wer wann was geändert oder versucht hat. Admins lesen sie unter
+**Einstellungen → Audit-Log** (`/settings/audit`), filterbar nach Kategorie, Ereignis,
+Akteur und Zeitraum. Die Ansicht ist nur lesend; Einträge lassen sich weder in der
+Oberfläche noch von der Anwendung ändern oder löschen (ein Datenbank-Trigger weist das ab,
+ausgenommen der Aufräum-Lauf und die Kontolöschung).
 
-Die Aufbewahrungsdauer des Audit-Logs ist schulspezifisch. Empfehlung:
-mindestens so lange wie die gesetzliche Aufbewahrungspflicht für
-Schülerakten in Ihrem Bundesland.
+**Was protokolliert wird:**
+
+| Kategorie | Ereignisse | Frist |
+|---|---|---|
+| Anmeldung (`auth`) | gescheiterte Anmeldungen (mit Grund, **ohne** Benutzernamen), abgelehnte Bestätigungen der Anmeldung (Step-up), Sperren der Drossel (höchstens ein Eintrag je Person, Bereich und Viertelstunde), abgewiesene Rückmeldungen gesperrter Personen | 180 Tage |
+| Verwaltung (`admin`) | Assistenten freigegeben, abgelehnt, aktiviert, deaktiviert, gelöscht; Modell-Freischaltung; Wochenbeträge und Zuschläge; Guardrail-Prompt; Site-Texte; Ferienkalender; beendete Sitzungen; Statuswechsel von Rückmeldungen | 2 Jahre |
+| Moderation (`moderation`) | Krisen-Flag angelegt (Kategorie und Schwere), Krisen-Flag erledigt | 1 Jahr |
+| System (`system`) | Ergebnisse der Löschläufe für Konten, Chats und Audit-Log sowie des Lebenszyklus im Kontextspeicher (Anzahlen) | 90 Tage |
+
+Den Aufräum-Lauf `cleanup_audit_log` zeigt die Tabelle der [automatischen Läufe](#automatische-läufe-cron-jobs).
+
+**Was nie hineinkommt:** Chat- und Meldungstexte, Prompts, der Inhalt von Site-Texten oder
+Guardrail-Prompt, der Text einer Krisennachricht, Kontaktangaben, Passwörter, Tokens,
+Cookies, IP-Adressen, Benutzernamen gescheiterter Anmeldungen. Gelungene Anmeldungen stehen
+nicht im Audit-Log; den letzten Login hält `pseudonym_audit`. Das Lesen des Audit-Logs wird
+nicht protokolliert.
+
+**Wer liest:** nur die Rolle `admin`. Akteure erscheinen als Pseudonym; die Ansicht ordnet
+es keiner Person zu.
+
+### Für den Datenschutzbeauftragten: Audit-Log und Kontolöschung
+
+> Die Plattform führt seit Version 0.28 ein Audit-Log sicherheitsrelevanter Ereignisse. Es
+> enthält keine Inhalte, nur Art des Ereignisses, Zeitpunkt, das Pseudonym und die Rolle der
+> handelnden Person, das betroffene Objekt (etwa die Kennung eines Assistenten) und wenige
+> Angaben ohne Inhalt (etwa „mit Begründung: ja"). Die Einträge werden nach festen Fristen
+> automatisch gelöscht: Anmeldeereignisse nach 180 Tagen, Verwaltungsereignisse nach zwei
+> Jahren, Moderationsereignisse nach einem Jahr, Systemereignisse nach 90 Tagen. Lesen
+> können nur Admins.
+>
+> Wird ein Konto nach 90 Tagen ohne Anmeldung gelöscht, bleiben seine Einträge im Audit-Log
+> bis zum Ende ihrer Frist bestehen. Dabei gilt:
+>
+> - **Anmelde- und Moderationsereignisse** verlieren das Pseudonym; es wird geleert, nur die
+>   Rolle („Schüler:in", „Lehrkraft") bleibt. Hier ist die handelnde Person meist eine
+>   Schüler:in, und die Frist dient der Mustererkennung (etwa gehäufte Fehlanmeldungen), nicht
+>   der Zuordnung zu einer Person.
+> - **Verwaltungsereignisse** behalten das Pseudonym bis zum Ende ihrer Frist von zwei
+>   Jahren. Sie werden nur von Admins ausgelöst. Ihr Zweck ist die Revisionsspur: Wer hat
+>   einen Assistenten für Schüler:innen freigegeben, wer ein Budget geändert? Diese Frage
+>   bliebe ohne Pseudonym unbeantwortbar.
+>
+> Das Pseudonym enthält keinen Namen, und die Datenbank führt keine Zuordnung zu Personen,
+> weder vor noch nach der Kontolöschung. Möglich ist nur die Gegenrichtung: Wer den Schlüssel
+> `SCHOOL_SECRET` kennt, kann für ein bekanntes Schulkonto das Pseudonym berechnen und im
+> Audit-Log suchen. Bei Anmelde- und Moderationsereignissen gelöschter Konten führt das ins
+> Leere, bei Verwaltungsereignissen nicht.
+>
+> Wir bitten um Prüfung, ob diese Regelung und die Fristen so tragen.
+
+### Ein Pseudonym einer Person zuordnen
+
+Eine Funktion dafür hat die Plattform nicht, auch nicht für Admins. Das Pseudonym ist
+eine Einwegfunktion der Nutzer-ID aus dem Schulkonto (siehe
+[Pseudonymisierungskonzept](#pseudonymisierungskonzept)). Möglich ist nur die Gegenprobe:
+Wer `SCHOOL_SECRET` und die Nutzer-ID eines Schulkontos kennt, berechnet dessen Pseudonym
+und sucht es. Das geschieht außerhalb der Plattform und wird nicht protokolliert. Wann das
+zulässig ist und wer es tun darf, gehört in das Datenschutzkonzept der Schule.
+
+Für Einblicke in geflaggte Chats gibt es den geregelten Weg mit zweiter Freigabe; er hat
+eine eigene Spur (`conversation_access_audit`), siehe [Inhaltsmoderation](content-moderation.md).
 
 ## Hinweise für den Datenschutzbeauftragten
 

@@ -356,6 +356,12 @@ class TestSpamSperre:
                                          headers=auth_headers_student)
         assert antwort.status_code == 403
         assert "gesperrt bis" in antwort.json()["detail"]
+        # Audit-Log: unter `auth` — der Akteur ist die gesperrte Person, kein Admin, und ihr
+        # Pseudonym fällt bei der Kontolöschung (ADR-010 §2.5).
+        with sync_conn.cursor() as cur:
+            cur.execute("SELECT category FROM audit_log WHERE event_type = 'feedback_blocked'"
+                        " AND actor_pseudonym = %s", (STUDENT_PSEUDO,))
+            assert {z[0] for z in cur.fetchall()} == {"auth"}
 
     async def test_nach_vierzehn_tagen_wieder_frei(
         self, test_client, sync_conn, auth_headers_student

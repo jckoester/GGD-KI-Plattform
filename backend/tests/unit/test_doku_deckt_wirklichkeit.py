@@ -103,11 +103,18 @@ _TABELLE = {
     "ContextNode": "context_nodes",
     "Feedback": "feedback",
     "GroupJoinCode": "group_join_codes",
+    "AuditLog": "audit_log",
 }
 
 
 def _abgeraeumte_modelle() -> set[str]:
-    """Modelle aus `delete(X)` in `cleanup_inactive_accounts` — über den Syntaxbaum."""
+    """Modelle aus `delete(X)` und `update(X)` in `cleanup_inactive_accounts` — über den
+    Syntaxbaum.
+
+    `update` zählt mit: Was den Personenbezug verliert, statt gelöscht zu werden (Feedback,
+    geteilte Bausteine, Audit-Log), gehört genauso in die Tabelle. Bis 0.28 sah der Test nur
+    `delete` — die Zeilen dafür standen trotzdem da, aber von Hand.
+    """
     baum = ast.parse(_CLEANUP.read_text(encoding="utf-8"))
     fn = next(
         k for k in ast.walk(baum)
@@ -118,7 +125,7 @@ def _abgeraeumte_modelle() -> set[str]:
         for k in ast.walk(fn)
         if isinstance(k, ast.Call)
         and isinstance(k.func, ast.Name)
-        and k.func.id == "delete"
+        and k.func.id in ("delete", "update")
         and k.args
         and isinstance(k.args[0], ast.Name)
     }
@@ -142,11 +149,13 @@ def test_jede_geloeschte_kategorie_steht_in_der_betriebsdoku():
         f"Neues Modell in der Kontolöschung, das dieser Test nicht kennt: {unbekannt}. "
         "In `_TABELLE` den Tabellennamen ergänzen und die Doku-Zeile schreiben."
     )
+    # Eine Zeile darf die Spalte nennen (`group_join_codes.erstellt_von`).
     fehlend = sorted(
-        _TABELLE[m] for m in _abgeraeumte_modelle() if f"`{_TABELLE[m]}`" not in abschnitt
+        t for t in (_TABELLE[m] for m in _abgeraeumte_modelle())
+        if f"`{t}`" not in abschnitt and f"`{t}." not in abschnitt
     )
     assert not fehlend, (
-        f"Gelöschte Kategorie(n) ohne Zeile in der Doku: {fehlend}. "
+        f"Abgeräumte Kategorie(n) ohne Zeile in der Doku: {fehlend}. "
         "In `docs/admin/datenschutz-betrieb.md` eintragen — und in ADR-003 Teil 6."
     )
 

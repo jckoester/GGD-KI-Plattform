@@ -70,5 +70,6 @@ cd frontend && npm install && npm run dev
 - [Hinweise auf Neuerungen](neuigkeiten.md) — Hinweise auf der Startseite schreiben, wer sie sieht
 - [Lokales Dev-Setup](dev-setup.md) — Entwicklungsumgebung ohne Docker
 - [Backend-Entwicklung](backend-entwicklung.md) — Migrationen, Tests, Skripte
+- [Audit-Log](audit-log.md) — Audit-Log oder Logger, Ereignisse schreiben, was nie hineingehört, nur anhängen
 - [Neuen Auth-Adapter implementieren](neuer-auth-adapter.md) — AuthAdapter-Interface
 - [Frontend-Konventionen](frontend-konventionen.md) — CSS-Tokens, Svelte 5, Routing
