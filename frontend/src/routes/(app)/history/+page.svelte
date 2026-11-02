@@ -3,7 +3,8 @@
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
-    import { getRecentConversations } from "$lib/api.js";
+    import { getRecentConversations, getVorschauChats } from "$lib/api.js";
+    import { kannVorschauBetreten } from "$lib/vorschau.js";
     import { Loader2, Bot } from "lucide-svelte";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
@@ -27,6 +28,10 @@
     let offset = $state(0);
     let total = $state(0);
     let hasMore = $state(false);
+    // Chats aus der Vorschau stehen in einer eigenen Liste (0.29). Nur außerhalb der
+    // Vorschau — in ihr gibt es ohnehin nur diese.
+    let liste = $state("eigene");
+    const vorschauListeAnbieten = $derived(kannVorschauBetreten($user));
 
     const limit = 25;
 
@@ -34,7 +39,9 @@
         loading = true;
         error = null;
         try {
-            const data = await getRecentConversations(limit, offset);
+            const data = liste === "vorschau"
+                ? await getVorschauChats(limit, offset)
+                : await getRecentConversations(limit, offset);
             conversations = [...conversations, ...data.items];
             total = data.total;
             hasMore = offset + data.items.length < data.total;
@@ -99,6 +106,27 @@
             <h1 class="text-2xl font-semibold">Meine Chats</h1>
         </div>
 
+        {#if vorschauListeAnbieten}
+            <div class="flex gap-2 mb-4 text-sm" role="group" aria-label="Welche Chats">
+                {#each [["eigene", "Meine Chats"], ["vorschau", "Aus der Vorschau"]] as [wert, label] (wert)}
+                    <button
+                        onclick={() => { liste = wert; resetAndLoad(); }}
+                        aria-pressed={liste === wert}
+                        class="px-3 py-1 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                               {liste === wert
+                                   ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx font-medium'
+                                   : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+                    >{label}</button>
+                {/each}
+            </div>
+            {#if liste === "vorschau"}
+                <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    Chats, die du in der Vorschau als Schüler:in geführt hast. Fortsetzen lassen
+                    sie sich nur in der Vorschau; nach 30 Tagen werden sie gelöscht.
+                </p>
+            {/if}
+        {/if}
+
         {#if loading && conversations.length === 0}
             <div class="flex items-center justify-center py-12">
                 <div class="flex flex-col items-center gap-2 text-gray-500">
@@ -110,7 +138,9 @@
             <ErrorBanner message={error} />
         {:else if conversations.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
-                <p class="text-lg">Noch keine Chats gespeichert.</p>
+                <p class="text-lg">
+                    {liste === "vorschau" ? "Noch keine Chats aus der Vorschau." : "Noch keine Chats gespeichert."}
+                </p>
             </div>
         {:else}
             <div class="overflow-x-auto">
@@ -153,6 +183,13 @@
                                                 size={16}
                                                 class="shrink-0"
                                             />
+                                        {/if}
+                                        {#if conv.vorschau}
+                                            <span
+                                                class="shrink-0 px-1.5 py-0.5 rounded text-xs
+                                                       bg-light-ye-bg dark:bg-dark-ye-bg text-light-tx dark:text-dark-tx"
+                                                title="Aus der Vorschau"
+                                            >Klasse {conv.vorschau.jahrgang}</span>
                                         {/if}
                                         {#if conv.assistant_name}
                                             <Bot

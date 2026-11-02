@@ -10,6 +10,8 @@
     import Sidebar from "$lib/components/AdminSidebar.svelte";
     import FeedbackDialog from "$lib/components/FeedbackDialog.svelte";
     import { feedbackDialog, schliesseFeedback } from "$lib/stores/feedbackDialog.js";
+    import VorschauDialog from "$lib/components/VorschauDialog.svelte";
+    import { vorschauDialog, schliesseVorschau } from "$lib/stores/vorschauDialog.js";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
     let { children } = $props();
@@ -119,4 +121,9 @@
         vorauswahlChat={$feedbackDialog.chatAnhaengen}
         onclose={schliesseFeedback}
     />
+{/if}
+
+<!-- Vorschau aus dem Editor (`/assistants/manage/[id]`, 0.29) — wie im App-Layout. -->
+{#if $vorschauDialog.offen}
+    <VorschauDialog vorgabe={$vorschauDialog} onclose={schliesseVorschau} />
 {/if}

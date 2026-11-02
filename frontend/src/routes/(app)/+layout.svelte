@@ -1,7 +1,7 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import { afterNavigate, goto } from "$app/navigation";
-    import { getMe, getPreferences, getBudget } from "$lib/api.js";
+    import { getMe, getPreferences, getBudget, verlasseVorschau } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import { themePref } from "$lib/stores/theme.js";
     import { budget } from "$lib/stores/budget.js";
@@ -17,6 +17,10 @@
     import { feedbackDialog, schliesseFeedback } from "$lib/stores/feedbackDialog.js";
     import AppHeader from "$lib/components/AppHeader.svelte";
     import StepUpFehler from "$lib/components/StepUpFehler.svelte";
+    import VorschauBand from "$lib/components/VorschauBand.svelte";
+    import VorschauDialog from "$lib/components/VorschauDialog.svelte";
+    import { vorschauDialog, schliesseVorschau } from "$lib/stores/vorschauDialog.js";
+    import { HINWEIS_SCHLUESSEL } from "$lib/vorschau.js";
 
     let { children } = $props();
 
@@ -46,7 +50,18 @@
             refreshUiLevels();     // Zuschnitt der Darstellungsstufen
             refreshCrisisAlerts(); // Hinweis auf offene Krisen-Fälle (admin/review)
         } catch {
-            goto("/");
+            // Eine abgelaufene Vorschau (Rechner im Ruhezustand, länger als die Stunde)
+            // sieht hier aus wie eine fehlende Anmeldung. Das Backend tauscht das abgelaufene
+            // Vorschau-Token noch einmal gegen die alte Sitzung — erst wenn das nicht geht,
+            // zur Anmeldung.
+            try {
+                await verlasseVorschau();
+                sessionStorage.setItem(HINWEIS_SCHLUESSEL, "abgelaufen");
+                window.location.reload();
+                return;
+            } catch {
+                goto("/");
+            }
         }
         handleResize();
         window.addEventListener("resize", handleResize);
@@ -108,6 +123,7 @@
 
     <!-- Rechter Bereich: Header + Inhalt -->
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <VorschauBand />
         <AppHeader {sidebarOpen} onToggle={toggleSidebar} />
         <StepUpFehler />
         <main class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2">
@@ -119,6 +135,10 @@
 <!-- Einmal je Layout, geschaltet über den Store: Geöffnet wird der Dialog aus dem
      Nutzermenü und aus dem Chat-Kopf — beides Elemente, die beim Klick
      verschwinden. Ein Dialog, der dort hinge, ginge mit ihnen. -->
+{#if $vorschauDialog.offen}
+    <VorschauDialog vorgabe={$vorschauDialog} onclose={schliesseVorschau} />
+{/if}
+
 {#if $feedbackDialog.offen}
     <FeedbackDialog
         vorauswahlChat={$feedbackDialog.chatAnhaengen}

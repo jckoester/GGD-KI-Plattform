@@ -3,6 +3,9 @@
     import ModellWahl from "./ModellWahl.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import { user } from "$lib/stores/user.js";
+    import { oeffneVorschau } from "$lib/stores/vorschauDialog.js";
+    import { jahrgangFuerAssistent, kannVorschauBetreten } from "$lib/vorschau.js";
     import { auswahlMitBestand, eigeneFaecher, fachDerGruppe } from "$lib/stores/myGroups.js";
     import { GETEILT_SCOPES, SCHOOLWIDE_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
     import {
@@ -365,6 +368,21 @@
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
     let isNew = $derived(assistantId === "neu");
+    // Wer den Assistenten angelegt hat — die Vorschau nimmt nur eigene an (0.29, F6).
+    let erstellerin = $state(null);
+    const vorschauMoeglich = $derived(
+        !isNew && erstellerin != null && erstellerin === $user?.pseudonym && kannVorschauBetreten($user),
+    );
+
+    function alsSchuelerinTesten() {
+        const min = form.min_grade ? parseInt(form.min_grade) : null;
+        const max = form.max_grade ? parseInt(form.max_grade) : null;
+        oeffneVorschau({
+            assistentId: Number(assistantId),
+            jahrgang: jahrgangFuerAssistent({ min_grade: min, max_grade: max }),
+            gruppeId: form.scope === "teaching_group" && form.scope_group_id ? Number(form.scope_group_id) : undefined,
+        });
+    }
     // `SCHOOLWIDE_SCOPES` steht in `$lib/assistant_lebenszyklus.js` — dieselbe Menge führt
     // das Backend, ein Wächter hält beide zusammen.
     let isDraft = $derived(isNew || form.status === "draft");
@@ -680,6 +698,7 @@
             if (!isNew) {
                 const a = await getMyAssistant(assistantId);
                 form = mapAssistantToForm(a);
+                erstellerin = a.created_by ?? null;
                 // Dokumente laden für bestehenden Assistenten
                 await loadDocuments();
                 // Kontext-Anker laden
@@ -2349,8 +2368,19 @@
                             Testchat
                         </h2>
                     </div>
-                    <span class="text-xs text-light-tx-3 dark:text-dark-tx-3">
+                    <span class="text-xs text-light-tx-3 dark:text-dark-tx-3 flex items-center gap-3">
                         Modell: {form.model || "schulweiter Standard"}
+                        {#if vorschauMoeglich}
+                            <!-- Vorschaumodus (0.29, F6): Der Testchat zeigt den Assistenten,
+                                 die Vorschau zeigt ihn so, wie eine Schüler:in ihn findet. -->
+                            <button
+                                type="button"
+                                onclick={alsSchuelerinTesten}
+                                class="flex items-center gap-1 px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                            >
+                                <Eye class="w-3.5 h-3.5" /> Als Schüler:in testen
+                            </button>
+                        {/if}
                     </span>
                 </div>
 

@@ -27,6 +27,8 @@ export function stepupFehlerText(code, jetzt = new Date()) {
       return "Du hast dich mit einem anderen Konto angemeldet als dem, mit dem du hier arbeitest. Die Aktion wurde nicht ausgeführt.";
     case "ohne_2fa":
       return "Die erneute Anmeldung muss mit dem zweiten Faktor erfolgen (etwa dem Code aus der Authenticator-App). Die Aktion wurde nicht ausgeführt.";
+    case "vorschau":
+      return "In der Vorschau gibt es keine Einsicht in Krisenfälle. Beende die Vorschau und versuch es dann noch einmal.";
     case "nicht_frisch":
       return `Die erneute Anmeldung ließ sich nicht bestätigen. Bitte versuch es noch einmal. ${melden}`;
     default:

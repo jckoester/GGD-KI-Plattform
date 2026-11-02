@@ -19,6 +19,10 @@ function speicher() {
 }
 
 describe("stepupFehlerText", () => {
+  it("erklärt die Ablehnung in der Vorschau", () => {
+    expect(stepupFehlerText("vorschau")).toMatch(/Vorschau/);
+  });
+
   const jetzt = new Date(2026, 9, 19, 14, 7);
 
   it("nennt bei nicht bestätigter Anmeldung die Uhrzeit fürs Protokoll", () => {

@@ -488,6 +488,19 @@ async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
         # (z.B. fälschlich als student eingestufte Lehrkraft sieht ihre Gruppen).
         "sso_groups": current_user.sso_groups,
         "sso_roles": current_user.sso_roles,
+        # Vorschaumodus (0.29): `roles`/`grade` oben sind dann die simulierten; die
+        # Oberfläche zeigt das Band und bietet den Rückweg an. Sonst `None`.
+        "vorschau": (
+            {
+                "jahrgang": current_user.grade,
+                "gruppe_id": current_user.preview.gruppe_id,
+                "assistent_id": current_user.preview.assistent_id,
+                "beginn": current_user.preview.beginn,
+                "ablauf": current_user.exp,
+                "echte_rollen": current_user.preview.echte_rollen,
+            }
+            if current_user.preview is not None else None
+        ),
     }
 
 

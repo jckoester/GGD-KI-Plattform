@@ -3012,3 +3012,35 @@ export async function neuigkeitGelesen(id) {
     })
     if (!res.ok) throw new ApiError(res.status, 'Der Hinweis konnte nicht geschlossen werden')
 }
+
+// ── Vorschaumodus (0.29, ADR-016) ──────────────────────────────────────────────
+
+// Als Schüler:in ansehen: Das Sitzungs-Cookie trägt danach das Vorschau-Token.
+export async function betreteVorschau({ jahrgang, gruppeId = null, assistentId = null }) {
+  const res = await fetch(`${BASE}/auth/vorschau`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jahrgang, gruppe_id: gruppeId, assistent_id: assistentId }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Die Vorschau ließ sich nicht öffnen.");
+  return res.json(); // { ok, jahrgang, gruppe_id, assistent_id, ablauf }
+}
+
+// Zurück in die eigene Sitzung — auch mit abgelaufenem Vorschau-Token.
+export async function verlasseVorschau() {
+  const res = await fetch(`${BASE}/auth/vorschau`, { method: "DELETE", credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Die Vorschau ließ sich nicht beenden.");
+  return res.json();
+}
+
+// Chats aus der Vorschau — die eigene Liste „Vorschau" außerhalb der Vorschau.
+export async function getVorschauChats(limit = 25, offset = 0) {
+  const params = new URLSearchParams({ limit, offset, vorschau: "true" });
+  const res = await fetch(`${BASE}/conversations?${params}`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Fehler beim Laden der Vorschau-Chats");
+  return res.json();
+}

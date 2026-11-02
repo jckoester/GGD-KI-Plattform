@@ -17,6 +17,8 @@
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
+    import { oeffneVorschau } from "$lib/stores/vorschauDialog.js";
+    import { kannVorschauBetreten } from "$lib/vorschau.js";
     import { offeneFeedbackCount } from "$lib/stores/feedbackAlerts.js";
     import {
         openFlagCount,
@@ -217,6 +219,20 @@
         <User class="w-4 h-4 mr-3" />
         Profil
     </a>
+
+    {#if kannVorschauBetreten($user)}
+        <!-- Vorschaumodus (0.29): die App als Schüler:in sehen und ausprobieren. -->
+        <button
+            onclick={() => {
+                oeffneVorschau();
+                onClose();
+            }}
+            class="w-full flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        >
+            <Eye class="w-4 h-4 mr-3" />
+            Als Schüler:in ansehen…
+        </button>
+    {/if}
 
     {#if $user?.roles?.includes("teacher")}
         <a

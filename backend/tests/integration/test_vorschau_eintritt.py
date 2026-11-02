@@ -79,6 +79,11 @@ async def test_eintritt_und_rueckweg(test_client, jwt_service, welt, fabrik):
 
     ich = (await test_client.get("/auth/me", headers=_cookie(vorschau_token))).json()
     assert (ich["roles"], ich["grade"]) == (["student"], "9")
+    assert ich["vorschau"]["gruppe_id"] == welt["eigene"]
+    assert ich["vorschau"]["echte_rollen"] == ["teacher"]
+    assert ich["vorschau"]["ablauf"] == antwort.json()["ablauf"]
+    normal = (await test_client.get("/auth/me", headers=_cookie(sitzung))).json()
+    assert normal["vorschau"] is None
     eintritt = (await _ereignisse(fabrik, "preview_entered"))[-1]
     assert eintritt[0] == TEACHER1_PSEUDO and eintritt[1] == "teacher"
     assert eintritt[2] == {"jahrgang": 9, "gruppe_id": welt["eigene"],

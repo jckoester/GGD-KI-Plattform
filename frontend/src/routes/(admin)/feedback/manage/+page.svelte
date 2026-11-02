@@ -246,7 +246,7 @@
                                     {STATI.find((s) => s.wert === e.status)?.label ?? e.status}
                                 </span>
                                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    {kategorieText(e.category)} · {e.role} · {e.app_version}
+                                    {kategorieText(e.category)} · {e.role} · {e.app_version}{#if e.preview} · aus der Vorschau{/if}
                                     · {zeitpunkt(e.created_at)}
                                     {#if e.has_snapshot}· mit Chat{/if}
                                     {#if e.issue_ref}· {e.issue_ref}{/if}

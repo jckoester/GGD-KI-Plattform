@@ -78,3 +78,22 @@ def test_normale_sitzung_hat_kein_merkmal():
     dienst = JwtService(secret="x" * 32)
     token, _ = dienst.issue("lk", ["teacher"], None)
     assert dienst.verify(token).preview is None
+
+
+async def test_budget_in_der_vorschau_mit_echten_rollen(monkeypatch):
+    """Bezahlt wird aus dem Konto der Lehrkraft — ihr Wochenbetrag gilt, nicht der einer
+    Schüler:in (sonst stand „+600 Einheiten am Mo." neben dem Kontostand der Lehrkraft)."""
+    from app.budget import router as budget_router
+
+    gesehen = {}
+
+    async def fake(db, pseudonym, *, roles, grade):
+        gesehen.update(roles=roles, grade=grade)
+        return {}
+
+    monkeypatch.setattr(budget_router, "get_budget_info", fake)
+    user = JwtPayload(sub="lk", roles=["student"], grade="9", jti="j", iat=0, exp=2**31,
+                      preview=Vorschau(echte_rollen=["teacher", "admin"], echter_jahrgang=None,
+                                       beginn=0, sitzung_ablauf=2**31))
+    await budget_router.read_my_budget(current_user=user, db=None)
+    assert gesehen == {"roles": ["teacher", "admin"], "grade": None}
