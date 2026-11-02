@@ -141,6 +141,7 @@ async def erstelle(
     *,
     pseudonym: str,
     rolle: str,
+    aus_vorschau: bool = False,
     jetzt: datetime | None = None,
 ) -> Feedback:
     """Legt eine Meldung an — nach Sperre, Tageslimit und (optional) Snapshot."""
@@ -172,6 +173,7 @@ async def erstelle(
         viewport=daten.viewport,
         model=modell,
         provider_model=anbietermodell,
+        preview=aus_vorschau,
         conversation_snapshot=anhang,
     )
     db.add(eintrag)

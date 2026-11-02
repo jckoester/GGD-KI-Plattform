@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 _ACCOUNT_RETENTION_DAYS = 90
 _CONVERSATION_RETENTION_DAYS = 93
+#: Vorschau-Chats (0.29, ADR-011 6.1): kürzer — sie sind Ausprobieren, kein Unterricht.
+_PREVIEW_RETENTION_DAYS = 30
 # Geflaggte Konversationen werden nach Resolution 180 Tage aufbewahrt (ADR-008 Teil 7);
 # offene/in-Prüfung-Fälle gar nicht gelöscht, bis sie abgeschlossen sind.
 _FLAG_RETENTION_DAYS = 180
@@ -447,6 +449,11 @@ async def cleanup_stale_conversations(
     current_time = now or _utc_now()
     cutoff = current_time - timedelta(days=_CONVERSATION_RETENTION_DAYS)
     activity_ts = func.coalesce(Conversation.last_message_at, Conversation.created_at)
+    cutoff_vorschau = current_time - timedelta(days=_PREVIEW_RETENTION_DAYS)
+    faellig = or_(
+        activity_ts < cutoff,
+        and_(Conversation.preview_context.is_not(None), activity_ts < cutoff_vorschau),
+    )
 
     logger.info(
         "cleanup_stale_conversations gestartet cutoff=%s limit=%d dry_run=%s",
@@ -462,7 +469,7 @@ async def cleanup_stale_conversations(
         count_result = await db.execute(
             select(func.count())
             .select_from(Conversation)
-            .where(activity_ts < cutoff, ~protected)
+            .where(faellig, ~protected)
         )
         stats.found = int(count_result.scalar_one() or 0)
         stats.duration_ms = int((perf_counter() - started) * 1000)
@@ -471,7 +478,7 @@ async def cleanup_stale_conversations(
     while True:
         result = await db.execute(
             select(Conversation.id)
-            .where(activity_ts < cutoff, ~protected)
+            .where(faellig, ~protected)
             .order_by(activity_ts.asc())
             .limit(limit)
         )

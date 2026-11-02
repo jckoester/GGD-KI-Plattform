@@ -256,6 +256,7 @@ async def test_post_chat_existing_conversation_without_model_uses_stored_model()
     existing_conv.model_used = "openai/gpt-4o-mini"
     existing_conv.system_prompt_snapshot = None
     existing_conv.assistant_id = None
+    existing_conv.preview_context = None  # kein Vorschau-Chat (0.29)
 
     result = MagicMock()
     result.scalar_one_or_none = MagicMock(return_value=existing_conv)

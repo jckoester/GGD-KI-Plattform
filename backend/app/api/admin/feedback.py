@@ -53,6 +53,7 @@ class FeedbackAdminOut(BaseModel):
     viewport: Optional[str] = None
     model: Optional[str] = None  # Alias der letzten Antwort im Chat (0.28.1)
     provider_model: Optional[str] = None  # Anbietermodell dahinter
+    preview: bool = False  # aus der Vorschau gemeldet (0.29)
     status: str
     admin_reply: Optional[str] = None
     resolved_in_version: Optional[str] = None
@@ -98,6 +99,7 @@ def _nach_aussen(eintrag: Feedback, *, mit_anhang: bool = False):
         "viewport": eintrag.viewport,
         "model": eintrag.model,
         "provider_model": eintrag.provider_model,
+        "preview": bool(eintrag.preview),
         "status": eintrag.status,
         "admin_reply": eintrag.admin_reply,
         "resolved_in_version": eintrag.resolved_in_version,

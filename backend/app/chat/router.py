@@ -106,6 +106,7 @@ from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 from app.core.audit import audit
+from app.auth import vorschau
 from app.auth.vorschau import mitglied
 
 
@@ -118,6 +119,8 @@ class ConversationItem(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     is_test: bool = False
+    # Simulierter Kontext, wenn der Chat aus der Vorschau stammt (0.29) — sonst None.
+    vorschau: Optional[dict] = None
 
 
 class ConversationListResponse(BaseModel):
@@ -1975,6 +1978,11 @@ async def chat(
     is_new = conversation_id is None
     gruppe_abgeleitet = False  # 0.20, F1 — unten beim Anlegen gesetzt
     conversation_is_test = request.is_test
+    # Vorschau-Chat (0.29): keine Krisen-Flags, keine Zähler — wie der Testchat.
+    conversation_vorschau = vorschau.ist_vorschau(current_user)
+    if conversation_vorschau and request.is_test:
+        await client.aclose()
+        raise HTTPException(status_code=422, detail="Den Testchat gibt es im Editor, nicht in der Vorschau.")
     title_prompt: str | None = None
     # Ruheregel des Assistenten-Vorschlags (C2, F4): in dieser Konversation schon angeboten.
     schon_vorgeschlagen: set[int] = set()
@@ -2060,6 +2068,7 @@ async def chat(
             stunde_node_id=conversation_stunde_id,
             system_prompt_snapshot=system_prompt_snapshot,
             is_test=request.is_test,
+            preview_context=vorschau.chat_kontext(current_user),
         )
         db.add(new_conv)
         await db.flush()
@@ -2077,9 +2086,15 @@ async def chat(
             )
         )
         existing = result.scalar_one_or_none()
-        if existing is None:
+        if existing is None or not vorschau.darf_chat_sehen(existing, current_user):
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+        if not vorschau.darf_chat_fortsetzen(existing, current_user):
+            await client.aclose()
+            raise HTTPException(
+                status_code=409,
+                detail="Diesen Chat aus der Vorschau kannst du nur in der Vorschau fortsetzen.",
+            )
 
         # Startwerte aus bestehender Konversation
         model_used = existing.model_used
@@ -2088,6 +2103,7 @@ async def chat(
         conversation_group_id = existing.group_id
         conversation_stunde_id = existing.stunde_node_id
         conversation_is_test = existing.is_test
+        conversation_vorschau = existing.preview_context is not None
         schon_vorgeschlagen = set(existing.vorgeschlagen or [])
         active_assistant: Optional[Assistant] = None
 
@@ -2165,10 +2181,11 @@ async def chat(
             raise HTTPException(status_code=409, detail="Es gibt keine Nachricht, die sich ersetzen ließe.")
 
     # Krisen-Erkennung (ADR-008 Teil 3): lokal, parallel zum LLM-Call, OHNE Blockieren.
-    # Test-Chats (Assistenten-Entwicklung) werden nicht geflaggt.
+    # Test-Chats (Assistenten-Entwicklung) und Vorschau-Chats (0.29) werden nicht geflaggt.
     crisis_record: Optional[_CrisisRecord] = None
     crisis_hit: Optional[CrisisHit] = None
-    if not conversation_is_test:
+    ohne_nebenwirkungen = conversation_is_test or conversation_vorschau
+    if not ohne_nebenwirkungen:
         crisis_record = await _record_crisis(
             db,
             conversation_id,
@@ -2951,10 +2968,10 @@ async def chat(
         # aus dem Editor zählen nicht (ADR-016) — sie sind kein Betrieb.
         # Zug-Auslöser (0.26, Schritt 10): Treffer und Anweisungen ablegen — für das Nachsetzen
         # in den nächsten Zügen und für die Zähler des Betatests. Eigene Transaktion, wirft nie.
-        if _nachricht_id is not None and not conversation_is_test:
+        if _nachricht_id is not None and not ohne_nebenwirkungen:
             await zug_ausloeser_speichern(conversation_id, len(_vorher_user) + 1,
                                           {"druck": druck, "lehrkraft": lehrkraft})
-        if _nachricht_id is not None and not conversation_is_test:
+        if _nachricht_id is not None and not ohne_nebenwirkungen:
             await vorab_zaehlen(
                 db, kontext=kontext, werkzeug_bausteine=_werkzeug_bausteine,
                 gesucht=bool(_suchanfragen), modell=model_used,
@@ -3170,7 +3187,7 @@ async def update_conversation(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
 
-    if conversation.pseudonym != current_user.sub:
+    if not vorschau.darf_chat_sehen(conversation, current_user):
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
     if 'title' in request.model_fields_set and request.title is not None:
@@ -3238,7 +3255,7 @@ async def delete_conversation(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
 
-    if conversation.pseudonym != current_user.sub:
+    if not vorschau.darf_chat_sehen(conversation, current_user):
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
     # ADR-008 Teil 7: Konversationen mit einem nicht verworfenen Flag werden nicht hart
@@ -3319,6 +3336,9 @@ async def variiere_generiertes_bild(
     if record is None:
         raise HTTPException(status_code=404, detail="Bild nicht gefunden")
     if record.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    # Die Variante landet im Chat des Bildes — also nur, wo man weiterschreiben darf (0.29).
+    if not vorschau.darf_chat_fortsetzen(await db.get(Conversation, record.conversation_id), current_user):
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     if not record.prompt:
         # Bilder von vor der Prompt-Spalte. Ohne Prompt gäbe es nichts zu wiederholen.
@@ -3433,6 +3453,9 @@ async def list_conversations(
     subject_id: Optional[int] = Query(None),
     group_id: Optional[int] = Query(None),
     exclude_groups: bool = Query(default=False),
+    # Die eigene Liste „Vorschau“ (0.29): nur Chats aus der Vorschau. In der Vorschau selbst
+    # gibt es ohnehin nur diese.
+    vorschau_liste: bool = Query(default=False, alias="vorschau"),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationListResponse:
@@ -3441,7 +3464,7 @@ async def list_conversations(
 
     # Build where conditions
     where_conditions = [
-        Conversation.pseudonym == current_user.sub,
+        vorschau.eigene_chats(current_user, vorschau_liste=vorschau_liste),
         is_test_filter,
         Conversation.hidden_by_user.is_(False),
     ]
@@ -3479,6 +3502,7 @@ async def list_conversations(
             subject_id=conv.subject_id,
             group_id=conv.group_id,
             is_test=conv.is_test,
+            vorschau=conv.preview_context,
         )
         for conv, asst_name in rows
     ]
@@ -3503,7 +3527,7 @@ async def get_conversation_counts(
             func.count().label("cnt"),
         )
         .where(
-            Conversation.pseudonym == current_user.sub,
+            vorschau.eigene_chats(current_user),
             Conversation.is_test.is_(False),
             Conversation.hidden_by_user.is_(False),
         )
@@ -3558,7 +3582,7 @@ async def get_conversation_costs(
     )).scalar_one_or_none()
     if conv is None:
         raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
-    if conv.pseudonym != current_user.sub:
+    if not vorschau.darf_chat_sehen(conv, current_user):
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
     zeilen = (await db.execute(
@@ -3596,7 +3620,7 @@ async def get_conversation_messages(
         raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
 
     # Sicherheitscheck: Pseudonym muss übereinstimmen
-    if conversation.pseudonym != current_user.sub:
+    if not vorschau.darf_chat_sehen(conversation, current_user):
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
     # Nachrichten laden mit Assistenten-JOIN

@@ -607,6 +607,10 @@ class Conversation(Base):
     )
     # Ab Phase 11 (ADR-008 Teil 7): Soft-Delete-Marker für geflaggte Konversationen.
     # Eine Konversation mit offenem Flag wird beim Nutzer-Löschwunsch nur ausgeblendet.
+    # Vorschaumodus (0.29, ADR-016, F2 a): der simulierte Kontext (Jahrgang, Gruppe,
+    # Assistent), wenn der Chat in der Vorschau entstand — sonst NULL. Eigene Liste, Frist
+    # 30 Tage (`cleanup_stale_conversations`), keine Krisen-Flags und Zähler.
+    preview_context: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     hidden_by_user: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
@@ -1952,6 +1956,8 @@ class Feedback(Base):
     # Client behauptet; ohne Einwilligung, weil weder Inhalt noch Personenbezug.
     model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Aus der Vorschau gemeldet (0.29, ADR-020 `feedback.preview`).
+    preview: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"), default=False)
     conversation_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'open'"), default="open"

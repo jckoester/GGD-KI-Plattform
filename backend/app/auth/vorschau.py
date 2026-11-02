@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Optional
 import sqlalchemy as sa
 from pydantic import BaseModel
 
-from app.db.models import GroupMembership
+from app.db.models import Conversation, GroupMembership
 
 if TYPE_CHECKING:
     from app.auth.jwt import JwtPayload
@@ -137,6 +137,8 @@ SCHREIBEND = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ERLAUBT: dict[str, str] = {
     "app.chat.router.chat": "Ausprobieren ist der Zweck der Vorschau",
     "app.chat.router.variiere_generiertes_bild": "Bild im Chat abwandeln — Teil des Chats",
+    "app.chat.router.update_conversation": "nur Vorschau-Chats (`darf_chat_sehen`)",
+    "app.chat.router.delete_conversation": "nur Vorschau-Chats (`darf_chat_sehen`)",
     "app.upload.router.upload_session": "Datei für den Chat",
     "app.feedback.router.create_feedback": "Rückmeldung aus der Vorschau (ADR-020, feedback.preview)",
     "app.context.router.search_context_nodes": "rechnet nur",
@@ -169,3 +171,46 @@ def pruefe_schreibsperre(scope: dict, methode: str, user: "JwtPayload") -> None:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=403, detail=GESPERRT_TEXT)
+
+
+# ── Vorschau-Chats (0.29, Schritt 4) ────────────────────────────────────────────
+#
+# Ein Chat aus der Vorschau trägt `preview_context`. In der Vorschau sind nur solche Chats
+# erreichbar — die echten Chats der Lehrkraft sieht eine Schüler:in nicht. Außerhalb darf die
+# Lehrkraft ihre Vorschau-Chats lesen und löschen (eigene Liste), aber nicht fortsetzen: Sie
+# liefen sonst mit Lehrkraft-Kontext weiter, in einem Chat, der als Schülersicht begann.
+
+
+def chat_kontext(user: "JwtPayload") -> dict | None:
+    """Was ein neuer Chat als `preview_context` bekommt — ``None`` außerhalb der Vorschau."""
+    v = getattr(user, "preview", None)
+    if v is None:
+        return None
+    return {"jahrgang": user.grade, "gruppe_id": v.gruppe_id,
+            "assistent_id": v.assistent_id, "beginn": v.beginn}
+
+
+def eigene_chats(user: "JwtPayload", *, vorschau_liste: bool = False):
+    """SQL-Bedingung für Listen: in der Vorschau nur Vorschau-Chats; außerhalb ohne sie,
+    außer ``vorschau_liste`` fragt ausdrücklich nach ihnen."""
+    nur_vorschau = ist_vorschau(user) or vorschau_liste
+    return sa.and_(
+        Conversation.pseudonym == user.sub,
+        Conversation.preview_context.is_not(None) if nur_vorschau
+        else Conversation.preview_context.is_(None),
+    )
+
+
+def darf_chat_sehen(konversation, user: "JwtPayload") -> bool:
+    """Einzelner Chat lesen, umbenennen, löschen."""
+    if konversation is None or konversation.pseudonym != user.sub:
+        return False
+    return not ist_vorschau(user) or konversation.preview_context is not None
+
+
+def darf_chat_fortsetzen(konversation, user: "JwtPayload") -> bool:
+    """Weiterschreiben: nur in derselben Welt, in der der Chat entstand."""
+    if not darf_chat_sehen(konversation, user):
+        return False
+    return ist_vorschau(user) == (konversation.preview_context is not None)
+

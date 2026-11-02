@@ -6,7 +6,8 @@ Alias-Pflege)? Sucht das Modell Begriffe knapp über dem Band per Werkzeug nach?
 
 Gezählt wird je Antwort, **nach** dem Speichern und in einer eigenen Transaktion: Ein Fehler
 beim Zählen darf die Antwort nie kosten — er wird geloggt, die Zähler fehlen dann für diese
-Nachricht. Vorschau-Chats (``is_test``, ADR-016) zählt der Aufrufer nicht.
+Nachricht. Testchats aus dem Editor (``is_test``) und Chats aus dem Vorschaumodus
+(``preview_context``, ADR-016) zählt der Aufrufer nicht.
 
 ⚠️ **„Nachgeschlagen" heißt: im Werkzeugergebnis derselben Antwort.** Ob das Modell den
 angebotenen Titel gezielt gesucht hat oder er bei einer anderen Suche mitkam, sieht die

@@ -107,7 +107,7 @@ class TestStellungImSystemtext:
         """Sie werden nicht geflaggt — sonst wäre das Verhalten nur prüfbar, indem man
         einen echten Fall in der Einsicht zu zweit erzeugt (AP4)."""
         block = re.search(
-            r"if not conversation_is_test:(?:.|\n)*?else:(?:.|\n)*?crisis_hit = scan\(",
+            r"if not ohne_nebenwirkungen:(?:.|\n)*?else:(?:.|\n)*?crisis_hit = scan\(",
             quelle,
         )
         assert block, "Im Test-Chat-Zweig wird nicht gescannt"

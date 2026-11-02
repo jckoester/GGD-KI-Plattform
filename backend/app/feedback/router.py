@@ -34,11 +34,15 @@ async def create_feedback(
     Schüler:in meldet, hat es als Schüler:in getan — auch wenn das Konto später
     wechselt.
     """
+    # Aus der Vorschau (0.29): die **echte** Rolle — es meldet eine Lehrkraft, keine
+    # Schüler:in —, und das Merkmal `preview` (ADR-020).
+    merkmal = current_user.preview
     eintrag = await service.erstelle(
         db,
         daten,
         pseudonym=current_user.sub,
-        rolle=get_primary_role(current_user.roles),
+        rolle=get_primary_role(merkmal.echte_rollen if merkmal else current_user.roles),
+        aus_vorschau=merkmal is not None,
     )
 
     # Im Hintergrund: Ein Mailserver darf eine Rückmeldung nicht aufhalten. Ob

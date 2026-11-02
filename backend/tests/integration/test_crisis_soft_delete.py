@@ -87,6 +87,7 @@ async def test_hidden_conversation_excluded_from_list(db):
         subject_id=None,
         group_id=None,
         exclude_groups=False,
+        vorschau_liste=False,
         current_user=_payload("lister"),
         db=db,
     )

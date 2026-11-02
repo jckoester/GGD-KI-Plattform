@@ -25,6 +25,13 @@ from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message
 GEKUERZT_AUF = 50
 
 
+def _in_der_vorschau_verborgen(konversation, pseudonym: str) -> bool:
+    """In der Vorschau (0.29) sind nur Vorschau-Chats erreichbar — auch für den Anhang."""
+    from app.auth.vorschau import aktive
+
+    return aktive(pseudonym) is not None and konversation.preview_context is None
+
+
 def baue(konversation, nachrichten) -> dict:
     """Der JSONB-Inhalt. `created_at` als ISO-Zeichenkette — JSONB kennt kein datetime."""
     return {
@@ -57,7 +64,7 @@ async def lade(db: AsyncSession, conversation_id: UUID, pseudonym: str) -> dict 
             Conversation.pseudonym == pseudonym,
         )
     )
-    if konversation is None:
+    if konversation is None or _in_der_vorschau_verborgen(konversation, pseudonym):
         return None
 
     # Alle Zeilen holen und in Python schneiden, statt `ORDER BY … DESC LIMIT 50`:
@@ -91,7 +98,7 @@ async def modell(
             Conversation.pseudonym == pseudonym,
         )
     )
-    if konversation is None:
+    if konversation is None or _in_der_vorschau_verborgen(konversation, pseudonym):
         return None, None
     # Aufsteigend nach `NACHRICHTEN_FOLGE` und in Python die letzte, wie in `lade` — ein
     # `DESC LIMIT 1` auf dem Zeitstempel wäre bei gleichen Zeitpunkten mehrdeutig.

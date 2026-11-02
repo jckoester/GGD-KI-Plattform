@@ -108,6 +108,8 @@ def umgebung(bildarten_datei):
         ergebnis.scalar_one_or_none.return_value = steuerung.key
         db.execute = AsyncMock(return_value=ergebnis)
         db.commit = AsyncMock()
+        # Der Chat des Bildes (0.29): ein gewöhnlicher, eigener — kein Vorschau-Chat.
+        db.get = AsyncMock(return_value=SimpleNamespace(pseudonym=EIGNER, preview_context=None))
         yield db
 
     app.dependency_overrides[get_current_user] = fake_user

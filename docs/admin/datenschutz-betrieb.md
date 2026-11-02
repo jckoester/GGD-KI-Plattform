@@ -136,7 +136,7 @@ dazukommt. Jetzt prüft ein Test sie gegen die `docker-compose.yml`
 | Job | Zeitplan | Löscht | Was wird ausgeführt |
 |-----|---------|:--:|-----------------|
 | `cleanup_inactive_accounts` | täglich 02:00 Uhr | ✅ | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
-| `cleanup_stale_conversations` | täglich 02:30 Uhr | ✅ | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
+| `cleanup_stale_conversations` | täglich 02:30 Uhr | ✅ | Konversationen ohne neue Nachrichten seit 93 Tagen löschen, Chats aus dem Vorschaumodus nach 30 Tagen (seit 0.29) |
 | `cleanup_feedback` | täglich 02:50 Uhr | ✅ | Abgeschlossene Rückmeldungen 180 Tage nach dem Statuswechsel löschen |
 | `cleanup_audit_log` | täglich 02:55 Uhr | ✅ | Audit-Log nach Frist je Klasse löschen: Anmeldung 180 Tage, Verwaltung 2 Jahre, Moderation 1 Jahr, System 90 Tage, Geheimnisse nie (seit 0.28) |
 | `embedding_backfill` | täglich 03:15 Uhr | — | Embeddings für Knoten ohne Embedding nachgenerieren |
