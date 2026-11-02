@@ -11,8 +11,8 @@ Create Date: 2026-11-01
 
 **Nur anhängen:** Ein Trigger weist `UPDATE`, `DELETE` und `TRUNCATE` ab. Ausnahmen setzt nur,
 wer für seine Transaktion `SET LOCAL audit.aufraeumen = 'on'` ausführt — der tägliche
-Aufräum-Lauf (Aufbewahrung je Klasse, §2.3) und die Kontolöschung (Platzhalter für das
-Pseudonym, §2.5). `REVOKE` liefe ins Leere: Die Anwendung läuft in der Compose als `postgres`.
+Aufräum-Lauf (Aufbewahrung je Klasse, §2.3) und die Kontolöschung (leert das Pseudonym in
+`auth`/`moderation`, §2.5). `REVOKE` liefe ins Leere: Die Anwendung läuft in der Compose als `postgres`.
 
 **Rücknahme:** `alembic downgrade 0096` entfernt Tabelle, Trigger und Funktion samt Inhalt.
 """

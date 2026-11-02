@@ -35,13 +35,22 @@ export function sammleKontext({ pfad, assistentId = null, version, fenster, kenn
     };
 }
 
-/** Die Nutzlast für `POST /feedback`. */
-export function baueNutzlast({ kategorie, text, kontakt = "", chatId = null, kontext = {} }) {
+/**
+ * Die Nutzlast für `POST /feedback`.
+ *
+ * Zwei Chat-Kennungen mit verschiedenem Zweck: `chatId` hängt den Verlauf an — nur auf
+ * ausdrücklichen Wunsch. `aktiverChat` geht immer mit, sobald ein Chat offen ist; der Server
+ * liest daraus nur das Modell der letzten Antwort (0.28.1) und speichert die Kennung nicht.
+ */
+export function baueNutzlast({
+    kategorie, text, kontakt = "", chatId = null, aktiverChat = null, kontext = {},
+}) {
     return {
         category: kategorie,
         content: (text ?? "").trim(),
         contact: (kontakt ?? "").trim() || null,
         attach_conversation_id: chatId ?? null,
+        active_conversation_id: aktiverChat ?? null,
         ...kontext,
     };
 }
@@ -90,6 +99,16 @@ export function statusFarbe(status) {
         default:
             return "bg-light-ui-2 dark:bg-dark-ui-2 border-light-ui-3 dark:border-dark-ui-3";
     }
+}
+
+/**
+ * Das Modell, wie die Sichtung es liest: Alias und Anbietermodell dahinter (0.28.1).
+ * Der Alias sagt, was die Schule eingestellt hat; das Anbietermodell, was tatsächlich
+ * geantwortet hat — die Zuordnung eines Alias kann sich ändern.
+ */
+export function modellText({ model, provider_model } = {}) {
+    if (!model) return provider_model ?? "—";
+    return provider_model && provider_model !== model ? `${model} (${provider_model})` : model;
 }
 
 export function kategorieText(wert) {

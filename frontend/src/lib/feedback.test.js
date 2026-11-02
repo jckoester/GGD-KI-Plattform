@@ -15,6 +15,7 @@ import {
     feedbackFehlertext,
     istAbsendbar,
     kategorieText,
+    modellText,
     sammleKontext,
     statusText,
 } from "./feedback.js";
@@ -93,6 +94,13 @@ describe("Nutzlast", () => {
         expect(baueNutzlast({ ...basis, chatId: "abc" }).attach_conversation_id).toBe("abc");
     });
 
+    it("nennt den offenen Chat fürs Modell, ohne ihn anzuhängen", () => {
+        const nutzlast = baueNutzlast({ ...basis, aktiverChat: "abc" });
+        expect(nutzlast.active_conversation_id).toBe("abc");
+        expect(nutzlast.attach_conversation_id).toBe(null);
+        expect(baueNutzlast(basis).active_conversation_id).toBe(null);
+    });
+
     it("übernimmt den Kontext unverändert", () => {
         const kontext = { app_version: "0.10.3", route: "/chat" };
         expect(baueNutzlast({ ...basis, kontext })).toMatchObject(kontext);
@@ -101,7 +109,10 @@ describe("Nutzlast", () => {
     it("trägt keine Felder, die der Server nicht kennt", () => {
         // Die Gegenprobe zur Datensparsamkeit: Wer hier etwas ergänzt, muss es
         // begründen — der Server wiese es ohnehin ab.
+        // `active_conversation_id` (0.28.1): Der Server liest daraus nur das Modell der
+        // letzten Antwort; gespeichert wird die Kennung nicht.
         expect(Object.keys(baueNutzlast(basis)).sort()).toEqual([
+            "active_conversation_id",
             "attach_conversation_id",
             "category",
             "contact",
@@ -142,5 +153,20 @@ describe("Fehlertexte", () => {
 
     it("hat einen Satz für den Fall ohne Auskunft", () => {
         expect(feedbackFehlertext({ status: 0 })).toBe("Die Meldung konnte nicht gesendet werden.");
+    });
+});
+
+describe("modellText", () => {
+    it("zeigt Alias und Anbietermodell", () => {
+        expect(modellText({ model: "chat-komplex", provider_model: "openai/gpt-oss-120b" }))
+            .toBe("chat-komplex (openai/gpt-oss-120b)");
+    });
+    it("nennt den Alias allein, wenn nichts dahinter steht oder es dasselbe ist", () => {
+        expect(modellText({ model: "chat-standard", provider_model: null })).toBe("chat-standard");
+        expect(modellText({ model: "x", provider_model: "x" })).toBe("x");
+    });
+    it("zeigt einen Strich ohne Modell", () => {
+        expect(modellText({})).toBe("—");
+        expect(modellText({ model: null, provider_model: null })).toBe("—");
     });
 });

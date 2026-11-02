@@ -11,10 +11,15 @@ ausmacht.
 
 - **Pseudonym und Rolle** — mehr Identität gibt es nicht.
 - **Freitext**, Kategorie (Fehler · Vorschlag · Sonstiges) und der technische Kontext
-  (Version, Seite, Browser, Fenstergröße, ggf. Assistent).
+  (Version, Seite, Browser, Fenstergröße; aus dem Chat auch Assistent und **Modell** der
+  letzten Antwort, seit 0.28.1). Das Modell steht als Alias mit dem Anbietermodell dahinter,
+  etwa „chat-komplex (openai/gpt-oss-120b)“: Der Alias zeigt, was die Schule eingestellt hat,
+  das Anbietermodell, was tatsächlich geantwortet hat. Es wird ohne Einwilligung erfasst, weil
+  es weder Inhalt noch Personenbezug trägt; den Chat selbst gibt es weiterhin nur als Anhang.
+  Ältere Meldungen haben kein Modell.
 - **Kontaktangabe**, falls die meldende Person freiwillig eine gemacht hat.
 - **Chat-Kopie**, falls sie ausdrücklich angehängt wurde. Sie wird erst beim Aufklappen
-  geladen.
+  geladen und nennt bei jeder Antwort das Modell.
 
 Der Freitext läuft **nicht** durch Guardrails oder die Krisenerkennung — er ist keine
 Modelleingabe. Das ist eine bewusste Lücke, siehe unten.

@@ -51,6 +51,8 @@ class FeedbackAdminOut(BaseModel):
     assistant_id: Optional[int] = None
     user_agent: Optional[str] = None
     viewport: Optional[str] = None
+    model: Optional[str] = None  # Alias der letzten Antwort im Chat (0.28.1)
+    provider_model: Optional[str] = None  # Anbietermodell dahinter
     status: str
     admin_reply: Optional[str] = None
     resolved_in_version: Optional[str] = None
@@ -94,6 +96,8 @@ def _nach_aussen(eintrag: Feedback, *, mit_anhang: bool = False):
         "assistant_id": eintrag.assistant_id,
         "user_agent": eintrag.user_agent,
         "viewport": eintrag.viewport,
+        "model": eintrag.model,
+        "provider_model": eintrag.provider_model,
         "status": eintrag.status,
         "admin_reply": eintrag.admin_reply,
         "resolved_in_version": eintrag.resolved_in_version,

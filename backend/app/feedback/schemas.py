@@ -44,6 +44,10 @@ class FeedbackCreate(BaseModel):
     content: str = Field(..., min_length=MIN_LAENGE, max_length=MAX_LAENGE)
     contact: Optional[str] = Field(None, max_length=MAX_KONTAKT)
     attach_conversation_id: Optional[UUID] = None
+    # Der Chat, der gerade offen ist — **nur**, damit der Server das Modell nachschlägt
+    # (0.28.1). Gespeichert werden die Modellnamen, nicht diese Kennung; der Chat selbst
+    # geht nur über `attach_conversation_id` mit, also nur auf ausdrücklichen Wunsch.
+    active_conversation_id: Optional[UUID] = None
     app_version: str = Field(..., min_length=1)
     route: Optional[str] = None
     assistant_id: Optional[int] = None

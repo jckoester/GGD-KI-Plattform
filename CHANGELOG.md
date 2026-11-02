@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.28.1] – 2026-11-02
+
+Rückmeldungen aus dem Chat nennen das Modell. Eine Migration (0098).
+
+### Neu
+
+- **Modell in Rückmeldungen:** Wer aus einem Chat meldet, schickt das Modell der letzten Antwort mit — als Alias und
+  Anbietermodell, ohne den Chat selbst. Die Rückmelde-Verwaltung zeigt es an, im angehängten Chat auch je Antwort.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0098) — wie im regulären Update.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+
 ## [0.28.0] – 2026-11-02
 
 Audit-Log: Sicherheitsrelevante Ereignisse werden protokolliert, Admins lesen sie unter Einstellungen. Eine Migration

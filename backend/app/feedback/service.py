@@ -153,6 +153,12 @@ async def erstelle(
         if anhang is None:
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
 
+    modell = anbietermodell = None
+    if daten.active_conversation_id is not None:
+        modell, anbietermodell = await snapshot.modell(
+            db, daten.active_conversation_id, pseudonym
+        )
+
     eintrag = Feedback(
         pseudonym=pseudonym,
         role=rolle,
@@ -164,6 +170,8 @@ async def erstelle(
         assistant_id=daten.assistant_id,
         user_agent=daten.user_agent,
         viewport=daten.viewport,
+        model=modell,
+        provider_model=anbietermodell,
         conversation_snapshot=anhang,
     )
     db.add(eintrag)

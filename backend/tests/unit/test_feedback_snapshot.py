@@ -24,6 +24,7 @@ def _nachricht(rolle, inhalt, minute):
         role=rolle,
         content=inhalt,
         model="chat-standard" if rolle == "assistant" else None,
+        provider_model="openai/gpt-oss-120b" if rolle == "assistant" else None,
         created_at=datetime(2026, 9, 20, 10, minute, tzinfo=timezone.utc),
         # Felder, die es am Modell gibt und die nicht mitkommen sollen:
         cost_usd=0.0021,
@@ -56,4 +57,6 @@ def test_zeitstempel_als_zeichenkette():
 def test_keine_kosten_und_keine_token():
     """Sie beantworten keine Frage, die eine Fehlermeldung stellt."""
     eintrag = snapshot.baue(_konversation(), [_nachricht("assistant", "Antwort", 1)])["messages"][0]
-    assert set(eintrag) == {"role", "content", "model", "created_at"}
+    # `provider_model` (0.28.1): Welches Modell tatsächlich antwortete, beantwortet eine
+    # Fehlermeldung sehr wohl — die Zuordnung eines Alias kann sich ändern.
+    assert set(eintrag) == {"role", "content", "model", "provider_model", "created_at"}

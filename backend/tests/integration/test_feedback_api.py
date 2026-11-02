@@ -175,7 +175,8 @@ class TestAnhang:
             headers=auth_headers_student,
         )
         anhang = _zeile(sync_conn, STUDENT_PSEUDO)[7]
-        assert set(anhang["messages"][0]) == {"role", "content", "model", "created_at"}
+        assert set(anhang["messages"][0]) == {
+            "role", "content", "model", "provider_model", "created_at"}
 
     async def test_lange_chats_werden_auf_die_letzten_50_gekuerzt(
         self, test_client, sync_conn, auth_headers_student
@@ -206,6 +207,87 @@ class TestAnhang:
         )
         assert antwort.status_code == 404
         assert _zeile(sync_conn, STUDENT_PSEUDO) is None
+
+
+# ── Modell (0.28.1) ─────────────────────────────────────────────────────────────
+
+def _modell(conn, pseudonym):
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute("SELECT model, provider_model, conversation_snapshot FROM feedback"
+                    " WHERE pseudonym = %s", (pseudonym,))
+        return cur.fetchone()
+
+
+class TestModell:
+    """Das Modell der letzten Antwort geht immer mit — der Chat selbst nur auf Wunsch."""
+
+    async def test_letzte_antwort_mit_anbietermodell_ohne_anhang(
+        self, test_client, sync_conn, auth_headers_student
+    ):
+        with sync_conn.cursor() as cur:
+            kid = _konversation(cur, STUDENT_PSEUDO, nachrichten=4)
+            cur.execute(
+                "UPDATE messages SET model = 'chat-standard', provider_model = 'alt/eins'"
+                " WHERE conversation_id = %s AND content = 'Nachricht 1'", (str(kid),))
+            cur.execute(
+                "UPDATE messages SET model = 'chat-komplex', provider_model = 'openai/gpt-oss-120b'"
+                " WHERE conversation_id = %s AND content = 'Nachricht 3'", (str(kid),))
+        sync_conn.commit()
+
+        antwort = await test_client.post(
+            "/feedback", json=_rumpf(active_conversation_id=str(kid)),
+            headers=auth_headers_student,
+        )
+        assert antwort.status_code == 201, antwort.text
+        modell, anbieter, anhang = _modell(sync_conn, STUDENT_PSEUDO)
+        assert (modell, anbieter) == ("chat-komplex", "openai/gpt-oss-120b")
+        assert anhang is None, "Ohne Wunsch kein Chat-Anhang"
+
+    async def test_ohne_antwort_das_modell_der_konversation(
+        self, test_client, sync_conn, auth_headers_student
+    ):
+        with sync_conn.cursor() as cur:
+            kid = _konversation(cur, STUDENT_PSEUDO, nachrichten=1)
+        sync_conn.commit()
+        await test_client.post(
+            "/feedback", json=_rumpf(active_conversation_id=str(kid)),
+            headers=auth_headers_student,
+        )
+        assert _modell(sync_conn, STUDENT_PSEUDO)[:2] == ("chat-standard", None)
+
+    async def test_fremder_chat_bleibt_ohne_modell_und_die_meldung_geht_durch(
+        self, test_client, sync_conn, auth_headers_student
+    ):
+        with sync_conn.cursor() as cur:
+            kid = _konversation(cur, TEACHER1_PSEUDO, nachrichten=2)
+            cur.execute("UPDATE messages SET model = 'chat-komplex' WHERE conversation_id = %s",
+                        (str(kid),))
+        sync_conn.commit()
+        antwort = await test_client.post(
+            "/feedback", json=_rumpf(active_conversation_id=str(kid)),
+            headers=auth_headers_student,
+        )
+        assert antwort.status_code == 201
+        assert _modell(sync_conn, STUDENT_PSEUDO)[:2] == (None, None)
+
+    async def test_die_sichtung_sieht_das_modell(
+        self, test_client, sync_conn, auth_headers_student, auth_headers
+    ):
+        with sync_conn.cursor() as cur:
+            kid = _konversation(cur, STUDENT_PSEUDO, nachrichten=2)
+            cur.execute(
+                "UPDATE messages SET model = 'chat-komplex', provider_model = 'openai/gpt-oss-120b'"
+                " WHERE conversation_id = %s AND role = 'assistant'", (str(kid),))
+        sync_conn.commit()
+        await test_client.post(
+            "/feedback", json=_rumpf(active_conversation_id=str(kid)),
+            headers=auth_headers_student,
+        )
+        liste = (await test_client.get("/admin/feedback", headers=auth_headers)).json()
+        eintrag = next(e for e in liste["items"] if e["pseudonym"] == STUDENT_PSEUDO)
+        assert (eintrag["model"], eintrag["provider_model"]) == (
+            "chat-komplex", "openai/gpt-oss-120b")
 
 
 # ── Meine Meldungen ─────────────────────────────────────────────────────────────

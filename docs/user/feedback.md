@@ -22,8 +22,9 @@ Im Formular:
 
 Vier technische Angaben legt die Plattform von sich aus bei: die **Version**, die
 **Seite**, auf der du warst (ohne das, was hinter dem `?` in der Adresse steht), dein
-**Browser** und die **Fenstergröße**. Bei einem Chat kommt die Nummer des Assistenten
-dazu.
+**Browser** und die **Fenstergröße**. Meldest du aus einem Chat, kommen die Nummer des
+Assistenten und das **Modell** dazu, das zuletzt geantwortet hat (seit 0.28.1). Der Chat
+selbst geht dabei nicht mit, nur der Name des Modells.
 
 Das klingt nach viel, ist aber genau das, was eine Fehlermeldung nachvollziehbar macht —
 und was niemand zuverlässig von Hand angibt. Etwas darüber hinaus wird nicht erfasst:

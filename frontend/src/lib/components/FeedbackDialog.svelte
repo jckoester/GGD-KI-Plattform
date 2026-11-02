@@ -5,7 +5,8 @@
      * **Was automatisch mitgeht und warum.** Version, Seite, Browserkennung und
      * Fenstergröße legt der Client bei; von Hand liefert diese Angaben niemand
      * zuverlässig, und ohne sie ist eine Fehlerbeschreibung oft nicht
-     * nachvollziehbar. Der Chat wandert **nur** auf ausdrücklichen Wunsch mit.
+     * nachvollziehbar. Der Chat wandert **nur** auf ausdrücklichen Wunsch mit; das
+     * Modell der letzten Antwort liest der Server dagegen immer nach (0.28.1).
      *
      * **Der Hinweis oben ist Pflichtbestandteil** (ADR-020): Der Freitext ist die
      * einzige Stelle im System, an der jemand ungefiltert über Dritte schreiben
@@ -87,6 +88,7 @@
                     text,
                     kontakt,
                     chatId: chatAnhaengen && chatVorhanden ? $activeConversationId : null,
+                    aktiverChat: $activeConversationId,
                     kontext,
                 }),
             );

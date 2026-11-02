@@ -126,7 +126,7 @@ gespeichert:
 
 | Was | Woher | Löschung |
 |-----|-------|---------|
-| Dein Meldungstext samt technischem Kontext (Version, Seite, Browser, Fenstergröße) | Du schreibst ihn, den Kontext legt die Plattform bei | 180 Tage nach dem Abschluss der Meldung |
+| Dein Meldungstext samt technischem Kontext (Version, Seite, Browser, Fenstergröße; aus dem Chat auch Assistent und Modell) | Du schreibst ihn, den Kontext legt die Plattform bei | 180 Tage nach dem Abschluss der Meldung |
 | Eine **freiwillige** Kontaktangabe | nur wenn du das Feld ausfüllst | beim Abschluss der Meldung, spätestens mit der Meldung |
 | Eine **Kopie des Chats**, wenn du ihn ausdrücklich anhängst | nur nach deinem Häkchen | beim Abschluss der Meldung, sofern sie nicht ausdrücklich behalten wird |
 

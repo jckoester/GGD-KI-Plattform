@@ -37,6 +37,7 @@ def baue(konversation, nachrichten) -> dict:
                 "role": n.role,
                 "content": n.content,
                 "model": n.model,
+                "provider_model": n.provider_model,
                 "created_at": n.created_at.isoformat() if n.created_at else None,
             }
             for n in nachrichten
@@ -73,3 +74,38 @@ async def lade(db: AsyncSession, conversation_id: UUID, pseudonym: str) -> dict 
     )
     nachrichten = list(ergebnis.scalars().all())[-GEKUERZT_AUF:]
     return baue(konversation, nachrichten)
+
+
+async def modell(
+    db: AsyncSession, conversation_id: UUID, pseudonym: str
+) -> tuple[str | None, str | None]:
+    """Alias und Anbietermodell der letzten Antwort einer **eigenen** Konversation (0.28.1).
+
+    Ohne Antwort mit Modell gilt das Modell der Konversation (Alias, ohne Anbietermodell).
+    Fremd oder unbekannt: `(None, None)` — die Meldung geht trotzdem durch; anders als beim
+    Anhang ist das Modell eine Beigabe, kein Wunsch der meldenden Person.
+    """
+    konversation = await db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.pseudonym == pseudonym,
+        )
+    )
+    if konversation is None:
+        return None, None
+    # Aufsteigend nach `NACHRICHTEN_FOLGE` und in Python die letzte, wie in `lade` — ein
+    # `DESC LIMIT 1` auf dem Zeitstempel wäre bei gleichen Zeitpunkten mehrdeutig.
+    antworten = (await db.execute(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation_id,
+            Message.role == "assistant",
+            Message.model.is_not(None),
+            Message.ersetzt_am.is_(None),
+        )
+        .order_by(*NACHRICHTEN_FOLGE)
+    )).scalars().all()
+    letzte = antworten[-1] if antworten else None
+    if letzte is not None:
+        return letzte.model, letzte.provider_model
+    return konversation.model_used, None

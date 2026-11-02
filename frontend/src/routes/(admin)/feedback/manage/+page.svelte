@@ -18,7 +18,7 @@
         getAdminFeedbackDetail,
         patchAdminFeedback,
     } from "$lib/api.js";
-    import { feedbackFehlertext, kategorieText, statusFarbe } from "$lib/feedback.js";
+    import { feedbackFehlertext, kategorieText, modellText, statusFarbe } from "$lib/feedback.js";
     import { refreshFeedbackAlerts } from "$lib/stores/feedbackAlerts.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -273,6 +273,7 @@
                                 <div><dt class="inline">Pseudonym:</dt> <dd class="inline">{e.pseudonym ?? "—"}</dd></div>
                                 <div><dt class="inline">Seite:</dt> <dd class="inline">{e.route ?? "—"}</dd></div>
                                 <div><dt class="inline">Assistent:</dt> <dd class="inline">{e.assistant_id ?? "—"}</dd></div>
+                                <div><dt class="inline">Modell:</dt> <dd class="inline">{modellText(e)}</dd></div>
                                 <div><dt class="inline">Browser:</dt> <dd class="inline">{e.user_agent ?? "—"}</dd></div>
                                 <div><dt class="inline">Fenster:</dt> <dd class="inline">{e.viewport ?? "—"}</dd></div>
                             </dl>
@@ -310,7 +311,8 @@
                                             {#each detail.conversation_snapshot.messages ?? [] as n, i (i)}
                                                 <li class="text-xs">
                                                     <span class="font-medium text-light-tx-2 dark:text-dark-tx-2">
-                                                        {n.role === "user" ? "Nutzer:in" : "Assistent"}:
+                                                        {n.role === "user" ? "Nutzer:in" : "Assistent"}{#if n.role !== "user" && n.model}
+                                                            ({modellText(n)}){/if}:
                                                     </span>
                                                     <span class="whitespace-pre-wrap text-light-tx dark:text-dark-tx">
                                                         {n.content}

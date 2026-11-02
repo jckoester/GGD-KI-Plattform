@@ -1947,6 +1947,11 @@ class Feedback(Base):
     assistant_id: Mapped[Optional[int]] = mapped_column(nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     viewport: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Modell der letzten Antwort im Chat, aus dem gemeldet wurde (0.28.1): Alias und
+    # Anbietermodell dahinter. Vom Server aus der eigenen Konversation gelesen, nicht vom
+    # Client behauptet; ohne Einwilligung, weil weder Inhalt noch Personenbezug.
+    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     conversation_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'open'"), default="open"
