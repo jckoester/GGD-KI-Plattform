@@ -141,6 +141,13 @@ def run_migrations(db_url):
 #
 # Deshalb je Test, nicht je Sitzung: Der Schaden entsteht *während* des Laufs, nicht
 # beim Aufsetzen. Gemessen rund 8 ms.
+#
+# ⚠️ **Untergrenze 100 000** (02.11.2026). Nachziehen auf `max(id)` hilft nur, wenn die feste
+# ID zuerst da ist. Umgekehrt nicht: Rund zehn Testdateien setzen feste IDs zwischen 332 und
+# 861 mit `ON CONFLICT DO NOTHING`. Im Gesamtlauf erreichte die Sequenz 720, bevor der
+# Token-Test seine Gruppe 720 einsetzen wollte — sie war schon eine fremde Gruppe, mit
+# Lehrkraft 1 als Schülerin, und der Test bekam zu Recht 403. Fortlaufende IDs beginnen
+# deshalb oberhalb aller festen.
 _SEQUENZEN_NACHZIEHEN = """
 DO $$
 DECLARE r record; s text;
@@ -152,7 +159,7 @@ BEGIN
     s := pg_get_serial_sequence(format('public.%I', r.table_name), 'id');
     IF s IS NOT NULL THEN
       EXECUTE format(
-        'SELECT setval(%L, GREATEST(COALESCE((SELECT max(id) FROM public.%I), 0), 1))',
+        'SELECT setval(%L, GREATEST(COALESCE((SELECT max(id) FROM public.%I), 0), 100000))',
         s, r.table_name);
     END IF;
   END LOOP;

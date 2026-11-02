@@ -78,6 +78,19 @@ class JwtService:
         # zusätzlichen Claims nicht versehentlich eine Sitzung in ein Token verwandelt.
         return JwtPayload.model_validate({**raw, "token_scopes": None})
 
+    def verify_ohne_ablauf(self, token: str) -> JwtPayload:
+        """Wie :meth:`verify`, aber ein abgelaufenes Token gilt noch als lesbar.
+
+        **Nur** für den Rückweg aus der Vorschau (0.29, F1): Nach 60 Minuten trägt das Cookie
+        ein abgelaufenes Vorschau-Token und sonst nichts — ohne diesen Weg wäre mit der
+        Vorschau auch die Sitzung der Lehrkraft vorbei. Die Signatur wird geprüft; ob der
+        Rückweg zulässig ist (Merkmal, Widerruf, Ablauf der Ausgangssitzung), entscheidet
+        der Aufrufer.
+        """
+        raw = jwt.decode(token, self._secret, algorithms=[self._algorithm],
+                         options={"verify_exp": False})
+        return JwtPayload.model_validate({**raw, "token_scopes": None})
+
     async def revoke(
         self,
         db: AsyncSession,

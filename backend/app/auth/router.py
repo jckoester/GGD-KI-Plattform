@@ -485,3 +485,9 @@ async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
         "sso_groups": current_user.sso_groups,
         "sso_roles": current_user.sso_roles,
     }
+
+
+# ===== Vorschaumodus (0.29, ADR-016) — eigene Datei, hier nur eingehängt =====
+from app.auth.vorschau_router import router as _vorschau_router  # noqa: E402
+
+router.include_router(_vorschau_router)
