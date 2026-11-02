@@ -3,6 +3,7 @@ from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 
 from app.api.admin.assistants import router as assistants_router
+from app.api.admin.audit import router as audit_router
 from app.api.admin.budgets import router as budgets_router
 from app.api.admin.feedback import router as feedback_router
 from app.api.admin.flags import router as flags_router
@@ -19,6 +20,7 @@ from app.api.admin.holidays import router as holidays_router
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 router.include_router(assistants_router)
+router.include_router(audit_router)
 router.include_router(budgets_router)
 router.include_router(feedback_router)
 router.include_router(flags_router)

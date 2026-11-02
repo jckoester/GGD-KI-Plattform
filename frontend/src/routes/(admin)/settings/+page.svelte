@@ -9,6 +9,7 @@
         FileText,
         CalendarDays,
         BookOpen,
+        ScrollText,
     } from "lucide-svelte";
     import { onMount } from "svelte";
     import {
@@ -105,6 +106,19 @@
             <div class="font-medium text-light-tx dark:text-dark-tx">Nutzer & Sitzungen</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                 Rollen einsehen, Sitzungen nach Rollenentzug beenden
+            </div>
+        </a>
+        <!-- Audit-Log (0.28) -->
+        <a
+            href="/settings/audit"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <ScrollText class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Audit-Log</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Wer wann was geändert hat — Anmeldung, Verwaltung, Moderation, Löschläufe
             </div>
         </a>
         <!-- Export-Vorlagen (Phase 19) -->

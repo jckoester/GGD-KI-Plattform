@@ -24,6 +24,7 @@
         CalendarDays,
         Inbox,
         BookOpen,
+        ScrollText,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import { hasAnyRole } from "$lib/stores/user.js";
@@ -217,6 +218,16 @@
                     <span class="flex items-center gap-2">
                         <ShieldCheck class="w-4 h-4" />
                         Guardrails
+                    </span>
+                </button>
+                <button
+                    onclick={() => goto('/settings/audit')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <ScrollText class="w-4 h-4" />
+                        Audit-Log
                     </span>
                 </button>
                 <button

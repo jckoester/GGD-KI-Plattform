@@ -2475,6 +2475,25 @@ export async function revokeUserSessions(pseudonym) {
   return res.json(); // { ok, pseudonym, revoked_all_before }
 }
 
+// Admin: Audit-Log lesen (0.28) — nur lesend, Akteure als Pseudonym
+export async function getAuditKatalog() {
+  const res = await fetch(`${BASE}/admin/audit/katalog`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { kategorien: [{ name, bezeichnung, aufbewahrung_tage, ereignisse: [{ name, bezeichnung }] }] }
+}
+
+export async function getAuditLog(filter = {}) {
+  const url = new URL(`${BASE}/admin/audit`, location.href);
+  for (const [k, v] of Object.entries(filter)) {
+    if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, v);
+  }
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { eintraege, gesamt, seite, pro_seite }
+}
+
 // ── Artefaktbibliothek (Phase 18) ──────────────────────────────────────────────
 
 // „In Bibliothek speichern": ein generiertes Bild dauerhaft ablegen.

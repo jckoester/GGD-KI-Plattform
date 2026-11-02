@@ -15,6 +15,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Budget und Zuschläge; Guardrail-Prompt, Site-Texte, Ferienkalender; beendete Sitzungen; Feedback-Status und
   gesperrte Meldungen; Krisen-Flags angelegt und erledigt (ohne Text); gescheiterte Anmeldungen und Step-ups (ohne
   Benutzernamen); Sperren der Drossel; Ergebnisse der Lösch- und Lebenszyklus-Läufe.
+- **Ansicht „Audit-Log“** unter Einstellungen (`/settings/audit`, nur Admins): Filter nach Kategorie, Ereignis,
+  Akteur und Zeitraum, seitenweise, nur lesend. Akteure erscheinen als Pseudonym.
 
 ### Behoben
 
