@@ -332,6 +332,8 @@ class Settings(BaseSettings):
     render_cache_max_age_days: int = 90
     # Plot-Rendering (matplotlib, in-process): Timeout gegen pathologische Funktionen.
     plot_render_timeout: float = 10.0
+    # Strukturformeln (0.30, ```smiles): RDKit in-process, wie der Plot.
+    smiles_render_timeout: float = 10.0
 
     # ── Artefaktbibliothek (Phase 18) ────────────────────────────────────────
     # Ablage der Artefakt-Bytes (repo-root-relativ, falls nicht absolut).

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.render import cache
 from app.render.sidecar import RenderError, render_circuit
 from app.render.plot import render_plot
+from app.render.smiles import render_smiles
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ ERROR_SVG = (
 RENDERERS: dict[str, Callable[[str], Awaitable[str]]] = {
     "circuit": render_circuit,   # CircuiTikZ → Node-Sidecar
     "plot": render_plot,         # Funktionsgraph → matplotlib in-process
+    "smiles": render_smiles,     # Strukturformel → RDKit in-process (0.30)
 }
 
 

@@ -61,6 +61,7 @@ export const BIBLIOTHEKEN = [
             { name: 'NumPy', paket: 'numpy', lizenz: 'BSD-3-Clause' },
             { name: 'Matplotlib', paket: 'matplotlib', lizenz: 'Matplotlib-Lizenz (PSF-basiert)' },
             { name: 'Lark', paket: 'lark', lizenz: 'MIT' },
+            { name: 'RDKit', paket: 'rdkit', lizenz: 'BSD-3-Clause' },
             { name: 'spaCy', paket: 'spacy', lizenz: 'MIT' },
             { name: 'spaCy-Sprachmodell Deutsch (de_core_news_md)', paket: 'de_core_news_md', lizenz: 'MIT' },
         ],
