@@ -1,0 +1,86 @@
+# Messung „Strukturformeln im Chat" (0.30, Päckchen AH, Plan Schritt 5)
+# Plan: Plaene/Release-0.30-Strukturformeln-Plan.md
+#
+# Freier Chat, kein Assistent: Gemessen wird der Prompt-Satz in pedagogy.yaml (Abschnitt Grafiken).
+# Je Fall eine neue Konversation mit der Rolle und Stufe des Falls.
+#
+# Automatisch geprüft (scripts/strukturformel_messung.py):
+#   block       — steht ein ```smiles-Block in der Antwort? (`block: false` = soll keiner stehen)
+#   lesbar      — lässt sich jeder Block zeichnen (Schreibweise und SMILES gültig)?
+#   moleküle    — jedes Molekül im Block ist eines der `erwartet` (kanonisches SMILES); bei
+#                 `alle: true` muss zudem jedes erwartete vorkommen (Reaktionen)
+#   mindestens  — so viele Moleküle muss der Block haben (Grenzformeln: mehr als eine)
+#   operator    — dieses Zeichen muss vorkommen (mesomerie, gleichgewicht|pfeil …)
+#   darstellung — valenzstrich (Vorgabe) oder skelett
+#   kein TikZ, kein Mermaid — in jeder Antwort
+#
+# `erwartet` sind Alternativen: Für Grenzformeln jede zulässige Grenzformel.
+
+faelle:
+  - id: L1
+    titel: Lehrkraft, ohne Angabe → Valenzstrichformel
+    rolle: teacher
+    frage: Zeichne die Strukturformel von Benzoesäure.
+    erwartet: ["OC(=O)c1ccccc1"]
+    darstellung: valenzstrich
+
+  - id: L2
+    titel: Lehrkraft, Skelettformel ausdrücklich
+    rolle: teacher
+    frage: Zeichne die Skelettformel von Ibuprofen.
+    erwartet: ["CC(C)Cc1ccc(cc1)C(C)C(=O)O"]
+    darstellung: skelett
+
+  - id: L3
+    titel: Lehrkraft, Grenzformeln des Phenolat-Ions
+    rolle: teacher
+    frage: Zeige die mesomeren Grenzformeln des Phenolat-Ions.
+    erwartet: ["[O-]c1ccccc1", "O=C1C=CC=C[CH-]1", "O=C1C=C[CH-]C=C1"]
+    mindestens: 2
+    operator: [mesomerie]
+
+  - id: L4
+    titel: Lehrkraft, Benzol
+    rolle: teacher
+    frage: Zeichne Benzol.
+    erwartet: ["c1ccccc1"]
+
+  - id: S1
+    titel: Klasse 9, Ethanol
+    rolle: student
+    stufe: 9
+    frage: Wie sieht die Strukturformel von Ethanol aus?
+    erwartet: ["CCO"]
+    darstellung: valenzstrich
+
+  - id: S2
+    titel: Klasse 11, Veresterung als Reaktion
+    rolle: student
+    stufe: 11
+    frage: Stelle die Veresterung von Essigsäure mit Ethanol als Reaktionsgleichung mit Strukturformeln dar.
+    erwartet: ["CC(=O)O", "CCO", "CC(=O)OCC", "O"]
+    alle: true
+    operator: [gleichgewicht, pfeil]
+
+  - id: S3
+    titel: Klasse 12, Glycin als Zwitterion
+    rolle: student
+    stufe: 12
+    frage: Zeichne Glycin als Zwitterion.
+    erwartet: ["[NH3+]CC(=O)[O-]"]
+
+  - id: S4
+    titel: Klasse 10, Grenzformeln des Carbonat-Ions
+    rolle: student
+    stufe: 10
+    frage: Zeichne die Grenzformeln des Carbonat-Ions.
+    erwartet: ["O=C([O-])[O-]"]
+    mindestens: 2
+    operator: [mesomerie]
+
+  - id: F1
+    titel: Gegenprobe — Reaktionsgleichung ohne Strukturformel
+    rolle: student
+    stufe: 9
+    frage: Wie lautet die Reaktionsgleichung für die Verbrennung von Methan?
+    block: false

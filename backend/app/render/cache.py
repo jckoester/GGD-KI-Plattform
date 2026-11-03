@@ -17,7 +17,10 @@ from app.db.models import RenderedSvg
 #: die Zahl — sonst liefert der Cache weiter das alte Bild zur gleichen Quelle. Renderer ohne
 #: Eintrag behalten ihren bisherigen Schlüssel (Schaltplan, Graph: unverändert seit Phase 17).
 RENDERER_FASSUNG: dict[str, int] = {
-    "smiles": 2,  # 03.11.2026: Elektronenpaare nach der gelesenen Beschriftung, Vorgabe Valenzstrich
+    # 2 — 03.11.2026: Elektronenpaare nach der gelesenen Beschriftung, Vorgabe Valenzstrich
+    # 3 — 03.11.2026: Moleküle als flache Gruppen statt verschachtelter <svg>, Stile als
+    #     Attribute (Export: weasyprint, Word, LibreOffice); geladenes C behält seine Ladung
+    "smiles": 3,
 }
 
 

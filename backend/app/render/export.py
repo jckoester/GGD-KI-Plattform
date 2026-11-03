@@ -5,6 +5,7 @@ im PDF nicht. Diese Funktion **prä-rendert** vor weasyprint:
   - `$…$` / `$$…$$`  → MathJax-SVG (Sidecar, self-contained; inkl. mhchem)
   - ```circuitikz    → node-tikzjax-SVG (Sidecar)
   - ```plot          → matplotlib-SVG (in-process)
+  - ```smiles        → RDKit-SVG mit Elektronenpaaren (in-process, 0.30)
 …und bettet das SVG in die HTML ein, die weasyprint dann zu PDF macht.
 
 Token-basiert (markdown-it-py + `dollarmath`): Mathe wird nur außerhalb von Code erkannt.
@@ -32,6 +33,7 @@ from mdit_py_plugins.footnote import footnote_plugin
 from app.render import sidecar
 from app.render.errors import RenderError
 from app.render.plot import render_plot
+from app.render.smiles import render_smiles
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ logger = logging.getLogger(__name__)
 _FENCE_KINDS = {
     "circuitikz": "circuit", "circuittikz": "circuit", "circuit": "circuit",
     "plot": "plot",
+    "smiles": "smiles",
 }
 _MATH_INLINE = {"math_inline", "math_inline_double"}
 
@@ -85,11 +88,42 @@ def _svg_style_to_attrs(svg: str) -> str:
     return _STYLE_ATTR_RE.sub(_repl, svg)
 
 
+_WURZEL_SVG = re.compile(r"<svg\b([^>]*)>")
+#: Breite des Satzspiegels in px (A4 mit 2 cm Rand ≈ 17 cm ≈ 640 px bei 96 dpi), etwas Luft.
+SATZSPIEGEL_PX = 620.0
+
+
+def _hoechstens_seitenbreit(svg: str) -> str:
+    """Ein zu breites Wurzel-<svg> verhältnisgleich auf den Satzspiegel verkleinern.
+
+    Über ``width``/``height``, nicht über CSS: weasyprint behält bei ``max-width`` +
+    ``height:auto`` die alte Höhe als leeren Rahmen und vergrößert kleine Bilder sogar.
+    Die ``viewBox`` hält die Zeichnung; Bilder ohne Pixelmaße bleiben unberührt.
+    """
+    def _repl(m: re.Match) -> str:
+        attrs = m.group(1)
+        b = re.search(r'\swidth="([\d.]+)(?:px)?"', attrs)
+        h = re.search(r'\sheight="([\d.]+)(?:px)?"', attrs)
+        if not (b and h and "viewBox" in attrs):
+            return m.group(0)
+        breite, hoehe = float(b.group(1)), float(h.group(1))
+        if breite <= SATZSPIEGEL_PX:
+            return m.group(0)
+        faktor = SATZSPIEGEL_PX / breite
+        attrs = attrs.replace(b.group(0), f' width="{SATZSPIEGEL_PX:.0f}"')
+        attrs = attrs.replace(h.group(0), f' height="{hoehe * faktor:.0f}"')
+        return f"<svg{attrs}>"
+    return _WURZEL_SVG.sub(_repl, svg, count=1)
+
+
 def _wrap(kind: str, svg: str, display: bool) -> str:
     svg = _svg_style_to_attrs(svg)
     if kind == "math" and not display:
         return svg  # inline (SVG trägt vertical-align + ex-Sizing selbst)
-    # Display-Mathe / Diagramme: zentrierter Block.
+    # Display-Mathe / Diagramme: zentrierter Block, nie breiter als die Seite. Eine Reihe
+    # Strukturformeln (0.30) ist schnell breiter als der Satzspiegel und lief rechts hinaus;
+    # mit viewBox skaliert weasyprint das SVG proportional, kleine Bilder bleiben, wie sie sind.
+    svg = _hoechstens_seitenbreit(svg)
     return f'<div class="render-block" style="text-align:center;margin:0.6em 0">{svg}</div>'
 
 
@@ -110,6 +144,8 @@ async def _render_one(kind: str, content: str, display: bool) -> str:
         return await sidecar.render_circuit(content)
     if kind == "plot":
         return await render_plot(content)
+    if kind == "smiles":
+        return await render_smiles(content)
     raise RenderError(f"unbekannter Render-Typ: {kind}")
 
 

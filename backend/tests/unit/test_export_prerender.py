@@ -31,7 +31,7 @@ async def test_plot_fence_becomes_embedded_svg(monkeypatch):
     md = "Vorher\n\n```plot\nfunctions:\n  - x^2\n```\n\nNachher"
     out = await prerender.prerender_diagrams(MagicMock(), md)
     assert "```plot" not in out
-    assert "![Diagramm](data:image/svg+xml;base64," in out
+    assert "![Funktionsgraph](data:image/svg+xml;base64," in out
     assert _decode_data_uri(out) == "<svg>plot</svg>"
     assert out.startswith("Vorher") and out.rstrip().endswith("Nachher")
 
@@ -44,6 +44,15 @@ async def test_circuit_fence_prerendered(monkeypatch):
     assert "data:image/svg+xml;base64," in out
     # kind-Übersetzung circuitikz → circuit
     assert render.await_args.args[1] == "circuit"
+
+
+async def test_smiles_fence_prerendered(monkeypatch):
+    """Strukturformel (0.30) — eingebettet mit passendem Alternativtext."""
+    render = AsyncMock(return_value={"svg": "<svg>mol</svg>", "error": None})
+    monkeypatch.setattr(prerender.service, "render", render)
+    out = await prerender.prerender_diagrams(MagicMock(), "```smiles\nCCO\n```")
+    assert out.startswith("![Strukturformel](data:image/svg+xml;base64,")
+    assert render.await_args.args[1:] == ("smiles", "CCO")
 
 
 async def test_render_error_leaves_fence(monkeypatch):

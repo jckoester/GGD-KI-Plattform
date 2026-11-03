@@ -168,3 +168,49 @@ def test_cache_schluessel_traegt_die_fassung():
     assert cache.svg_hash("smiles", "CCO") != alt
     # Schaltplan und Graph behalten ihren Schlüssel aus Phase 17.
     assert cache.svg_hash("plot", "x") == hashlib.sha256("plot\x00x".encode()).hexdigest()
+
+
+def test_keine_verschachtelten_svg():
+    """Ein <svg> außen, Moleküle als Gruppen — der Office- und PDF-Export verträgt das."""
+    svg = setze(lies("CCO + O -> CC(=O)O"))
+    assert svg.count("<svg") == 1
+    assert svg.count('<g transform="translate(') == 3
+    ET.fromstring(svg)
+
+
+def test_stile_als_attribute():
+    """weasyprint, Word und LibreOffice: Präsentation als Attribute, nicht als style='…'."""
+    svg = setze(lies("CCO"))
+    assert "style=" not in svg
+    assert 'fill="none"' in svg and 'stroke="#000000"' in svg
+
+
+def test_carbanion_behaelt_sein_ladungszeichen_in_der_valenzstrichformel():
+    """Die eigene Beschriftung „C“ ersetzt RDKits ganz — ohne Ausnahme fehlte das Minus."""
+    from app.render.smiles import _beschriftung
+    from rdkit import Chem
+    bild = zeichne(Molekuel("O=C1C=CC=C[CH-]1"), "valenzstrich")
+    # AddHs hängt die H hinten an — die Nummern der schweren Atome bleiben.
+    mol = Chem.MolFromSmiles("O=C1C=CC=C[CH-]1", sanitize=False)
+    idx = next(a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge() == -1)
+    assert len(_beschriftung(bild.inhalt)[idx]) >= 2, "Symbol und Ladungszeichen"
+
+
+def test_unmoegliches_molekuel_wird_platzhalter():
+    """Messung 03.11.2026: `[O-][O-]C=O` kippte die ganze Reihe — jetzt nur sein Platz."""
+    svg = setze(lies("O=C([O-])[O-] <-> [O-][O-]C=O"))
+    ET.fromstring(svg)
+    assert "nicht darstellbar" in svg and "[O-][O-]C=O" in svg
+    assert svg.count('<g transform="translate(') == 2
+    assert 'stroke-dasharray="4 3"' in svg
+
+
+def test_platzhalter_maskiert_die_quelle():
+    svg = setze(lies("CCO + C<&>"))
+    assert "C&lt;&amp;&gt;" in svg
+    ET.fromstring(svg)
+
+
+def test_block_ohne_zeichenbares_molekuel_scheitert():
+    with pytest.raises(SmilesError, match="kein gültiges SMILES"):
+        setze(lies("C1CC(=O + [O-][O-]C=O"))

@@ -19,6 +19,9 @@ Ladungen; wo und wie viele Paare stehen, folgt aus der Chemie und ist damit imme
 In der Valenzstrichformel (Vorgabe) stehen sie an allen Atomen, in der Skelettformel an
 Heteroatomen und geladenen Atomen.
 
+Ein Molekül, das sich nicht zeichnen lässt, wird ein gestrichelter Platzhalter mit seiner
+Quelle; der Block scheitert erst, wenn kein Molekül gelingt.
+
 Gebogene Elektronenpfeile (Mechanismen) gibt es nicht — Todo „Mechanismuspfeile“.
 """
 from __future__ import annotations
@@ -227,7 +230,9 @@ def zeichne(molekuel: Molekuel, darstellung: str) -> Bild:
     o.addStereoAnnotation = False
     if darstellung == "valenzstrich":
         for a in mol.GetAtoms():
-            if a.GetSymbol() == "C":
+            # Nur ungeladene: Eine eigene Beschriftung ersetzt RDKits ganz — beim Carbanion
+            # verschwand so das Minus (aufgefallen im Office-Export, 03.11.2026).
+            if a.GetSymbol() == "C" and a.GetFormalCharge() == 0:
                 o.atomLabels[a.GetIdx()] = "C"
     rdMolDraw2D.PrepareAndDrawMolecule(d, mol, kekulize=True)
     d.FinishDrawing()
@@ -265,6 +270,33 @@ def zeichne(molekuel: Molekuel, darstellung: str) -> Bild:
 
     return Bild(inhalt=svg[svg.find("<svg"):], breite=d.Width(), hoehe=d.Height(),
                 striche=striche, name=molekuel.name)
+
+
+_STIL = re.compile(r"style='([^']*)'")
+
+
+def _stil_als_attribute(treffer: re.Match) -> str:
+    """``style='fill:none;stroke:#000'`` → ``fill="none" stroke="#000"``.
+
+    ⚠️ RDKit schreibt Stile in **einfache** Anführungszeichen. Die PDF-Strecke
+    (`app/render/export.py`) schreibt Stile für weasyprint in Attribute um, erkennt aber nur
+    doppelte — weasyprint füllte die Bindungen dann schwarz. Attribute verstehen alle
+    Abnehmer: Browser, weasyprint, der SVG-Import von Word und LibreOffice.
+    """
+    teile = []
+    for angabe in treffer.group(1).split(";"):
+        if ":" in angabe:
+            name, wert = (x.strip() for x in angabe.split(":", 1))
+            teile.append(f'{name}="{escape(wert)}"')
+    return " ".join(teile)
+
+
+def _innen(svg: str) -> str:
+    """Der Inhalt eines RDKit-SVGs ohne Hülle und Kommentare, Stile als Attribute."""
+    anfang = svg.index(">", svg.index("<svg")) + 1
+    ende = svg.rindex("</svg>")
+    innen = re.sub(r"<!--.*?-->", "", svg[anfang:ende], flags=re.S)
+    return _STIL.sub(_stil_als_attribute, innen)
 
 
 _PFAD = re.compile(r"<path class='atom-(\d+)' d='([^']*)'")
@@ -326,10 +358,46 @@ def _operator(art: str, x: float, y: float) -> str:
             f'<polyline points="{a+6:.1f},{y+7:.1f} {a:.1f},{y+3:.1f}" {s}/>')
 
 
+def platzhalter(molekuel: Molekuel) -> Bild:
+    """Gestrichelter Kasten mit der Quelle — statt eines Moleküls, das nicht zu zeichnen ist."""
+    quelle = molekuel.smiles if len(molekuel.smiles) <= 40 else molekuel.smiles[:39] + "…"
+    breite = max(120.0, 6.8 * len(quelle) + 20)
+    hoehe = 52.0
+    s = f'fill="{FARBE}" font-size="11" text-anchor="middle"'
+    inhalt = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{breite:.0f}" height="{hoehe:.0f}">'
+        f'<rect x="1" y="1" width="{breite - 2:.1f}" height="{hoehe - 2:.1f}" fill="none" '
+        f'stroke="{FARBE}" stroke-width="1" stroke-dasharray="4 3"/>'
+        f'<text x="{breite / 2:.1f}" y="21" {s} font-family="sans-serif">nicht darstellbar</text>'
+        f'<text x="{breite / 2:.1f}" y="38" {s} font-family="monospace">{escape(quelle)}</text>'
+        "</svg>"
+    )
+    return Bild(inhalt=inhalt, breite=breite, hoehe=hoehe, striche=[], name=molekuel.name)
+
+
+def _zeichne_oder_platzhalter(molekuel: Molekuel, darstellung: str, fehler: list[str]) -> Bild:
+    try:
+        return zeichne(molekuel, darstellung)
+    except SmilesError as e:
+        fehler.append(str(e))
+        return platzhalter(molekuel)
+
+
 def setze(block: Block) -> str:
-    """Den ganzen Block zu einem SVG zusammensetzen."""
-    reihen = [[zeichne(t, block.darstellung) if isinstance(t, Molekuel) else t for t in r.teile]
+    """Den ganzen Block zu einem SVG zusammensetzen.
+
+    Ein Molekül, das RDKit nicht zeichnen kann (chemisch unmöglich, zu groß), wird ein
+    Platzhalter; die übrigen bleiben sichtbar (Messung 03.11.2026: ein erfundenes Teilchen
+    kippte sonst die ganze Reihe Grenzformeln). Nur wenn **kein** Molekül gelingt, scheitert
+    der Block — dann zeigt die Oberfläche die Quelle mit der Fehlermeldung.
+    """
+    fehler: list[str] = []
+    reihen = [[_zeichne_oder_platzhalter(t, block.darstellung, fehler) if isinstance(t, Molekuel)
+               else t for t in r.teile]
               for r in block.reihen]
+    anzahl = sum(isinstance(t, Bild) for r in reihen for t in r)
+    if len(fehler) == anzahl:
+        raise SmilesError(fehler[0])
     teile_svg: list[str] = []
     gesamt_breite = 0.0
     y = 0.0
@@ -345,8 +413,11 @@ def setze(block: Block) -> str:
                 x += OPERATOR_BREITE
                 continue
             ox, oy = x + RAND, mitte - t.hoehe / 2
-            innen = t.inhalt.replace("<svg ", f'<svg x="{ox:.1f}" y="{oy:.1f}" overflow="visible" ', 1)
-            teile_svg.append(innen)
+            # Flache Gruppe statt verschachteltem <svg>: Browser können beides, der
+            # SVG-Import von Word und LibreOffice und weasyprint nicht verlässlich das
+            # Verschachtelte (Export, Schritt 3). RDKit zeichnet im Maßstab 1:1 zu seiner
+            # viewBox, die Verschiebung genügt.
+            teile_svg.append(f'<g transform="translate({ox:.1f},{oy:.1f})">{_innen(t.inhalt)}</g>')
             for x1, y1, x2, y2 in t.striche:
                 teile_svg.append(
                     f'<line x1="{ox+x1:.1f}" y1="{oy+y1:.1f}" x2="{ox+x2:.1f}" y2="{oy+y2:.1f}" '

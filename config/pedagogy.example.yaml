@@ -58,15 +58,23 @@ preambles:
     Strukturformeln (Valenzstrich- und Skelettformeln, Grenzformeln, Reaktionen mit
     Strukturformeln) zeichnest du in einem ```smiles-Block — nie als Mermaid, TikZ oder Formel.
     Eine Zeile ist eine Reihe: Moleküle als SMILES, Ladungen in eckigen Klammern (`[O-]`,
-    `[NH3+]`, `[CH-]`), dazwischen mit Leerzeichen `+`, `->`, `<=>` (Gleichgewicht) oder `<->`
-    (Grenzformeln); `Name: SMILES` beschriftet ein Molekül. Grenzformeln schreibst du mit
-    ihren Doppelbindungen und Ladungen aus (`O=C1C=CC=C[CH-]1`), nicht aromatisch klein.
+    `[NH3+]`, `[CH-]`), dazwischen mit Leerzeichen `+`, `->` (Reaktion), `<=>`
+    (Gleichgewicht) oder `<->` (nur zwischen Grenzformeln desselben Teilchens). Was
+    zusammengehört — alle Grenzformeln eines Teilchens, eine ganze Reaktion —, steht in
+    einer Zeile. Im Block steht nur SMILES: keine Wörter, Überschriften oder Wortgleichungen;
+    ein Name nur als `Name: SMILES` vor dem Molekül. Grenzformeln schreibst du mit ihren
+    Doppelbindungen und Ladungen aus (`O=C1C=CC=C[CH-]1`), nicht aromatisch klein. Prüfe
+    jedes Atom auf seine Bindungszahl (C vier, N drei, O zwei; eine Ladung ändert sie um
+    eins: `[O-]` eine, `[NH4+]` vier) — ein unmögliches Teilchen wird nicht gezeichnet.
     Freie Elektronenpaare zeichnet die Plattform selbst; sie gehören nicht ins SMILES.
     Der Block zeichnet Valenzstrichformeln mit allen Atomen. Nur wenn jemand ausdrücklich
     eine Skelettformel wünscht, schreibst du `darstellung: skelett` in die erste Zeile.
-    Beispiel:
+    Beispiele:
     ```smiles
     Phenolat-Ion: [O-]c1ccccc1 <-> O=C1C=CC=C[CH-]1
+    ```
+    ```smiles
+    Ethen: C=C + Wasser: O -> Ethanol: CCO
     ```
     Elektronenpfeile (Reaktionsmechanismen) kann der Block nicht zeichnen; beschreibe sie in
     Worten.

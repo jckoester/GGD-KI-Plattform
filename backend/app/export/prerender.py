@@ -24,10 +24,12 @@ from app.render import service
 # ```circuitikz / ```plot-Fence (gleiche Backtick-Zahl öffnend/schließend, Sprache
 # case-insensitiv — wie die Chat-Normalisierung in markdown.js).
 _FENCE_RE = re.compile(
-    r"(?msi)^(?P<fence>`{3,})[ \t]*(?P<lang>circuitikz|plot)[ \t]*\r?\n"
+    r"(?msi)^(?P<fence>`{3,})[ \t]*(?P<lang>circuitikz|plot|smiles)[ \t]*\r?\n"
     r"(?P<body>.*?)\r?\n(?P=fence)[ \t]*$"
 )
-_LANG_KIND = {"circuitikz": "circuit", "plot": "plot"}
+_LANG_KIND = {"circuitikz": "circuit", "plot": "plot", "smiles": "smiles"}
+# Alternativtext im Dokument — „Diagramm“ wäre für eine Strukturformel falsch.
+_ALT = {"circuit": "Schaltplan", "plot": "Funktionsgraph", "smiles": "Strukturformel"}
 
 
 def _svg_data_uri(svg: str) -> str:
@@ -54,7 +56,7 @@ async def prerender_diagrams(db: AsyncSession, markdown: str) -> str:
         if result.get("error"):
             out.append(m.group(0))  # Render-Fehler → Fence als Codeblock belassen
         else:
-            out.append(f"![Diagramm]({_svg_data_uri(result['svg'])})")
+            out.append(f"![{_ALT.get(kind, 'Diagramm')}]({_svg_data_uri(result['svg'])})")
         last = m.end()
     out.append(markdown[last:])
     return "".join(out)

@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Strukturformeln** im Chat (```smiles): Valenzstrichformeln mit freien Elektronenpaaren, Skelettformeln auf
+  Wunsch, Grenzformeln und Reaktionen. Ein Molekül, das sich nicht zeichnen lässt, erscheint als Platzhalter mit
+  seiner Formel; der Rest bleibt sichtbar.
+
 ## [0.29.0] – 2026-11-03
 
 Vorschaumodus: Lehrkräfte sehen die Plattform als Schüler:in und probieren sie aus. Eine Migration (0099).

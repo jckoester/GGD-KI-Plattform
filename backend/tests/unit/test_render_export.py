@@ -105,3 +105,14 @@ async def test_curriculum_pdf_roundtrip():
     ):
         pdf = await render_curriculum_pdf(None, tree)
     assert pdf[:4] == b"%PDF"
+
+
+def test_zu_breites_diagramm_wird_auf_den_satzspiegel_verkleinert():
+    """0.30: Eine Reihe Strukturformeln lief rechts über den Seitenrand."""
+    breit = '<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="200" viewBox="0 0 1240 200"></svg>'
+    aus = export._hoechstens_seitenbreit(breit)
+    assert 'width="620"' in aus and 'height="100"' in aus and 'viewBox="0 0 1240 200"' in aus
+    schmal = '<svg width="300" height="100" viewBox="0 0 300 100"></svg>'
+    assert export._hoechstens_seitenbreit(schmal) == schmal
+    ohne_masse = '<svg viewBox="0 0 10 10"></svg>'
+    assert export._hoechstens_seitenbreit(ohne_masse) == ohne_masse
