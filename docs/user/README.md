@@ -32,7 +32,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [Fächer und Unterrichtsgruppen](faecher.md) — die Übersichtsseite, „Jetzt", Archiv früherer Schuljahre
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
 - [Bilder erzeugen](bilder-erzeugen.md) — Bild-Werkzeuge finden, nutzen, Grenzen & Kosten
-- [Diagramme & Graphen](diagramme.md) — Diagramme, Schaltpläne, Funktionsgraphen im Chat
+- [Diagramme & Graphen](diagramme.md) — Diagramme, Schaltpläne, Funktionsgraphen, Strukturformeln im Chat
 - [Bibliothek](bibliothek.md) — Bilder & Diagramme dauerhaft speichern, herunterladen, GeoGebra-Export
 - [Material-Werkstatt](werkstatt.md) — Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
 - [KI-Ergebnisse zitieren](zitieren.md) — Modell, Datum und Eingabe für GFS, Seminarkurs, Facharbeit

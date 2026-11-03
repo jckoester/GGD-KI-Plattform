@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.30.0] – 2026-11-03
+
+Strukturformeln im Chat, lesbare Formelfehler und eine Reparatur aus 0.29.0. Eine Migration (0100).
+
 ### Neu
 
 - **Strukturformeln** im Chat (```smiles): Valenzstrichformeln mit freien Elektronenpaaren, Skelettformeln auf
@@ -17,6 +21,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Neue Chats fehlten seit 0.29.0 in „Letzte Chats“, im Verlauf und in den Fachlisten und wären nach 30 statt 93 Tagen
   gelöscht worden. Migration 0100 stellt die betroffenen Chats wieder her.
+
+### Geändert
+
+- Der Prompt sagt den Modellen, wie sie Strukturformeln schreiben, und dass in eine Formel keine Zeichnung
+  (`tikzpicture`) gehört.
+- Werkstatt-Export (PDF, DOCX, ODT) mit Strukturformeln; zu breite Grafiken werden im PDF auf Seitenbreite verkleinert.
+
+### Dokumentation
+
+- Hilfe: Strukturformeln unter „Diagramme & Graphen“, Hinweis im Chat-Abschnitt zu Formeln.
+- `docs/dev/server-rendering.md`: Renderer `smiles` mit seinen Fallen, `RENDERER_FASSUNG` im Cache.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0100) — wie im regulären Update.
+- `config/pedagogy.yaml` wird nicht überschrieben: In `preambles.universal_base` die beiden Absätze „Formeln schreibst
+  du in LaTeX …“ und „Strukturformeln … beschreibe sie in Worten.“ aus `config/pedagogy.example.yaml` hinter den Absatz
+  zu Diagrammen übernehmen. Ohne sie kennen die Modelle den Strukturformel-Block nicht.
+- Das Backend-Image wird durch RDKit rund 76 MB größer.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.29.0] – 2026-11-03
 

@@ -1,14 +1,15 @@
-# Server-Rendering (Phase 17)
+# Server-Rendering (Phase 17, Strukturformeln 0.30)
 
 Serverseitiges Rendern von Inhalten, die der Browser nicht (sicher) selbst rendern kann:
 
 - **CircuiTikZ-Schaltpläne** (```circuitikz) — brauchen eine TeX-Engine.
 - **Funktionsgraphen** (```plot) — deklarative Spec → matplotlib.
+- **Strukturformeln** (```smiles, seit 0.30) — SMILES → RDKit, freie Elektronenpaare berechnet.
 - **Mathe im PDF-Export** — `$…$`/`$$…$$` → MathJax-SVG (weasyprint führt kein KaTeX/JS aus).
 
 Reines Rendering: **kein LLM, kein Provider, keine Kosten, keine Moderation.** Das LLM (bzw.
 die Kurator:in) liefert nur eine **Beschreibung** (CircuiTikZ-Quelle, Plot-Spec), nie
-ausführbaren Code.
+ausführbaren Code (Strukturformeln: SMILES).
 
 ## Bausteine im Überblick
 
@@ -19,10 +20,10 @@ Chat/Knoten (Browser)            PDF-Export (Backend)
         ▼                                 ▼
    app/render/router.py  ──►  app/render/service.py (Registry + Cache rendered_svg)
                                     │              │
-                            circuit │              │ plot
+                            circuit │              │ plot, smiles
                                     ▼              ▼
                      render-sidecar (Node)   app/render/plot.py (matplotlib, in-process)
-                     node-tikzjax + MathJax
+                     node-tikzjax + MathJax  app/render/smiles.py (RDKit, in-process)
 ```
 
 ## Node-Render-Sidecar (`render-sidecar/`)
@@ -48,6 +49,9 @@ Env: `RENDER_SIDECAR_HOST/PORT`, `RENDER_POOL_SIZE`, `RENDER_TIMEOUT_MS`, `RENDE
   Hash → Cache-Treffer? → sonst Renderer → **nur Erfolge** in den Cache. `svg_hash(kind, source)`.
 - `cache.py` — Tabelle `rendered_svg (hash PK, svg, created_at)` (content-adressiert,
   deterministisch). Aufräumen altersbasiert: `cleanup_rendered_svg` (Cron, siehe unten).
+  **`RENDERER_FASSUNG`** (seit 0.30): Ändert sich die Zeichnung eines Renderers, erhöhen Sie
+  dort seine Zahl — sie geht in den Hash ein, sonst liefert der Cache zur gleichen Quelle weiter
+  das alte Bild. Renderer ohne Eintrag (Schaltplan, Graph) behalten ihren Schlüssel.
 - `sidecar.py` — httpx-Client zum Sidecar (`render_circuit`, `render_math`); Timeout/Fehler →
   `RenderError` (`app/render/errors.py`).
 - `plot.py` — Plots **in-process** (kein Sidecar): `lark`-Grammatik (Präzedenz `^`>unär->`*`/`/`>
@@ -79,6 +83,55 @@ für kompakte Kontexte (Tabellenzellen, ohne `<p>`).
 `style` in echte **Attribute** um (`vertical-align` bleibt im style). Eingehängt in
 `curriculum_export._build_pdf_kapitel` (konkretisierung) und `lesson_export.export_pdf`
 (beschreibung/stundenziel).
+
+## Strukturformeln (```smiles, `app/render/smiles.py`)
+
+In-process wie der Plot (`asyncio.to_thread` mit `smiles_render_timeout`). Eine Zeile je Reihe,
+Moleküle als SMILES, Operatoren von Leerzeichen umgeben:
+
+```smiles
+darstellung: skelett
+[O-]c1ccccc1 <-> O=C1C=CC=C[CH-]1
+Essigsäure: CC(=O)O + Ethanol: OCC <=> CC(=O)OCC + O
+```
+
+- Operatoren `+`, `->`, `<=>` (Gleichgewicht), `<->` (Mesomerie), auch `→ ⇌ ↔`. SMILES enthält
+  kein Leerzeichen; deshalb trennen Leerzeichen eindeutig, auch bei `[NH3+]`. `Name: SMILES`
+  beschriftet (getrennt am letzten „: ").
+- `darstellung:` in der ersten Zeile, Vorgabe **valenzstrich** (alle H, `C` beschriftet);
+  `skelett` nur auf Wunsch.
+- **Freie Elektronenpaare** zeichnet RDKit nicht. `freie_paare()` rechnet: Außenelektronen −
+  Formalladung − `GetTotalValence()` − Radikalelektronen, halbiert. Die Striche gehen in die
+  größten Winkellücken zwischen Bindungen **und** Beschriftung.
+- **Grenzen:** 2000 Zeichen, 4 Reihen, 6 Moleküle je Reihe, 300 Zeichen je SMILES, 120 schwere
+  Atome.
+- **Teilfehler:** Ein Molekül, das RDKit nicht annimmt, wird ein gestrichelter Platzhalter mit
+  seiner Quelle (`platzhalter()`); der Block scheitert erst, wenn kein Molekül gelingt.
+
+**Fallen (alle aufgetreten):**
+
+- **Keine Aromatizitäts-Erkennung** (`SANITIZE_ALL ^ SANITIZE_SETAROMATICITY`). Sonst legt
+  RDKit die Doppelbindungen einer Grenzformel wie `O=C1C=CC=C[CH-]1` neu — und genau deren
+  Lage ist die Aussage. Nur klein (aromatisch) geschriebene Ringe werden kekulisiert.
+- **Maßstab über `scalingFactor`** (Bildpunkte je Å). `fixedBondLength` wirkt bei anpassbarer
+  Zeichenfläche (`MolDraw2DSVG(-1, -1)`) nicht.
+- **Lage der Beschriftung wird gelesen, nicht geschätzt:** `_beschriftung()` liest die
+  Umrisse der Glyphen-Pfade `class='atom-N'` aus dem RDKit-SVG. Nah an der Atommitte = Symbol,
+  weiter weg = angehängtes H, Ladung → belegte Richtung. Geschätzt stand ein Paar im H von „OH".
+- **Eigene Atombeschriftung nur für ungeladenes C** — `atomLabels` ersetzt RDKits Beschriftung
+  ganz; beim Carbanion verschwand sonst das Minus.
+- **Flache Gruppen statt verschachtelter `<svg>`, Stile als Attribute** (`_innen()`):
+  weasyprint und der SVG-Import von Word/LibreOffice verkraften beides sonst nicht; RDKit
+  schreibt `style='…'` in einfachen Anführungszeichen, die `_svg_style_to_attrs` nicht erkennt.
+
+**Export:** `export.py` und `app/export/prerender.py` kennen `smiles` wie `circuit`/`plot`.
+Breite Reihen verkleinert `_hoechstens_seitenbreit` über `width`/`height` auf den Satzspiegel
+(`SATZSPIEGEL_PX`) — CSS `max-width` ignoriert weasyprint hier. Office-Alternativtext
+„Strukturformel".
+
+**Prompt:** Der Absatz zu Strukturformeln steht in `config/pedagogy.yaml` (Abschnitt Grafiken,
+`universal_base`), gemessen mit `backend/scripts/strukturformel_messung.py` (Szenarien
+`scripts/szenarien/strukturformeln.yaml`; zählt einen Platzhalter weiter als Fehler).
 
 ## ```plot-Spec (v1)
 

@@ -232,3 +232,15 @@
     deinen Assistenten mit „Als Schüler:in testen“ direkt aus Schülersicht. Ändern lässt sich in
     der Vorschau nichts.
   link: /help/vorschau
+
+- id: "0.30-strukturformeln"
+  version: "0.30.0"
+  datum: 2026-11-03
+  rollen: [student, teacher]
+  titel: "Strukturformeln im Chat"
+  text: >-
+    Frag im Chat nach einer Strukturformel, und sie erscheint als Bild: als Valenzstrichformel
+    mit freien Elektronenpaaren, auf Wunsch als Skelettformel, auch Grenzformeln und Reaktionen.
+    Eine Formel, die sich nicht darstellen lässt, zeigt jetzt „Formel nicht darstellbar“ statt
+    Quelltext.
+  link: /help/diagramme

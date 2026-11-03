@@ -100,6 +100,7 @@ was du selbst schreibst.
 - **Mathematik** in LaTeX-Schreibweise zwischen Dollarzeichen: `$a^2 + b^2 = c^2$` im Text
   oder `$$\int_0^1 x\,dx$$` als abgesetzte Formel.
 - **Chemie** mit `\ce{ }`: `$\ce{2 H2 + O2 -> 2 H2O}$` ergibt eine gesetzte Reaktionsgleichung.
+  **Strukturformeln** zeichnet der Chat als Bild — frag einfach danach (siehe unten).
 - **Diagramme** als Codeblock mit der Sprache **mermaid** — zum Beispiel ein Flussdiagramm:
 
       flowchart LR
@@ -107,16 +108,18 @@ was du selbst schreibst.
 
 Die Darstellung passiert automatisch auf deinem Gerät. Wenn du die LaTeX-Schreibweise nicht
 kennst, bitte die KI einfach, etwas „als Formel" zu schreiben — sie kümmert sich um die
-richtige Notation.
+richtige Notation. Versteht die Darstellung eine Formel nicht, erscheint **„Formel nicht
+darstellbar"**; ein Klick zeigt den Quelltext.
 
 **Weiterverwenden.** Fährst du über eine abgesetzte Formel, erscheint **„Kopieren"**: In der
 Zwischenablage landet die Schreibweise `$$…$$`, die sich in Chat, Werkstatt oder Wissensgraph
 wieder einfügen lässt. Wer Text mit Formeln markiert und kopiert, bekommt die Formeln ebenfalls
 so.
 
-Auch **elektrische Schaltpläne** und **Funktionsgraphen** stellt der Chat als Grafik dar — was
-dabei geht und wie du eine Grafik weiterverwendest, steht unter
-[Diagramme, Schaltpläne & Funktionsgraphen](diagramme.md).
+Auch **elektrische Schaltpläne**, **Funktionsgraphen** und **Strukturformeln** (mit freien
+Elektronenpaaren) stellt der Chat als Grafik dar — was dabei geht und wie du eine Grafik
+weiterverwendest, steht unter
+[Diagramme, Schaltpläne, Funktionsgraphen & Strukturformeln](diagramme.md).
 
 ## Chat-Verlauf
 
