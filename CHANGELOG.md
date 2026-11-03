@@ -10,6 +10,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Strukturformeln** im Chat (```smiles): Valenzstrichformeln mit freien Elektronenpaaren, Skelettformeln auf
   Wunsch, Grenzformeln und Reaktionen. Ein Molekül, das sich nicht zeichnen lässt, erscheint als Platzhalter mit
   seiner Formel; der Rest bleibt sichtbar.
+- Eine Formel, die sich nicht darstellen lässt, zeigt „Formel nicht darstellbar“ und den Quelltext zum Aufklappen statt
+  roten TeX-Codes.
+
+### Behoben
+
+- Neue Chats fehlten seit 0.29.0 in „Letzte Chats“, im Verlauf und in den Fachlisten und wären nach 30 statt 93 Tagen
+  gelöscht worden. Migration 0100 stellt die betroffenen Chats wieder her.
 
 ## [0.29.0] – 2026-11-03
 

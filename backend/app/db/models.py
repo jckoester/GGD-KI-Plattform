@@ -610,7 +610,10 @@ class Conversation(Base):
     # Vorschaumodus (0.29, ADR-016, F2 a): der simulierte Kontext (Jahrgang, Gruppe,
     # Assistent), wenn der Chat in der Vorschau entstand — sonst NULL. Eigene Liste, Frist
     # 30 Tage (`cleanup_stale_conversations`), keine Krisen-Flags und Zähler.
-    preview_context: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # ⚠️ `none_as_null`: Ohne schreibt SQLAlchemy für ein ausdrücklich übergebenes None den
+    # JSON-Wert `null`, und `IS NULL` trifft nicht mehr — in 0.29.0 galten so alle neuen Chats
+    # in den Listen und im Löschlauf als Vorschau-Chats (repariert mit Migration 0100).
+    preview_context: Mapped[Optional[dict]] = mapped_column(JSONB(none_as_null=True), nullable=True)
     hidden_by_user: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )

@@ -74,6 +74,8 @@ async def _neuer_chat(client, kopf, **json):
 
     async def anhalten(*, chat_id, db, **_):
         gesehen["konversation"] = await db.get(Conversation, chat_id)
+        gesehen["sql_null"] = (await db.execute(sa.select(
+            Conversation.preview_context.is_(None)).where(Conversation.id == chat_id))).scalar_one()
         gesehen["flags"] = (await db.execute(sa.select(ConversationFlag).where(
             ConversationFlag.conversation_id == chat_id))).scalars().all()
         raise _BisHierher
@@ -99,6 +101,10 @@ async def test_neuer_chat_traegt_den_kontext_und_kein_flag(test_client, jwt_serv
 async def test_gegenprobe_gewoehnlicher_chat_flaggt(test_client, jwt_service, welt):
     gesehen, _ = await _neuer_chat(test_client, _kopf(jwt_service, normal=True))
     assert gesehen["konversation"].preview_context is None
+    # ⚠️ In der Datenbank SQL-NULL, nicht JSON-`null`: Python liest beides als None, die
+    # Listen und der Löschlauf fragen aber `IS NULL` (0.29.0: alle neuen Chats galten in SQL
+    # als Vorschau-Chats und fehlten in „Letzte Chats“).
+    assert gesehen["sql_null"] is True
     assert len(gesehen["flags"]) == 1
 
 
