@@ -5,6 +5,36 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.29.0] – 2026-11-03
+
+Vorschaumodus: Lehrkräfte sehen die Plattform als Schüler:in und probieren sie aus. Eine Migration (0099).
+
+### Neu
+
+- **Als Schüler:in ansehen** (Benutzermenü) und **Als Schüler:in testen** (Assistenten-Editor): eine Stunde lang die
+  Plattform wie eine Schüler:in einer gewählten Klasse und Unterrichtsgruppe — Assistentenliste, Gruppenkontext,
+  Leitplanken, Chat. Ein Band oben nennt Klasse, Gruppe und Restzeit; „Vorschau beenden“ oder der Ablauf führt zurück in
+  die eigene Sitzung, ohne neue Anmeldung.
+- In der Vorschau lässt sich nichts ändern (Einstellungen, Bibliothek, Gruppen, Zugangstoken); Chatten und Feedback
+  gehen. Eigene Entwürfe und private Assistenten sind unsichtbar, außer dem aus dem Editor.
+- **Vorschau-Chats** stehen unter „Meine Chats → Aus der Vorschau“, lassen sich lesen und löschen, aber nur in der
+  Vorschau fortsetzen; sie werden nach 30 Tagen gelöscht. Sie lösen keine Krisen-Flags aus (der Hinweis mit den
+  Hilfsangeboten erscheint) und zählen nicht in der Vorab-Statistik.
+- Rückmeldungen aus der Vorschau sind in der Rückmelde-Verwaltung als „aus der Vorschau“ markiert.
+- Audit-Log: Beginn und Ende einer Vorschau.
+- Hilfe „Als Schüler:in ansehen“ für Lehrkräfte.
+
+### Dokumentation
+
+- `docs/dev/vorschau.md`: Aufbau des Vorschaumodus und was eine neue Route beachten muss.
+- `docs/admin/datenschutz-betrieb.md`: Abschnitt Vorschaumodus; Löschlauf um die 30-Tage-Frist ergänzt.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0099) — wie im regulären Update.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
+
 ## [0.28.2] – 2026-11-02
 
 Der Budgetbalken misst am erreichbaren Höchststand. Keine Migration.

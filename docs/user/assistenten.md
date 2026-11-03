@@ -125,6 +125,10 @@ den Knopf **Löschen** im Editor. Beim Löschen bleiben die bisherigen Chats erh
 Assistent verschwindet aus ihnen. Ist er mit einer Gruppe oder Fachschaft geteilt, verlieren
 die anderen dort den Zugang — die Rückfrage sagt es dir.
 
+**Ausprobieren:** Der Testchat im Editor zeigt, wie der Assistent antwortet. Mit **Als
+Schüler:in testen** daneben siehst du ihn so, wie eine Schüler:in ihn findet und benutzt —
+siehe [Als Schüler:in ansehen](vorschau.md).
+
 Als **Fach** stehen im Editor deine eigenen Fächer zur Wahl: die deiner Unterrichtsgruppen und
 Fachschaften. Gibst du den Assistenten für eine Unterrichtsgruppe oder Fachschaft frei, kommt das
 Fach aus der Gruppe; das Feld zeigt es dann nur an. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.

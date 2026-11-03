@@ -214,3 +214,18 @@ def darf_chat_fortsetzen(konversation, user: "JwtPayload") -> bool:
         return False
     return ist_vorschau(user) == (konversation.preview_context is not None)
 
+
+
+# ── Lernstand (0.29, Schritt 6) ─────────────────────────────────────────────────
+
+
+def schreibt_lernstand(user: "JwtPayload") -> bool:
+    """Darf aus dieser Anfrage persönlicher Lernstand (`node_engagement` je Pseudonym)
+    entstehen? In der Vorschau nie: Was eine Lehrkraft als Schüler:in ausprobiert, ist kein
+    Lernen (ADR-016).
+
+    Heute schreibt niemand persönlichen Lernstand aus dem Chat — der einzige Schreiber ist
+    der Gruppenstand der Nachbereitung, ein Lehrkraft-Weg. Wer einen Schreiber einführt,
+    fragt hier; `tests/unit/test_lernstand_schreiber.py` erinnert daran.
+    """
+    return not ist_vorschau(user)

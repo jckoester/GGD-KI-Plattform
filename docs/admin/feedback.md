@@ -17,6 +17,9 @@ ausmacht.
   das Anbietermodell, was tatsächlich geantwortet hat. Es wird ohne Einwilligung erfasst, weil
   es weder Inhalt noch Personenbezug trägt; den Chat selbst gibt es weiterhin nur als Anhang.
   Ältere Meldungen haben kein Modell.
+- **Aus der Vorschau** (seit 0.29): Eine Lehrkraft hat die Meldung im Vorschaumodus
+  geschrieben, also beim Ansehen der Plattform als Schüler:in. In der Liste steht dann „aus der
+  Vorschau“; als Rolle steht ihre echte Rolle da, nicht „Schüler:in“.
 - **Kontaktangabe**, falls die meldende Person freiwillig eine gemacht hat.
 - **Chat-Kopie**, falls sie ausdrücklich angehängt wurde. Sie wird erst beim Aufklappen
   geladen und nennt bei jeder Antwort das Modell.

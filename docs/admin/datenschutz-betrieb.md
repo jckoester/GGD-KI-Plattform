@@ -365,6 +365,24 @@ docker compose exec backend python scripts/cleanup_stale_conversations.py --dry-
 docker compose exec backend python scripts/cleanup_inactive_accounts.py --dry-run
 ```
 
+## Vorschaumodus (seit 0.29)
+
+Lehrkräfte können die Plattform als Schüler:in einer Klasse und einer ihrer
+Unterrichtsgruppen ansehen. Es entsteht dabei **kein zweites Konto** und es werden **keine
+Daten echter Schüler:innen** gezeigt: Die Lehrkraft bleibt unter ihrem Pseudonym angemeldet,
+nur ihre Rechte sind für die Dauer der Vorschau die einer Schüler:in.
+
+| Bestand | Inhalt | Frist | Zugriff |
+|---|---|---|---|
+| `conversations` mit `preview_context` | Chats aus der Vorschau, mit simulierter Klasse und Gruppe | 30 Tage nach der letzten Nachricht (`cleanup_stale_conversations`) | nur die Lehrkraft selbst |
+| `feedback.preview` | Markierung „aus der Vorschau“ an einer Rückmeldung | wie die Rückmeldung | Admins |
+| `audit_log` (`preview_entered`, `preview_exited`) | Beginn und Ende, Klasse, Gruppe, Dauer | 180 Tage | Admins |
+
+Aus Vorschau-Chats entstehen **keine Krisen-Flags** — der Hinweis mit den Hilfsangeboten
+erscheint trotzdem — und keine Einträge in der Vorab-Statistik. Die Kosten gehen auf das
+Budget der Lehrkraft. Eine Vorschau dauert höchstens eine Stunde und verlängert die Sitzung
+nicht. Bei der Kontolöschung gehen Vorschau-Chats mit den übrigen Chats.
+
 ## Vorab-Statistik (seit 0.16)
 
 Die Tabelle `vorab_statistik` zählt, wie oft die Vorab-Suche Einträge des Wissensspeichers
@@ -393,7 +411,7 @@ ausgenommen der Aufräum-Lauf und die Kontolöschung).
 
 | Kategorie | Ereignisse | Frist |
 |---|---|---|
-| Anmeldung (`auth`) | gescheiterte Anmeldungen (mit Grund, **ohne** Benutzernamen), abgelehnte Bestätigungen der Anmeldung (Step-up), Sperren der Drossel (höchstens ein Eintrag je Person, Bereich und Viertelstunde), abgewiesene Rückmeldungen gesperrter Personen | 180 Tage |
+| Anmeldung (`auth`) | gescheiterte Anmeldungen (mit Grund, **ohne** Benutzernamen), abgelehnte Bestätigungen der Anmeldung (Step-up), Sperren der Drossel (höchstens ein Eintrag je Person, Bereich und Viertelstunde), abgewiesene Rückmeldungen gesperrter Personen, Beginn und Ende des Vorschaumodus (Klasse, Gruppe) | 180 Tage |
 | Verwaltung (`admin`) | Assistenten freigegeben, abgelehnt, aktiviert, deaktiviert, gelöscht; Modell-Freischaltung; Wochenbeträge und Zuschläge; Guardrail-Prompt; Site-Texte; Ferienkalender; beendete Sitzungen; Statuswechsel von Rückmeldungen | 2 Jahre |
 | Moderation (`moderation`) | Krisen-Flag angelegt (Kategorie und Schwere), Krisen-Flag erledigt | 1 Jahr |
 | System (`system`) | Ergebnisse der Löschläufe für Konten, Chats und Audit-Log sowie des Lebenszyklus im Kontextspeicher (Anzahlen) | 90 Tage |

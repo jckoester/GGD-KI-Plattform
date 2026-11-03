@@ -220,3 +220,15 @@
     Budget geändert oder Sitzungen beendet hat, dazu gescheiterte Anmeldungen, Krisen-Flags und
     die nächtlichen Löschläufe. Ohne Inhalte, Personen nur als Pseudonym; die Einträge lassen
     sich nicht ändern.
+
+- id: "0.29-vorschau"
+  version: "0.29.0"
+  datum: 2026-11-03
+  rollen: [teacher]
+  titel: "Als Schüler:in ansehen"
+  text: >-
+    Im Benutzermenü kannst du die Plattform jetzt eine Stunde lang so sehen, wie eine
+    Schüler:in deiner Gruppe sie sieht, und alles ausprobieren. Im Assistenten-Editor testest du
+    deinen Assistenten mit „Als Schüler:in testen“ direkt aus Schülersicht. Ändern lässt sich in
+    der Vorschau nichts.
+  link: /help/vorschau
