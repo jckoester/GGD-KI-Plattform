@@ -16,7 +16,7 @@ from app.core.hintergrund import im_hintergrund
 from app.db.session import AsyncSessionLocal, get_db
 from app.feedback import service
 from app.feedback.benachrichtigung import benachrichtige
-from app.feedback.schemas import FeedbackCreate, FeedbackOut
+from app.feedback.schemas import BekanntesProblemOut, FeedbackCreate, FeedbackOut
 from app.ratelimit.dependency import rate_limit
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -66,6 +66,19 @@ async def my_feedback(
     """Die eigenen Meldungen mit Status und Antwort — der Rückweg über das Pseudonym."""
     eintraege = await service.eigene(db, current_user.sub)
     return [service.nach_aussen(e) for e in eintraege]
+
+
+@router.get("/public")
+async def known_problems(
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[BekanntesProblemOut]:
+    """Bekannte Probleme (0.31): was die Sichtung öffentlich gemacht hat, für die eigene Rolle.
+
+    Maßgeblich sind die Rollen **im Token** — in der Vorschau also die simulierte Schülersicht.
+    """
+    eintraege = await service.bekannte(db, lehrkraft="teacher" in current_user.roles)
+    return [service.als_bekanntes_problem(e) for e in eintraege]
 
 
 @router.delete("/{feedback_id}")

@@ -66,6 +66,7 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "holidays_changed",
         "user_sessions_revoked",
         "feedback_status_changed",
+        "feedback_public_changed",
     }),
     "access": frozenset(),
     "moderation": frozenset({

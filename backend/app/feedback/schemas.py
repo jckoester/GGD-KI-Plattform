@@ -116,3 +116,15 @@ class FeedbackOut(BaseModel):
     has_snapshot: bool
     created_at: datetime
     status_changed_at: Optional[datetime] = None
+
+
+class BekanntesProblemOut(BaseModel):
+    """Ein bekanntes Problem (0.31): der Titel der Sichtung und der Stand — **ohne** den Text
+    der Meldung, ihre Kategorie, Rolle oder Version. Wer gemeldet hat, bleibt unsichtbar."""
+
+    id: UUID
+    title: str
+    status: Literal["open", "in_progress", "done"]
+    resolved_in_version: Optional[str] = None
+    #: Eingang (offen, in Arbeit) oder Behebung (erledigt).
+    seit: datetime

@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Feedback
 from app.feedback import snapshot
-from app.feedback.schemas import FeedbackCreate, FeedbackOut
+from app.feedback.schemas import BekanntesProblemOut, FeedbackCreate, FeedbackOut
 from app.core.audit import audit, audit_getrennt
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,16 @@ UEBERGAENGE: dict[str, frozenset[str]] = {
     ABGELEHNT: frozenset({OFFEN}),
     SPAM: frozenset({OFFEN}),
 }
+
+# ── Bekannte Probleme (0.31, Päckchen T) ─────────────────────────────────────────
+ALLE = "all"
+NUR_LEHRKRAEFTE = "teacher"
+ZIELGRUPPEN = frozenset({ALLE, NUR_LEHRKRAEFTE})
+# Behobene Einträge bleiben so lange stehen (Plan F2): Wer das Problem kannte, sieht, dass
+# es weg ist.
+BEHOBEN_SICHTBAR = timedelta(days=30)
+# Abgelehnt und Spam sind nie ein bekanntes Problem.
+NIE_OEFFENTLICH = frozenset({ABGELEHNT, SPAM})
 
 
 def _jetzt(jetzt: datetime | None) -> datetime:
@@ -275,9 +285,16 @@ async def aendere(
     resolved_in_version: str | None = None,
     issue_ref: str | None = None,
     keep_snapshot: bool = False,
+    public_title: str | None = None,
+    public_audience: str | None = None,
     jetzt: datetime | None = None,
 ) -> Feedback:
     """Der Statuswechsel der Sichtung — mit allem, was daran hängt.
+
+    **Bekanntes Problem** (0.31): `public_audience` ``all``/``teacher`` zeigt die Meldung mit
+    `public_title` öffentlich, ``none`` nimmt sie zurück, ``None`` lässt sie, wie sie ist. Wie
+    die Begründung wird der Titel gegen den Endzustand geprüft. Wird eine öffentliche Meldung
+    abgelehnt oder als Spam markiert, verschwindet sie aus der Liste; der Titel bleibt.
 
     **Was beim Abschluss fällt.** `contact` immer: Nach dem Abschluss gibt es nichts
     mehr nachzufragen, und es ist die einzige Spalte im System, die einen Klarnamen
@@ -307,12 +324,39 @@ async def aendere(
             detail="Für „nicht umgesetzt“ ist eine kurze Begründung erforderlich.",
         )
 
+    titel = public_title.strip() if public_title is not None else eintrag.public_title
+    zielgruppe_vorher = eintrag.public_audience
+    if public_audience is None:
+        zielgruppe = zielgruppe_vorher
+    else:
+        zielgruppe = None if public_audience == "none" else public_audience
+        if zielgruppe is not None and zielgruppe not in ZIELGRUPPEN:
+            raise HTTPException(status_code=422, detail=f"Unbekannte Zielgruppe: {public_audience}")
+    if ziel in NIE_OEFFENTLICH:
+        if public_audience not in (None, "none"):
+            raise HTTPException(
+                status_code=422,
+                detail="Eine abgelehnte Meldung kann kein bekanntes Problem sein.",
+            )
+        zielgruppe = None
+    if zielgruppe is not None and not titel:
+        raise HTTPException(
+            status_code=422, detail="Ein bekanntes Problem braucht einen Titel.",
+        )
+
     if admin_reply is not None:
         eintrag.admin_reply = admin_reply.strip() or None
     if resolved_in_version is not None:
         eintrag.resolved_in_version = resolved_in_version.strip() or None
     if issue_ref is not None:
         eintrag.issue_ref = issue_ref.strip() or None
+
+    eintrag.public_title = titel or None
+    eintrag.public_audience = zielgruppe
+    if zielgruppe != zielgruppe_vorher:
+        await audit(db, "admin", "feedback_public_changed", akteur=admin_pseudonym, rolle="admin",
+                    ziel=("feedback", feedback_id),
+                    daten={"von": zielgruppe_vorher, "nach": zielgruppe})
 
     if ziel != vorher:
         eintrag.status = ziel
@@ -333,3 +377,44 @@ async def aendere(
         admin_pseudonym, feedback_id, vorher, ziel, keep_snapshot,
     )
     return eintrag
+
+
+# ── Bekannte Probleme (0.31) ─────────────────────────────────────────────────────
+
+
+async def bekannte(
+    db: AsyncSession, *, lehrkraft: bool, jetzt: datetime | None = None,
+) -> list[Feedback]:
+    """Die öffentlichen Meldungen für eine Rolle: Offenes zuerst, dann kürzlich Behobenes.
+
+    Schüler:innen sehen nur Einträge für alle, Lehrkräfte (und Admins) auch die für
+    Lehrkräfte. Behobenes bleibt `BEHOBEN_SICHTBAR` nach dem Statuswechsel stehen.
+    """
+    jetzt = _jetzt(jetzt)
+    zielgruppen = [ALLE, NUR_LEHRKRAEFTE] if lehrkraft else [ALLE]
+    ergebnis = await db.execute(
+        select(Feedback).where(
+            Feedback.public_audience.in_(zielgruppen),
+            (Feedback.status.in_([OFFEN, IN_ARBEIT]))
+            | ((Feedback.status == ERLEDIGT)
+               & (Feedback.status_changed_at >= jetzt - BEHOBEN_SICHTBAR)),
+        )
+    )
+    eintraege = list(ergebnis.scalars().all())
+    # Offenes nach Eingang, Behobenes nach Behebung — jeweils neueste zuerst.
+    offen = sorted((e for e in eintraege if e.status != ERLEDIGT),
+                   key=lambda e: e.created_at, reverse=True)
+    behoben = sorted((e for e in eintraege if e.status == ERLEDIGT),
+                     key=lambda e: e.status_changed_at, reverse=True)
+    return offen + behoben
+
+
+def als_bekanntes_problem(eintrag: Feedback) -> BekanntesProblemOut:
+    """Nur, was der Admin für die Öffentlichkeit geschrieben hat — nie der Text der Meldung."""
+    return BekanntesProblemOut(
+        id=eintrag.id,
+        title=eintrag.public_title or "",
+        status=eintrag.status,
+        resolved_in_version=eintrag.resolved_in_version if eintrag.status == ERLEDIGT else None,
+        seit=eintrag.status_changed_at if eintrag.status == ERLEDIGT else eintrag.created_at,
+    )

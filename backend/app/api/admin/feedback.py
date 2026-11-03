@@ -61,6 +61,8 @@ class FeedbackAdminOut(BaseModel):
     has_snapshot: bool
     created_at: datetime
     status_changed_at: Optional[datetime] = None
+    public_title: Optional[str] = None  # bekanntes Problem (0.31)
+    public_audience: Optional[str] = None  # all | teacher | leer
 
 
 class FeedbackAdminDetail(FeedbackAdminOut):
@@ -82,6 +84,9 @@ class FeedbackPatch(BaseModel):
     resolved_in_version: Optional[str] = Field(None, max_length=50)
     issue_ref: Optional[str] = Field(None, max_length=200)
     keep_snapshot: bool = False
+    # Bekanntes Problem (0.31): Zielgruppe `none` nimmt die Meldung aus der Liste.
+    public_title: Optional[str] = Field(None, max_length=200)
+    public_audience: Optional[Literal["all", "teacher", "none"]] = None
 
 
 def _nach_aussen(eintrag: Feedback, *, mit_anhang: bool = False):
@@ -107,6 +112,8 @@ def _nach_aussen(eintrag: Feedback, *, mit_anhang: bool = False):
         "has_snapshot": eintrag.conversation_snapshot is not None,
         "created_at": eintrag.created_at,
         "status_changed_at": eintrag.status_changed_at,
+        "public_title": eintrag.public_title,
+        "public_audience": eintrag.public_audience,
     }
     if mit_anhang:
         return FeedbackAdminDetail(conversation_snapshot=eintrag.conversation_snapshot, **felder)
@@ -184,7 +191,7 @@ async def patch_feedback(
     current_user: JwtPayload = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ) -> FeedbackAdminDetail:
-    """Status, Antwort, Version, Issue-Referenz.
+    """Status, Antwort, Version, Issue-Referenz, bekanntes Problem.
 
     Die Regeln stehen in `app/feedback/service.py`, nicht hier: Sie gelten für die
     Meldung, nicht für diesen Endpunkt.
@@ -198,5 +205,7 @@ async def patch_feedback(
         resolved_in_version=aenderung.resolved_in_version,
         issue_ref=aenderung.issue_ref,
         keep_snapshot=aenderung.keep_snapshot,
+        public_title=aenderung.public_title,
+        public_audience=aenderung.public_audience,
     )
     return _nach_aussen(eintrag, mit_anhang=True)
