@@ -34,6 +34,7 @@
         activeConversationAssistantId,
         activeConversationId,
     } from "$lib/stores/pageTitle.js";
+    import BekannteProbleme from "$lib/components/BekannteProbleme.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
@@ -163,7 +164,10 @@
                 <ErrorBanner message={fehler} />
             {/if}
 
-            <fieldset class="mt-2">
+            <!-- Bekannte Probleme (0.31): vor dem Schreiben, gegen Doppelmeldungen. -->
+            <BekannteProbleme kompakt />
+
+            <fieldset class="mt-4">
                 <legend class="text-sm font-medium text-light-tx dark:text-dark-tx">
                     Worum geht es?
                 </legend>

@@ -2908,6 +2908,17 @@ export async function withdrawFeedback(id) {
   return res.json();
 }
 
+// Bekannte Probleme (0.31): Titel und Stand, die die Sichtung öffentlich gemacht hat —
+// gefiltert nach der eigenen Rolle.
+export async function getKnownProblems() {
+  const res = await fetch(`${BASE}/feedback/public`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
 // Admin: der Eingang. Ohne `status` liefert der Server, was Arbeit macht
 // (offen + in Bearbeitung). `counts` folgt den übrigen Filtern, nicht dem Status.
 export async function getAdminFeedback({
@@ -2998,8 +3009,9 @@ export async function unparkEintrag(id, toSlotId) {
 
 
 /** Hinweise auf Neuerungen für die eigene Rolle (Startseite, 0.17). */
-export async function getNeuigkeiten() {
-    const res = await fetch(`${BASE}/neuigkeiten`, { credentials: 'include' })
+// `alle`: auch weggeklickte — die Übersicht „Was ist neu“ auf /feedback (0.31).
+export async function getNeuigkeiten({ alle = false } = {}) {
+    const res = await fetch(`${BASE}/neuigkeiten${alle ? '?alle=true' : ''}`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, 'Hinweise konnten nicht geladen werden')
     return res.json()
 }

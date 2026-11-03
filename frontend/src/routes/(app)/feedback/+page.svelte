@@ -6,10 +6,15 @@
      * Seite: Wer etwas gemeldet hat, sieht hier, was daraus geworden ist. Deshalb
      * schließen sich Anonymität und Rückmeldung nicht aus — der Weg läuft über das
      * Pseudonym, das die Sitzung ohnehin trägt.
+     *
+     * Darüber (0.31, Päckchen T): die **bekannten Probleme**, die die Sichtung öffentlich
+     * gemacht hat, und **„Was ist neu“** — die laufenden Neuigkeiten der eigenen Rolle, auch
+     * weggeklickte (Plan F3: die Neuigkeiten statt eines Auszugs aus dem CHANGELOG, der für
+     * Admins geschrieben ist).
      */
     import { onMount } from "svelte";
     import { Loader2 } from "lucide-svelte";
-    import { getMyFeedback, withdrawFeedback } from "$lib/api.js";
+    import { getMyFeedback, getNeuigkeiten, withdrawFeedback } from "$lib/api.js";
     import {
         feedbackFehlertext,
         kategorieText,
@@ -17,6 +22,7 @@
         statusText,
     } from "$lib/feedback.js";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
+    import BekannteProbleme from "$lib/components/BekannteProbleme.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let meldungen = $state([]);
@@ -37,6 +43,14 @@
     }
 
     onMount(laden);
+
+    // Fehlt die Antwort, fehlt nur der Abschnitt.
+    let neuigkeiten = $state([]);
+    onMount(() => {
+        getNeuigkeiten({ alle: true })
+            .then((d) => (neuigkeiten = d))
+            .catch(() => {});
+    });
 
     async function zurueckziehen(eintrag) {
         zieheZurueck = eintrag.id;
@@ -67,6 +81,35 @@
         {#if fehler}
             <ErrorBanner message={fehler} />
         {/if}
+
+        <section aria-labelledby="bekannte-probleme" class="mb-8">
+            <h2 id="bekannte-probleme" class="mb-3 text-base font-semibold text-light-tx dark:text-dark-tx">
+                Bekannte Probleme
+            </h2>
+            <BekannteProbleme />
+        </section>
+
+        {#if neuigkeiten.length > 0}
+            <section aria-labelledby="was-ist-neu" class="mb-8">
+                <h2 id="was-ist-neu" class="mb-3 text-base font-semibold text-light-tx dark:text-dark-tx">
+                    Was ist neu
+                </h2>
+                <ul class="space-y-2">
+                    {#each neuigkeiten as n (n.id)}
+                        <li class="text-sm text-light-tx dark:text-dark-tx">
+                            <span class="font-medium">{n.titel}</span> — {n.text}
+                            {#if n.link}
+                                <a href={n.link} class="underline text-light-bl dark:text-dark-bl">Mehr dazu</a>
+                            {/if}
+                        </li>
+                    {/each}
+                </ul>
+            </section>
+        {/if}
+
+        <h2 class="mb-3 text-base font-semibold text-light-tx dark:text-dark-tx">
+            Meine Meldungen
+        </h2>
 
         {#if laedt}
             <div class="flex items-center gap-2 py-12 text-light-tx-2 dark:text-dark-tx-2">

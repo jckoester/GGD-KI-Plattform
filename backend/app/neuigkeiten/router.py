@@ -1,7 +1,7 @@
 """Hinweise auf Neuerungen: lesen und wegklicken (`app/neuigkeiten/quelle.py`)."""
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,16 +26,20 @@ class NeuigkeitRead(BaseModel):
 
 @router.get("", response_model=list[NeuigkeitRead])
 async def meine_neuigkeiten(
+    # „Was ist neu“ auf `/feedback` (0.31, Päckchen T, Plan F3): auch weggeklickte Hinweise
+    # und solche von vor dem eigenen Konto — eine Übersicht, keine Erinnerung. Rolle, Stufe
+    # und Laufzeit gelten weiter.
+    alle_laufenden: bool = Query(False, alias="alle"),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[NeuigkeitRead]:
-    konto_seit = (await db.execute(
+    konto_seit = None if alle_laufenden else (await db.execute(
         select(PseudonymAudit.created_at).where(PseudonymAudit.pseudonym == current_user.sub)
     )).scalar_one_or_none()
     liste = sichtbar(
         alle(),
         rollen=list(current_user.roles),
-        gelesen=await neuigkeiten_gelesen(db, current_user.sub),
+        gelesen=set() if alle_laufenden else await neuigkeiten_gelesen(db, current_user.sub),
         konto_seit=konto_seit,
         stufe=await ui_stufe(db, current_user.sub, list(current_user.roles)),
         stufen=load_ui_levels(),

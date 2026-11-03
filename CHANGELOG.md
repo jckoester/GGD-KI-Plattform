@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Bekannte Probleme:** Die Administration kann eine Meldung mit eigenem Titel als bekanntes Problem zeigen — für alle
+  oder nur für Lehrkräfte; der Text der Meldung bleibt intern. Die Liste steht im Feedback-Dialog („Schon bekannt“) und
+  unter „Meine Meldungen“; behobene Einträge bleiben 30 Tage stehen.
+- „Meine Meldungen“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
+- Audit-Log: bekanntes Problem gezeigt oder zurückgenommen.
+
 ## [0.30.0] – 2026-11-03
 
 Strukturformeln im Chat, lesbare Formelfehler und eine Reparatur aus 0.29.0. Eine Migration (0100).

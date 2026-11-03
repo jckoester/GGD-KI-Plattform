@@ -11,11 +11,15 @@ import {
     MAX_LAENGE,
     MIN_LAENGE,
     baueNutzlast,
+    bekanntStatusText,
     fehlendeZeichen,
     feedbackFehlertext,
     istAbsendbar,
+    kannOeffentlichSein,
     kategorieText,
     modellText,
+    oeffentlichFehlt,
+    oeffentlichNutzlast,
     sammleKontext,
     statusText,
 } from "./feedback.js";
@@ -168,5 +172,37 @@ describe("modellText", () => {
     it("zeigt einen Strich ohne Modell", () => {
         expect(modellText({})).toBe("—");
         expect(modellText({ model: null, provider_model: null })).toBe("—");
+    });
+});
+
+describe("Bekannte Probleme (0.31)", () => {
+    it("verlangt einen Titel, sobald die Meldung öffentlich ist", () => {
+        expect(oeffentlichFehlt({ zielgruppe: "all", titel: "  ", status: "open" })).toMatch(/Titel/);
+        expect(oeffentlichFehlt({ zielgruppe: "teacher", titel: "PDF", status: "open" })).toBeNull();
+        expect(oeffentlichFehlt({ zielgruppe: "none", titel: "", status: "open" })).toBeNull();
+    });
+
+    it("abgelehnt und Spam sind nie öffentlich — auch ohne Titel kein Hindernis", () => {
+        for (const status of ["declined", "spam"]) {
+            expect(kannOeffentlichSein(status)).toBe(false);
+            expect(oeffentlichFehlt({ zielgruppe: "all", titel: "", status })).toBeNull();
+            expect(oeffentlichNutzlast({ zielgruppe: "all", titel: "X", status }).public_audience)
+                .toBe("none");
+        }
+    });
+
+    it("schickt den Titel getrimmt und eine leere Zielgruppe als none", () => {
+        expect(oeffentlichNutzlast({ zielgruppe: "", titel: " PDF ", status: "open" }))
+            .toEqual({ public_title: "PDF", public_audience: "none" });
+        expect(oeffentlichNutzlast({ zielgruppe: "teacher", titel: "PDF", status: "done" }))
+            .toEqual({ public_title: "PDF", public_audience: "teacher" });
+    });
+
+    it("beschriftet den Stand", () => {
+        expect(bekanntStatusText({ status: "open" })).toBe("Bekannt");
+        expect(bekanntStatusText({ status: "in_progress" })).toBe("Wird bearbeitet");
+        expect(bekanntStatusText({ status: "done", resolved_in_version: "0.31.1" }))
+            .toBe("Behoben in 0.31.1");
+        expect(bekanntStatusText({ status: "done" })).toBe("Behoben");
     });
 });

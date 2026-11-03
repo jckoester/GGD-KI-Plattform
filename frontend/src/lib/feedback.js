@@ -127,3 +127,51 @@ export function feedbackFehlertext(err) {
     if (typeof eigener === "string" && eigener.trim()) return eigener;
     return "Die Meldung konnte nicht gesendet werden.";
 }
+
+// ── Bekannte Probleme (0.31, Päckchen T) ─────────────────────────────────────────
+
+/** Die Zielgruppen, wie die Sichtung sie wählt. `none` = nicht öffentlich. */
+export const ZIELGRUPPEN = [
+    { wert: "none", label: "Nicht öffentlich" },
+    { wert: "all", label: "Für alle sichtbar" },
+    { wert: "teacher", label: "Nur für Lehrkräfte sichtbar" },
+];
+
+/** Muss mit `public_title` in `app/api/admin/feedback.py` übereinstimmen. */
+export const MAX_TITEL = 200;
+
+/** Abgelehnt und Spam sind nie ein bekanntes Problem — der Server nimmt sie heraus. */
+export function kannOeffentlichSein(status) {
+    return status !== "declined" && status !== "spam";
+}
+
+/**
+ * Was dem Speichern in der Sichtung noch fehlt — oder `null`. Dieselbe Regel wie im Server
+ * (`service.aendere`): Eine öffentliche Meldung braucht einen Titel.
+ */
+export function oeffentlichFehlt({ zielgruppe, titel, status }) {
+    if (!zielgruppe || zielgruppe === "none" || !kannOeffentlichSein(status)) return null;
+    return (titel ?? "").trim() ? null : "Für ein bekanntes Problem fehlt noch der Titel.";
+}
+
+/** Was `PATCH /admin/feedback/{id}` zum bekannten Problem mitbekommt. */
+export function oeffentlichNutzlast({ zielgruppe, titel, status }) {
+    return {
+        public_title: (titel ?? "").trim(),
+        public_audience: kannOeffentlichSein(status) ? (zielgruppe || "none") : "none",
+    };
+}
+
+/** Der Stand eines bekannten Problems, wie alle ihn lesen. */
+export function bekanntStatusText(eintrag) {
+    switch (eintrag?.status) {
+        case "in_progress":
+            return "Wird bearbeitet";
+        case "done":
+            return eintrag.resolved_in_version
+                ? `Behoben in ${eintrag.resolved_in_version}`
+                : "Behoben";
+        default:
+            return "Bekannt";
+    }
+}

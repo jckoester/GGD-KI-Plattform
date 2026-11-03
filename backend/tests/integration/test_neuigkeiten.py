@@ -93,3 +93,19 @@ async def test_neues_konto_sieht_alte_hinweise_nicht(test_client, umgebung, asyn
             text("INSERT INTO pseudonym_audit (pseudonym, role, created_at) VALUES (:p, 'student', :t)"),
             {"p": NEU_PSEUDO, "t": datetime.now(timezone.utc)})
     assert await _ids(test_client, _kopf(jwt_service, NEU_PSEUDO, ["student"], "8")) == []
+
+
+
+async def test_alle_zeigt_auch_weggeklickte(test_client, umgebung, async_engine, jwt_service,
+                                            auth_headers_student):
+    """„Was ist neu“ auf /feedback (0.31): Übersicht statt Erinnerung — Rolle gilt weiter."""
+    await test_client.post("/neuigkeiten/t-alle/gelesen", headers=auth_headers_student)
+    resp = await test_client.get("/neuigkeiten?alle=true", headers=auth_headers_student)
+    assert [n["id"] for n in resp.json()] == ["t-alle"]
+    async with async_engine.begin() as conn:
+        await conn.execute(
+            text("INSERT INTO pseudonym_audit (pseudonym, role, created_at) VALUES (:p, 'student', :t)"),
+            {"p": NEU_PSEUDO, "t": datetime.now(timezone.utc)})
+    kopf = _kopf(jwt_service, NEU_PSEUDO, ["student"], "8")
+    resp = await test_client.get("/neuigkeiten?alle=true", headers=kopf)
+    assert [n["id"] for n in resp.json()] == ["t-alle"], "auch vor dem eigenen Konto"

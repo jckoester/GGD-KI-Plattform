@@ -18,7 +18,17 @@
         getAdminFeedbackDetail,
         patchAdminFeedback,
     } from "$lib/api.js";
-    import { feedbackFehlertext, kategorieText, modellText, statusFarbe } from "$lib/feedback.js";
+    import {
+        MAX_TITEL,
+        ZIELGRUPPEN,
+        feedbackFehlertext,
+        kannOeffentlichSein,
+        kategorieText,
+        modellText,
+        oeffentlichFehlt,
+        oeffentlichNutzlast,
+        statusFarbe,
+    } from "$lib/feedback.js";
     import { refreshFeedbackAlerts } from "$lib/stores/feedbackAlerts.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -54,10 +64,16 @@
     let erledigtIn = $state("");
     let issueRef = $state("");
     let anhangBehalten = $state(false);
+    // Bekanntes Problem (0.31): Zielgruppe none/all/teacher und der öffentliche Titel.
+    let zielgruppe = $state("none");
+    let oeffentlicherTitel = $state("");
     let speichert = $state(false);
 
     const schliesstAb = $derived(ABGESCHLOSSEN.includes(neuerStatus));
     const brauchtBegruendung = $derived(neuerStatus === "declined" && !antwort.trim());
+    const titelFehlt = $derived(
+        oeffentlichFehlt({ zielgruppe, titel: oeffentlicherTitel, status: neuerStatus }),
+    );
 
     async function laden() {
         laedt = true;
@@ -104,6 +120,8 @@
         erledigtIn = eintrag.resolved_in_version ?? "";
         issueRef = eintrag.issue_ref ?? "";
         anhangBehalten = false;
+        zielgruppe = eintrag.public_audience ?? "none";
+        oeffentlicherTitel = eintrag.public_title ?? "";
         if (!eintrag.has_snapshot) return;
         detailLaedt = true;
         try {
@@ -124,6 +142,11 @@
                 resolved_in_version: erledigtIn,
                 issue_ref: issueRef,
                 keep_snapshot: anhangBehalten,
+                ...oeffentlichNutzlast({
+                    zielgruppe,
+                    titel: oeffentlicherTitel,
+                    status: neuerStatus,
+                }),
             });
             fehler = null;
             offenerEintrag = null;
@@ -251,6 +274,16 @@
                                     {#if e.has_snapshot}· mit Chat{/if}
                                     {#if e.issue_ref}· {e.issue_ref}{/if}
                                 </span>
+                                {#if e.public_audience}
+                                    <span
+                                        class="text-xs px-2 py-0.5 rounded-full border
+                                               text-light-tx dark:text-dark-tx
+                                               border-light-bl dark:border-dark-bl"
+                                        title={e.public_title}
+                                    >
+                                        {e.public_audience === "teacher" ? "Bekannt (Lehrkräfte)" : "Bekannt"}
+                                    </span>
+                                {/if}
                             </span>
                             <span
                                 class="mt-1 block truncate text-sm text-light-tx dark:text-dark-tx"
@@ -366,6 +399,47 @@
                                            border-light-ui-3 dark:border-dark-ui-3"
                                 ></textarea>
 
+                                <!-- Bekanntes Problem (0.31) -->
+                                {#if kannOeffentlichSein(neuerStatus)}
+                                    <div class="space-y-1">
+                                        <div class="flex flex-wrap gap-2">
+                                            <select
+                                                bind:value={zielgruppe}
+                                                aria-label="Als bekanntes Problem zeigen"
+                                                class="rounded-lg border px-2 py-1 text-sm
+                                                       bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
+                                                       border-light-ui-3 dark:border-dark-ui-3"
+                                            >
+                                                {#each ZIELGRUPPEN as z (z.wert)}
+                                                    <option value={z.wert}>{z.label}</option>
+                                                {/each}
+                                            </select>
+                                            {#if zielgruppe !== "none"}
+                                                <input
+                                                    bind:value={oeffentlicherTitel}
+                                                    maxlength={MAX_TITEL}
+                                                    placeholder="Öffentlicher Titel, z. B. „Formeln im PDF verrutschen“"
+                                                    aria-label="Öffentlicher Titel"
+                                                    class="flex-1 min-w-48 rounded-lg border px-2 py-1 text-sm
+                                                           bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
+                                                           border-light-ui-3 dark:border-dark-ui-3"
+                                                />
+                                            {/if}
+                                        </div>
+                                        {#if zielgruppe !== "none"}
+                                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                                Erscheint unter „Bekannte Probleme“ und im Feedback-Dialog —
+                                                nur dieser Titel, nie der Text der Meldung. Bitte ohne Namen.
+                                                Nach „Erledigt“ bleibt der Eintrag 30 Tage als behoben stehen.
+                                            </p>
+                                        {/if}
+                                    </div>
+                                {:else if zielgruppe !== "none"}
+                                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                        Abgelehnte Meldungen erscheinen nicht unter „Bekannte Probleme“.
+                                    </p>
+                                {/if}
+
                                 {#if schliesstAb && e.has_snapshot}
                                     <label class="flex items-start gap-2">
                                         <input
@@ -388,10 +462,12 @@
                                         <span class="text-xs text-light-tx dark:text-dark-tx">
                                             Für „Nicht umgesetzt“ fehlt noch eine Begründung.
                                         </span>
+                                    {:else if titelFehlt}
+                                        <span class="text-xs text-light-tx dark:text-dark-tx">{titelFehlt}</span>
                                     {/if}
                                     <button
                                         onclick={() => speichern(e)}
-                                        disabled={speichert || brauchtBegruendung}
+                                        disabled={speichert || brauchtBegruendung || !!titelFehlt}
                                         class="px-3 py-1.5 text-sm rounded-lg inline-flex items-center gap-2
                                                bg-primary dark:bg-primary-dark text-white
                                                disabled:opacity-50 disabled:cursor-not-allowed"
