@@ -174,8 +174,12 @@ eine Erweiterung dort wirkt überall. Pipeline: `marked` → `DOMPurify.sanitize
 
 - KaTeX als **marked-Extension** (Tokenizer) — respektiert den Code-Kontext, d. h. Formeln
   in Inline-Code/```-Blöcken bleiben Quelltext. Delimiter: `\(…\)`/`\[…\]` und `$…$`/`$$…$$`.
-  `throwOnError: false`, damit unvollständige (Streaming) oder fehlerhafte Formeln das
-  Rendering nicht brechen.
+  Eine Formel, die KaTeX nicht versteht (`ParseError`), bricht das Rendering nicht, sondern
+  wird zur Fehleranzeige (seit 0.30): abgesetzt „Formel nicht darstellbar“ mit der Quelle in
+  einem zugeklappten `<details class="formel-fehler">`, im Fließtext die Quelle als
+  `<code class="formel-fehler">` mit der Meldung im `title`. Unvollständige Formeln beim
+  Streamen erreichen KaTeX gar nicht — die Tokenizer greifen erst beim schließenden Delimiter.
+  `renderInlineMath` (Titel) bleibt bei `throwOnError: false`.
 - **Chemie:** `import 'katex/contrib/mhchem'` registriert `\ce{}`/`\pu{}` (Reaktionsgleichungen).
 - **Sicherheit — „protect-and-reinsert":** Die von KaTeX **erzeugte** Ausgabe ist
   vertrauenswürdig (KaTeX parst TeX, schleust kein HTML durch; `trust:false`-Default) und soll

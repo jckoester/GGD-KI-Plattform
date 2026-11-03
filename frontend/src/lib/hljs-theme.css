@@ -277,3 +277,32 @@ section.footnotes {
 .dark .hljs-meta .hljs-keyword {
     color: var(--color-yellow-400);
 }
+
+/* Formel, die KaTeX nicht versteht (0.30, Schritt 6): Hinweis statt roter TeX-Wand */
+details.formel-fehler {
+    margin: 0.5rem 0;
+}
+
+details.formel-fehler summary {
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--color-light-re, #b00);
+}
+
+.dark details.formel-fehler summary {
+    color: var(--color-dark-re, #e66);
+}
+
+details.formel-fehler pre {
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    margin-top: 0.25rem;
+}
+
+code.formel-fehler {
+    text-decoration: underline wavy var(--color-light-re, #b00);
+}
+
+.dark code.formel-fehler {
+    text-decoration-color: var(--color-dark-re, #e66);
+}

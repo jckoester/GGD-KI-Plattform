@@ -446,3 +446,41 @@ describe('ohneFett (Schüler-Assistenten, 0.26 B1)', () => {
         expect(renderMarkdown('**wichtig**')).toContain('<strong>wichtig</strong>');
     });
 });
+
+describe('renderMarkdown — Formel, die KaTeX nicht versteht (0.30)', () => {
+    // Der Fall von Prod (02.11.2026): TikZ in einer abgesetzten Formel.
+    const tikz = 'Phenolat:\n\n\\[\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,0);\n\\end{tikzpicture}\n\\]'
+
+    it('abgesetzt: Hinweis und Quelle zum Aufklappen statt roter TeX-Wand', () => {
+        const dom = document.createElement('div')
+        dom.innerHTML = renderMarkdown(tikz)
+        const details = dom.querySelector('details.formel-fehler')
+        expect(details).not.toBeNull()
+        expect(details.querySelector('summary').textContent).toBe('Formel nicht darstellbar')
+        expect(details.querySelector('pre').textContent).toContain('\\begin{tikzpicture}')
+        expect(details.open).toBe(false)
+        expect(details.getAttribute('title')).toMatch(/tikzpicture/)
+        expect(dom.querySelector('.katex-error')).toBeNull()
+    })
+
+    it('im Fließtext: markierte Quelle, Absatz bleibt ganz', () => {
+        const dom = document.createElement('div')
+        dom.innerHTML = renderMarkdown('Vorher $\\gibtsnicht{x}$ nachher.')
+        expect(dom.querySelectorAll('p')).toHaveLength(1)
+        const code = dom.querySelector('p > code.formel-fehler')
+        expect(code.textContent).toBe('$\\gibtsnicht{x}$')
+        expect(code.getAttribute('title')).toMatch(/^Formel nicht darstellbar/)
+    })
+
+    it('escapet die Quelle', () => {
+        const html = renderMarkdown('\\[ \\fehler <img src=x onerror=alert(1)> \\]')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('&lt;img')
+    })
+
+    it('eine gültige Formel daneben rendert weiter', () => {
+        const html = renderMarkdown('$x^2$ und $\\gibtsnicht$')
+        expect(html).toContain('class="katex"')
+        expect(html).toContain('formel-fehler')
+    })
+})

@@ -187,8 +187,44 @@ function katexHtml(tex, display) {
     }
 }
 
+/**
+ * Lesbare Anzeige einer Formel, die KaTeX nicht versteht (0.30, Schritt 6).
+ *
+ * Mit `throwOnError: false` setzt KaTeX die ganze Quelle rot in die Antwort — bei einer
+ * abgesetzten Formel mit `tikzpicture` darin eine Wand aus TeX (Prod, 02.11.2026). Statt
+ * dessen: ein Hinweis und die Quelle zum Aufklappen. Im Fließtext bleibt die (meist kurze)
+ * Quelle sichtbar, markiert; ein `<details>` würde dort den Absatz aufbrechen.
+ */
+function formelFehlerHtml(tex, display, meldung) {
+    const titel = escapeAttr(`Formel nicht darstellbar: ${meldung}`);
+    if (!display) {
+        return `<code class="formel-fehler" title="${titel}">${escapeHtml('$' + tex + '$')}</code>`;
+    }
+    return (
+        `<details class="formel-fehler" title="${titel}">` +
+        '<summary>Formel nicht darstellbar</summary>' +
+        `<pre>${escapeHtml(tex.trim())}</pre></details>`
+    );
+}
+
+/** Wie `katexHtml`, aber eine fehlerhafte Formel wird zur lesbaren Fehleranzeige. */
+function katexOderFehler(tex, display) {
+    try {
+        return katex.renderToString(tex, {
+            displayMode: !!display,
+            throwOnError: true,
+            output: 'htmlAndMathml',
+        });
+    } catch (e) {
+        if (e instanceof katex.ParseError) {
+            return formelFehlerHtml(tex, display, String(e.rawMessage ?? e.message).slice(0, 200));
+        }
+        return null;
+    }
+}
+
 function renderKatexPlaceholder(tex, display) {
-    const html = katexHtml(tex, display);
+    const html = katexOderFehler(tex, display);
     if (html === null) {
         // Rohtext zurückgeben — DOMPurify escapet ihn im weiteren Verlauf.
         const d = display ? '$$' : '$';
