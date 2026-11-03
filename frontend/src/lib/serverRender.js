@@ -21,6 +21,7 @@ const BASE = '/api';
 const BLOCK_KINDS = {
     'circuit-block': 'circuit',
     'plot-block': 'plot',
+    'smiles-block': 'smiles',
 };
 
 const SELECTOR = Object.keys(BLOCK_KINDS)

@@ -138,6 +138,11 @@ renderer.code = function({ text, lang }) {
     if (langNorm === 'plot') {
         return `<div class="plot-block">${escapeHtml(text)}</div>`;
     }
+    // Strukturformel (0.30, Päckchen AH): ```smiles-Block → Platzhalter; der Server zeichnet
+    // mit RDKit (POST /render/smiles), samt berechneter freier Elektronenpaare.
+    if (langNorm === 'smiles') {
+        return `<div class="smiles-block">${escapeHtml(text)}</div>`;
+    }
     const language = lang && hljs.getLanguage(lang) ? lang : null;
     const highlighted = language
         ? hljs.highlight(text, { language }).value

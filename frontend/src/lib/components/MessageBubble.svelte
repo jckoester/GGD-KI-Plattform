@@ -155,10 +155,12 @@
     // Server-/Client-gerenderte Diagramme (circuit/plot/mermaid) bekommen einen
     // „In Bibliothek speichern"-Knopf, sobald sie erfolgreich zu SVG gerendert wurden.
     // Die Rohquelle liegt in `data-source` (von serverRender.js/diagrams.js gestasht).
-    const DIAGRAM_KIND = { 'circuit-block': 'circuit', 'plot-block': 'plot', 'mermaid-block': 'mermaid' };
+    const DIAGRAM_KIND = {
+        'circuit-block': 'circuit', 'plot-block': 'plot', 'smiles-block': 'smiles', 'mermaid-block': 'mermaid',
+    };
     function libraryButtons(node) {
         function attach() {
-            node.querySelectorAll('.circuit-block, .plot-block, .mermaid-block').forEach((block) => {
+            node.querySelectorAll('.circuit-block, .plot-block, .smiles-block, .mermaid-block').forEach((block) => {
                 if (block.hasAttribute('data-lib-attached')) return;
                 if (!block.dataset.source) return;        // Rohquelle noch nicht gestasht
                 if (!block.querySelector('svg')) return;   // noch nicht erfolgreich gerendert

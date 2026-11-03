@@ -808,7 +808,7 @@ class Artifact(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     owner_pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
-    kind: Mapped[str] = mapped_column(Text, nullable=False)  # image | circuit | plot | mermaid | ggb | (document …)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)  # image | circuit | plot | smiles | mermaid | ggb | (document …)
     mime_type: Mapped[str] = mapped_column(Text, nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)

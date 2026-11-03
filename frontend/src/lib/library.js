@@ -10,6 +10,7 @@ export const KIND_LABELS = {
     image: 'Bild',
     circuit: 'Schaltplan',
     plot: 'Funktionsgraph',
+    smiles: 'Strukturformel',
     mermaid: 'Diagramm',
     ggb: 'GeoGebra',
     document: 'Dokument',
@@ -38,7 +39,7 @@ export function mimeExt(mime) {
 }
 
 // Dateiendung für den rohen Quelltext (Prompt bzw. Diagramm-Code).
-const CODE_EXT = { circuit: 'tex', plot: 'yaml', mermaid: 'mmd', image: 'txt' };
+const CODE_EXT = { circuit: 'tex', plot: 'yaml', smiles: 'smi', mermaid: 'mmd', image: 'txt' };
 
 export function codeExt(kind) {
     return CODE_EXT[kind] ?? 'txt';

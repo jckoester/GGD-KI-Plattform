@@ -32,6 +32,7 @@ export const SVG_DATEINAME = {
     mermaid: 'diagramm.svg',
     circuit: 'schaltplan.svg',
     plot: 'funktionsgraph.svg',
+    smiles: 'strukturformel.svg',
 };
 
 /**

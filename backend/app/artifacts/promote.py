@@ -61,10 +61,11 @@ async def herkunft_der_nachricht(
 _DIAGRAM_DEFAULT_TITLE = {
     "circuit": "Schaltplan",
     "plot": "Funktionsgraph",
+    "smiles": "Strukturformel",
     "mermaid": "Diagramm",
 }
-_SERVER_RENDER_KINDS = ("circuit", "plot")
-DIAGRAM_KINDS = ("circuit", "plot", "mermaid")
+_SERVER_RENDER_KINDS = ("circuit", "plot", "smiles")
+DIAGRAM_KINDS = ("circuit", "plot", "smiles", "mermaid")
 
 
 def _title(explicit: Optional[str], default: str) -> str:

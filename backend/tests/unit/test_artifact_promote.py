@@ -158,6 +158,24 @@ async def test_promote_diagram_plot_title(monkeypatch):
     assert captured["title"] == "Funktionsgraph"
 
 
+async def test_promote_diagram_smiles_wird_serverseitig_gerendert(monkeypatch):
+    """Strukturformel (0.30): wie Schaltplan und Graph — der Server zeichnet aus der Quelle,
+    ein mitgeschicktes SVG wird nicht gebraucht."""
+    render = AsyncMock(return_value={"svg": "<svg>mol</svg>", "error": None})
+    monkeypatch.setattr(promote.service, "render", render)
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    await promote.promote_diagram(object(), user=_user(), kind="smiles", source="CCO")
+    assert captured["title"] == "Strukturformel"
+    assert render.await_args.args[1:] == ("smiles", "CCO")
+
+
 async def test_promote_diagram_render_error(monkeypatch):
     monkeypatch.setattr(
         promote.service, "render",

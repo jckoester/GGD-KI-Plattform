@@ -8,6 +8,7 @@ describe('kindLabel', () => {
         expect(kindLabel('image')).toBe('Bild');
         expect(kindLabel('circuit')).toBe('Schaltplan');
         expect(kindLabel('plot')).toBe('Funktionsgraph');
+        expect(kindLabel('smiles')).toBe('Strukturformel');
         expect(kindLabel('mermaid')).toBe('Diagramm');
     });
     it('kennt Dokument- und Export-Arten', () => {
@@ -34,6 +35,7 @@ describe('mimeExt / codeExt', () => {
     it('mappt kind auf Code-Endung', () => {
         expect(codeExt('circuit')).toBe('tex');
         expect(codeExt('plot')).toBe('yaml');
+        expect(codeExt('smiles')).toBe('smi');
         expect(codeExt('mermaid')).toBe('mmd');
         expect(codeExt('image')).toBe('txt');
         expect(codeExt('unbekannt')).toBe('txt');

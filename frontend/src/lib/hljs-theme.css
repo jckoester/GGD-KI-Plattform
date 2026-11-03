@@ -15,17 +15,28 @@
     margin-bottom: 0.25rem;
 }
 
-/* Server-gerenderte Blöcke (Phase 17): CircuiTikZ-Schaltpläne, später Plots */
+/* Server-gerenderte Blöcke (Phase 17): CircuiTikZ-Schaltpläne, Plots, Strukturformeln (0.30) */
 .circuit-block,
-.plot-block {
+.plot-block,
+.smiles-block {
     margin: 0.75rem 0;
     text-align: center;
 }
 
 .circuit-block svg,
-.plot-block svg {
+.plot-block svg,
+.smiles-block svg {
     max-width: 100%;
     height: auto;
+}
+
+/* Strukturformeln zeichnet RDKit schwarz, mit farbigen Heteroatomen (O rot, N blau …).
+   Umfärben ginge auf Kosten dieser Farben, die Bedeutung tragen — deshalb im Dunkelmodus
+   eine helle Karte hinter dem Bild (Plan 0.30, Schritt 2). */
+.dark .smiles-block > svg {
+    background: var(--color-light-bg, #fffcf0);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
 }
 
 .server-render-loading {

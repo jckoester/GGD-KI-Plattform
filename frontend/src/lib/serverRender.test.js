@@ -36,6 +36,13 @@ describe('renderMarkdown: ```circuitikz-Platzhalter', () => {
     expect(html).not.toContain('circuit-block')
   })
 
+  it('erzeugt einen smiles-block-Platzhalter für ```smiles (0.30)', () => {
+    const html = renderMarkdown('```smiles\n[O-]c1ccccc1 <-> O=C1C=CC=C[CH-]1\n```')
+    expect(html).toContain('class="smiles-block"')
+    expect(html).toContain('&lt;-&gt;')
+    expect(html).not.toContain('code-block')
+  })
+
   it('erzeugt einen plot-block-Platzhalter für ```plot', () => {
     const html = renderMarkdown('```plot\nfunctions:\n  - x^2\ndomain: [-3, 3]\n```')
     expect(html).toContain('class="plot-block"')
