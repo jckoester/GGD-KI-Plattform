@@ -3,7 +3,7 @@
 SMILES → SVG mit RDKit, **in-process** wie die Funktionsgraphen. Ein Block hat eine Zeile je
 Reihe; Moleküle stehen zwischen Operatoren, die von Leerzeichen umgeben sind::
 
-    darstellung: valenzstrich                 (optional, erste Zeile; Vorgabe: skelett)
+    darstellung: skelett                      (optional, erste Zeile; Vorgabe: valenzstrich)
     [O-]c1ccccc1 <-> O=C1C=CC=C[CH-]1
     Essigsäure: CC(=O)O + Ethanol: OCC <=> CC(=O)OCC + O
 
@@ -16,8 +16,8 @@ minus Ladung minus Bindungen (Wasserstoff eingeschlossen) minus Radikalelektrone
 und als Striche in die größten freien Winkel um das Atom gesetzt (Entscheidung Jan, 03.11.2026:
 Striche, wie in der Valenzstrichformel der Schule). Das Modell schreibt nur das SMILES mit
 Ladungen; wo und wie viele Paare stehen, folgt aus der Chemie und ist damit immer vollständig.
-In der Valenzstrichformel stehen sie an allen Atomen, in der Skelettformel an Heteroatomen und
-geladenen Atomen (F2).
+In der Valenzstrichformel (Vorgabe) stehen sie an allen Atomen, in der Skelettformel an
+Heteroatomen und geladenen Atomen.
 
 Gebogene Elektronenpfeile (Mechanismen) gibt es nicht — Todo „Mechanismuspfeile“.
 """
@@ -88,7 +88,10 @@ def lies(quelle: str) -> Block:
     if len(quelle) > MAX_QUELLE:
         raise SmilesError(f"Der Block ist zu lang (höchstens {MAX_QUELLE} Zeichen).")
     zeilen = [z.strip() for z in quelle.splitlines() if z.strip()]
-    darstellung = "skelett"
+    # Vorgabe Valenzstrichformel (Jan, 03.11.2026): so lernen es Schüler:innen, und so
+    # erwartet man es meist auch als Lehrkraft; die Skelettformel nur auf ausdrücklichen
+    # Wunsch. Die erste Fassung hatte es umgekehrt (Plan F2).
+    darstellung = "valenzstrich"
     if zeilen and (m := _DARSTELLUNG.match(zeilen[0])):
         wert = m.group(1).lower()
         if wert not in _DARSTELLUNGEN:
@@ -230,6 +233,8 @@ def zeichne(molekuel: Molekuel, darstellung: str) -> Bild:
     d.FinishDrawing()
     schrift = d.FontSize()
 
+    svg = d.GetDrawingText()
+    zeichen = _beschriftung(svg)
     striche = []
     for atom in mol.GetAtoms():
         anzahl = freie_paare(atom)
@@ -238,29 +243,65 @@ def zeichne(molekuel: Molekuel, darstellung: str) -> Bild:
         p = d.GetDrawCoords(atom.GetIdx())
         belegt = [math.atan2(d.GetDrawCoords(n.GetIdx()).y - p.y, d.GetDrawCoords(n.GetIdx()).x - p.x)
                   for n in atom.GetNeighbors()]
-        if atom.GetTotalNumHs() and belegt:
-            # Implizite H stehen in der Beschriftung („OH“) auf der den Bindungen
-            # abgewandten Seite — dort nichts hinsetzen.
-            mx = sum(math.cos(w) for w in belegt)
-            my = sum(math.sin(w) for w in belegt)
-            belegt.append(math.atan2(-my, -mx))
-        if atom.GetFormalCharge():
-            belegt.append(-math.pi / 4)   # Ladungszeichen oben rechts
-        # Abstand an der Beschriftung, nicht an der Bindung: Mitte bis Rand des Symbols
-        # plus Luft; breitere Symbole (Cl, Br) etwas weiter.
-        rx = schrift * (0.42 + 0.28 * (len(atom.GetSymbol()) - 1)) + 2.5
-        ry = schrift * 0.55 + 2.5
-        if atom.GetFormalCharge():
-            rx += schrift * 0.2   # das Ladungszeichen macht die Beschriftung breiter
+        # ⚠️ **Gelesen, nicht geschätzt.** Die Beschriftung steht im SVG als ein Pfad je
+        # Zeichen (Klasse `atom-<n>`). Was nah an der Atommitte liegt, ist das Symbol; was
+        # weiter weg liegt — angehängtes H („OH“), Ladungszeichen, Ziffer —, belegt seine
+        # Richtung. Bis 03.11.2026 wurde die H-Seite geschätzt (den Bindungen abgewandt);
+        # bei der Carboxygruppe der Benzoesäure stand ein Elektronenpaar dadurch im H.
+        symbol: list[tuple[float, float, float, float]] = []
+        for x0, y0, x1, y1 in zeichen.get(atom.GetIdx(), []):
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            if math.dist((mx, my), (p.x, p.y)) < schrift * 0.45:
+                symbol.append((x0, y0, x1, y1))
+            else:
+                belegt.append(math.atan2(my - p.y, mx - p.x))
+        luft = schrift * 0.3
         halb = schrift * 0.36
         for phi in _richtungen(belegt, anzahl):
-            cx, cy = p.x + rx * math.cos(phi), p.y + ry * math.sin(phi)
+            r = _bis_zum_rand(p.x, p.y, phi, symbol, schrift) + luft
+            cx, cy = p.x + r * math.cos(phi), p.y + r * math.sin(phi)
             dx, dy = -math.sin(phi) * halb, math.cos(phi) * halb
             striche.append((cx - dx, cy - dy, cx + dx, cy + dy))
 
-    svg = d.GetDrawingText()
     return Bild(inhalt=svg[svg.find("<svg"):], breite=d.Width(), hoehe=d.Height(),
                 striche=striche, name=molekuel.name)
+
+
+_PFAD = re.compile(r"<path class='atom-(\d+)' d='([^']*)'")
+_ZAHL = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _beschriftung(svg: str) -> dict[int, list[tuple[float, float, float, float]]]:
+    """Umriss (x0, y0, x1, y1) jedes Beschriftungszeichens, je Atom — aus dem RDKit-SVG."""
+    umrisse: dict[int, list[tuple[float, float, float, float]]] = {}
+    for treffer in _PFAD.finditer(svg):
+        zahlen = [float(z) for z in _ZAHL.findall(treffer.group(2))]
+        xs, ys = zahlen[0::2], zahlen[1::2]
+        if xs and ys:
+            umrisse.setdefault(int(treffer.group(1)), []).append((min(xs), min(ys), max(xs), max(ys)))
+    return umrisse
+
+
+def _bis_zum_rand(cx: float, cy: float, phi: float, kaesten, schrift: float) -> float:
+    """Abstand von der Atommitte bis zum Rand des Symbols in Richtung ``phi``.
+
+    Ohne Beschriftung (Kohlenstoff in der Skelettformel) ein halber Schriftgrad.
+    """
+    if not kaesten:
+        return schrift * 0.5
+    x0 = min(k[0] for k in kaesten); y0 = min(k[1] for k in kaesten)
+    x1 = max(k[2] for k in kaesten); y1 = max(k[3] for k in kaesten)
+    dx, dy = math.cos(phi), math.sin(phi)
+    t = []
+    if dx > 1e-9:
+        t.append((x1 - cx) / dx)
+    elif dx < -1e-9:
+        t.append((x0 - cx) / dx)
+    if dy > 1e-9:
+        t.append((y1 - cy) / dy)
+    elif dy < -1e-9:
+        t.append((y0 - cy) / dy)
+    return max(0.0, min(t)) if t else schrift * 0.5
 
 
 def _operator(art: str, x: float, y: float) -> str:

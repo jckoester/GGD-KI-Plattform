@@ -13,9 +13,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import RenderedSvg
 
 
+#: Ausgabe-Fassung je Renderer (0.30). Wer die Zeichnung eines Renderers ändert, erhöht hier
+#: die Zahl — sonst liefert der Cache weiter das alte Bild zur gleichen Quelle. Renderer ohne
+#: Eintrag behalten ihren bisherigen Schlüssel (Schaltplan, Graph: unverändert seit Phase 17).
+RENDERER_FASSUNG: dict[str, int] = {
+    "smiles": 2,  # 03.11.2026: Elektronenpaare nach der gelesenen Beschriftung, Vorgabe Valenzstrich
+}
+
+
 def svg_hash(kind: str, source: str) -> str:
-    """Stabiler Hash über (kind, source) — trennt circuit/plot mit gleicher Quelle."""
-    return hashlib.sha256(f"{kind}\x00{source}".encode("utf-8")).hexdigest()
+    """Stabiler Hash über (kind, source[, Fassung]) — trennt circuit/plot mit gleicher Quelle."""
+    fassung = RENDERER_FASSUNG.get(kind)
+    zusatz = f"\x00v{fassung}" if fassung else ""
+    return hashlib.sha256(f"{kind}\x00{source}{zusatz}".encode("utf-8")).hexdigest()
 
 
 async def get_cached_svg(db: AsyncSession, hash_: str) -> str | None:

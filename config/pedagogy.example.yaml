@@ -51,6 +51,26 @@ preambles:
     Fließtext-Antworten — nicht Diagramme. Ein hilfreiches Diagramm oder eine passende
     Schaltung darfst du daher auch Schüler:innen direkt zeichnen.
 
+    Formeln schreibst du in LaTeX ($…$ im Text, \[…\] abgesetzt), chemische Formeln und
+    Gleichungen mit \ce{…}. In eine Formel gehören nie Zeichenumgebungen wie `tikzpicture` —
+    sie werden nicht dargestellt.
+
+    Strukturformeln (Valenzstrich- und Skelettformeln, Grenzformeln, Reaktionen mit
+    Strukturformeln) zeichnest du in einem ```smiles-Block — nie als Mermaid, TikZ oder Formel.
+    Eine Zeile ist eine Reihe: Moleküle als SMILES, Ladungen in eckigen Klammern (`[O-]`,
+    `[NH3+]`, `[CH-]`), dazwischen mit Leerzeichen `+`, `->`, `<=>` (Gleichgewicht) oder `<->`
+    (Grenzformeln); `Name: SMILES` beschriftet ein Molekül. Grenzformeln schreibst du mit
+    ihren Doppelbindungen und Ladungen aus (`O=C1C=CC=C[CH-]1`), nicht aromatisch klein.
+    Freie Elektronenpaare zeichnet die Plattform selbst; sie gehören nicht ins SMILES.
+    Der Block zeichnet Valenzstrichformeln mit allen Atomen. Nur wenn jemand ausdrücklich
+    eine Skelettformel wünscht, schreibst du `darstellung: skelett` in die erste Zeile.
+    Beispiel:
+    ```smiles
+    Phenolat-Ion: [O-]c1ccccc1 <-> O=C1C=CC=C[CH-]1
+    ```
+    Elektronenpfeile (Reaktionsmechanismen) kann der Block nicht zeichnen; beschreibe sie in
+    Worten.
+
   # Vorrang des Wissensspeichers (0.16) — steht direkt nach universal_base, für alle
   # Zielgruppen. Gemessen mit genau diesem Satz. Pflegt Ihre Schule keinen
   # Wissensspeicher, lassen Sie den Wert leer oder den Schlüssel weg: Dann steht kein

@@ -20,7 +20,7 @@ def test_reihe_mit_operatoren_und_namen():
     assert [t if isinstance(t, str) else t.smiles for t in teile] == [
         "CC(=O)O", "plus", "OCC", "gleichgewicht", "CC(=O)OCC", "plus", "O"]
     assert teile[0].name == "Essigsäure" and teile[4].name is None
-    assert block.darstellung == "skelett"
+    assert block.darstellung == "valenzstrich", "Vorgabe seit 03.11.2026"
 
 
 def test_ladung_in_klammern_ist_kein_operator():
@@ -29,8 +29,8 @@ def test_ladung_in_klammern_ist_kein_operator():
 
 
 def test_mesomerie_unicode_und_mehrere_reihen():
-    block = lies("darstellung: valenzstrich\n[O-]c1ccccc1 ↔ O=C1C=CC=C[CH-]1\nO → O")
-    assert block.darstellung == "valenzstrich"
+    block = lies("darstellung: skelett\n[O-]c1ccccc1 ↔ O=C1C=CC=C[CH-]1\nO → O")
+    assert block.darstellung == "skelett"
     assert block.reihen[0].teile[1] == "mesomerie"
     assert block.reihen[1].teile[1] == "pfeil"
 
@@ -138,3 +138,33 @@ def test_grenzformel_behaelt_ihre_doppelbindungen():
     mol = Chem.MolFromSmiles("O=C1C=CC=C[CH-]1", sanitize=False)
     Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
     assert not any(bd.GetIsAromatic() for bd in mol.GetBonds())
+
+
+@pytest.mark.parametrize("smiles,darstellung", [
+    ("OC(=O)c1ccccc1", "skelett"),      # Benzoesäure — der gemeldete Fall (03.11.2026)
+    ("CCO", "skelett"),
+    ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "skelett"),
+    ("[O-]c1ccccc1", "skelett"),
+    ("[NH3+]CC(=O)[O-]", "valenzstrich"),
+    ("OC(=O)c1ccccc1", "valenzstrich"),
+])
+def test_kein_elektronenpaar_in_der_beschriftung(smiles, darstellung):
+    """Die Mitte keines Strichs liegt in einem Zeichen der Beschriftung — weder im
+    Symbol noch im angehängten H („OH“) noch im Ladungszeichen."""
+    from app.render.smiles import _beschriftung
+    bild = zeichne(Molekuel(smiles), darstellung)
+    kaesten = [k for liste in _beschriftung(bild.inhalt).values() for k in liste]
+    for x1, y1, x2, y2 in bild.striche:
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        for x0, y0, x3, y3 in kaesten:
+            assert not (x0 <= mx <= x3 and y0 <= my <= y3), (smiles, (mx, my), (x0, y0, x3, y3))
+
+
+def test_cache_schluessel_traegt_die_fassung():
+    """Ändert sich die Zeichnung, darf der Cache das alte Bild nicht mehr treffen."""
+    import hashlib
+    from app.render import cache
+    alt = hashlib.sha256("smiles\x00CCO".encode()).hexdigest()
+    assert cache.svg_hash("smiles", "CCO") != alt
+    # Schaltplan und Graph behalten ihren Schlüssel aus Phase 17.
+    assert cache.svg_hash("plot", "x") == hashlib.sha256("plot\x00x".encode()).hexdigest()

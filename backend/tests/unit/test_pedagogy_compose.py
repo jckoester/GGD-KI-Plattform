@@ -61,8 +61,10 @@ def test_student_treatment_includes_extension_and_augmentations():
     out = compose_system_content(
         _ped(), student_treatment=True, context_str=None, assistant_system_prompt="SP"
     )
-    assert "Lernassistent" in out          # student_extension
-    assert "Lehrkräfte" not in out         # KEINE teacher_extension
+    # Nach den Zusätzen selbst fragen, nicht nach einem Wort darin: Der Absatz zu
+    # Strukturformeln im allgemeinen Teil (0.30) nennt auch „Lehrkräfte“.
+    assert _ped().preambles.student_extension.strip() in out
+    assert _ped().preambles.teacher_extension.strip() not in out
     assert _aug("no_complete_homework_solutions") in out
     assert "SP" in out
 
@@ -71,8 +73,8 @@ def test_teacher_treatment_has_no_augmentations():
     out = compose_system_content(
         _ped(), student_treatment=False, context_str=None, assistant_system_prompt="SP"
     )
-    assert "Lehrkräfte" in out             # teacher_extension
-    assert "Lernassistent" not in out
+    assert _ped().preambles.teacher_extension.strip() in out
+    assert _ped().preambles.student_extension.strip() not in out
     assert _aug("no_complete_homework_solutions") not in out
 
 
@@ -155,7 +157,9 @@ class TestKlassenstufeImSystemkontext:
         assert STUFEN_REGEL in self._inhalt(stufe=9)
 
     def test_ohne_stufe_keine_zeile(self):
-        assert "Klasse" not in self._inhalt(stufe=None).split("Wissens")[0][-400:]
+        # Nach der Zeile selbst fragen, nicht nach dem Wort „Klasse“: Der Absatz zu
+        # Strukturformeln (0.30) nennt „bis Klasse 10“ — das ist keine Stufenangabe.
+        assert "Die fragende Person ist in Klasse" not in self._inhalt(stufe=None)
 
     def test_lehrkraefte_bekommen_keine_stufe(self):
         """Eine Lehrkraft, die den Unterricht einer neunten Klasse vorbereitet, braucht
