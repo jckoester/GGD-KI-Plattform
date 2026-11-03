@@ -1976,10 +1976,23 @@ class Feedback(Base):
     status_changed_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # Als „bekanntes Problem“ gezeigt (0.31, Päckchen T): öffentlich ist nur dieser Titel, den
+    # der Admin formuliert — nie `content`. Zielgruppe `all` oder `teacher`, leer = nicht
+    # öffentlich (Plan F1; ersetzt `visible_to_all` aus ADR-020).
+    public_title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    public_audience: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
             "category IN ('bug', 'suggestion', 'other')", name="ck_feedback_category"
+        ),
+        CheckConstraint(
+            "public_audience IS NULL OR public_audience IN ('all', 'teacher')",
+            name="ck_feedback_public_audience",
+        ),
+        CheckConstraint(
+            "public_audience IS NULL OR public_title IS NOT NULL",
+            name="ck_feedback_public_title",
         ),
         CheckConstraint(
             "status IN ('open', 'in_progress', 'done', 'declined', 'spam')",
@@ -2117,4 +2130,76 @@ class VorabStatistik(Base):
         ),
         # Für die Kaskade beim Löschen eines Knotens — sonst ein Durchlauf je Löschung.
         Index("idx_vorab_statistik_node", "node_id"),
+    )
+
+
+# 28. message_ratings — Daumen hoch/runter an einer Antwort (0.31, Päckchen T, ADR-020)
+class MessageRating(Base):
+    """Die Bewertung einer Modellantwort durch die Person, der der Chat gehört.
+
+    **Kein Pseudonym.** Wem die Bewertung gehört, folgt aus Nachricht → Konversation; eine
+    eigene Spalte wäre eine weitere, die mit dem Konto gehen muss (Päckchen U). Die Zeile geht
+    mit der Nachricht — und damit mit dem Chat und dem Konto.
+
+    ``rolle`` ist die Rolle beim ersten Bewerten und bestimmt, in welche Zeile von
+    ``rating_counts`` die Bewertung zählt; Umentscheiden und Zurücknehmen korrigieren dieselbe
+    Zeile (Woche aus ``created_at``).
+    """
+
+    __tablename__ = "message_ratings"
+
+    message_id: Mapped[UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True
+    )
+    rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    rolle: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("rating IN (-1, 1)", name="ck_message_ratings_rating"),
+        CheckConstraint("rolle IN ('student', 'teacher')", name="ck_message_ratings_rolle"),
+    )
+
+
+# 29. rating_counts — Bewertungen als Wochenzähler, ohne Personenbezug (0.31, Plan F5)
+class RatingCount(Base):
+    """Daumen hoch/runter je Woche, Assistent, Modell und Rolle.
+
+    Gepflegt im selben Vorgang wie ``message_ratings``. Die Zähler **überdauern** das Löschen
+    der Chats (93 Tage, Löschwunsch, Kontolöschung) — sonst sähe jede Auswertung höchstens drei
+    Monate zurück. Kein Pseudonym, kein Bezug zu Konversation oder Nachricht, die Woche ist die
+    feinste Einheit; deshalb keine automatische Löschung. Zeilen eines gelöschten Assistenten
+    folgen ihm. ``assistant_id`` leer = Chat ohne Assistent.
+
+    ⚠️ **Der Schlüssel braucht ``NULLS NOT DISTINCT``** — wie bei ``vorab_statistik``: Sonst
+    legte jedes ``INSERT … ON CONFLICT`` für den Chat ohne Assistent eine neue Zeile an.
+    """
+
+    __tablename__ = "rating_counts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Montag der ISO-Kalenderwoche der ersten Bewertung, Ortszeit der Schule.
+    woche: Mapped[date] = mapped_column(nullable=False)
+    assistant_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assistants.id", ondelete="CASCADE"), nullable=True
+    )
+    #: Modell-Alias der Antwort (`messages.model`), wie in `vorab_statistik`.
+    modell: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rolle: Mapped[str] = mapped_column(Text, nullable=False)
+    plus: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    minus: Mapped[int] = mapped_column(nullable=False, server_default="0")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "woche", "assistant_id", "modell", "rolle",
+            name="uq_rating_counts_schluessel", postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint("rolle IN ('student', 'teacher')", name="ck_rating_counts_rolle"),
+        CheckConstraint("plus >= 0 AND minus >= 0", name="ck_rating_counts_nicht_negativ"),
+        Index("idx_rating_counts_assistant", "assistant_id"),
     )
