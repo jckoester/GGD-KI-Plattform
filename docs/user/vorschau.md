@@ -9,6 +9,9 @@ Unterrichts im Chat an?
 
 - **Im Benutzermenü** unten links: **Als Schüler:in ansehen…** Du wählst eine Klasse und, wenn
   du magst, eine deiner Unterrichtsgruppen.
+- **Auf der Seite einer Unterrichtsgruppe**, Reiter **„Assistenten"**: **Als Schüler:in
+  ansehen** — mit dieser Gruppe und ihrer Klasse vorbelegt. Der Reiter selbst listet schon
+  vorher, welche Assistenten die Gruppe sieht; die Vorschau ist für das Ausprobieren.
 - **Im Assistenten-Editor** neben dem Testchat: **Als Schüler:in testen**. Klasse und Gruppe sind
   aus dem Assistenten vorbelegt, und die Vorschau öffnet gleich den Chat mit ihm — auch wenn er
   noch ein Entwurf ist.

@@ -266,3 +266,14 @@
     zeigen, für alle oder nur für Lehrkräfte. Unter Statistik → Antwortbewertung siehst du,
     wie die Daumen je Assistent und Modell ausfallen.
 
+- id: "0.32-assistenten-der-gruppe"
+  version: "0.32.0"
+  datum: 2026-11-04
+  rollen: [teacher]
+  titel: "Welche Assistenten sieht meine Klasse?"
+  text: >-
+    Auf der Seite deiner Unterrichtsgruppe zeigt der neue Reiter „Assistenten“, welche
+    Assistenten die Schüler:innen dieser Gruppe sehen — und welche deiner eigenen nicht, mit
+    Grund. Von dort kommst du mit einem Klick in die Vorschau als Schüler:in dieser Gruppe.
+  link: /help/faecher
+

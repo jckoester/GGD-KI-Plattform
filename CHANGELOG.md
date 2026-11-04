@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.32.0] – 2026-11-04
+
+Lehrkräfte sehen auf der Gruppenseite, welche Assistenten ihre Schüler:innen haben. Keine Migration.
+
 ### Neu
 
 - **Reiter „Assistenten“ auf der Seite der Unterrichtsgruppe** (Lehrkräfte): welche Assistenten eine Schüler:in dieser
@@ -12,6 +16,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   welche eigenen Assistenten sie nicht sieht, mit Grund. Ohne bekannten Jahrgang lässt sich die Klasse wählen. Knopf
   „Als Schüler:in ansehen“ mit dieser Gruppe.
 - Assistenten-Editor: Hinweis, dass ein Assistent mit Freigabe „Fachschaft“ keine Schüler:innen erreicht.
+
+### Dokumentation
+
+- Hilfe: Reiter „Assistenten“ in „Fächer“, Hinweis zur Freigabe „Fachschaft“ in „Assistenten“, neuer Einstieg in
+  „Als Schüler:in ansehen“.
+- `docs/dev/architektur.md`: Sichtbarkeitsregel in drei Darstellungen (`warum_nicht` für den Grund), Schülersicht einer
+  Gruppe.
+
+### Nach dem Update
+
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.31.0] – 2026-11-04
 

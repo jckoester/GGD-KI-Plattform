@@ -129,6 +129,13 @@ die anderen dort den Zugang — die Rückfrage sagt es dir.
 Schüler:in testen** daneben siehst du ihn so, wie eine Schüler:in ihn findet und benutzt —
 siehe [Als Schüler:in ansehen](vorschau.md).
 
+**Wer sieht ihn?** Auf der Seite deiner Unterrichtsgruppe zeigt der Reiter **„Assistenten"**,
+welche Assistenten die Schüler:innen dieser Gruppe sehen — und welche deiner eigenen nicht, mit
+Grund (siehe [Fächer](faecher.md#der-reiter-assistenten)). Achtung bei **„Freigeben für:
+Fachschaft"**: Die Fachschaft sind die Lehrkräfte des Fachs. Ein Assistent für Schüler:innen
+erreicht so keine Schüler:in — der Editor weist darauf hin. Für eine Klasse gibst du ihn unter
+„Unterrichtsgruppe" frei, für alle Schüler:innen unter „Alle Schüler:innen".
+
 Als **Fach** stehen im Editor deine eigenen Fächer zur Wahl: die deiner Unterrichtsgruppen und
 Fachschaften. Gibst du den Assistenten für eine Unterrichtsgruppe oder Fachschaft frei, kommt das
 Fach aus der Gruppe; das Feld zeigt es dann nur an. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.

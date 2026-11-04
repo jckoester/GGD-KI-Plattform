@@ -69,8 +69,8 @@ und trägt alles, was zum Fach gehört, aber zu keiner Gruppe: persönliche Fach
 Curriculum, Bildungsplan und die Bestände der Fachschaft.
 
 **Die Gruppenseite** (`Mathematik / Klasse 8c`) ist der Arbeitsplatz. Dort steht die
-Übersicht von oben, dazu die Reiter Curriculum, Bildungsplan, Archiv und weiterer
-Kontext sowie der Absprung in die Jahresplanung.
+Übersicht von oben, dazu die Reiter Curriculum, Bildungsplan, weiterer Kontext,
+Assistenten und Archiv sowie der Absprung in die Jahresplanung.
 
 ### Der Block „Jetzt"
 
@@ -86,6 +86,28 @@ Ausgefallene Stunden zählen nicht mit — weder als letzte Stunde noch in den S
 Einheit. Prüfungen und Pufferstunden zählen mit.
 
 Steht dort ein Hinweis auf die Planung, hat die Gruppe noch kein Wochenmuster.
+
+### Der Reiter „Assistenten"
+
+Er beantwortet die Frage **„Welche Assistenten sehen meine Schüler:innen?"** — ohne dass du
+dafür in die Vorschau wechseln musst. Gerechnet wird nach derselben Regel wie im Chat, für eine
+Schüler:in dieser Gruppe und ihrer Klassenstufe:
+
+- **Für diese Gruppe freigegeben** — von dir oder einer Kollegin.
+- **Schulweit** für diese Klassenstufe — nur die, deren Modell für die Stufe freigeschaltet ist.
+  Ausgeblendete Assistenten stehen gekennzeichnet dabei: Schüler:innen können sie benutzen,
+  finden sie aber nicht in der Übersicht.
+- **Deine Assistenten, die diese Gruppe nicht sieht** — jeweils mit dem Grund, etwa „Entwurf",
+  „für eine andere Klassenstufe (Klasse 11–13)" oder „nur für die Lehrkräfte der Fachschaft
+  freigegeben".
+
+Ein Klick auf einen eigenen Assistenten öffnet den Editor, auf einen fremden den Chat. Kennt die
+Plattform den Jahrgang der Gruppe nicht (Kurse, AGs), wählst du die Klasse oben aus; bis dahin
+gilt kein Klassenstufen-Filter. **Als Schüler:in ansehen** führt in die
+[Vorschau](vorschau.md) mit dieser Gruppe.
+
+Was einzelne Schüler:innen über **andere** Gruppen zusätzlich haben — eine AG, ein anderes
+Fach —, steht hier nicht; das hängt an der Person, nicht an der Gruppe.
 
 ### Der Reiter „Archiv"
 
