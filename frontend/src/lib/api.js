@@ -2919,6 +2919,21 @@ export async function getKnownProblems() {
   return res.json();
 }
 
+// Antwortbewertung (0.31): 1 hilfreich, -1 nicht hilfreich, 0 zurücknehmen → { rating }.
+export async function rateMessage(id, rating) {
+  const res = await fetch(`${BASE}/messages/${id}/rating`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
 // Admin: der Eingang. Ohne `status` liefert der Server, was Arbeit macht
 // (offen + in Bearbeitung). `counts` folgt den übrigen Filtern, nicht dem Status.
 export async function getAdminFeedback({

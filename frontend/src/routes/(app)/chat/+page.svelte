@@ -149,6 +149,8 @@
     }
     let scrollAnchor = $state(null);
     let conversationId = $state(null);
+    // Daumen an den Antworten (0.31): vom Server je Chat, für neue Chats außerhalb der Vorschau.
+    let bewertbar = $state(false);
     let loadingConversation = $state(false);
     let conversationError = $state(null);
     let currentConversationModel = $state(null);
@@ -1249,9 +1251,12 @@
                     kontext: m.kontext?.length ? m.kontext : undefined,
                     abgebrochen: m.abgebrochen ?? false,
                     werkzeuge_mit_wirkung: m.werkzeuge_mit_wirkung ?? [],
+                    rating: m.rating ?? null,
                 }));
                 messages = insertSeparators(rawMessages);
                 conversationId = data.id;
+                // Daumen an den Antworten (0.31) — der Server kennt Test- und Vorschau-Chats.
+                bewertbar = data.bewertbar ?? false;
                 currentConversationModel = data.model_used;
                 totalCostUsd = data.total_cost_usd ?? null;
                 selectedAssistant = null;
@@ -1309,6 +1314,8 @@
             // Neue Konversation
             messages = [];
             conversationId = null;
+            // Ein neuer Chat ist bewertbar — außer in der Vorschau (Plan F6).
+            bewertbar = !$user?.vorschau;
             currentConversationModel = null;
             totalCostUsd = null;
             conversationError = null;
@@ -1496,6 +1503,7 @@
                             : null}
                         isStreaming={isStreaming && i === messages.length - 1}
                         ohneFett={schuelerAssistenten.has(message.assistantId)}
+                        {bewertbar}
                         kostenSichtbar={granularity === "message" ||
                             granularity === "both"}
                         kontextStufe={kontextAnzeige}

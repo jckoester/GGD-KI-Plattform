@@ -1,11 +1,12 @@
 <script>
-    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2, Pencil } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2, Pencil, ThumbsUp, ThumbsDown } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { bibliotheksSvg, diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
-    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
+    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild, rateMessage } from '$lib/api.js';
+    import { DAUMEN, alsAnzeige, naechsteBewertung, zeigeDaumen } from '$lib/bewertung.js';
     import { user } from '$lib/stores/user.js';
     import { zitiername, zitatText, zeitpunkt } from '$lib/provenance.js';
     import { branding } from '$lib/branding.js';
@@ -41,7 +42,40 @@
         onBearbeiten = null,
         // Antwort eines Schüler-Assistenten: Fettdruck erscheint als einfacher Text (0.26, B1).
         ohneFett = false,
+        // Daumen an der Antwort (0.31)? Nur der Chat setzt das — Editor-Testchat und
+        // Krisen-Einsicht bleiben bei der Vorgabe. Ob der Chat bewertbar ist, sagt der Server.
+        bewertbar = false,
     } = $props();
+
+    // ── Antwortbewertung (0.31, ADR-020) ────────────────────────────────────
+    // Sofort anzeigen, beim Fehlschlag zurücknehmen: Ein Daumen, der eine Sekunde auf den
+    // Server wartet, fühlt sich kaputt an.
+    //
+    // ⚠️ **Je Nachrichten-ID gemerkt, nicht als einfacher Zustand.** Der Chat legt die
+    // Blasen ohne Schlüssel an und verwendet sie je Position weiter; ein `$state` mit dem
+    // Anfangswert behielte beim Wechsel in einen anderen Chat den Daumen der vorigen Antwort.
+    let geklickt = $state({});
+    // Kennung der Antwort, deren Bewertung zuletzt scheiterte — aus demselben Grund je ID.
+    let fehlerBei = $state(null);
+    const bewertung = $derived(
+        message.id && message.id in geklickt ? geklickt[message.id] : alsAnzeige(message.rating),
+    );
+    const daumen = $derived(zeigeDaumen({ bewertbar, message, isStreaming }));
+
+    async function bewerten(wert) {
+        const id = message.id;
+        const vorher = bewertung;
+        const ziel = naechsteBewertung(vorher, wert);
+        geklickt = { ...geklickt, [id]: alsAnzeige(ziel) };
+        fehlerBei = null;
+        try {
+            const antwort = await rateMessage(id, ziel);
+            geklickt = { ...geklickt, [id]: alsAnzeige(antwort.rating) };
+        } catch {
+            geklickt = { ...geklickt, [id]: vorher };
+            fehlerBei = id;
+        }
+    }
 
     // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
     // Ist ein Bild dabei, bliebe es wortlos zurück — der Hinweis sagt es.
@@ -566,7 +600,7 @@
                     {/if}
                 </div>
             {/if}
-            {#if kosten !== null || (hatHerkunftsangaben && !isStreaming) || kontext}
+            {#if kosten !== null || (hatHerkunftsangaben && !isStreaming) || kontext || daumen}
                 <div class="flex items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2
                             mt-2 pt-1 border-t border-light-ui-3 dark:border-dark-ui-3">
                     {#if kosten !== null}
@@ -602,6 +636,31 @@
                             <BookOpen class="w-3.5 h-3.5" />
                             Kontext ({kontext.length})
                         </button>
+                    {/if}
+                    {#if daumen}
+                        <span class="ml-auto inline-flex items-center gap-1">
+                            {#if fehlerBei === message.id}
+                                <span class="text-light-re dark:text-dark-re">Bewertung nicht gespeichert</span>
+                            {/if}
+                            {#each DAUMEN as d (d.wert)}
+                                <button
+                                    type="button"
+                                    onclick={() => bewerten(d.wert)}
+                                    aria-label={d.label}
+                                    aria-pressed={bewertung === d.wert}
+                                    title={d.label}
+                                    class="p-1 rounded hover:text-light-tx dark:hover:text-dark-tx
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                                           {bewertung === d.wert ? 'text-light-tx dark:text-dark-tx' : ''}"
+                                >
+                                    {#if d.wert === 1}
+                                        <ThumbsUp class="w-3.5 h-3.5 {bewertung === 1 ? 'fill-current' : ''}" />
+                                    {:else}
+                                        <ThumbsDown class="w-3.5 h-3.5 {bewertung === -1 ? 'fill-current' : ''}" />
+                                    {/if}
+                                </button>
+                            {/each}
+                        </span>
                     {/if}
                 </div>
                 {#if herkunftOffen}

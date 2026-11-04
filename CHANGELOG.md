@@ -10,6 +10,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Bekannte Probleme:** Die Administration kann eine Meldung mit eigenem Titel als bekanntes Problem zeigen — für alle
   oder nur für Lehrkräfte; der Text der Meldung bleibt intern. Die Liste steht im Feedback-Dialog („Schon bekannt“) und
   unter „Meine Meldungen“; behobene Einträge bleiben 30 Tage stehen.
+- **Antworten bewerten:** Daumen hoch oder runter unter jeder Antwort im Chat; ein zweiter Klick nimmt die Bewertung
+  zurück. Nicht in Test- und Vorschau-Chats.
 - „Meine Meldungen“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
 - Audit-Log: bekanntes Problem gezeigt oder zurückgenommen.
 
