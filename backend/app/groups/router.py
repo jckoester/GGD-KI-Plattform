@@ -10,7 +10,7 @@ import logging
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,7 @@ from app.groups.beitritt import (
     pruefe_code,
     widerrufe_codes,
 )
+from app.groups.schuelersicht import schuelersicht
 from app.planning.permissions import require_group_teacher
 from app.ratelimit.dependency import rate_limit
 
@@ -305,3 +306,69 @@ async def angebot_wieder_zeigen(
         await db.rollback()
         raise HTTPException(404, str(exc)) from None
     await db.commit()
+
+
+# ── Assistenten der Gruppe (0.32, Päckchen AJ) ──────────────────────────────────
+
+
+class AssistentKurz(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    icon: str | None = None
+    subject_id: int | None = None
+    audience: str
+    scope: str
+    #: `visibility: hidden` — benutzbar, aber nicht in Übersichten und Vorschlägen (F2).
+    ausgeblendet: bool
+    min_grade: int | None = None
+    max_grade: int | None = None
+    model: str | None = None
+    #: Von der anfragenden Lehrkraft angelegt — Klick öffnet den Editor statt des Chats (F6).
+    eigen: bool
+    #: Nur bei „sieht die Gruppe nicht“: Kennung aus `sichtbarkeit.GRUENDE`.
+    grund: str | None = None
+
+
+class SchuelersichtAntwort(BaseModel):
+    jahrgang: int | None
+    jahrgang_quelle: str | None
+    modelle_bekannt: bool
+    fuer_die_gruppe: list[AssistentKurz]
+    schulweit: list[AssistentKurz]
+    eigene_unsichtbar: list[AssistentKurz]
+
+
+def _kurz(a, lehrkraft: str, grund: str | None = None) -> AssistentKurz:
+    return AssistentKurz(
+        id=a.id, name=a.name, description=a.description, icon=a.icon, subject_id=a.subject_id,
+        audience=a.audience, scope=a.scope, ausgeblendet=a.visibility == "hidden",
+        min_grade=a.min_grade, max_grade=a.max_grade, model=a.model,
+        eigen=a.created_by == lehrkraft, grund=grund,
+    )
+
+
+@router.get("/{group_id}/student-assistants")
+async def student_assistants(
+    group_id: int,
+    # Nur für Gruppen ohne bekannten Jahrgang gedacht (Plan F1); gilt aber immer, wenn gesetzt.
+    jahrgang: int | None = Query(None, ge=1, le=13),
+    current_user: JwtPayload = Depends(_LEHRKRAFT),
+    db: AsyncSession = Depends(get_db),
+) -> SchuelersichtAntwort:
+    """Was eine Schüler:in dieser Gruppe an Assistenten sieht — nur für Lehrkräfte der Gruppe.
+
+    Dieselbe Regel wie Chat und Liste, über einen nachgebauten Schüler-Zugang
+    (`app/groups/schuelersicht.py`); dazu die eigenen Assistenten, die die Gruppe nicht sieht,
+    mit dem ersten Grund.
+    """
+    gruppe = await require_group_teacher(group_id, current_user, db)
+    sicht = await schuelersicht(db, gruppe, lehrkraft=current_user.sub, jahrgang_wahl=jahrgang)
+    return SchuelersichtAntwort(
+        jahrgang=sicht.jahrgang, jahrgang_quelle=sicht.jahrgang_quelle,
+        modelle_bekannt=sicht.modelle_bekannt,
+        fuer_die_gruppe=[_kurz(a, current_user.sub) for a in sicht.fuer_die_gruppe],
+        schulweit=[_kurz(a, current_user.sub) for a in sicht.schulweit],
+        eigene_unsichtbar=[_kurz(a, current_user.sub, g) for a, g in sicht.eigene_unsichtbar],
+    )
+
