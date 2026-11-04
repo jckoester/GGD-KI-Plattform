@@ -34,6 +34,9 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # das Limit zählt je Person, nicht je Gruppe, und muss deshalb nur ein
     # einzelnes Durchprobieren bremsen, nicht den Normalfall.
     "group_join": (10, 300.0),
+    # Antwortbewertung (0.31): Daumen umschalten ist schnell gemacht; das Limit bremst nur
+    # Skripte, nicht jemanden, der sich zweimal umentscheidet.
+    "bewertung": (60, 60.0),
     # Fachbegriff-Import (Paket 10/AP3): Ein Lauf liest ein ganzes Bündel, schreibt
     # Knoten **und** Kanten und ist damit die teuerste Anfrage, die eine Lehrkraft
     # auslösen kann. Zwanzig in fünf Minuten decken das Arbeiten ab (jeder Import ist

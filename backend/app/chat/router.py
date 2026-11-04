@@ -107,6 +107,7 @@ from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 from app.core.audit import audit
 from app.auth import vorschau
+from app.feedback import bewertung
 from app.auth.vorschau import mitglied
 
 
@@ -167,6 +168,8 @@ class MessageItem(BaseModel):
     abgebrochen: bool = False
     # 0.19: Schreibende Werkzeuge dieser Antwort — die Oberfläche warnt beim Bearbeiten.
     werkzeuge_mit_wirkung: list[str] = []
+    # 0.31: die eigene Bewertung der Antwort (1, -1) oder keine.
+    rating: Optional[int] = None
 
 
 class ConversationDetailResponse(BaseModel):
@@ -182,6 +185,8 @@ class ConversationDetailResponse(BaseModel):
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     is_test: bool = False
+    # 0.31: Daumen an den Antworten? Nicht in Test- und Vorschau-Chats (Plan F6).
+    bewertbar: bool = False
     messages: list[MessageItem]
 
 
@@ -3641,6 +3646,10 @@ async def get_conversation_messages(
         db, [row.Message.id for row in rows if row.Message.role == "assistant"],
         current_user.sub, current_user.roles,
     )
+    # Eigene Bewertungen (0.31) — der Chat gehört der Person, also auch die Bewertungen.
+    rating_map = await bewertung.bewertungen(
+        db, [row.Message.id for row in rows if row.Message.role == "assistant"],
+    )
 
     # Hilfe-Banner je Nachricht rekonstruieren (ADR-008 Teil 3/4).
     #
@@ -3718,6 +3727,7 @@ async def get_conversation_messages(
                 "abgebrochen": msg.abgebrochen,
                 "werkzeuge_mit_wirkung": msg.werkzeuge_mit_wirkung or [],
                 "kontext": kontext_map.get(msg.id, []),
+                "rating": rating_map.get(msg.id),
             })
 
     assistant_name: Optional[str] = None
@@ -3741,5 +3751,8 @@ async def get_conversation_messages(
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         is_test=conversation.is_test,
+        # In der Vorschau selbst sperrt die Schreibsperre ohnehin; die Daumen kämen dort nur
+        # mit einer Fehlermeldung zurück.
+        bewertbar=bewertung.bewertbar(conversation) and not vorschau.ist_vorschau(current_user),
         messages=messages_list,
     )
