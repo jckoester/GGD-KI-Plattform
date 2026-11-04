@@ -13,7 +13,9 @@ from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.context.visibility import read_scope_clause
 from app.context.vorab_statistik import ANGEBOT, BLOCK, GRUPPE, SICHER
-from app.db.models import ContextNode, ExchangeRate, Subject, VorabStatistik as VS
+from app.db.models import (
+    Assistant, ContextNode, ExchangeRate, RatingCount as RC, Subject, VorabStatistik as VS,
+)
 from app.db.session import get_db
 from app.litellm import systemkonto
 from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX, VALID_GRADES
@@ -463,4 +465,98 @@ async def get_vorab_statistik(
                             im_block_nachgeschlagen=int(k[8] or 0))
                 for k in knoten],
         faecher=[VorabFach(id=f[0], name=f[1]) for f in faecher],
+    )
+
+
+# ── Antwortbewertung (0.31, Päckchen T) ─────────────────────────────────────────
+
+
+class BewertungZeile(BaseModel):
+    """Ein Assistent oder ein Modell: Daumen getrennt nach Rolle."""
+
+    #: Assistenten-ID bzw. Modell-Alias; leer = Chat ohne Assistent bzw. Modell unbekannt.
+    schluessel: str | None
+    name: str | None
+    plus_schueler: int = 0
+    minus_schueler: int = 0
+    plus_lehrkraft: int = 0
+    minus_lehrkraft: int = 0
+
+
+class BewertungWoche(BaseModel):
+    woche: date
+    plus: int
+    minus: int
+
+
+class BewertungStatistikAntwort(BaseModel):
+    von: date
+    bis: date
+    gruppierung: Literal["assistent", "modell"]
+    zeilen: list[BewertungZeile]
+    wochen: list[BewertungWoche]
+
+
+@router.get("/ratings", response_model=BewertungStatistikAntwort)
+async def get_bewertung_statistik(
+    from_date: date | None = None,
+    to_date: date | None = None,
+    gruppierung: Literal["assistent", "modell"] = "assistent",
+    _: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> BewertungStatistikAntwort:
+    """Daumen je Assistent oder Modell und je Woche (`rating_counts`, ohne Personenbezug).
+
+    Der Zeitraum gilt wochenweise wie bei der Vorab-Statistik. Gezählt wird in der Woche der
+    **ersten** Bewertung einer Antwort; wer sich später umentscheidet, ändert diese Woche.
+    """
+    today = datetime.now(BERLIN).date()
+    bis = to_date or today
+    von = from_date or bis - timedelta(weeks=12)
+    if von > bis:
+        raise HTTPException(status_code=422, detail="Der Zeitraum beginnt nach seinem Ende.")
+    filter_ = [RC.woche >= von - timedelta(days=von.weekday()), RC.woche <= bis]
+
+    def je_rolle(spalte, rolle):
+        return sa.func.sum(sa.case((RC.rolle == rolle, spalte), else_=0))
+
+    summen = (
+        je_rolle(RC.plus, "student"), je_rolle(RC.minus, "student"),
+        je_rolle(RC.plus, "teacher"), je_rolle(RC.minus, "teacher"),
+    )
+    if gruppierung == "assistent":
+        zeilen = (await db.execute(
+            sa.select(RC.assistant_id, Assistant.name, *summen)
+            .outerjoin(Assistant, Assistant.id == RC.assistant_id)
+            .where(*filter_)
+            .group_by(RC.assistant_id, Assistant.name)
+        )).all()
+        roh = [(str(z[0]) if z[0] is not None else None, z[1], *z[2:]) for z in zeilen]
+    else:
+        zeilen = (await db.execute(
+            sa.select(RC.modell, *summen).where(*filter_).group_by(RC.modell)
+        )).all()
+        roh = [(z[0], z[0], *z[1:]) for z in zeilen]
+
+    ergebnis = [
+        BewertungZeile(schluessel=r[0], name=r[1], plus_schueler=int(r[2] or 0),
+                       minus_schueler=int(r[3] or 0), plus_lehrkraft=int(r[4] or 0),
+                       minus_lehrkraft=int(r[5] or 0))
+        for r in roh
+    ]
+    # Zeilen, deren Bewertungen alle zurückgenommen wurden, sind nur Rauschen.
+    ergebnis = [z for z in ergebnis
+                if z.plus_schueler + z.minus_schueler + z.plus_lehrkraft + z.minus_lehrkraft]
+    ergebnis.sort(key=lambda z: (-(z.plus_schueler + z.minus_schueler + z.plus_lehrkraft
+                                   + z.minus_lehrkraft), z.name or ""))
+
+    wochen = (await db.execute(
+        sa.select(RC.woche, sa.func.sum(RC.plus), sa.func.sum(RC.minus))
+        .where(*filter_).group_by(RC.woche).order_by(RC.woche)
+    )).all()
+
+    return BewertungStatistikAntwort(
+        von=von, bis=bis, gruppierung=gruppierung, zeilen=ergebnis,
+        wochen=[BewertungWoche(woche=w[0], plus=int(w[1] or 0), minus=int(w[2] or 0))
+                for w in wochen if (w[1] or 0) + (w[2] or 0)],
     )

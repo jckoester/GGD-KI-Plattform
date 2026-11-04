@@ -12,6 +12,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   unter „Meine Meldungen“; behobene Einträge bleiben 30 Tage stehen.
 - **Antworten bewerten:** Daumen hoch oder runter unter jeder Antwort im Chat; ein zweiter Klick nimmt die Bewertung
   zurück. Nicht in Test- und Vorschau-Chats.
+- **Statistik → Antwortbewertung:** Daumen je Assistent oder Modell, getrennt nach Schüler:innen und Lehrkräften, und je
+  Woche; ohne Personenbezug, die Zahlen bleiben nach dem Löschen der Chats. Anteil „hilfreich“ ab 10 Bewertungen; CSV.
 - „Meine Meldungen“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
 - Audit-Log: bekanntes Problem gezeigt oder zurückgenommen.
 

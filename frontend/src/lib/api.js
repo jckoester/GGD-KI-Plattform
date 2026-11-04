@@ -608,6 +608,20 @@ export async function getVorabStatistik(fromDate = null, toDate = null, fach = n
   //   angeboten, nachgeschlagen}], faecher: [{id, name}] }
 }
 
+// Antwortbewertung (0.31): Daumen je Assistent oder Modell und je Woche.
+export async function getBewertungStatistik(fromDate = null, toDate = null, gruppierung = "assistent") {
+  const url = new URL(`${BASE}/admin/stats/ratings`, location.href);
+  if (fromDate) url.searchParams.set("from_date", fromDate);
+  if (toDate) url.searchParams.set("to_date", toDate);
+  url.searchParams.set("gruppierung", gruppierung);
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+  // { von, bis, gruppierung, zeilen: [{schluessel, name, plus_schueler, minus_schueler,
+  //   plus_lehrkraft, minus_lehrkraft}], wochen: [{woche, plus, minus}] }
+}
+
 export async function getHeatmap(teamId = null, model = null, weekOffset = 0) {
   const url = new URL(`${BASE}/admin/stats/heatmap`, location.href);
   if (teamId) url.searchParams.set("team_id", teamId);

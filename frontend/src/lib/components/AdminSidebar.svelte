@@ -17,6 +17,7 @@
         ChartColumn,
         ReceiptEuro,
         ScanSearch,
+        ThumbsUp,
         ShieldCheck,
         PiggyBank,
         Bot,
@@ -478,6 +479,20 @@
                         <span class="flex items-center gap-2">
                             <ScanSearch class="w-4 h-4" />
                             Vorab-Suche
+                        </span>
+                    </div>
+                </button>
+            </div>
+            <div class="mt-1 space-y-1 pl-2">
+                <button
+                    onclick={() => goto(`/statistics/ratings`)}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <div class="flex justify-between items-center">
+                        <span class="flex items-center gap-2">
+                            <ThumbsUp class="w-4 h-4" />
+                            Antwortbewertung
                         </span>
                     </div>
                 </button>
