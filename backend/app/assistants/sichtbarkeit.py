@@ -33,6 +33,9 @@ Bestand gegeneinander laufen. Dasselbe Muster wie bei den Wissensknoten
   Lehrkräfte sehen alle Stufen; die Erstellerin ihren eigenen sowieso. Bei Gruppen-Scopes
   gelten Gruppe **und** Stufe.
 
+**Drei Darstellungen seit 0.32:** :func:`warum_nicht` nennt zusätzlich den **Grund** eines
+Neins (Reiter „Assistenten“ der Gruppenseite, Päckchen AJ). Auch sie läuft im Wächtertest mit.
+
 **Was hier bewusst *nicht* geprüft wird:** `visibility`. `hidden` heißt „nicht in
 Übersicht und Vorschlag, aber benutzbar“ (C1, F3) — das ist eine Frage der **Darstellung**
 (`frontend/src/lib/assistentenliste.js`), nicht des Zugangs. Die Einstiege wählen aus der
@@ -223,10 +226,83 @@ def darf_nutzen(assistant: Assistant, zugang: Zugang, *, jetzt=None) -> bool:
     return False
 
 
+#: Gründe aus :func:`warum_nicht` — Kennungen für die Oberfläche (Reiter „Assistenten“ der
+#: Gruppenseite, 0.32), die die Beschriftung selbst wählt.
+GRUENDE = frozenset({
+    "entwurf", "in_pruefung", "deaktiviert", "archiviert", "nicht_aktiv",
+    "noch_nicht_freigeschaltet", "abgelaufen", "modell", "stufe", "ohne_gruppe",
+    "fachschaft", "andere_gruppe", "nur_lehrkraefte", "nur_schueler", "privat", "unbekannt",
+})
+
+_STATUS_GRUND = {"draft": "entwurf", "pending_review": "in_pruefung",
+                 "disabled": "deaktiviert", "archived": "archiviert"}
+
+
+def _zielgruppe_grund(audience: str, zugang: Zugang) -> str:
+    if audience == "teacher" and not zugang.lehrkraft:
+        return "nur_lehrkraefte"
+    if audience == "student" and not zugang.schuelerin:
+        return "nur_schueler"
+    return "unbekannt"
+
+
+def warum_nicht(assistant: Assistant, zugang: Zugang, *, jetzt=None) -> str | None:
+    """Warum diese Person den Assistenten **nicht** benutzen darf — der erste Grund, oder
+    ``None``, wenn sie darf (0.32, Päckchen AJ).
+
+    ⚠️ **Dieselbe Prüfreihenfolge wie :func:`darf_nutzen`, Schritt für Schritt.** Die Regel
+    steht damit ein drittes Mal da; ``tests/integration/test_assistenten_sichtbarkeit.py``
+    prüft am selben Bestand, dass ``warum_nicht(...) is None`` genau dann gilt, wenn
+    ``darf_nutzen`` ja sagt. Wer die Regel ändert, ändert alle drei.
+
+    Der **erste** Grund, nicht alle: Ein Entwurf mit falscher Stufe ist zuerst ein Entwurf —
+    so liest sich die Liste von oben, und genau in dieser Reihenfolge fragt die Regel.
+    """
+    jetzt = jetzt or datetime.now(timezone.utc)
+    if not _ist_eintritt(assistant, zugang):
+        if assistant.status != "active":
+            return _STATUS_GRUND.get(assistant.status, "nicht_aktiv")
+        if assistant.available_from and assistant.available_from > jetzt:
+            return "noch_nicht_freigeschaltet"
+        if assistant.available_until and assistant.available_until < jetzt:
+            return "abgelaufen"
+
+    if not _modell_passt(assistant, zugang):
+        return "modell"
+
+    if zugang.eigene and assistant.created_by == zugang.pseudonym:
+        return None
+
+    if not _stufe_passt(assistant, zugang):
+        return "stufe"
+
+    if assistant.scope in GRUPPENSCOPES:
+        gruppe = assistant.scope_group_id
+        if gruppe is None:
+            return "ohne_gruppe"
+        if gruppe in zugang.lehrgruppen and zugang.lehrkraft:
+            return None
+        if gruppe not in zugang.gruppen:
+            # Die Fachschaft gesondert: Sie ist die Gruppe, die Schüler:innen nie haben —
+            # „andere Gruppe“ läse sich, als fehle nur die richtige Freigabe (Plan F3 a).
+            return "fachschaft" if assistant.scope == "subject_department" else "andere_gruppe"
+        return None if _zielgruppe_passt(assistant.audience, zugang) else _zielgruppe_grund(
+            assistant.audience, zugang)
+
+    if assistant.scope == "teachers":
+        return None if zugang.lehrkraft else "nur_lehrkraefte"
+    if assistant.scope in OFFENE_SCOPES:
+        return None if _zielgruppe_passt(assistant.audience, zugang) else _zielgruppe_grund(
+            assistant.audience, zugang)
+    if assistant.scope == "private":
+        return "privat"
+    return "unbekannt"
+
+
 def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
     """Dieselbe Regel als SQL-Bedingung — für die Liste.
 
-    ⚠️ Wer hier etwas ändert, ändert :func:`darf_nutzen` mit.
+    ⚠️ Wer hier etwas ändert, ändert :func:`darf_nutzen` mit — und :func:`warum_nicht`.
     `tests/integration/test_assistenten_sichtbarkeit.py` lässt beide am selben Bestand
     gegeneinander laufen; auseinanderlaufen lassen sie sich nur, indem man den Test
     löscht.

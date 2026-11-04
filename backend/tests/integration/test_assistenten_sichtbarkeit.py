@@ -15,11 +15,14 @@ Zwei Dinge werden hier geprüft, und das zweite ist das wichtigere:
    nur einmal prüft, wäre derselbe Fehler noch einmal.
 """
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import sqlalchemy as sa
 
-from app.assistants.sichtbarkeit import Zugang, darf_nutzen, lade_zugang, sichtbar_klausel
+from app.assistants.sichtbarkeit import (
+    GRUENDE, Zugang, darf_nutzen, lade_zugang, sichtbar_klausel, warum_nicht,
+)
 from app.auth.jwt import JwtPayload
 from app.db.models import Assistant, Group, GroupMembership, Subject
 
@@ -209,6 +212,19 @@ class TestFunktionUndAbfrageSagenDasselbe:
                 audience="student", min_grade=10, max_grade=13,
                 created_by="irgendeine-kollegin",
             ),
+            # Seit 0.32 (Gründe): weitere Status, Zeitfenster, Fachschaft, Zielgruppe in der Gruppe
+            await _assistent(db_session, scope="all", audience="all", status="pending_review",
+                             created_by="wer-anders"),
+            await _assistent(db_session, scope="all", audience="all", status="disabled",
+                             created_by="wer-anders"),
+            await _assistent(db_session, scope="all", audience="all", created_by="wer-anders",
+                             available_from=datetime.now(timezone.utc) + timedelta(days=3)),
+            await _assistent(db_session, scope="all", audience="all", created_by="wer-anders",
+                             available_until=datetime.now(timezone.utc) - timedelta(days=3)),
+            await _assistent(db_session, scope="subject_department", audience="student",
+                             scope_group_id=welt["fremde_gruppe"].id, created_by="wer-anders"),
+            await _assistent(db_session, scope="teaching_group", audience="teacher",
+                             scope_group_id=welt["gruppe"].id, created_by="wer-anders"),
         ]
 
     @pytest.mark.parametrize(
@@ -243,6 +259,12 @@ class TestFunktionUndAbfrageSagenDasselbe:
             f"nur Funktion {sorted(aus_der_funktion - aus_der_abfrage)}, "
             f"nur Abfrage {sorted(aus_der_abfrage - aus_der_funktion)}"
         )
+
+        # Die dritte Darstellung (0.32): kein Grund genau dann, wenn die Funktion ja sagt —
+        # und jeder Grund ist einer, den die Oberfläche kennt.
+        gruende = {a.id: warum_nicht(a, zugang) for a in bestand}
+        assert {i for i, g in gruende.items() if g is None} == aus_der_funktion, pseudonym
+        assert set(gruende.values()) - {None} <= GRUENDE
 
     async def test_der_bestand_deckt_beide_antworten_ab(self, db_session, welt):
         """Ein Vergleich zweier leerer Mengen belegt nichts."""
@@ -506,3 +528,73 @@ class TestVorschau:
         )).scalars().all())
         assert aus_der_funktion == aus_der_abfrage
         assert aus_der_funktion, "Ein Vergleich zweier leerer Mengen belegt nichts"
+
+
+class TestWarumNicht:
+    """Der Grund eines Neins (0.32, Päckchen AJ) — je Grund ein Fall.
+
+    Der Zugang ist der, den der Reiter „Assistenten“ für eine Schüler:in der Gruppe nachbaut:
+    Mitglied nur dieser Gruppe, ``eigene=False`` — eigene Entwürfe der Lehrkraft zählen nicht.
+    """
+
+    def _schuelerin(self, welt, *, stufe=9, modelle=None) -> Zugang:
+        return Zugang(pseudonym="nachgebaut", rollen=frozenset({"student"}),
+                      gruppen=frozenset({welt["gruppe"].id}), lehrgruppen=frozenset(),
+                      stufe=stufe, modelle=modelle, eigene=False)
+
+    @pytest.mark.parametrize("felder,grund", [
+        ({"status": "draft"}, "entwurf"),
+        ({"status": "pending_review"}, "in_pruefung"),
+        ({"status": "disabled"}, "deaktiviert"),
+        ({"status": "archived"}, "archiviert"),
+        ({"min_grade": 10}, "stufe"),
+        ({"scope": "teachers", "audience": "teacher"}, "nur_lehrkraefte"),
+        ({"scope": "all", "audience": "teacher"}, "nur_lehrkraefte"),
+        ({"scope": "private"}, "privat"),
+        ({"scope": "teaching_group", "scope_group_id": None}, "ohne_gruppe"),
+    ])
+    async def test_grund(self, db_session, welt, felder, grund):
+        a = await _assistent(db_session, **felder)
+        assert warum_nicht(a, self._schuelerin(welt)) == grund
+        assert not darf_nutzen(a, self._schuelerin(welt))
+
+    async def test_andere_gruppe_und_fachschaft(self, db_session, welt):
+        andere = await _assistent(db_session, scope="teaching_group",
+                                  scope_group_id=welt["fremde_gruppe"].id)
+        fachschaft = await _assistent(db_session, scope="subject_department",
+                                      scope_group_id=welt["fremde_gruppe"].id)
+        assert warum_nicht(andere, self._schuelerin(welt)) == "andere_gruppe"
+        assert warum_nicht(fachschaft, self._schuelerin(welt)) == "fachschaft"
+
+    async def test_zeitfenster(self, db_session, welt):
+        jetzt = datetime.now(timezone.utc)
+        spaeter = await _assistent(db_session, available_from=jetzt + timedelta(days=1))
+        vorbei = await _assistent(db_session, available_until=jetzt - timedelta(days=1))
+        assert warum_nicht(spaeter, self._schuelerin(welt)) == "noch_nicht_freigeschaltet"
+        assert warum_nicht(vorbei, self._schuelerin(welt)) == "abgelaufen"
+
+    async def test_modell_nicht_freigeschaltet(self, db_session, welt):
+        a = await _assistent(db_session, model="chat-komplex")
+        zugang = self._schuelerin(welt, modelle=frozenset({"chat-standard"}))
+        assert warum_nicht(a, zugang) == "modell"
+        assert not darf_nutzen(a, zugang)
+
+    async def test_erster_grund_gewinnt(self, db_session, welt):
+        """Ein Entwurf mit falscher Stufe und fremder Gruppe ist zuerst ein Entwurf."""
+        a = await _assistent(db_session, status="draft", min_grade=11, scope="teaching_group",
+                             scope_group_id=welt["fremde_gruppe"].id)
+        assert warum_nicht(a, self._schuelerin(welt)) == "entwurf"
+
+    async def test_sichtbar_heisst_kein_grund(self, db_session, welt):
+        fuer_die_gruppe = await _assistent(db_session, scope="teaching_group",
+                                           scope_group_id=welt["gruppe"].id)
+        schulweit = await _assistent(db_session, scope="all_students", min_grade=8, max_grade=10)
+        for a in (fuer_die_gruppe, schulweit):
+            assert warum_nicht(a, self._schuelerin(welt)) is None
+
+    async def test_eigener_entwurf_zaehlt_in_der_nachgebauten_sicht_nicht(self, db_session, welt):
+        """Für die Erstellerin selbst wäre er benutzbar — für ihre Klasse nicht."""
+        a = await _assistent(db_session, scope="private", created_by=ERSTELLERIN)
+        assert warum_nicht(a, await _zugang(db_session, ERSTELLERIN, "teacher")) is None
+        assert warum_nicht(a, self._schuelerin(welt)) == "privat"
+
