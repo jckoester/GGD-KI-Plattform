@@ -8,6 +8,7 @@
     import { jahrgangFuerAssistent, kannVorschauBetreten } from "$lib/vorschau.js";
     import { auswahlMitBestand, eigeneFaecher, fachDerGruppe } from "$lib/stores/myGroups.js";
     import { GETEILT_SCOPES, SCHOOLWIDE_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
+    import { fachschaftHinweis } from "$lib/schuelersicht.js";
     import {
         Bot,
         Send,
@@ -1559,6 +1560,13 @@
                             <strong>Schüler:innen</strong> pädagogisch geformt (Denkanstöße statt
                             Komplettlösungen) und für <strong>Lehrkräfte</strong> direkt und
                             vollständig.
+                        </p>
+                    {/if}
+
+                    <!-- Fachschaft = Teilen unter Lehrkräften (0.32, F3 a) — erreicht keine Schüler:in -->
+                    {#if fachschaftHinweis(form)}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 -mt-2">
+                            {fachschaftHinweis(form)}
                         </p>
                     {/if}
 

@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Reiter „Assistenten“ auf der Seite der Unterrichtsgruppe** (Lehrkräfte): welche Assistenten eine Schüler:in dieser
+  Gruppe sieht — für die Gruppe freigegeben und schulweit für ihre Klassenstufe, ausgeblendete gekennzeichnet — und
+  welche eigenen Assistenten sie nicht sieht, mit Grund. Ohne bekannten Jahrgang lässt sich die Klasse wählen. Knopf
+  „Als Schüler:in ansehen“ mit dieser Gruppe.
+- Assistenten-Editor: Hinweis, dass ein Assistent mit Freigabe „Fachschaft“ keine Schüler:innen erreicht.
+
 ## [0.31.0] – 2026-11-04
 
 Feedback-Kanal ausgebaut: bekannte Probleme und Daumen an den Antworten. Eine Migration (0101).

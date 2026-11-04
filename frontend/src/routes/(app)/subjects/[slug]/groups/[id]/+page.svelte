@@ -17,6 +17,7 @@
   import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
   import CurriculumList from '$lib/components/CurriculumList.svelte'
   import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
+  import AssistentenDerGruppe from '$lib/components/AssistentenDerGruppe.svelte'
 
   // ── Gruppe + Fach aus Stores ──────────────────────────────────────────────
   // `myTeachingGroups` führt die eigenen `teaching_group`-Mitgliedschaften — für
@@ -160,6 +161,9 @@
 
   {:else if activeTab === 'archiv'}
     <GruppenArchiv subjectId={subject?.id} />
+
+  {:else if activeTab === 'assistenten'}
+    <AssistentenDerGruppe {group} />
 
   {:else if activeTab === 'kontext'}
     <KnowledgeNodeList

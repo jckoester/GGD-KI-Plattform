@@ -29,6 +29,9 @@ export const REITER = [
   { id: 'curriculum', label: 'Curriculum' },
   { id: 'bildungsplan', label: 'Bildungsplan' },
   { id: 'kontext', label: 'weiterer Kontext' },
+  // Was die Schüler:innen dieser Gruppe an Assistenten sehen (0.32, Päckchen AJ) — ein
+  // Nachschlagen, kein tägliches Arbeiten, deshalb hinten (Plan F5).
+  { id: 'assistenten', label: 'Assistenten' },
   { id: 'archiv', label: 'Archiv' },
 ]
 

@@ -2948,6 +2948,21 @@ export async function rateMessage(id, rating) {
   return res.json();
 }
 
+// Assistenten der Gruppe aus Schülersicht (0.32): sichtbare und eigene nicht sichtbare mit
+// Grund. `jahrgang` nur, wenn die Gruppe keinen bekannten hat (oder zum Ausprobieren).
+export async function getGruppenSchuelersicht(groupId, jahrgang = null) {
+  const params = jahrgang ? `?jahrgang=${jahrgang}` : "";
+  const res = await fetch(`${BASE}/groups/${groupId}/student-assistants${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+  // { jahrgang, jahrgang_quelle, modelle_bekannt, fuer_die_gruppe, schulweit, eigene_unsichtbar }
+}
+
 // Admin: der Eingang. Ohne `status` liefert der Server, was Arbeit macht
 // (offen + in Bearbeitung). `counts` folgt den übrigen Filtern, nicht dem Status.
 export async function getAdminFeedback({

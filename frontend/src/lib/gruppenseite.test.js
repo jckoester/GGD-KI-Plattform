@@ -25,6 +25,7 @@ describe('REITER', () => {
       'curriculum',
       'bildungsplan',
       'kontext',
+      'assistenten',
       'archiv',
     ])
   })
