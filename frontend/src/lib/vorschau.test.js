@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-    bandText, hinweisText, jahrgangFuerAssistent, kannVorschauBetreten, restMinuten,
+    bandText, hinweisText, jahrgangFuerAssistent, kannVorschauBetreten, klasseDerGruppe, klassenWahl,
+    restMinuten,
     vorschauGruppen, zielNachEintritt,
 } from "./vorschau.js";
 
@@ -65,3 +66,33 @@ describe("Ziel und Hinweis", () => {
         expect(hinweisText("x")).toBe(null);
     });
 });
+
+const STUFEN = [5, 6, 7, 8, 9, 10, 11, 12];
+
+describe("klasseDerGruppe (0.32.1)", () => {
+    it("nimmt den wirksamen Jahrgang, sonst die Festlegung", () => {
+        expect(klasseDerGruppe({ jahrgang_wirksam: 11, jahrgang: null }, STUFEN)).toBe(11);
+        expect(klasseDerGruppe({ jahrgang: 9 }, STUFEN)).toBe(9);
+    });
+    it("unbekannt, wenn es keinen gibt oder die Schule die Stufe nicht führt", () => {
+        expect(klasseDerGruppe({ jahrgang_wirksam: null }, STUFEN)).toBeNull();
+        expect(klasseDerGruppe({ jahrgang_wirksam: 13 }, STUFEN)).toBeNull();
+        expect(klasseDerGruppe(null, STUFEN)).toBeNull();
+    });
+});
+
+describe("klassenWahl (0.32.1)", () => {
+    it("ohne Gruppe frei", () => {
+        expect(klassenWahl(null, STUFEN)).toEqual({ fest: false, jahrgang: null, hinweis: null });
+    });
+    it("mit Gruppe fest — die Klasse ergibt sich aus ihr", () => {
+        expect(klassenWahl({ jahrgang_wirksam: 11 }, STUFEN))
+            .toEqual({ fest: true, jahrgang: 11, hinweis: "aus der Gruppe" });
+    });
+    it("Gruppe mit unbekanntem Jahrgang: wählbar, mit Hinweis", () => {
+        const wahl = klassenWahl({ jahrgang_wirksam: null }, STUFEN);
+        expect(wahl.fest).toBe(false);
+        expect(wahl.hinweis).toMatch(/unbekannt/);
+    });
+});
+

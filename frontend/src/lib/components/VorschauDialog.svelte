@@ -11,7 +11,7 @@
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { onMount } from "svelte";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
-    import { vorschauGruppen, zielNachEintritt } from "$lib/vorschau.js";
+    import { klassenWahl, vorschauGruppen, zielNachEintritt } from "$lib/vorschau.js";
 
     let { vorgabe = {}, onclose = () => {} } = $props();
 
@@ -19,19 +19,18 @@
     // Einmal beim Öffnen vorbelegen — danach gehört die Auswahl der Lehrkraft.
     // svelte-ignore state_referenced_locally
     let gruppeId = $state(vorgabe.gruppeId ?? "");
+    // Die frei gewählte Klasse — gilt ohne Gruppe und bei Gruppen ohne bekannten Jahrgang.
     // svelte-ignore state_referenced_locally
-    let jahrgang = $state(vorgabe.jahrgang ?? STUDENT_GRADES[0]);
+    let freieKlasse = $state(vorgabe.jahrgang ?? STUDENT_GRADES[0]);
+    // Mit Gruppe ergibt sich die Klasse aus ihr (0.32.1, Rückmeldung aus dem Test).
+    const gruppe = $derived(gruppen.find((x) => String(x.id) === String(gruppeId)) ?? null);
+    const wahl = $derived(klassenWahl(gruppe));
+    const jahrgang = $derived(wahl.fest ? wahl.jahrgang : freieKlasse);
     let laeuft = $state(false);
     let fehler = $state(null);
 
     // Das Admin-Layout lädt die eigenen Gruppen nicht — der Dialog holt sie selbst.
     onMount(() => refreshMyGroups());
-
-    function gruppeGewaehlt() {
-        // Die Gruppe kennt ihren Jahrgang — dann soll er nicht widersprechen.
-        const g = gruppen.find((x) => String(x.id) === String(gruppeId));
-        if (g?.jahrgang && STUDENT_GRADES.includes(g.jahrgang)) jahrgang = g.jahrgang;
-    }
 
     async function starten() {
         laeuft = true;
@@ -72,7 +71,7 @@
     <div class="mt-4 space-y-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
         <label class="block">
             Unterrichtsgruppe
-            <select bind:value={gruppeId} onchange={gruppeGewaehlt} class="{feld} mt-1">
+            <select bind:value={gruppeId} class="{feld} mt-1">
                 <option value="">ohne Gruppe</option>
                 {#each gruppen as g (g.id)}
                     <option value={g.id}>{g.name}</option>
@@ -84,11 +83,20 @@
         </label>
         <label class="block">
             Klasse
-            <select bind:value={jahrgang} class="{feld} mt-1">
-                {#each STUDENT_GRADES as stufe (stufe)}
-                    <option value={stufe}>{stufe}</option>
-                {/each}
-            </select>
+            {#if wahl.fest}
+                <select value={wahl.jahrgang} disabled class="{feld} mt-1 opacity-70">
+                    <option value={wahl.jahrgang}>{wahl.jahrgang}</option>
+                </select>
+            {:else}
+                <select bind:value={freieKlasse} class="{feld} mt-1">
+                    {#each STUDENT_GRADES as stufe (stufe)}
+                        <option value={stufe}>{stufe}</option>
+                    {/each}
+                </select>
+            {/if}
+            {#if wahl.hinweis}
+                <span class="block text-xs mt-1">{wahl.hinweis}</span>
+            {/if}
         </label>
     </div>
 

@@ -43,6 +43,31 @@ export function jahrgangFuerAssistent(assistent, stufen = STUDENT_GRADES) {
   return passend ?? stufen[0];
 }
 
+/**
+ * Die Klasse, die sich aus einer Gruppe ergibt (0.32.1): der wirksame Jahrgang aus
+ * `GET /groups/me` (festgelegt oder abgeleitet), sonst die Festlegung — und nur, wenn es die
+ * Stufe an der Schule gibt. `null` heißt: unbekannt, die Lehrkraft wählt.
+ */
+export function klasseDerGruppe(gruppe, stufen = STUDENT_GRADES) {
+  const wert = gruppe?.jahrgang_wirksam ?? gruppe?.jahrgang ?? null;
+  return wert != null && stufen.includes(Number(wert)) ? Number(wert) : null;
+}
+
+/**
+ * Wie der Dialog die Klasse anbietet (0.32.1, Rückmeldung aus dem Test): Ohne Gruppe wählt die
+ * Lehrkraft frei. Mit Gruppe ergibt sich die Klasse aus ihr und ist gesperrt — außer der
+ * Jahrgang der Gruppe ist unbekannt; dann bleibt sie wählbar, mit Hinweis.
+ *
+ * @returns {{ fest: boolean, jahrgang: number|null, hinweis: string|null }}
+ *   `jahrgang` nur bei `fest`; sonst gilt die freie Auswahl.
+ */
+export function klassenWahl(gruppe, stufen = STUDENT_GRADES) {
+  if (!gruppe) return { fest: false, jahrgang: null, hinweis: null };
+  const klasse = klasseDerGruppe(gruppe, stufen);
+  if (klasse != null) return { fest: true, jahrgang: klasse, hinweis: "aus der Gruppe" };
+  return { fest: false, jahrgang: null, hinweis: "Jahrgang der Gruppe unbekannt — bitte Klasse wählen." };
+}
+
 /** Gruppen, die der Dialog anbietet (F3): Unterrichtsgruppen des laufenden Schuljahres. */
 export function vorschauGruppen(gruppen) {
   return (gruppen ?? []).filter((g) => g.type === "teaching_group" && g.aktuell !== false);

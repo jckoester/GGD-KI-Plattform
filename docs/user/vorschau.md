@@ -7,13 +7,14 @@ Unterrichts im Chat an?
 
 ## So startest du
 
-- **Im Benutzermenü** unten links: **Als Schüler:in ansehen…** Du wählst eine Klasse und, wenn
-  du magst, eine deiner Unterrichtsgruppen.
+- **Im Benutzermenü** unten links: **Als Schüler:in ansehen…** Wählst du eine deiner
+  Unterrichtsgruppen, ergibt sich die Klasse aus ihr. Ohne Gruppe wählst du die Klasse selbst —
+  ebenso bei einer Gruppe, deren Jahrgang die Plattform nicht kennt (manche Kurse und AGs).
 - **Auf der Seite einer Unterrichtsgruppe**, Reiter **„Assistenten"**: **Als Schüler:in
   ansehen** — mit dieser Gruppe und ihrer Klasse vorbelegt. Der Reiter selbst listet schon
   vorher, welche Assistenten die Gruppe sieht; die Vorschau ist für das Ausprobieren.
 - **Im Assistenten-Editor** neben dem Testchat: **Als Schüler:in testen**. Klasse und Gruppe sind
-  aus dem Assistenten vorbelegt, und die Vorschau öffnet gleich den Chat mit ihm — auch wenn er
+  aus dem Assistenten vorbelegt (ist er für eine Gruppe freigegeben, gilt deren Klasse), und die Vorschau öffnet gleich den Chat mit ihm — auch wenn er
   noch ein Entwurf ist.
 
 Der Testchat im Editor zeigt, *wie der Assistent antwortet*. Die Vorschau zeigt zusätzlich, *ob

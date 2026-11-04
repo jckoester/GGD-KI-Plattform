@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func as sa_func, select
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.config import SsoConfig
@@ -27,6 +28,7 @@ from app.groups.aktualitaet import (
     ist_aktuell,
 )
 from app.db.session import get_db
+from app.groups.jahrgang import jahrgang_aus
 from app.planning.calendar import SchoolYearConfig, load_school_year
 from app.auth.vorschau import mitglied
 
@@ -90,6 +92,10 @@ class MyGroupOut(GroupOut):
     # frühere Gruppen gefüllt und auch dort nur, wenn es etwas zu sagen gibt. Eine
     # geratene Jahreszahl wäre schlechter als keine (dieselbe Regel wie im Archiv).
     letztes_schuljahr: Optional[str] = None
+    # Der Jahrgang, nach dem sich die Gruppe richtet (0.32.1): festgelegt oder aus Klassen
+    # bzw. Namen abgeleitet (`jahrgang_aus`) — anders als `jahrgang`, das nur die Festlegung
+    # trägt. Für den Vorschau-Dialog: Mit Gruppe steht die Klasse fest. Nur bei Unterrichtsgruppen.
+    jahrgang_wirksam: Optional[int] = None
 
 
 class MyGroupsResponse(BaseModel):
@@ -153,6 +159,17 @@ async def list_my_groups(
     jahre = await letztes_schuljahr(
         db, [g.id for g in gruppen if not aktualitaet[g.id]]
     )
+    # Quellklassen aller Unterrichtsgruppen auf einmal (wie `GET /planning/groups`) — der
+    # Jahrgang folgt derselben Regel wie überall (`jahrgang_aus`).
+    klassen: dict[int, list[str]] = {}
+    if unterricht_ids:
+        klassengruppe = aliased(Group)
+        for gid, name in (await db.execute(
+            select(GroupSourceClass.group_id, klassengruppe.name)
+            .join(klassengruppe, klassengruppe.id == GroupSourceClass.class_group_id)
+            .where(GroupSourceClass.group_id.in_(unterricht_ids))
+        )).all():
+            klassen.setdefault(gid, []).append(name)
     return MyGroupsResponse(
         items=[
             # Erst `GroupOut` aus dem ORM-Objekt, dann die Zusätze daneben. Direkt
@@ -162,6 +179,10 @@ async def list_my_groups(
                 **GroupOut.model_validate(g, from_attributes=True).model_dump(),
                 aktuell=aktualitaet[g.id],
                 letztes_schuljahr=jahre.get(g.id),
+                jahrgang_wirksam=(
+                    jahrgang_aus(g, klassen.get(g.id, []), schuljahr_ende=cfg.ende.year)
+                    if g.type == "teaching_group" else None
+                ),
             )
             for g in gruppen
         ]

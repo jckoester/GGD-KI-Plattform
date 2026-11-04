@@ -11,6 +11,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nie nachgetragen — die Übersicht war unsortiert, Fächer fehlten im Menü, der Vorschlag im Chat sprang nicht an. Der Seed
   (`scripts/seed_assistants.py`) trägt jetzt alle leeren Felder nach und überschreibt nichts, was gesetzt ist.
 
+### Geändert
+
+- **Als Schüler:in ansehen:** Mit gewählter Unterrichtsgruppe ergibt sich die Klasse aus der Gruppe und ist nicht mehr
+  wählbar; ohne Gruppe oder bei unbekanntem Jahrgang der Gruppe wählst du sie selbst. Der Einstieg aus dem Editor begann
+  bisher in Klasse 5, wenn der Assistent keine Klassenstufen hatte.
+
 ### Nach dem Update
 
 - `docker compose exec backend python scripts/seed_assistants.py --dry-run` — zeigt je Assistent, was nachgetragen würde;
