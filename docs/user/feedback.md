@@ -4,6 +4,18 @@ Etwas funktioniert nicht, ist umständlich oder fehlt? Sag Bescheid. Die Plattfo
 an der Schule entwickelt, und Rückmeldungen aus dem Unterricht sind der einzige Weg,
 von dem zu erfahren, was im Alltag stört.
 
+## Erst schauen: Ist es schon bekannt?
+
+Was die Administration schon kennt, steht unter **„Bekannte Probleme"** — oben im
+Feedback-Formular als „Schon bekannt" und im Nutzermenü unter **„Feedback & Neuigkeiten"**.
+Dort siehst du zu jedem Eintrag, wie weit er ist: **Bekannt**, **Wird bearbeitet** oder
+**Behoben in …** (behobene Einträge bleiben 30 Tage stehen). Steht dein Anliegen schon da,
+musst du es nicht noch einmal melden.
+
+Die Einträge formuliert die Administration selbst. Von den Meldungen dahinter ist nichts zu
+sehen — weder der Text noch, wer gemeldet hat. Manche Einträge sehen nur Lehrkräfte, etwa
+wenn sie Werkzeuge betreffen, die es nur für sie gibt.
+
 ## Eine Meldung schreiben
 
 Über das **Nutzermenü** unten links (auf deinem Namen) → **„Feedback geben"**. Bist du
@@ -59,10 +71,18 @@ persönlich ansprechen. Beim Abschluss der Meldung wird das Feld gelöscht.
 Der Freitext ist die einzige Stelle in der Plattform, an der man über Dritte schreiben
 kann; beschreibe deshalb, was passiert ist, nicht wer beteiligt war.
 
+## Feedback & Neuigkeiten
+
+Im Nutzermenü unter **„Feedback & Neuigkeiten"** stehen drei Abschnitte:
+
+- **Bekannte Probleme** — siehe oben.
+- **Was ist neu** — die aktuellen Neuigkeiten für dich, auch die, die du auf der Startseite
+  schon weggeklickt hast.
+- **Meine Meldungen** — deine eigenen Meldungen, siehe unten.
+
 ## Meine Meldungen
 
-Über das Nutzermenü → **„Feedback & Neuigkeiten"**, Abschnitt „Meine Meldungen". Dort steht
-zu jeder Meldung, wie weit sie ist:
+Zu jeder Meldung steht dort, wie weit sie ist:
 
 | Anzeige | Bedeutung |
 |---|---|
@@ -77,6 +97,22 @@ neue Meldung oder sprich die Administration an.
 
 Solange eine Meldung **offen** ist, kannst du sie **zurückziehen**. Sobald sie in
 Bearbeitung ist, geht das nicht mehr — dann sitzt jemand daran.
+
+## Antworten bewerten
+
+Unter jeder Antwort im Chat stehen rechts zwei Daumen: **hoch** heißt „hilfreich",
+**runter** „nicht hilfreich". Ein zweiter Klick auf denselben Daumen nimmt die Bewertung
+zurück, der andere schaltet um. Im Testchat eines Assistenten und in der Vorschau gibt es
+keine Daumen.
+
+Die Daumen sind etwas anderes als eine Meldung: Sie sagen, ob eine Antwort brauchbar war,
+nicht was nicht funktioniert. Die Administration sieht sie nur **zusammengezählt** — je
+Assistent und Modell und je Woche, getrennt nach Schüler:innen und Lehrkräften —, nie
+einzeln, nie mit dir oder dem Chat verbunden. So zeigt sich, welche Assistenten gut
+ankommen und wo jemand nachbessern sollte.
+
+Willst du sagen, **was** an einer Antwort nicht gestimmt hat, schreib eine Meldung und
+häng den Chat an.
 
 ## Wie oft man melden kann
 

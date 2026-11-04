@@ -5,7 +5,8 @@ und Vorschläge aus der Anwendung heraus, die Administration sichtet sie unter
 **`/feedback/manage`**. Grundlage ist ADR-020.
 
 Diese Seite beschreibt die Triage — also die Handarbeit, die den Wert des Kanals
-ausmacht.
+ausmacht —, die **bekannten Probleme** (seit 0.31) und die Auswertung der **Daumen** an
+den Antworten (seit 0.31).
 
 ## Was eine Meldung enthält
 
@@ -59,6 +60,66 @@ Kontaktangabe (s. u.) oder spricht die Person an.
 **Wiedereröffnen** geht aus jedem abgeschlossenen Zustand zurück nach `open`. Ein
 direkter Sprung zwischen abgeschlossenen Zuständen wird abgelehnt — er liefe am
 Wiedereröffnen vorbei und verstellte den Zeitpunkt, ab dem die Löschfrist läuft.
+
+## Bekannte Probleme (seit 0.31)
+
+Eine Meldung lässt sich als **bekanntes Problem** zeigen: In der aufgeklappten Meldung wählen
+Sie „Für alle sichtbar" oder „Nur für Lehrkräfte sichtbar" und geben einen **öffentlichen
+Titel** ein (höchstens 200 Zeichen). Der Eintrag erscheint dann
+
+- im Feedback-Formular als „Schon bekannt" — dort, wo eine Doppelmeldung entsteht,
+- und unter „Feedback & Neuigkeiten" im Nutzermenü,
+
+mit dem Stand **Bekannt** (offen), **Wird bearbeitet** oder **Behoben in *Version***. Nach
+`Erledigt` bleibt er **30 Tage** stehen und verschwindet dann von selbst. In der Liste der
+Sichtung tragen öffentliche Meldungen das Abzeichen „Bekannt".
+
+Öffentlich ist **nur der Titel**, den Sie schreiben — nie der Text der Meldung, nie
+Kategorie, Rolle, Version oder wer gemeldet hat. Formulieren Sie ihn deshalb selbst und ohne
+Namen, Klassen oder Zitate aus der Meldung, etwa „Formeln im PDF-Export verrutschen".
+
+- **Zielgruppe:** „Nur für Lehrkräfte" für alles, was Schüler:innen nicht betrifft oder nicht
+  kennen (Planung, Assistenten-Editor, Werkstatt). Die Entscheidung trifft bewusst der
+  Mensch, nicht die Plattform.
+- **Mehrere Meldungen zum selben Problem:** nur **eine** öffentlich zeigen; die übrigen
+  bündeln Sie wie gewohnt über die Issue-Referenz.
+- **Abgelehnt oder Spam:** Solche Meldungen erscheinen nie als bekanntes Problem. Wer eine
+  öffentliche Meldung ablehnt, nimmt sie damit aus der Liste; der Titel bleibt für ein
+  späteres Wiedereröffnen gespeichert.
+- **Zurücknehmen:** „Nicht öffentlich" wählen und speichern.
+
+Zeigen und Zurücknehmen stehen im **Audit-Log** (`feedback_public_changed`, mit alter und neuer
+Zielgruppe, ohne Titel).
+
+## Antwortbewertung auswerten (seit 0.31)
+
+Unter jeder Antwort im Chat setzen Nutzer:innen Daumen hoch („hilfreich") oder runter („nicht
+hilfreich"). Das ist ein **zweiter Kanal** neben den Meldungen (ADR-020): kein Fehlerbericht,
+sondern ein Qualitätssignal für die Konfiguration von Assistenten und die Modellwahl.
+
+Ausgewertet wird unter **`/statistics/ratings`** (Rollen `admin` und `statistics`):
+
+- **Je Assistent oder je Modell**, getrennt nach Schüler:innen und Lehrkräften (Admins zählen
+  als Lehrkräfte): Daumen hoch, runter und der **Anteil „hilfreich"**. Den Anteil zeigt die
+  Seite erst ab **10 Bewertungen** — darunter wäre er Zufall. „Ohne Assistent" sind Chats ohne
+  Assistenten.
+- **Je Woche** der Verlauf mit einer Summe für den Zeitraum; die Tabelle lässt sich als CSV
+  herunterladen.
+
+Lesehilfen:
+
+- Gezählt wird in der Woche der **ersten** Bewertung einer Antwort. Wer sich später
+  umentscheidet, ändert diese Woche, nicht die aktuelle.
+- Test-Chats im Assistenten-Editor und Vorschau-Chats tragen keine Daumen und zählen nicht.
+- Wenige Bewertungen sind normal: Die meisten Antworten bewertet niemand. Aussagekräftig ist
+  der Vergleich zwischen Assistenten oder Modellen über einige Wochen, nicht die einzelne Zahl.
+- Ein auffällig niedriger Anteil ist ein Anlass, sich den Assistenten anzusehen — mit einer
+  eigenen Probe oder über Meldungen mit angehängtem Chat. Die Bewertungen selbst verweisen auf
+  keinen Chat.
+
+Die Zahlen enthalten **keine Personen und keine Chats**; sie bleiben auch nach dem Löschen der
+Chats erhalten. Zeilen eines gelöschten Assistenten verschwinden mit ihm. Einzelheiten:
+[Datenschutz im Betrieb](datenschutz-betrieb.md#antwortbewertung-seit-031).
 
 ## Zweckbindung der Kontaktangabe
 

@@ -121,6 +121,12 @@ Elektronenpaaren) stellt der Chat als Grafik dar — was dabei geht und wie du e
 weiterverwendest, steht unter
 [Diagramme, Schaltpläne, Funktionsgraphen & Strukturformeln](diagramme.md).
 
+## Antworten bewerten
+
+Unter jeder Antwort stehen rechts zwei Daumen — **hoch** für „hilfreich", **runter** für
+„nicht hilfreich". Ein zweiter Klick nimmt die Bewertung zurück. Gezählt wird ohne deinen
+Namen und ohne den Chat; mehr dazu unter [Feedback geben](feedback.md#antworten-bewerten).
+
 ## Chat-Verlauf
 
 Alle deine Gespräche werden unter **„Letzte Chats"** in der Seitenleiste gespeichert. Von dort kannst du ein älteres Gespräch jederzeit wieder öffnen und fortsetzen.

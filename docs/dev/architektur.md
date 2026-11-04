@@ -39,7 +39,7 @@ Cron-Container (separat):
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
 | `groups/` | Unterrichtsgruppen jenseits der Endpunkte: Beitrittscodes (`beitritt.py` — reine Regeln plus schreibende Vorgänge, Rücknahme als Menge), die Aktualitätsregel „gehört zum laufenden Schuljahr?" (`aktualitaet.py`, geteilt mit dem Stundenplan-Abgleich) und die Angebote für neue SSO-Unterrichtsgruppen (`angebote.py` — zuordnen, anlegen, ignorieren) |
-| `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster |
+| `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster; seit 0.31 bekannte Probleme (`GET /feedback/public`) und die Antwortbewertung (`bewertung.py`: `PUT /messages/{id}/rating`, Wochenzähler `rating_counts` in derselben Transaktion) |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
 | `api/` | Übrige Endpunkt-Module neben `api/admin/`: Gruppen, Fächer, Bildarten, Zugangstoken, Leitplanken, PII-Prüfung, Krisen-Freigabe (`review.py`), Archiv |

@@ -244,3 +244,25 @@
     Eine Formel, die sich nicht darstellen lässt, zeigt jetzt „Formel nicht darstellbar“ statt
     Quelltext.
   link: /help/diagramme
+
+- id: "0.31-daumen"
+  version: "0.31.0"
+  datum: 2026-11-04
+  rollen: [student, teacher]
+  titel: "Antworten bewerten, bekannte Probleme"
+  text: >-
+    Unter jeder Antwort im Chat stehen jetzt zwei Daumen: Sag mit einem Klick, ob die Antwort
+    hilfreich war. Im Nutzermenü unter „Feedback & Neuigkeiten“ siehst du außerdem, welche
+    Probleme schon bekannt sind — dann musst du sie nicht noch einmal melden.
+  link: /help/feedback
+
+- id: "0.31-sichtung"
+  version: "0.31.0"
+  datum: 2026-11-04
+  rollen: [admin]
+  titel: "Bekannte Probleme und Antwortbewertung"
+  text: >-
+    In der Rückmelde-Verwaltung kannst du eine Meldung mit eigenem Titel als bekanntes Problem
+    zeigen, für alle oder nur für Lehrkräfte. Unter Statistik → Antwortbewertung siehst du,
+    wie die Daumen je Assistent und Modell ausfallen.
+

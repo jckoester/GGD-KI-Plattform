@@ -5,22 +5,40 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.31.0] – 2026-11-04
+
+Feedback-Kanal ausgebaut: bekannte Probleme und Daumen an den Antworten. Eine Migration (0101).
+
 ### Neu
 
 - **Bekannte Probleme:** Die Administration kann eine Meldung mit eigenem Titel als bekanntes Problem zeigen — für alle
   oder nur für Lehrkräfte; der Text der Meldung bleibt intern. Die Liste steht im Feedback-Dialog („Schon bekannt“) und
-  unter „Meine Meldungen“; behobene Einträge bleiben 30 Tage stehen.
+  unter „Feedback & Neuigkeiten“; behobene Einträge bleiben 30 Tage stehen.
 - **Antworten bewerten:** Daumen hoch oder runter unter jeder Antwort im Chat; ein zweiter Klick nimmt die Bewertung
   zurück. Nicht in Test- und Vorschau-Chats.
 - **Statistik → Antwortbewertung:** Daumen je Assistent oder Modell, getrennt nach Schüler:innen und Lehrkräften, und je
   Woche; ohne Personenbezug, die Zahlen bleiben nach dem Löschen der Chats. Anteil „hilfreich“ ab 10 Bewertungen; CSV.
-- „Meine Meldungen“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
+- „Feedback & Neuigkeiten“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
 - Audit-Log: bekanntes Problem gezeigt oder zurückgenommen.
 
 ### Geändert
 
 - Der Menüpunkt „Meine Meldungen“ heißt jetzt **„Feedback & Neuigkeiten“**; die eigenen Meldungen sind dort der letzte
   Abschnitt.
+
+### Dokumentation
+
+- Hilfe: „Feedback geben“ um bekannte Probleme, „Feedback & Neuigkeiten“ und das Bewerten ergänzt; Chat und
+  Datenschutz („Daumen an Antworten“).
+- `docs/admin/feedback.md`: bekannte Probleme zeigen, Antwortbewertung auswerten.
+- `docs/admin/datenschutz-betrieb.md`: Abschnitt Antwortbewertung (`message_ratings`, `rating_counts`).
+
+### Nach dem Update
+
+- `alembic upgrade head` (0101) — wie im regulären Update.
+- Optional in `config/rate_limits.yaml`: Drossel `bewertung` (Vorgabe 60 je Minute, gilt auch ohne Eintrag).
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.30.0] – 2026-11-03
 

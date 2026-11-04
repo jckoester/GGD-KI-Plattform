@@ -141,6 +141,14 @@ folgt der Frist der Meldung. Das geschieht nur auf dein ausdrückliches Häkchen
 Wird dein Konto gelöscht, bleibt die Meldung als Befund über die Software bestehen,
 verliert aber Pseudonym und Kontaktangabe und ist dann niemandem mehr zuzuordnen.
 
+### Daumen an Antworten
+
+Bewertest du eine Antwort mit Daumen hoch oder runter, wird die Bewertung **an der Antwort**
+gespeichert und mit dem Chat gelöscht. Zusätzlich zählt die Plattform sie in eine
+Wochensumme je Assistent, Modell und Rolle (Schüler:in oder Lehrkraft) — **ohne** dich und
+ohne den Chat. Diese Summen bleiben auch nach dem Löschen der Chats; aus ihnen lässt sich
+nicht ablesen, wer wie bewertet hat.
+
 Mehr dazu: [Feedback geben](/help/feedback).
 
 ## Weiterführende Informationen

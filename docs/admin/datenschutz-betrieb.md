@@ -195,7 +195,7 @@ Personenbezug und bleibt.
 
 | Tabelle | Was geschieht |
 |---|---|
-| `conversations` | gelöscht — samt Nachrichten, erzeugten Bildern und Krisen-Flags |
+| `conversations` | gelöscht — samt Nachrichten, erzeugten Bildern, Krisen-Flags und Antwortbewertungen (`message_ratings`) |
 | `pseudonym_audit` | gelöscht — damit ist die Rückrechnung auf die Person endgültig unmöglich |
 | `user_preferences` | gelöscht; darin auch das Stundenplan-Kürzel |
 | `calendar_sync_status` | gelöscht — der Abrufstatus des Stundenplans |
@@ -397,6 +397,21 @@ der Liste der Verarbeitungen für die DSFA steht sie der Vollständigkeit halber
 | `vorab_statistik` | Zählerstände ohne Personenbezug | keine automatische Löschung; Zeilen gelöschter Einträge oder Fächer verschwinden mit ihnen | Rollen `admin`, `statistics` (`/statistics/vorab`) |
 
 Bedeutung der Zahlen: [Vorab-Suche beobachten](vorab-statistik.md).
+
+## Antwortbewertung (seit 0.31)
+
+Nutzer:innen können jede Antwort im Chat mit Daumen hoch oder runter bewerten (ADR-020). Es
+entstehen zwei Bestände:
+
+| Bestand | Inhalt | Frist | Zugriff |
+|---|---|---|---|
+| `message_ratings` | die Bewertung an der Antwort (±1) und die Rolle beim Bewerten — **ohne Pseudonym**; wem sie gehört, folgt aus dem Chat | mit der Nachricht, also mit dem Chat (93 Tage, Löschwunsch, Kontolöschung) | nur die Person selbst (ihr Daumen im Chat) |
+| `rating_counts` | Wochensummen je Assistent, Modell und Rolle (Schüler:in/Lehrkraft) — **kein Pseudonym, kein Bezug zu Chat oder Nachricht** | keine automatische Löschung; Zeilen gelöschter Assistenten verschwinden mit ihnen | Rollen `admin`, `statistics` (`/statistics/ratings`) |
+
+Die Wochensummen sind keine personenbezogenen Daten: Die feinste Einheit ist eine Woche, und
+die Seite zeigt einen Anteil erst ab zehn Bewertungen. Für die Daumen selbst steht ein Absatz
+in den Datenschutzhinweisen der Hilfe (`/help/datenschutz`, Abschnitt „Daumen an Antworten").
+In Test- und Vorschau-Chats gibt es keine Bewertung.
 
 ## Audit-Log (seit 0.28)
 

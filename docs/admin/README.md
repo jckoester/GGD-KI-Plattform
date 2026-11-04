@@ -76,7 +76,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Vorab-Suche beobachten](vorab-statistik.md) — Statistik unter `/statistics/vorab`: was der Wissensspeicher vorlegt und anbietet, was nachgeschlagen wird
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Speicherplatz freigeben, Schuljahreswechsel, Troubleshooting
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
-- [Rückmeldungen sichten](feedback.md) — Triage des Feedback-Kanals: Issue-Referenz, Zweckbindung der Kontaktangabe, Abgrenzung zur 4-Augen-Einsicht, Löschfristen
+- [Rückmeldungen sichten](feedback.md) — Triage des Feedback-Kanals: Issue-Referenz, bekannte Probleme, Zweckbindung der Kontaktangabe, Abgrenzung zur 4-Augen-Einsicht, Löschfristen; Auswertung der Antwortbewertung (`/statistics/ratings`)
 - [Server-Rendering-Sidecar](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Betrieb, Config, Cache-Cleanup
 - [Artefaktbibliothek](artefaktbibliothek.md) — Aufbewahrung/Quota, Ablage-Volume, Cleanup-Cron
 - [Material-Werkstatt](material-werkstatt.md) — Pandoc-Abhängigkeit, Export-Vorlagen (CSS/reference-doc)

@@ -45,7 +45,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [Als Schüler:in ansehen](vorschau.md) — *(Lehrkräfte)* die Plattform aus Schülersicht ausprobieren, auch den eigenen Assistenten
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?
-- [Feedback geben](feedback.md) — Fehler melden und den Stand der eigenen Meldungen sehen
+- [Feedback geben](feedback.md) — Fehler melden, bekannte Probleme und den Stand der eigenen Meldungen sehen, Antworten mit Daumen bewerten
 - [Inhaltsrichtlinien](guardrails.md) — *(Admins)* wie die Schutzregeln der Modelle wirken
 
 ---
