@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.32.1] – 2026-11-04
+
+Assistenten bekommen fehlende Metadaten nachgetragen; die Vorschau nimmt die Klasse aus der Gruppe. Keine Migration.
+
 ### Behoben
 
 - Assistenten, die aus einer älteren Beispieldatei angelegt wurden, bekamen Fach, Klassenstufen, Vorschlag und Schlagwörter
@@ -14,13 +18,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Geändert
 
 - **Als Schüler:in ansehen:** Mit gewählter Unterrichtsgruppe ergibt sich die Klasse aus der Gruppe und ist nicht mehr
-  wählbar; ohne Gruppe oder bei unbekanntem Jahrgang der Gruppe wählst du sie selbst. Der Einstieg aus dem Editor begann
+  wählbar; ohne Gruppe oder bei unbekanntem Jahrgang der Gruppe wird sie gewählt. Der Einstieg aus dem Editor begann
   bisher in Klasse 5, wenn der Assistent keine Klassenstufen hatte.
 
 ### Nach dem Update
 
-- `docker compose exec backend python scripts/seed_assistants.py --dry-run` — zeigt je Assistent, was nachgetragen würde;
-  danach ohne `--dry-run` ausführen. Die Auslöser-Beispiele werden dabei eingebettet.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Danach (der Seed läuft im neuen Image): `docker compose exec backend python scripts/seed_assistants.py --dry-run` —
+  zeigt je Assistent, was nachgetragen würde; dann ohne `--dry-run` ausführen. Die Auslöser-Beispiele werden dabei
+  eingebettet. Was nicht nachgetragen werden soll (ein bewusst leeres Feld), vorher im Editor setzen.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.32.0] – 2026-11-04
 
