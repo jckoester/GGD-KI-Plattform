@@ -116,9 +116,11 @@ async def test_nachtrag_bei_vorhandenem_ohne_beispiele(sitzungen, tmp_path):
     a, listen, docs = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
     assert listen["beispiel"] == ["eins", "zwei"]
     assert (a.suggest, a.suggestion_text) == ("specific", "Eine Rechenhilfe.")
-    # Alles andere bleibt, wie die Schule es eingerichtet hat.
-    assert (a.system_prompt, a.model, a.min_grade) == ("eigener Prompt", "", None)
-    assert docs == []
+    # Seit 0.32.1 auch die übrigen leeren Felder (Prod 04.11.2026: ohne Fach und Stufen) …
+    assert (a.min_grade, a.max_grade) == (8, 13) and a.subject_id is not None
+    assert len(docs) == 1
+    # … aber nie Prompt und Modell — sie sind Entscheidungen der Schule.
+    assert (a.system_prompt, a.model) == ("eigener Prompt", "")
 
 
 async def test_eigene_beispiele_werden_nicht_ueberschrieben(sitzungen, tmp_path):
@@ -130,8 +132,7 @@ async def test_eigene_beispiele_werden_nicht_ueberschrieben(sitzungen, tmp_path)
         await ausloeser.setze(db, a.id, ausloeser.BEISPIEL, ["meins"])
         await db.commit()
 
-    stand = await SEED.seed(_yaml(tmp_path, EINTRAG), session_factory=sitzungen)
-    assert stand["nachgetragen"] == 0
+    await SEED.seed(_yaml(tmp_path, EINTRAG), session_factory=sitzungen)
 
     a, listen, _ = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
     assert listen["beispiel"] == ["meins"] and a.suggest == "fallback"
@@ -190,3 +191,72 @@ async def test_operator_faecher_nachtragen(sitzungen, tmp_path):
     nw, _, _ = await _lade(sitzungen, f"{PRAEFIX}NW")
     eigen, _, _ = await _lade(sitzungen, f"{PRAEFIX}Eigen")
     assert (nw.operator_faecher, eigen.operator_faecher) == ([SLUG], ["andere"])
+
+
+# ── Leere Felder nachtragen (0.32.1) ─────────────────────────────────────────────
+
+
+async def test_gesetztes_bleibt(sitzungen, tmp_path):
+    """Nur Leeres wird gefüllt: eigenes Fach, eine eigene Stufengrenze, eigene Schlagwörter,
+    ein eigenes Dokument und ein bewusst gesetzter Vorschlag bleiben."""
+    async with sitzungen() as db:
+        fach = Subject(name="Seedtest Eigenes", slug=f"{SLUG}-eigen")
+        db.add(fach)
+        await db.flush()
+        a = Assistant(name=f"{PRAEFIX}Rechenhilfe", system_prompt="P", model="", audience="student",
+                      scope="all_students", suggest="fallback", fallbacks=[], subject_id=fach.id,
+                      min_grade=10, tags=["eigen"], suggestion_text="Mein Text")
+        db.add(a)
+        await db.flush()
+        db.add(AssistantDocument(assistant_id=a.id, filename="eigen.md", mime_type="text/markdown",
+                                 size_bytes=1, content="x"))
+        await db.commit()
+        fach_id = fach.id
+
+    await SEED.seed(_yaml(tmp_path, EINTRAG), session_factory=sitzungen)
+
+    a, _, docs = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
+    assert (a.subject_id, a.min_grade, a.max_grade) == (fach_id, 10, None), "eine Grenze allein bleibt"
+    assert a.tags == ["eigen"] and (a.suggest, a.suggestion_text) == ("fallback", "Mein Text")
+    assert [d.filename for d in docs] == ["eigen.md"]
+    async with sitzungen() as db:
+        await db.execute(sa.delete(Assistant).where(Assistant.name.like(f"{PRAEFIX}%")))
+        await db.execute(sa.delete(Subject).where(Subject.id == fach_id))
+        await db.commit()
+
+
+async def test_probelauf_aendert_nichts(sitzungen, tmp_path):
+    async with sitzungen() as db:
+        db.add(Assistant(name=f"{PRAEFIX}Rechenhilfe", system_prompt="P", model="", audience="student",
+                         scope="all_students", suggest="never", fallbacks=[]))
+        await db.commit()
+
+    stand = await SEED.seed(_yaml(tmp_path, EINTRAG), dry_run=True, session_factory=sitzungen)
+    assert stand["nachgetragen"] == 1
+
+    a, listen, docs = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
+    assert (a.suggest, a.subject_id, a.min_grade) == ("never", None, None) and not a.tags
+    assert listen["beispiel"] == [] and docs == []
+
+
+async def test_unbekanntes_fach_beim_nachtragen_wird_uebergangen(sitzungen, tmp_path):
+    """Beim Anlegen ein Fehler, beim Nachtragen nicht: Die übrigen Felder kommen trotzdem."""
+    async with sitzungen() as db:
+        db.add(Assistant(name=f"{PRAEFIX}Rechenhilfe", system_prompt="P", model="", audience="student",
+                         scope="all_students", suggest="never", fallbacks=[]))
+        await db.commit()
+
+    eintrag = EINTRAG.replace(f"subject: {SLUG}", "subject: gibt-es-nicht")
+    stand = await SEED.seed(_yaml(tmp_path, eintrag), session_factory=sitzungen)
+    assert stand["fehler"] == 0
+
+    a, _, _ = await _lade(sitzungen, f"{PRAEFIX}Rechenhilfe")
+    assert a.subject_id is None and (a.min_grade, a.suggest) == (8, "specific")
+
+
+async def test_vollstaendiger_assistent_wird_uebersprungen(sitzungen, tmp_path):
+    datei = _yaml(tmp_path, EINTRAG)
+    await SEED.seed(datei, session_factory=sitzungen)
+    stand = await SEED.seed(datei, session_factory=sitzungen)
+    assert (stand["nachgetragen"], stand["uebersprungen"]) == (0, 2)
+

@@ -241,9 +241,13 @@ Fach, Klassenstufen, Modell, abgeschaltete Augmentierungen, Dokumente, `suggest`
 (`test_assistenten_seed_datei.py`) hält Seed und Szenariokopf gleich: **gemessen wird, was
 ausgeliefert wird.**
 
-Der Seed ist idempotent nach Name. Bei einem vorhandenen Assistenten trägt er nur nach, was fehlt:
-Beispiele (samt `suggest`, Vorschlagstext), wenn er keine hat, und Rückfälle, wenn keine gesetzt
-sind. Prompt, Modell und Dokumente fasst er nicht an.
+Der Seed ist idempotent nach Name. Bei einem vorhandenen Assistenten trägt er nur nach, was fehlt
+(`_leere_felder_fuellen`): Beispiele, wenn er keine hat; Rückfälle und Operatoren-Fächer, wenn keine
+gesetzt sind; seit 0.32.1 Beschreibung, Symbol, Schlagwörter, Fach, Klassenstufen (nur beide
+zusammen), `suggest` (nur auf `never`) samt Text und Dokumente (nur ohne eigene). Prompt, Modell,
+Zielgruppe, Freigabe, Status, Sichtbarkeit und Bausteine fasst er nicht an. Anlass: Auf Prod waren
+die Assistenten aus einer älteren Beispieldatei ohne Fach, Stufen und Vorschlag entstanden, und
+spätere Läufe übersprangen sie.
 
 ## Auslöser-Beispiele und Vorschlag
 

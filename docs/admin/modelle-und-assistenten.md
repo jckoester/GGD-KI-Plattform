@@ -249,8 +249,17 @@ Editor von Hand wieder an.
 Der Seed (`scripts/seed_assistants.py`) legt vierzehn Assistenten für Schüler:innen an. Er
 liest `config/assistants.yaml`, wenn es die Datei gibt, sonst `config/assistants.example.yaml`.
 Pflegen Sie eine eigene `assistants.yaml`, übernehmen Sie die neuen Einträge aus der
-Beispieldatei. Vorhandene Assistenten gleichen Namens überspringt er; er trägt nur leere
-Felder nach (Auslöser-Beispiele, „Darunter anbieten“). Bausteine hängt er nur beim Anlegen an.
+Beispieldatei. Vorhandene Assistenten gleichen Namens legt er nicht neu an; er trägt nur
+**leere** Felder nach: Auslöser-Beispiele, „Darunter anbieten“, Fächer für Operatoren und seit
+0.32.1 auch Beschreibung, Symbol, Schlagwörter, Fach, Klassenstufen (nur wenn beide Grenzen leer
+sind), Vorschlag samt Text und Dokumente (nur wenn keine angehängt sind). Was gesetzt ist,
+überschreibt er nie; Prompt, Modell, Zielgruppe, Freigabe, Status und Sichtbarkeit fasst er nicht
+an. Bausteine hängt er nur beim Anlegen an.
+
+> **Vor dem ersten Lauf auf einer eingerichteten Schule:** `python scripts/seed_assistants.py
+> --dry-run` nennt je Assistent, was er nachtragen würde. Ein leeres Feld kann eine Entscheidung
+> sein (etwa ein bewusst entferntes Fach) — der Seed kann das nicht unterscheiden. Was nicht
+> nachgetragen werden soll, setzen Sie vorher im Editor.
 
 | Assistent | Art | Klassen | Tags (Fachseiten) |
 |---|---|---|---|
@@ -310,8 +319,8 @@ python scripts/seed_assistants.py
 
 Das Skript liest `config/assistants.yaml` (bzw. `config/assistants.example.yaml`)
 und legt alle darin definierten Assistenten an, sofern noch kein Assistent
-gleichen Namens existiert. Mit `--dry-run` kann man vorab prüfen, was angelegt
-würde.
+gleichen Namens existiert; vorhandenen trägt er leere Felder nach (siehe oben). Mit
+`--dry-run` kann man vorab prüfen, was angelegt oder nachgetragen würde.
 
 Ausgeliefert werden neben den Planungsassistenten drei **Schüler-Assistenten**, benannt im
 Schema „Assistent für …“: „stöchiometrische Berechnungen“ (mit dem Periodensystem der

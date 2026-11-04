@@ -2,12 +2,24 @@
 """
 Assistenten aus config/assistants.yaml (oder assistants.example.yaml) in die DB anlegen.
 
-Idempotent anhand des Namens: Existiert bereits ein Assistent gleichen Namens,
-wird er übersprungen — mit **zwei** Ausnahmen: Hat er noch keine Auslöser-Beispiele und
-nennt der Eintrag welche, werden sie nachgetragen, samt `suggest` und `suggestion_text`
-(Päckchen C1, 26.10.2026); hat er noch keine Rückfälle (`fallbacks`), ebenso diese
-(27.10.2026), und ebenso die Fächer für Operatoren (`operator_faecher`, Päckchen AF). So bekommt auch ein schon von Hand angelegter Assistent seine
-Beispiele; eigene Beispiele werden nie überschrieben.
+Idempotent anhand des Namens: Ein Assistent gleichen Namens wird nicht neu angelegt. Was
+ihm **fehlt**, trägt der Seed aus dem Eintrag nach — was gesetzt ist, überschreibt er nie:
+
+- Auslöser-Beispiele (Päckchen C1, 26.10.2026), Rückfälle (27.10.2026), Fächer für
+  Operatoren (Päckchen AF);
+- seit 0.32.1 auch **Beschreibung, Symbol, Schlagwörter, Fach, Klassenstufen** (nur wenn beide
+  Grenzen leer sind), **Vorschlag** (`suggest` auf der Vorgabe `never`, `suggestion_text`) und
+  **Dokumente** (nur wenn er keine hat).
+
+⚠️ **Anlass 0.32.1** (Prod, 04.11.2026): Die Assistenten waren aus einer älteren Fassung von
+`assistants.example.yaml` entstanden, ohne Fach, Klassenstufen und Vorschlag. Spätere Läufe
+übersprangen sie — die Übersicht war unsortiert, Fächer fehlten im Menü, der Vorschlag im Chat
+sprang nie an. Ein „leer“ lässt sich von „bewusst leer“ nicht unterscheiden; vor dem ersten
+Lauf auf einer eingerichteten Schule deshalb ``--dry-run``: Er nennt je Assistent, was er
+nachtragen würde.
+
+Prompt, Modell, Zielgruppe, Freigabe, Status, Sichtbarkeit und Bausteine fasst der Seed bei
+einem vorhandenen Assistenten nie an — sie sind Entscheidungen der Schule.
 
 Felder je Eintrag (alle außer `name` und Prompt optional):
 `description`, `system_prompt` | `system_prompt_file`, `model`, `audience`, `scope`,
@@ -135,6 +147,64 @@ async def _setze_beispiele(db, assistant_id: int, listen: dict[str, list[str]]) 
     return neu
 
 
+async def _leere_felder_fuellen(db: AsyncSession, existing: Assistant, entry: dict) -> list[str]:
+    """Leere Felder eines vorhandenen Assistenten aus dem Eintrag setzen (0.32.1).
+
+    Gibt die Namen der gesetzten Felder zurück — auch im Probelauf, dann auf einer Sitzung, die
+    nicht festgeschrieben wird. Ein Fach, das es hier nicht gibt, wird übergangen (wie bei den
+    Operatoren-Fächern): Die Fächerliste ist schulspezifisch.
+    """
+    gesetzt: list[str] = []
+    beschreibung = (entry.get("description") or "").strip()
+    if beschreibung and not existing.description:
+        existing.description = beschreibung
+        gesetzt.append("Beschreibung")
+    if entry.get("icon") and not existing.icon:
+        existing.icon = entry["icon"]
+        gesetzt.append("Symbol")
+    if entry.get("tags") and not existing.tags:
+        existing.tags = list(entry["tags"])
+        gesetzt.append("Schlagwörter")
+    if entry.get("subject") and existing.subject_id is None:
+        fach = (await db.execute(
+            select(Subject.id).where(Subject.slug == entry["subject"])
+        )).scalar_one_or_none()
+        if fach is None:
+            logger.warning("  Fach '%s' für %s übergangen (nicht vorhanden)", entry["subject"], existing.name)
+        else:
+            existing.subject_id = fach
+            gesetzt.append("Fach")
+    # Beide Grenzen zusammen: Eine allein gesetzte Grenze ist eine Entscheidung, die eine
+    # nachgetragene zweite verfälschte („ab 8“ würde zu „8–13“).
+    if ((entry.get("min_grade") is not None or entry.get("max_grade") is not None)
+            and existing.min_grade is None and existing.max_grade is None):
+        existing.min_grade = entry.get("min_grade")
+        existing.max_grade = entry.get("max_grade")
+        gesetzt.append("Klassenstufen")
+    if entry.get("suggest") and existing.suggest == "never":
+        existing.suggest = entry["suggest"]
+        gesetzt.append("Vorschlag")
+    text = (entry.get("suggestion_text") or "").strip()
+    if text and not existing.suggestion_text:
+        existing.suggestion_text = text
+        gesetzt.append("Vorschlagstext")
+    if entry.get("documents"):
+        vorhanden = (await db.execute(
+            select(AssistantDocument.id).where(AssistantDocument.assistant_id == existing.id).limit(1)
+        )).first()
+        if vorhanden is None:
+            for rel in entry["documents"]:
+                pfad = _datei(rel)
+                inhalt = pfad.read_text(encoding="utf-8")
+                db.add(AssistantDocument(
+                    assistant_id=existing.id, filename=pfad.name,
+                    mime_type="text/markdown" if pfad.suffix == ".md" else "text/plain",
+                    size_bytes=len(inhalt.encode("utf-8")), content=inhalt,
+                ))
+            gesetzt.append("Dokumente")
+    return gesetzt
+
+
 async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -> dict:
     """Legt an bzw. trägt Beispiele nach. ``session_factory`` für Tests; sonst die Konfiguration."""
     with open(config_path, encoding="utf-8") as f:
@@ -170,35 +240,32 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
 
             existing = (await db.execute(select(Assistant).where(Assistant.name == name))).scalar_one_or_none()
             operator_faecher = await _operator_faecher(db, entry)
-            if existing and operator_faecher and not existing.operator_faecher:
-                # Wie Rückfälle: nur nachtragen, wenn noch keine gesetzt sind (Päckchen AF).
-                if dry_run:
-                    logger.info("  DRY   %s → würde Fächer für Operatoren nachtragen", name)
-                else:
-                    existing.operator_faecher = operator_faecher
-                    logger.info("  NACH  %s (id=%d): Fächer für Operatoren %s", name, existing.id,
-                                ", ".join(operator_faecher))
-            if existing and entry.get("fallbacks") and not existing.fallbacks:
-                # Rückfälle wie Beispiele: nur nachtragen, wenn noch keine gesetzt sind.
-                if dry_run:
-                    logger.info("  DRY   %s → würde Rückfälle nachtragen", name)
-                else:
-                    rueckfaelle.append((existing.id, [str(n) for n in entry["fallbacks"]]))
-                    logger.info("  NACH  %s (id=%d): Rückfälle %s", name, existing.id,
-                                ", ".join(map(str, entry["fallbacks"])))
             if existing:
+                # Alles Nachgetragene in einer Zeile je Assistent — und als „ergänzt“ gezählt.
+                felder: list[str] = []
+                if operator_faecher and not existing.operator_faecher:
+                    # Wie Rückfälle: nur nachtragen, wenn noch keine gesetzt sind (Päckchen AF).
+                    existing.operator_faecher = operator_faecher
+                    felder.append("Fächer für Operatoren " + ", ".join(operator_faecher))
+                if entry.get("fallbacks") and not existing.fallbacks:
+                    if not dry_run:
+                        rueckfaelle.append((existing.id, [str(n) for n in entry["fallbacks"]]))
+                    felder.append("Rückfälle " + ", ".join(map(str, entry["fallbacks"])))
+                try:
+                    felder += await _leere_felder_fuellen(db, existing, entry)
+                except FileNotFoundError as e:
+                    logger.error("  ERROR %s: %s", name, e)
+                    errors += 1
+                    continue
                 if listen[ausloeser.BEISPIEL] and not await _hat_beispiele(db, existing.id):
-                    if dry_run:
-                        logger.info("  DRY   %s → würde Beispiele nachtragen", name)
-                    else:
+                    if not dry_run:
                         await _setze_beispiele(db, existing.id, listen)
-                        if existing.suggest == "never" and entry.get("suggest"):
-                            existing.suggest = entry["suggest"]
-                        if not existing.suggestion_text and entry.get("suggestion_text"):
-                            existing.suggestion_text = entry["suggestion_text"].strip()
                         einzubetten.append(existing.id)
-                        logger.info("  NACH  %s (id=%d): %d Beispiele, %d Gegenbeispiele nachgetragen", name,
-                                    existing.id, len(listen[ausloeser.BEISPIEL]), len(listen[ausloeser.GEGENBEISPIEL]))
+                    felder.append(f"{len(listen[ausloeser.BEISPIEL])} Beispiele, "
+                                  f"{len(listen[ausloeser.GEGENBEISPIEL])} Gegenbeispiele")
+                if felder:
+                    logger.info("  %s %s (id=%d): %s", "DRY  " if dry_run else "NACH ", name,
+                                existing.id, ", ".join(felder))
                     nachgetragen += 1
                 else:
                     logger.info("  SKIP  %s (bereits vorhanden, id=%d)", name, existing.id)
@@ -284,7 +351,10 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
                                    "nicht vorhanden" if not treffer else "nicht eindeutig")
             (await db.get(Assistant, assistant_id)).fallbacks = ids
 
-        if not dry_run:
+        if dry_run:
+            # `_leere_felder_fuellen` hat auf der Sitzung gesetzt, um es nennen zu können.
+            await db.rollback()
+        else:
             await db.commit()
             if einzubetten:
                 stand = await ausloeser.einbetten(db, einzubetten)
@@ -294,8 +364,9 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
     if engine is not None:
         await engine.dispose()
     action = "würde anlegen" if dry_run else "angelegt"
-    logger.info("Fertig: %d %s, %d mit nachgetragenen Beispielen, %d übersprungen, %d Fehler.",
-                inserted, action, nachgetragen, skipped, errors)
+    logger.info("Fertig: %d %s, %d %s, %d übersprungen, %d Fehler.",
+                inserted, action, nachgetragen,
+                "würden ergänzt" if dry_run else "ergänzt", skipped, errors)
     return {"angelegt": inserted, "nachgetragen": nachgetragen, "uebersprungen": skipped, "fehler": errors}
 
 

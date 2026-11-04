@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Assistenten, die aus einer älteren Beispieldatei angelegt wurden, bekamen Fach, Klassenstufen, Vorschlag und Schlagwörter
+  nie nachgetragen — die Übersicht war unsortiert, Fächer fehlten im Menü, der Vorschlag im Chat sprang nicht an. Der Seed
+  (`scripts/seed_assistants.py`) trägt jetzt alle leeren Felder nach und überschreibt nichts, was gesetzt ist.
+
+### Nach dem Update
+
+- `docker compose exec backend python scripts/seed_assistants.py --dry-run` — zeigt je Assistent, was nachgetragen würde;
+  danach ohne `--dry-run` ausführen. Die Auslöser-Beispiele werden dabei eingebettet.
+
 ## [0.32.0] – 2026-11-04
 
 Lehrkräfte sehen auf der Gruppenseite, welche Assistenten ihre Schüler:innen haben. Keine Migration.
