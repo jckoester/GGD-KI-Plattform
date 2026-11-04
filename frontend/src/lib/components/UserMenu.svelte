@@ -185,7 +185,8 @@
         class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
     >
         <MessageSquareText class="w-4 h-4 mr-3" />
-        Meine Meldungen
+        <!-- Seit 0.31 mehr als die eigenen Meldungen: bekannte Probleme, Neuigkeiten. -->
+        Feedback & Neuigkeiten
     </a>
 
     <!-- Trenner -->

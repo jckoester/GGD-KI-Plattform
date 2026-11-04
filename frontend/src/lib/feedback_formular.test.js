@@ -112,7 +112,7 @@ describe("Einstieg im Nutzermenü", () => {
         expect(abschluss).toBeLessThan(eintrag);
     });
 
-    it("führt zu „Meine Meldungen“", () => {
+    it("führt zu „Feedback & Neuigkeiten“ (/feedback)", () => {
         expect(MENUE).toContain('href="/feedback"');
     });
 });

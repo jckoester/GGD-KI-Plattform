@@ -101,7 +101,7 @@ Weg in den jeweiligen Stundenentwurf. Welche Kacheln du sehen willst, stellst du
 ## Wenn etwas nicht geht
 
 Melde es aus der Anwendung heraus — über das Nutzermenü, „Feedback geben". Die
-Meldung landet bei der Administration, und du siehst unter „Meine Meldungen", was daraus
-geworden ist.
+Meldung landet bei der Administration, und du siehst unter „Feedback & Neuigkeiten", was
+daraus geworden ist.
 
 Mehr dazu: [Feedback geben](feedback.md)

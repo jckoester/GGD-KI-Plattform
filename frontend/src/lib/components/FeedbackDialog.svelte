@@ -134,7 +134,7 @@
                 />
             </div>
             <p class="text-sm text-light-tx dark:text-dark-tx">
-                Was daraus geworden ist, siehst du jederzeit unter „Meine Meldungen“.
+                Was daraus geworden ist, siehst du jederzeit im Nutzermenü unter „Feedback & Neuigkeiten“.
             </p>
             <div class="mt-5 flex justify-end gap-2">
                 <a

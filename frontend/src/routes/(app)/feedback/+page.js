@@ -1,5 +1,5 @@
 export function load() {
   return {
-    title: 'Meine Meldungen'
+    title: 'Feedback & Neuigkeiten'
   }
 }

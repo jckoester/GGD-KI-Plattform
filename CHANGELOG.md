@@ -13,6 +13,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - „Meine Meldungen“ zeigt unter „Was ist neu“ die aktuellen Neuigkeiten, auch bereits weggeklickte.
 - Audit-Log: bekanntes Problem gezeigt oder zurückgenommen.
 
+### Geändert
+
+- Der Menüpunkt „Meine Meldungen“ heißt jetzt **„Feedback & Neuigkeiten“**; die eigenen Meldungen sind dort der letzte
+  Abschnitt.
+
 ## [0.30.0] – 2026-11-03
 
 Strukturformeln im Chat, lesbare Formelfehler und eine Reparatur aus 0.29.0. Eine Migration (0100).

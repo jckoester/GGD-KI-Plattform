@@ -61,8 +61,8 @@ kann; beschreibe deshalb, was passiert ist, nicht wer beteiligt war.
 
 ## Meine Meldungen
 
-Über das Nutzermenü → **„Meine Meldungen"**. Dort steht zu jeder Meldung, wie weit sie
-ist:
+Über das Nutzermenü → **„Feedback & Neuigkeiten"**, Abschnitt „Meine Meldungen". Dort steht
+zu jeder Meldung, wie weit sie ist:
 
 | Anzeige | Bedeutung |
 |---|---|

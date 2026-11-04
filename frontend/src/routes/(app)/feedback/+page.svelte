@@ -1,6 +1,7 @@
 <script>
     /**
-     * „Meine Meldungen“ — der Rückweg des Feedback-Kanals (ADR-020).
+     * „Feedback & Neuigkeiten“ — der Rückweg des Feedback-Kanals (ADR-020). Bis 0.30 hieß
+     * die Seite „Meine Meldungen“; das ist jetzt ihr letzter Abschnitt.
      *
      * Die Schleife wird nicht über Kommunikation geschlossen, sondern über diese
      * Seite: Wer etwas gemeldet hat, sieht hier, was daraus geworden ist. Deshalb
@@ -94,13 +95,16 @@
                 <h2 id="was-ist-neu" class="mb-3 text-base font-semibold text-light-tx dark:text-dark-tx">
                     Was ist neu
                 </h2>
-                <ul class="space-y-2">
+                <ul class="list-disc pl-5 space-y-3 marker:text-light-tx-2 dark:marker:text-dark-tx-2">
                     {#each neuigkeiten as n (n.id)}
                         <li class="text-sm text-light-tx dark:text-dark-tx">
-                            <span class="font-medium">{n.titel}</span> — {n.text}
-                            {#if n.link}
-                                <a href={n.link} class="underline text-light-bl dark:text-dark-bl">Mehr dazu</a>
-                            {/if}
+                            <span class="block font-medium">{n.titel}</span>
+                            <span class="block text-light-tx-2 dark:text-dark-tx-2">
+                                {n.text}
+                                {#if n.link}
+                                    <a href={n.link} class="underline text-light-bl dark:text-dark-bl">Mehr dazu</a>
+                                {/if}
+                            </span>
                         </li>
                     {/each}
                 </ul>
