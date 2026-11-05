@@ -13,8 +13,11 @@
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { oeffneVorschau } from "$lib/stores/vorschauDialog.js";
     import {
-        assistentLink, grundText, jahrgangText, jahrgangWaehlbar, stufenText,
+        assistentLink, grundText, jahrgangText, jahrgangWaehlbar, schulweitNachFach, stufenText,
     } from "$lib/schuelersicht.js";
+    import { subjectMap } from "$lib/stores/subjects.js";
+    import FachBadge from "$lib/components/FachBadge.svelte";
+    import Schlagwoerter from "$lib/components/Schlagwoerter.svelte";
     import { EyeOff, Eye } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -47,6 +50,13 @@
         untrack(laden);
     });
 
+    // Schulweite nach Fachbezug (0.33.1): erst die des Fachs der Gruppe, dann die allgemeinen
+    // dieses Fachs, dann die übrigen — wie die Auswahl im Chat.
+    const fach = $derived(group?.subject_id != null ? $subjectMap[group.subject_id] : null);
+    const schulweitTeile = $derived(
+        schulweitNachFach(sicht?.schulweit ?? [], group?.subject_id ?? null, fach?.slug ?? null, fach?.name ?? null),
+    );
+
     function ansehen() {
         oeffneVorschau({ gruppeId: group.id, ...(sicht?.jahrgang ? { jahrgang: sicht.jahrgang } : {}) });
     }
@@ -60,6 +70,7 @@
             <a href={assistentLink(a)} class="font-medium text-light-bl dark:text-dark-bl hover:underline">
                 {a.name}
             </a>
+            <FachBadge fach={a.subject_id != null ? $subjectMap[a.subject_id] : null} />
             {#if stufenText(a)}
                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Klasse {stufenText(a)}</span>
             {/if}
@@ -77,6 +88,9 @@
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">{grundText(grund, a)}</p>
         {:else if a.description}
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 line-clamp-2">{a.description}</p>
+        {/if}
+        {#if a.subject_id == null && !grund}
+            <Schlagwoerter tags={a.tags} />
         {/if}
     </li>
 {/snippet}
@@ -121,7 +135,7 @@
         {/if}
 
         <section>
-            <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">
+            <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">
                 Für diese Gruppe freigegeben
             </h2>
             {#if sicht.fuer_die_gruppe.length}
@@ -137,13 +151,21 @@
         </section>
 
         <section>
-            <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">
+            <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">
                 Schulweit{sicht.jahrgang != null ? ` für Klasse ${sicht.jahrgang}` : ""}
             </h2>
             {#if sicht.schulweit.length}
-                <ul>
-                    {#each sicht.schulweit as a (a.id)}{@render eintrag(a)}{/each}
-                </ul>
+                {#each schulweitTeile as teil, i (teil.titel ?? "alle")}
+                    {#if teil.titel}
+                        <!-- Zwischentitel wie unter /assistants, mit Abstand — als Gliederung erkennbar,
+                             nicht als weitere Zeile; ohne Linie (Jan, 05.11.2026). -->
+                        <h3 class="{i === 0 ? 'mt-1' : 'mt-6'} mb-1 text-base font-semibold
+                                   text-light-tx-2 dark:text-dark-tx-2">{teil.titel}</h3>
+                    {/if}
+                    <ul>
+                        {#each teil.liste as a (a.id)}{@render eintrag(a)}{/each}
+                    </ul>
+                {/each}
             {:else}
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Keine.</p>
             {/if}
@@ -151,7 +173,7 @@
 
         {#if sicht.eigene_unsichtbar.length}
             <section>
-                <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-1">
+                <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">
                     Deine Assistenten, die diese Gruppe nicht sieht
                 </h2>
                 <ul>

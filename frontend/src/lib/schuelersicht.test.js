@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
-    GRUENDE, assistentLink, fachschaftHinweis, grundText, jahrgangText, jahrgangWaehlbar, stufenText,
+    GRUENDE, assistentLink, fachschaftHinweis, grundText, schulweitNachFach, jahrgangText, jahrgangWaehlbar, stufenText,
 } from "./schuelersicht.js";
 
 describe("GRUENDE", () => {
@@ -69,3 +69,36 @@ describe("fachschaftHinweis", () => {
         expect(fachschaftHinweis({ scope: "teaching_group", audience: "student" })).toBeNull();
     });
 });
+
+describe("schulweitNachFach (0.33.1)", () => {
+    const CHEMIE = 6;
+    const liste = [
+        { id: 1, name: "Programmieren", suggest: "fallback", tags: ["informatik"] },
+        { id: 2, name: "Reaktionsgleichungen", subject_id: CHEMIE, suggest: "specific" },
+        { id: 3, name: "Rechnen mit Größen", suggest: "fallback", tags: ["physik", "chemie"] },
+        { id: 4, name: "Lernen", suggest: "fallback", tags: [] },
+    ];
+
+    it("Fach zuerst, dann allgemeine des Fachs, dann die übrigen", () => {
+        const teile = schulweitNachFach(liste, CHEMIE, "chemie", "Chemie");
+        expect(teile.map((t) => [t.titel, t.liste.map((a) => a.id)])).toEqual([
+            ["Für Chemie", [2]],
+            ["Allgemeine Assistenten", [3]],
+            ["Weitere Assistenten", [1, 4]],
+        ]);
+    });
+
+    it("ohne Fach der Gruppe: ein Abschnitt ohne Titel", () => {
+        const teile = schulweitNachFach(liste, null, null, null);
+        expect(teile).toHaveLength(1);
+        expect(teile[0].titel).toBeNull();
+        expect(teile[0].liste).toHaveLength(4);
+    });
+
+    it("lässt leere Abschnitte weg", () => {
+        const nurAllgemein = liste.filter((a) => a.id !== 2);
+        expect(schulweitNachFach(nurAllgemein, CHEMIE, "chemie", "Chemie").map((t) => t.titel))
+            .toEqual(["Allgemeine Assistenten", "Weitere Assistenten"]);
+    });
+});
+

@@ -3,6 +3,8 @@
 // Die Gründe kommen als Kennungen aus `app/assistants/sichtbarkeit.py` (`GRUENDE`); was dort
 // dazukommt, braucht hier einen Text — der Test prüft die Liste.
 
+import { ordneFuerFach } from "$lib/assistentenliste.js";
+
 /** Die Kennungen aus `sichtbarkeit.GRUENDE` — muss mit dem Backend übereinstimmen. */
 export const GRUENDE = [
     "entwurf", "in_pruefung", "deaktiviert", "archiviert", "nicht_aktiv",
@@ -81,4 +83,24 @@ export function jahrgangWaehlbar(sicht) {
 export function fachschaftHinweis({ scope, audience } = {}) {
     if (scope !== "subject_department" || audience === "teacher") return null;
     return "Schüler:innen sehen diesen Assistenten so nicht: Die Fachschaft sind die Lehrkräfte des Fachs. Für eine Klasse gibst du ihn unter „Unterrichtsgruppe“ frei, für alle Schüler:innen unter „Alle Schüler:innen“.";
+}
+
+/**
+ * Die schulweiten Assistenten nach Fachbezug (0.33.1, Jan): zuerst die des Fachs der Gruppe,
+ * dann die allgemeinen dieses Fachs (Schlagwort), dann die übrigen — dieselbe Ordnung wie die
+ * Auswahl im Chat (`ordneFuerFach`). Als Abschnitte mit Titel; ein einzelner Abschnitt bekommt
+ * keinen, denn eine Überschrift allein gliedert nichts.
+ *
+ * @returns {Array<{ titel: string|null, liste: Array }>}
+ */
+export function schulweitNachFach(liste, fachId, slug, fachName) {
+    const { liste: geordnet, abschnitte } = ordneFuerFach(liste ?? [], fachId, slug);
+    const grenzen = [0, ...abschnitte.map((a) => a.index), geordnet.length];
+    const titel = [fachName ? `Für ${fachName}` : "Für dieses Fach", ...abschnitte.map((a) => a.titel)];
+    const teile = [];
+    for (let i = 0; i < grenzen.length - 1; i++) {
+        const stueck = geordnet.slice(grenzen[i], grenzen[i + 1]);
+        if (stueck.length) teile.push({ titel: titel[i], liste: stueck });
+    }
+    return teile.length > 1 ? teile : teile.map((t) => ({ ...t, titel: null }));
 }

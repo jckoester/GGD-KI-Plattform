@@ -324,6 +324,10 @@ class AssistentKurz(BaseModel):
     min_grade: int | None = None
     max_grade: int | None = None
     model: str | None = None
+    #: Für die Ordnung nach Fach (0.33.1): `suggest` und `tags` erkennen die allgemeinen
+    #: Assistenten eines Fachs (`allgemeineImFach` im Frontend), die Schlagwörter erscheinen.
+    suggest: str | None = None
+    tags: list[str] = []
     #: Von der anfragenden Lehrkraft angelegt — Klick öffnet den Editor statt des Chats (F6).
     eigen: bool
     #: Nur bei „sieht die Gruppe nicht“: Kennung aus `sichtbarkeit.GRUENDE`.
@@ -344,6 +348,7 @@ def _kurz(a, lehrkraft: str, grund: str | None = None) -> AssistentKurz:
         id=a.id, name=a.name, description=a.description, icon=a.icon, subject_id=a.subject_id,
         audience=a.audience, scope=a.scope, ausgeblendet=a.visibility == "hidden",
         min_grade=a.min_grade, max_grade=a.max_grade, model=a.model,
+        suggest=a.suggest, tags=list(a.tags or []),
         eigen=a.created_by == lehrkraft, grund=grund,
     )
 

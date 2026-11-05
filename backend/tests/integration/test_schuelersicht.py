@@ -53,7 +53,8 @@ async def welt(async_engine):
             "gruppe": assistent("Für die Gruppe", scope="teaching_group", scope_group_id=g.id),
             "versteckt": assistent("Versteckt", scope="teaching_group", scope_group_id=g.id,
                                    visibility="hidden"),
-            "schulweit": assistent("Schulweit 8-10", min_grade=8, max_grade=10),
+            "schulweit": assistent("Schulweit 8-10", min_grade=8, max_grade=10,
+                                   suggest="fallback", tags=["chemie", "physik"]),
             "oberstufe": assistent("Oberstufe", min_grade=11),
             "fremde_gruppe": assistent("Fremde Gruppe", scope="teaching_group",
                                        scope_group_id=andere.id),
@@ -168,3 +169,11 @@ async def test_nur_lehrkraefte_der_gruppe(test_client, auth_headers_teacher2, au
     assert (await test_client.get(pfad, headers=auth_headers_student)).status_code == 403
     assert (await test_client.get(f"/groups/{welt['fachschaft']}/student-assistants",
                                   headers=auth_headers)).status_code == 404
+
+
+async def test_liefert_vorschlag_und_schlagwoerter(test_client, auth_headers, welt):
+    """Für die Ordnung nach Fach im Reiter (0.33.1)."""
+    sicht = await _sicht(test_client, auth_headers, welt["g"])
+    eintrag = next(e for e in sicht["schulweit"] if e["id"] == welt["a"]["schulweit"])
+    assert (eintrag["suggest"], eintrag["tags"]) == ("fallback", ["chemie", "physik"])
+

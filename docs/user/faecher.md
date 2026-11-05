@@ -95,6 +95,8 @@ Schüler:in dieser Gruppe und ihrer Klassenstufe:
 
 - **Für diese Gruppe freigegeben** — von dir oder einer Kollegin.
 - **Schulweit** für diese Klassenstufe — nur die, deren Modell für die Stufe freigeschaltet ist.
+  Zuerst die des Fachs der Gruppe (mit farbiger Fachmarke), dann die allgemeinen Assistenten,
+  deren Schlagwörter das Fach nennen, dann die übrigen.
   Ausgeblendete Assistenten stehen gekennzeichnet dabei: Schüler:innen können sie benutzen,
   finden sie aber nicht in der Übersicht.
 - **Deine Assistenten, die diese Gruppe nicht sieht** — jeweils mit dem Grund, etwa „Entwurf",

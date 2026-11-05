@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Reiter „Assistenten“ der Gruppenseite: Die schulweiten Assistenten stehen nach Fachbezug geordnet — zuerst die des Fachs
+  der Gruppe, dann die allgemeinen dieses Fachs, dann die übrigen — mit farbiger Fachmarke bzw. Fach-Schlagwörtern.
+
 ## [0.33.0] – 2026-11-05
 
 Lehrkräfte sehen, wie ihre eigenen Assistenten bewertet werden. Keine Migration.
