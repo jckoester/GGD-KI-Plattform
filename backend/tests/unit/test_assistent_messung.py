@@ -135,3 +135,71 @@ def test_planung_im_fall_und_im_protokollkopf(tmp_path):
     assert "Umfang: Stoffmenge" in text
     # Ohne `planung` bleibt der Fallkopf, wie er war.
     assert "Planung" not in M.protokoll(kopf, [fall | {"planung": None, "planung_block": None}])
+
+
+# ── Lagen und Vorlagen (0.35, Päckchen AL) ──────────────────────────────────────
+
+ROLLE = _SKRIPTE / "szenarien" / "rollenbehauptung.yaml"
+
+
+@pytest.mark.parametrize("vorlage", ["frei", "stoechiometrie", "mathe"])
+def test_rollenbehauptung_je_lage(vorlage):
+    """Jede Lage setzt alle Platzhalter ein, und die Stufe passt zum Assistenten."""
+    profil, faelle = M.profil_laden(ROLLE, vorlage=vorlage)
+    assert (profil is None) == (vorlage == "frei"), "`lage: frei` heißt ohne Assistent"
+    texte = [z["schueler"] for f in faelle for z in f["zuege"]]
+    assert not [t for t in texte if "{" in t or "}" in t], "Platzhalter stehen geblieben"
+    assert all(isinstance(f["stufe"], int) for f in faelle)
+    if profil:
+        assert all(profil["min_grade"] <= f["stufe"] <= profil["max_grade"] for f in faelle)
+    # `verboten: vorlage` wird zur Liste der Lage; ohne Angabe bleibt die Liste leer.
+    zuege = {f["id"]: f["zuege"] for f in faelle}
+    assert zuege["B1-prod"][0]["verboten"] and zuege["G2-begriff"][0]["verboten"] == []
+    assert M.selbsttest(faelle)
+
+
+def test_vorlage_setzt_platzhalter_und_stufe(tmp_path):
+    datei = tmp_path / "s.yaml"
+    datei.write_text(
+        "vorlagen:\n  a: {lage: frei, stufe: 7, aufgabe: Rechne 2+2, verboten: [4]}\n"
+        "faelle:\n- id: x\n  titel: t\n  zuege:\n  - schueler: '{aufgabe} (Kl. {stufe})'\n    verboten: vorlage\n"
+        "- id: y\n  titel: t\n  stufe: 9\n  zuege:\n  - schueler: s\n",
+        encoding="utf-8",
+    )
+    profil, faelle = M.profil_laden(datei, vorlage="a")
+    assert profil is None
+    assert faelle[0]["zuege"][0] == {"schueler": "Rechne 2+2 (Kl. 7)", "verboten": ["4"]}
+    assert faelle[0]["stufe"] == 7 and faelle[1]["stufe"] == 9, "eigene Stufe geht vor"
+
+
+def test_vorlage_fehler(tmp_path):
+    mit = tmp_path / "mit.yaml"
+    mit.write_text("vorlagen:\n  a: {lage: frei}\nfaelle:\n- id: x\n  titel: t\n  stufe: 9\n"
+                   "  zuege:\n  - schueler: '{unbekannt}'\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="unbekannt"):
+        M.profil_laden(mit, vorlage="b")
+    with pytest.raises(KeyError, match="unbekannt"):
+        M.profil_laden(mit, vorlage="a")
+    ohne = tmp_path / "ohne.yaml"
+    ohne.write_text("faelle: []\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="vorlagen"):
+        M.profil_laden(ohne, vorlage="a")
+    with pytest.raises(SystemExit, match="freier-chat"):
+        M.profil_laden(ohne)
+
+
+def test_kopf_aus_anderer_datei(tmp_path):
+    datei = tmp_path / "s.yaml"
+    datei.write_text("faelle:\n- id: x\n  titel: t\n  stufe: 9\n  zuege:\n  - schueler: s\n", encoding="utf-8")
+    profil, faelle = M.profil_laden(datei, kopf_aus=_SKRIPTE / "szenarien" / "stoechiometrie.yaml")
+    assert profil["name"] == "stöchiometrische Berechnungen" and len(faelle) == 1
+
+
+def test_protokollkopf_freier_chat():
+    kopf = {"name": "Freier Chat", "lauf": "1", "datum": "heute", "modell": "m", "assistent": None,
+            "frei": True, "fach": None, "min_grade": None, "max_grade": None, "import": "—", "ohne": [],
+            "szenarien": "backend/scripts/szenarien/rollenbehauptung.yaml", "vorlage": "frei"}
+    text = M.protokoll(kopf, [])
+    assert "**Lage:** freier Chat ohne Assistent" in text
+    assert "Vorlage `frei`" in text and "Chat ohne Assistent und ohne Fach" in text
+    assert "Prompt-Stand" not in text

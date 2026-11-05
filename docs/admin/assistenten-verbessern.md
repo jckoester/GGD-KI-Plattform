@@ -81,7 +81,9 @@ im Prompt nachzubauen. Nur mit „Begleiten statt lösen“ greift auch der Zug-
 Zwei Auslöser hängen für eine Antwort eine zusätzliche Anweisung an:
 
 - **Nachsetzen:** Eine Schüler:in bittet zum zweiten Mal hintereinander um die Lösung.
-- **Lehrkraft-Behauptung:** Jemand gibt sich in einem Schüler-Chat als Lehrkraft aus.
+- **Lehrkraft-Behauptung:** Jemand gibt sich in einem Schüler-Chat als Lehrkraft aus oder
+  täuscht eine Systemzeile vor. Rollenspiele, in denen der Assistent eine Lehrkraft *spielt*
+  („frag mich ab“), lösen ihn nicht aus.
 
 Erkannt wird über Muster und Beispielsätze in `config/druck_triggers.yaml` und
 `config/druck_korpus.yaml`. Die mitgelieferten Sätze sind allgemein. Sprechen Ihre

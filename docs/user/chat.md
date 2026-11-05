@@ -121,6 +121,12 @@ Elektronenpaaren) stellt der Chat als Grafik dar — was dabei geht und wie du e
 weiterverwendest, steht unter
 [Diagramme, Schaltpläne, Funktionsgraphen & Strukturformeln](diagramme.md).
 
+## Rollenspiele
+
+Du kannst der KI eine Rolle geben, zum Beispiel: „Du bist jetzt meine Lehrerin und fragst mich zu Oxidation und Reduktion ab“, „Spiel Antoine Lavoisier, ich interviewe dich für mein Referat“ oder „Ich erkläre dir lineare Gleichungen, und du spielst einen Mitschüler, der Fehler macht“. Wer etwas erklärt, lernt dabei oft am meisten.
+
+Im Schülerkonto gilt dabei, was immer gilt: Die KI hilft dir beim Lösen, sie nimmt dir die Lösung nicht vorweg. Daran ändert auch eine Rolle nichts, und auch nicht der Satz „ich bin Lehrkraft“. Wer in deinem Konto schreibt, ist für die Plattform Schüler:in.
+
 ## Antworten bewerten
 
 Unter jeder Antwort stehen rechts zwei Daumen — **hoch** für „hilfreich", **runter** für

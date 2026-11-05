@@ -42,6 +42,13 @@ mit Gruppenbezug durch und baut die Gruppe danach wieder ab — samt ihrer Konve
 werden die Kosten dieses Falls gleich danach gelesen, und `--behalten` gilt für ihn nicht. Im Chat
 steht dann „Klassenarbeit: … — Umfang: <Einheit>" im Block „Aktueller Unterricht".
 
+**Lagen** (seit 05.11.2026, Päckchen AL): Dieselben Fälle lassen sich in mehreren Lagen spielen —
+`--freier-chat` (ohne Assistent; die Datei braucht dann keinen Kopf) oder `--assistent-aus <datei>`
+(Kopf aus einer anderen Szenariodatei). Mit `vorlagen:` und `--vorlage <name>` bekommt jede Lage
+ihre eigene Aufgabe: Platzhalter wie `{aufgabe}` in den Schülertexten, `verboten: vorlage` für die
+Liste der Lage, `stufe` und `lage` (`frei` oder Pfad einer Szenariodatei mit Kopf). Muster:
+`szenarien/rollenbehauptung.yaml`.
+
 **Dazu, nach dem Lauf:** `assistent_systemtext.py <verlauf.json> <fall> <konto>` baut den Systemtext
 eines Zugs nach und legt ihn ins JSON.
 
@@ -49,6 +56,7 @@ eines Zugs nach und legt ihn ins JSON.
 Budgets des Schüler:innen-Kontos.
 """
 import argparse
+import copy
 import hashlib
 import importlib.util
 import json
@@ -76,13 +84,53 @@ VORGABE_OHNE = ["metacognitive_nudges"]
 VORGABE_MODELL = "chat-komplex"
 
 
-def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
-    """Kopf (`assistent:`) und Fälle einer Szenariodatei. Der Prompt-Pfad ist repo-relativ."""
+def vorlage_einsetzen(daten: dict, vorlage: str | None, dateiname: str) -> list[dict]:
+    """Die Fälle einer Szenariodatei — mit den Werten der gewählten Vorlage, falls es `vorlagen:` gibt.
+
+    Eine Vorlage ist ein Satz Platzhalter (``{aufgabe}``, ``{thema}`` …) für die Schülertexte, dazu
+    ``stufe`` (gilt für Fälle ohne eigene), ``verboten`` — ein Zug mit ``verboten: vorlage`` bekommt
+    diese Liste — und ``lage``: ``frei`` oder der Pfad einer Szenariodatei mit Kopf (relativ zu
+    ``scripts/``), wie ``--freier-chat`` bzw. ``--assistent-aus``. So spielen dieselben Fälle in mehreren Lagen mit je passender Aufgabe (0.35, AL).
+    Ein unbekannter Platzhalter bricht ab (``KeyError``), statt lautlos stehen zu bleiben."""
+    vorlagen = daten.get("vorlagen")
+    if not vorlagen:
+        if vorlage:
+            raise SystemExit(f"{dateiname}: keine `vorlagen:` — `--vorlage` passt nicht dazu.")
+        return daten["faelle"]
+    if vorlage not in vorlagen:
+        raise SystemExit(f"{dateiname}: `--vorlage` fehlt oder ist unbekannt (vorhanden: {', '.join(vorlagen)}).")
+    v = vorlagen[vorlage]
+    werte = {k: str(w) for k, w in v.items() if k not in ("verboten", "lage")}
+    faelle = copy.deepcopy(daten["faelle"])
+    for fall in faelle:
+        if fall.get("stufe") is None and "stufe" in v:
+            fall["stufe"] = v["stufe"]
+        for zug in fall["zuege"]:
+            zug["schueler"] = zug["schueler"].format_map(werte)
+            if zug.get("verboten") == "vorlage":
+                zug["verboten"] = list(v.get("verboten") or [])
+    return faelle
+
+
+def profil_laden(szenarien: Path, *, kopf_aus: Path | None = None, frei: bool = False,
+                 vorlage: str | None = None) -> tuple[dict | None, list[dict]]:
+    """Kopf (`assistent:`) und Fälle einer Szenariodatei. Der Prompt-Pfad ist repo-relativ.
+
+    ``kopf_aus``: der Kopf aus einer anderen Szenariodatei — dieselben Fälle mit einem Assistenten,
+    dessen Messeinrichtung dort steht. ``frei``: kein Assistent (freier Chat), das Profil ist ``None``."""
     daten = yaml.safe_load(szenarien.read_text(encoding="utf-8"))
-    kopf = daten.get("assistent") or {}
+    faelle = vorlage_einsetzen(daten, vorlage, szenarien.name)
+    lage = ((daten.get("vorlagen") or {}).get(vorlage) or {}).get("lage")
+    if lage and not frei and kopf_aus is None:
+        frei, kopf_aus = (True, None) if lage == "frei" else (False, HIER / lage)
+    if frei:
+        return None, _faelle_normalisieren(faelle)
+    quelle = kopf_aus or szenarien
+    kopf = (yaml.safe_load(kopf_aus.read_text(encoding="utf-8")) if kopf_aus else daten).get("assistent") or {}
     for feld in ("name", "prompt"):
         if not kopf.get(feld):
-            raise SystemExit(f"{szenarien.name}: `assistent.{feld}` fehlt im Kopf.")
+            raise SystemExit(f"{quelle.name}: `assistent.{feld}` fehlt im Kopf"
+                             + ("" if kopf_aus else " (ohne Kopf: `--freier-chat` oder `--assistent-aus`)") + ".")
     profil = {
         "name": kopf["name"],
         "beschreibung": kopf.get("beschreibung") or "",
@@ -97,8 +145,12 @@ def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
         # 0.26: Bausteine hinter dem Prompt (`app/assistants/bausteine/`).
         "bausteine": [str(b) for b in kopf.get("bausteine") or []],
     }
+    return profil, _faelle_normalisieren(faelle)
+
+
+def _faelle_normalisieren(faelle: list[dict]) -> list[dict]:
     # YAML liest `36` als Zahl — Prüfwerte sind immer Text.
-    for fall in daten["faelle"]:
+    for fall in faelle:
         fall["stufenfremd"] = [str(w) for w in fall.get("stufenfremd") or []]
         for zug in fall["zuege"]:
             if zug.get("operator") is not None:
@@ -107,7 +159,7 @@ def profil_laden(szenarien: Path) -> tuple[dict, list[dict]]:
             fall["planung"]["themen"] = [str(t) for t in fall["planung"].get("themen") or []]
         for zug in fall["zuege"]:
             zug["verboten"] = [str(v) for v in zug.get("verboten") or []]
-    return profil, daten["faelle"]
+    return faelle
 
 
 def _lade(name: str):
@@ -555,21 +607,30 @@ def _zitat(text: str) -> str:
 def protokoll(kopf: dict, faelle: list[dict]) -> str:
     name = kopf["name"]
     stufen = f"Kl. {kopf['min_grade'] or '?'}–{kopf['max_grade'] or '?'}"
+    if kopf.get("frei"):
+        einrichtung = ["- **Lage:** freier Chat ohne Assistent (Schüler-Behandlung: Präambel, Stufenzeile, "
+                       "alle Lernverhalten-Augmentierungen; kein Baustein)"]
+    else:
+        einrichtung = [
+            f"- **Assistent:** „{name}“, ID {kopf['assistent']} ({kopf.get('fach') or 'fachübergreifend'}, Schüler:innen, {stufen}, ohne Wissensbereich, "
+            "ohne zuschaltbare Fähigkeiten (die Kontextsuche ist immer an), " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
+                                     else "alle Lernverhalten-Augmentierungen an)"),
+            f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
+            + (f" · etwa {kopf['prompt_tokens']} Tokens (o200k_base)" if kopf.get("prompt_tokens") else "")]
     t = [f"# {name} — Lauf {kopf['lauf']}", "",
          f"- **Datum:** {kopf['datum']}", f"- **Modell:** {kopf['modell']}",
-         f"- **Assistent:** „{name}“, ID {kopf['assistent']} ({kopf.get('fach') or 'fachübergreifend'}, Schüler:innen, {stufen}, ohne Wissensbereich, "
-         "ohne zuschaltbare Fähigkeiten (die Kontextsuche ist immer an), " + (f"**Augmentierungen aus: {', '.join(kopf['ohne'])}**)" if kopf.get("ohne")
-                                  else "alle Lernverhalten-Augmentierungen an)"),
-         f"- **Prompt-Stand:** `{kopf['prompt_datei']}` {kopf['prompt']}"
-         + (f" · etwa {kopf['prompt_tokens']} Tokens (o200k_base)" if kopf.get("prompt_tokens") else ""),
+         *([f"- **Szenarien:** `{kopf['szenarien']}`" + (f", Vorlage `{kopf['vorlage']}`" if kopf.get("vorlage") else "")]
+           if kopf.get("szenarien") else []),
+         *einrichtung,
          f"- **Importstand:** {kopf['import']}",
          *(["- **Systemtext-Zusatz je Fall** (Feld `systemtext_zusatz`, an den Prompt des Assistenten gehängt)"]
            if kopf.get("systemtext_zusatz") else []),
          *(["- **Vorlauf im Standard-Chat** (danach Wechsel zum Assistenten in derselben Konversation): "
             + " · ".join(f"„{v}“" for v in kopf["vorlauf"])] if kopf.get("vorlauf") else []),
-         "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; Chat über den "
-         + (f"Assistenten (Fach {kopf['fach']} aus dem Assistenten)" if kopf.get("fach")
-            else "Assistenten (fachübergreifend, Konversation ohne Fach)"),
+         "- **Schüler:innen-Konto:** Dev-Konto ohne Unterrichtsgruppe, Stufe je Fall im Token; "
+         + ("Chat ohne Assistent und ohne Fach" if kopf.get("frei")
+            else "Chat über den " + (f"Assistenten (Fach {kopf['fach']} aus dem Assistenten)" if kopf.get("fach")
+                                     else "Assistenten (fachübergreifend, Konversation ohne Fach)")),
          "", "Automatisch: **Vorgriff** (verbotene Werte, normalisiert; Treffer mit Satz), **Stufenvorgriff** "
          "(Begriffe, die in der Stufe des Falls noch nicht dran sind), **Kosten**, Fragezeichen (Soll ≤ 1), "
          "Sätze, Wörter, Listenpunkte, Überschriften. Die Kriterien darunter prüft Jan.", ""]
@@ -759,6 +820,13 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     p = argparse.ArgumentParser(description="Messung eines Schüler-Assistenten mit festen Szenarien")
     p.add_argument("--szenarien", type=Path, default=szenarien, required=szenarien is None,
                    help="Szenariodatei mit Kopf `assistent:` und `faelle:`")
+    lage = p.add_mutually_exclusive_group()
+    lage.add_argument("--freier-chat", action="store_true", dest="frei",
+                      help="ohne Assistent spielen (freier Chat); die Szenariodatei braucht dann keinen Kopf")
+    lage.add_argument("--assistent-aus", type=Path, default=None, dest="kopf_aus",
+                      help="Kopf `assistent:` aus dieser Szenariodatei nehmen (dieselben Fälle, anderer Assistent)")
+    p.add_argument("--vorlage", default=None,
+                   help="Werte aus `vorlagen:` der Szenariodatei für die Platzhalter der Fälle (z. B. frei, mathe)")
     p.add_argument("--selbsttest", action="store_true", help="nur das Prüfinstrument testen")
     p.add_argument("--lauf", default="1", help="Bezeichnung des Laufs (Dateiname verlauf-<lauf>)")
     p.add_argument("--ziel", type=Path, default=None, help="Ordner für verlauf-<n>.md und verlauf-<n>.json")
@@ -781,7 +849,10 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
                         "mehrfach möglich, „keine“ = alle an")
     args = p.parse_args()
 
-    profil, faelle = profil_laden(args.szenarien)
+    profil, faelle = profil_laden(args.szenarien, kopf_aus=args.kopf_aus, frei=args.frei, vorlage=args.vorlage)
+    args.frei = profil is None   # auch über `lage: frei` der Vorlage
+    if args.frei and (args.prompt or args.systemtext_zusatz or args.ohne is not None):
+        p.error("Der freie Chat verträgt sich nicht mit --prompt, --systemtext-zusatz und --ohne-augmentierung.")
     vorlauf = ([str(t) for t in yaml.safe_load(args.vorlauf.read_text(encoding="utf-8"))]
                if args.vorlauf else None)
     if not selbsttest(faelle):
@@ -797,8 +868,11 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
     if args.ohne is not None:
         args.ohne = [o for o in args.ohne if o != "keine"]
     # Mit Handzusatz (Versuch Prüfregel, Arm B) ohne Fächerkreis — sonst stünde die Definition doppelt da.
-    kennung = assistent(conn, profil, args.prompt, args.ohne, [] if args.systemtext_zusatz else None)
-    args.ohne = profil["ohne"] if args.ohne is None else args.ohne
+    if args.frei:
+        kennung, args.ohne = None, []
+    else:
+        kennung = assistent(conn, profil, args.prompt, args.ohne, [] if args.systemtext_zusatz else None)
+        args.ohne = profil["ohne"] if args.ohne is None else args.ohne
     zeile = _alle(conn, "SELECT pseudonym FROM pseudonym_audit WHERE roles::text LIKE '%%student%%' "
                         "AND litellm_key IS NOT NULL AND pseudonym LIKE %s ORDER BY created_at LIMIT 1",
                   (args.konto or "") + "%")
@@ -806,12 +880,15 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
         raise SystemExit("Kein Schüler:innen-Konto mit LiteLLM-Schlüssel gefunden.")
     schueler = zeile[0][0]
     jwt = get_jwt_service()
-    print(f"\nAssistent {kennung}, Prompt {prompt_stand(profil['prompt'], args.prompt)}, "
-          f"ohne {args.ohne or '—'}, {len(faelle)} Fälle\n")
+    if args.frei:
+        print(f"\nFreier Chat ohne Assistent, {len(faelle)} Fälle\n")
+    else:
+        print(f"\nAssistent {kennung}, Prompt {prompt_stand(profil['prompt'], args.prompt)}, "
+              f"ohne {args.ohne or '—'}, {len(faelle)} Fälle\n")
 
     ergebnisse = []
     ausgaben_vorher = litellm_ausgaben(schueler)
-    grundprompt = (args.prompt or profil["prompt"]).read_text(encoding="utf-8").strip()
+    grundprompt = None if args.frei else (args.prompt or profil["prompt"]).read_text(encoding="utf-8").strip()
     try:
         for fall in faelle:
             # Arm B des Versuchs Prüfregel: Die Konversation übernimmt den Prompt beim Anlegen
@@ -855,15 +932,21 @@ def hauptprogramm(szenarien: Path | None = None) -> None:
         conn.close()
 
     modelle = sorted({z["modell"] for f in ergebnisse for z in f["zuege"] if z.get("modell")})
-    prompt_text = (args.prompt or profil["prompt"]).read_text(encoding="utf-8")
     kopf = {"lauf": args.lauf, "datum": datetime.now(timezone.utc).astimezone().strftime("%d.%m.%Y, %H:%M"),
-            "modell": ", ".join(modelle) or "?", "assistent": kennung, "name": profil["name"], "fach": profil["fach"],
-            "min_grade": profil["min_grade"], "max_grade": profil["max_grade"],
-            "prompt_datei": str((args.prompt or profil["prompt"]).resolve().relative_to(REPO))
-            if (args.prompt or profil["prompt"]).resolve().is_relative_to(REPO) else str(args.prompt),
-            "prompt": prompt_stand(profil["prompt"], args.prompt), "prompt_tokens": prompt_tokens(prompt_text),
-            "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf,
+            "modell": ", ".join(modelle) or "?", "assistent": kennung,
+            "szenarien": str(args.szenarien.resolve().relative_to(REPO))
+            if args.szenarien.resolve().is_relative_to(REPO) else str(args.szenarien),
+            "vorlage": args.vorlage, "ohne": args.ohne, "import": args.importstand, "vorlauf": vorlauf,
             "systemtext_zusatz": bool(args.systemtext_zusatz)}
+    if args.frei:
+        kopf |= {"frei": True, "name": "Freier Chat", "fach": None, "min_grade": None, "max_grade": None}
+    else:
+        prompt_text = (args.prompt or profil["prompt"]).read_text(encoding="utf-8")
+        kopf |= {"name": profil["name"], "fach": profil["fach"],
+                 "min_grade": profil["min_grade"], "max_grade": profil["max_grade"],
+                 "prompt_datei": str((args.prompt or profil["prompt"]).resolve().relative_to(REPO))
+                 if (args.prompt or profil["prompt"]).resolve().is_relative_to(REPO) else str(args.prompt),
+                 "prompt": prompt_stand(profil["prompt"], args.prompt), "prompt_tokens": prompt_tokens(prompt_text)}
     ausgaben_nachher = litellm_ausgaben(schueler)
     if ausgaben_vorher is not None and ausgaben_nachher is not None:
         kopf["kosten_litellm"] = round(ausgaben_nachher - ausgaben_vorher, 6)

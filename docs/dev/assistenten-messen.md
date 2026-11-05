@@ -52,11 +52,20 @@ vorab, dann Wechsel zum Assistenten in derselben Konversation), `--systemtext-zu
 `systemtext_zusatz` eines Falls von Hand an den Prompt; dann ohne Fächerkreis, sonst stünde die
 Definition doppelt da — der Vergleichsarm zum Plattformabschnitt).
 
+**Lagen (0.35):** Dieselben Fälle laufen auch ohne Assistent (`--freier-chat`; die Datei braucht
+dann keinen Kopf) oder mit dem Kopf einer anderen Szenariodatei (`--assistent-aus <datei>`). Mit
+`vorlagen:` in der Datei und `--vorlage <name>` bekommt jede Lage ihre eigene Aufgabe: Platzhalter
+wie `{aufgabe}` in den Schülertexten, `verboten: vorlage` für die Liste der Lage, dazu `stufe` und
+`lage` (`frei` oder der Pfad einer Szenariodatei mit Kopf). Muster: `szenarien/rollenbehauptung.yaml`
+(freier Chat, Stöchiometrie, Mathe). Bei der Messung von Prompt-Regeln **jeden Fall mehrfach
+spielen**: In AL ging derselbe Fall in drei Läufen dreimal durch und im vierten dreimal nicht.
+
 ⚠️ **zsh teilt Variablen nicht an Leerzeichen.** `NUR="--nur A --nur B"; … $NUR` übergibt *ein*
 Argument, und das Skript bricht ab. Mehrere `--nur` als bash-Array oder ausgeschrieben.
 
 ⚠️ **Budget des Schülerkontos.** Ein Lauf mit 25 Fällen und `chat-komplex` kostet etwa 0,40 USD.
-Restbudget per LiteLLM `/user/info` prüfen, aufstocken über `/user/update` (`max_budget`).
+Restbudget per LiteLLM `/user/info` prüfen. Aufstocken am besten über den Zuschlag
+(`POST /admin/budgets/grants`, Seite `/budget`): Er steht dann im Audit-Log.
 
 Der Messkanal `vorab_debug` (nur außerhalb der Produktion) liefert dem Skript angebotene Knoten,
 Suchanfragen, die Aufrufe von `list_context_nodes` (Filter, `gesamt`, `geliefert`) und die Teile
@@ -163,7 +172,7 @@ Konversationen; der Prompt dagegen ist ein Schnappschuss.
 
 ### Reihenfolge im Systemtext
 
-Präambeln · Klassenstufe · Fach · Bezug · Kontext + **Prompt** · **Bausteine** (begleiten, dann Grundton) ·
+Präambeln · Klassenstufe · Rollenregel (0.35, nur Schüler-Behandlung) · Fach · Bezug · Kontext + **Prompt** · **Bausteine** (begleiten, dann Grundton) ·
 **Andere allgemeine Assistenten** · Operator dieser Aufgabe · Augmentierungen
 (`compose_system_content`).
 

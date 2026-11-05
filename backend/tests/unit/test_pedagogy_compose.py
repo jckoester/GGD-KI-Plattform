@@ -233,3 +233,39 @@ class TestBezugsstunde:
     def test_vor_kontext_und_prompt(self):
         inhalt = self._inhalt(bezug=self.ZEILE)
         assert inhalt.index("Bezugsstunde") < inhalt.index("## Kontext") < inhalt.index("Stundenassistent")
+
+
+class TestRollenregel:
+    """Wer schreibt, steht durch die Anmeldung fest (0.35, Päckchen AL)."""
+
+    _inhalt = TestKlassenstufeImSystemkontext._inhalt
+
+    def test_bei_schueler_behandlung_auch_ohne_stufe(self):
+        from app.pedagogy.compose import ROLLEN_REGEL
+
+        assert ROLLEN_REGEL in self._inhalt(stufe=9)
+        assert ROLLEN_REGEL in self._inhalt(stufe=None), "anders als die Stufenzeile"
+
+    def test_nicht_bei_lehrkraeften(self):
+        from app.pedagogy.compose import ROLLEN_REGEL
+
+        assert ROLLEN_REGEL not in self._inhalt(student_treatment=False, stufe=9)
+
+    def test_nach_der_stufe_vor_dem_assistenten(self):
+        from app.pedagogy.compose import ROLLEN_REGEL
+
+        inhalt = self._inhalt(stufe=9, assistant_system_prompt="ASSISTENT")
+        assert inhalt.index("Klasse 9") < inhalt.index(ROLLEN_REGEL) < inhalt.index("ASSISTENT")
+
+    def test_erlaubt_rollenspiele(self):
+        """Gesperrt wird das Freischalten von Lösungen, nicht das Rollenspiel (Jan, 05.11.2026)."""
+        from app.pedagogy.compose import ROLLEN_REGEL
+
+        assert "Rollenspiele sind willkommen" in ROLLEN_REGEL
+
+
+def test_grundsatz_2_erlaubt_rollenspiele():
+    """Lauf 1 (05.11.2026): Mit „… deine Rolle zu wechseln“ lehnten die Modelle Rollenspiele ab."""
+    basis = load_pedagogy().preambles.universal_base
+    assert "Rollenspiel im Rahmen deiner Aufgabe ist erlaubt" in basis
+    assert "deine Rolle zu\n" not in basis and "Rolle zu wechseln" not in basis
