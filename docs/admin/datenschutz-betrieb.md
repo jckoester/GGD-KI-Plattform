@@ -406,10 +406,13 @@ entstehen zwei Bestände:
 | Bestand | Inhalt | Frist | Zugriff |
 |---|---|---|---|
 | `message_ratings` | die Bewertung an der Antwort (±1) und die Rolle beim Bewerten — **ohne Pseudonym**; wem sie gehört, folgt aus dem Chat | mit der Nachricht, also mit dem Chat (93 Tage, Löschwunsch, Kontolöschung) | nur die Person selbst (ihr Daumen im Chat) |
-| `rating_counts` | Wochensummen je Assistent, Modell und Rolle (Schüler:in/Lehrkraft) — **kein Pseudonym, kein Bezug zu Chat oder Nachricht** | keine automatische Löschung; Zeilen gelöschter Assistenten verschwinden mit ihnen | Rollen `admin`, `statistics` (`/statistics/ratings`) |
+| `rating_counts` | Wochensummen je Assistent, Modell und Rolle (Schüler:in/Lehrkraft) — **kein Pseudonym, kein Bezug zu Chat oder Nachricht** | keine automatische Löschung; Zeilen gelöschter Assistenten verschwinden mit ihnen | Rollen `admin`, `statistics` (`/statistics/ratings`); seit 0.33 die **Erstellerin** eines Assistenten für ihn — nur die Gesamtsumme je Rolle, erst ab 10 Bewertungen |
 
 Die Wochensummen sind keine personenbezogenen Daten: Die feinste Einheit ist eine Woche, und
-die Seite zeigt einen Anteil erst ab zehn Bewertungen. Für die Daumen selbst steht ein Absatz
+die Seite zeigt einen Anteil erst ab zehn Bewertungen. Die Lehrkraft, die einen Assistenten
+angelegt hat, sieht noch weniger: keine Wochen, nur die Gesamtsumme je Rolle, und unter zehn
+Bewertungen gar keine Zahl — die Schwelle setzt der Server durch (`MINDEST_EIGENE`). Sie
+verhindert den Rückschluss in kleinen Gruppen („eine Klasse, eine Stunde, ein Daumen runter"). Für die Daumen selbst steht ein Absatz
 in den Datenschutzhinweisen der Hilfe (`/help/datenschutz`, Abschnitt „Daumen an Antworten").
 In Test- und Vorschau-Chats gibt es keine Bewertung.
 

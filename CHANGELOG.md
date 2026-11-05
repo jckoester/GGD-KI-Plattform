@@ -5,11 +5,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.33.0] – 2026-11-05
+
+Lehrkräfte sehen, wie ihre eigenen Assistenten bewertet werden. Keine Migration.
+
 ### Neu
 
 - **Wie kommt mein Assistent an?** Im Editor eines eigenen Assistenten stehen unter „So kommt er an“ die Daumen aus dem
   Chat — gesamt, getrennt nach Schüler:innen und Lehrkräften, mit Anteil „hilfreich“; „Meine Assistenten“ zeigt den Anteil
   in einer eigenen Spalte. Zahlen erst ab 10 Bewertungen je Rolle, ohne Namen und ohne Chat.
+
+### Dokumentation
+
+- Hilfe: „Wie kommt er an?“ in „Assistenten“; „Feedback geben“ und „Datenschutz“ nennen, was die Erstellerin eines
+  Assistenten sieht.
+- `docs/admin/feedback.md` und `docs/admin/datenschutz-betrieb.md`: Zugriff der Erstellerin auf die Gesamtsumme, Schwelle
+  von 10 Bewertungen im Server.
+
+### Nach dem Update
+
+- Backend **und** Frontend neu bauen und starten (`docker compose up -d`); offene Browser-Tabs einmal neu laden.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.32.1] – 2026-11-04
 

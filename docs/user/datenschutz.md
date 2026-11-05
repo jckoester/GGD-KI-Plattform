@@ -147,7 +147,9 @@ Bewertest du eine Antwort mit Daumen hoch oder runter, wird die Bewertung **an d
 gespeichert und mit dem Chat gelöscht. Zusätzlich zählt die Plattform sie in eine
 Wochensumme je Assistent, Modell und Rolle (Schüler:in oder Lehrkraft) — **ohne** dich und
 ohne den Chat. Diese Summen bleiben auch nach dem Löschen der Chats; aus ihnen lässt sich
-nicht ablesen, wer wie bewertet hat.
+nicht ablesen, wer wie bewertet hat. Die Administration sieht die Wochensummen; die Lehrkraft,
+die einen Assistenten gebaut hat, nur die Gesamtsumme für ihn, und das erst ab 10 Bewertungen
+von Schüler:innen bzw. von Lehrkräften.
 
 Mehr dazu: [Feedback geben](/help/feedback).
 

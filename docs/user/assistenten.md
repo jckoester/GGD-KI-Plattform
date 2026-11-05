@@ -129,6 +129,14 @@ die anderen dort den Zugang — die Rückfrage sagt es dir.
 Schüler:in testen** daneben siehst du ihn so, wie eine Schüler:in ihn findet und benutzt —
 siehe [Als Schüler:in ansehen](vorschau.md).
 
+**Wie kommt er an?** Im Editor steht unter **„So kommt er an"**, wie die Daumen unter den
+Antworten deines Assistenten ausfallen — getrennt nach Schüler:innen und Lehrkräften, gesamt,
+seit es ihn gibt. Zahlen erscheinen erst ab 10 Bewertungen je Gruppe; darunter könnte man in
+einer kleinen Klasse erraten, wer bewertet hat. Unter **Meine Assistenten** zeigt die Spalte
+„Bewertung" den Anteil „hilfreich". Eine **Kopie** beginnt bei null — die Bewertungen gehören
+zum Original. Willst du wissen, *was* nicht stimmt, helfen Rückmeldungen mit angehängtem Chat
+mehr als die Zahl.
+
 **Wer sieht ihn?** Auf der Seite deiner Unterrichtsgruppe zeigt der Reiter **„Assistenten"**,
 welche Assistenten die Schüler:innen dieser Gruppe sehen — und welche deiner eigenen nicht, mit
 Grund (siehe [Fächer](faecher.md#der-reiter-assistenten)). Achtung bei **„Freigeben für:

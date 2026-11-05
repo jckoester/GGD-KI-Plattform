@@ -108,8 +108,10 @@ keine Daumen.
 Die Daumen sind etwas anderes als eine Meldung: Sie sagen, ob eine Antwort brauchbar war,
 nicht was nicht funktioniert. Die Administration sieht sie nur **zusammengezählt** — je
 Assistent und Modell und je Woche, getrennt nach Schüler:innen und Lehrkräften —, nie
-einzeln, nie mit dir oder dem Chat verbunden. So zeigt sich, welche Assistenten gut
-ankommen und wo jemand nachbessern sollte.
+einzeln, nie mit dir oder dem Chat verbunden. Die Lehrkraft, die einen Assistenten gebaut
+hat, sieht für ihn nur die **Gesamtsumme** seit seinem Bestehen, und das erst ab 10
+Bewertungen — darunter keine Zahl. So zeigt sich, welche Assistenten gut ankommen und wo
+jemand nachbessern sollte.
 
 Willst du sagen, **was** an einer Antwort nicht gestimmt hat, schreib eine Meldung und
 häng den Chat an.

@@ -277,3 +277,14 @@
     Grund. Von dort kommst du mit einem Klick in die Vorschau als Schüler:in dieser Gruppe.
   link: /help/faecher
 
+- id: "0.33-so-kommt-er-an"
+  version: "0.33.0"
+  datum: 2026-11-05
+  rollen: [teacher]
+  titel: "Wie kommt dein Assistent an?"
+  text: >-
+    Im Editor deiner eigenen Assistenten steht jetzt unter „So kommt er an“, wie die Daumen
+    unter den Antworten ausfallen — getrennt nach Schüler:innen und Lehrkräften, ab 10
+    Bewertungen, ohne Namen. „Meine Assistenten“ zeigt den Anteil „hilfreich“ in einer Spalte.
+  link: /help/assistenten
+

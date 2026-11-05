@@ -117,6 +117,15 @@ Lesehilfen:
   eigenen Probe oder über Meldungen mit angehängtem Chat. Die Bewertungen selbst verweisen auf
   keinen Chat.
 
+**Lehrkräfte sehen ihre eigenen Assistenten** (seit 0.33): Im Editor unter „So kommt er an"
+und als Spalte in „Meine Assistenten" — nur die **Gesamtsumme** seit Bestehen, getrennt nach
+Schüler:innen und Lehrkräften, und erst ab **10 Bewertungen je Rolle**. Darunter liefert der
+Server weder Zahl noch Anteil: In einer kleinen Gruppe wäre schon „1 Daumen runter" eine
+Aussage über eine bestimmte Schüler:in. Kein Wochenverlauf aus demselben Grund. Sehen kann es
+nur, wer den Assistenten angelegt hat (wie das Bearbeitungsrecht); Kolleg:innen, die einen
+geteilten Assistenten nur benutzen, sehen nichts. Die Zahlen der mitgelieferten Assistenten
+stehen nur hier unter `/statistics/ratings`.
+
 Die Zahlen enthalten **keine Personen und keine Chats**; sie bleiben auch nach dem Löschen der
 Chats erhalten. Zeilen eines gelöschten Assistenten verschwinden mit ihm. Einzelheiten:
 [Datenschutz im Betrieb](datenschutz-betrieb.md#antwortbewertung-seit-031).
