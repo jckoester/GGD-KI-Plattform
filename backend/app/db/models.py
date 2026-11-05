@@ -6,13 +6,14 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger, Float, Integer, SmallInteger, case
+from sqlalchemy import Numeric, Boolean, BigInteger, Float, Integer, SmallInteger, case, literal_column
 from pgvector.sqlalchemy import Vector
 
 import enum
 from typing import Optional
 
 from app.config import settings
+from app.context.lookup import titel_normalisiert_sql
 
 
 class Base(DeclarativeBase):
@@ -650,6 +651,13 @@ class ZugAusloeser(Base):
     anweisung: Mapped[bool] = mapped_column(nullable=False)
     erstellt: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False)
 
+    # Aus Migration 0094 nachgetragen (0.34): Ohne sie meldete `alembic check` die Indizes
+    # als zu löschen, und `--autogenerate` hätte es vorgeschlagen.
+    __table_args__ = (
+        Index("ix_zug_ausloeser_conversation", "conversation_id"),
+        Index("ix_zug_ausloeser_erstellt", "erstellt"),
+    )
+
 
 class Message(Base):
     __tablename__ = "messages"
@@ -712,6 +720,9 @@ class Message(Base):
         Index("idx_messages_conversation_id", "conversation_id"),
         Index("idx_messages_assistant_id", "assistant_id"),
         Index("idx_messages_created_at", "created_at"),
+        # Teilindex aus Migration 0058 (im Modell seit 0.34, `alembic check`).
+        Index("idx_messages_cost_ausstehend", "created_at",
+              postgresql_where=text("cost_status = 'ausstehend'")),
     )
 
 
@@ -896,6 +907,9 @@ class ConversationFlag(Base):
         ),
         Index("idx_flags_conversation", "conversation_id"),
         Index("idx_flags_status_severity", "status", "severity"),
+        # Teilindex aus Migration 0059 (im Modell seit 0.34, `alembic check`).
+        Index("idx_flags_offen_flagged_at", "flagged_at",
+              postgresql_where=text("status IN ('open', 'under_review')")),
     )
 
 
@@ -968,6 +982,9 @@ class ConversationAccessRequest(Base):
         Index("idx_access_requests_conversation", "conversation_id"),
         Index("idx_access_requests_flag", "flag_id"),
         Index("idx_access_requests_status", "status"),
+        # Teilindex aus Migration 0060 (im Modell seit 0.34, `alembic check`).
+        Index("idx_access_requests_pending_requested_at", "requested_at",
+              postgresql_where=text("status = 'pending'")),
     )
 
 
@@ -1395,6 +1412,13 @@ class ContextNode(Base):
             "idx_context_nodes_band", "subject_id", "min_grade", "max_grade", "niveau",
             postgresql_where=text("subject_id IS NOT NULL"),
         ),
+        # Nachschlagen nach Titel (Migrationen 0053/0054, im Modell seit 0.34, `alembic check`):
+        # exakter Treffer und Teiltreffer auf dem normalisierten Titel. Der Ausdruck kommt aus
+        # derselben Quelle wie die Abfrage — weichen beide ab, bleibt der Index ungenutzt.
+        Index("idx_context_nodes_titel_nachschlagen", text(titel_normalisiert_sql("title"))),
+        Index("idx_context_nodes_titel_trigramm",
+              literal_column(titel_normalisiert_sql("title")).label("titel_norm"),
+              postgresql_using="gin", postgresql_ops={"titel_norm": "gin_trgm_ops"}),
         # ⚠️ **Kein Index auf `embedding`.** Die semantische Suche läuft absichtlich als
         # vollständiger Durchlauf. Der frühere HNSW-Index lieferte nur rund die Hälfte der
         # ähnlichsten Knoten und ließ sich weder durch Neuaufbau noch durch stärkere
@@ -1464,6 +1488,14 @@ class NodeAlias(Base):
 
     __table_args__ = (
         Index("idx_node_aliases_node", "node_id"),
+        # Ausdrucksindizes aus Migration 0057 (im Modell seit 0.34, `alembic check`): exakter
+        # Treffer, Teiltreffer (Trigramm) und ein Alias je Knoten nur einmal, normalisiert.
+        Index("idx_node_aliases_norm", text(titel_normalisiert_sql("alias"))),
+        Index("idx_node_aliases_trigramm",
+              literal_column(titel_normalisiert_sql("alias")).label("alias_norm"),
+              postgresql_using="gin", postgresql_ops={"alias_norm": "gin_trgm_ops"}),
+        Index("uq_node_aliases_node_norm", "node_id", text(titel_normalisiert_sql("alias")),
+              unique=True),
     )
 
 
@@ -1882,13 +1914,13 @@ class PersonalAccessToken(Base):
     id: Mapped[UUIDType] = mapped_column(
         primary_key=True, server_default=text("gen_random_uuid()")
     )
-    pseudonym: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
     # Anzeigename, damit man in der Liste erkennt, welches Gerät man widerruft.
     name: Mapped[str] = mapped_column(Text, nullable=False)
     # SHA-256 des Klartexts. Kein bcrypt/argon2: Das Token ist ein Zufallswert mit 256
     # Bit Entropie, kein Passwort — ein Wörterbuchangriff greift nicht, und der schnelle
     # Hash erlaubt den Abgleich über einen Index statt über einen Tabellendurchlauf.
-    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
     scopes: Mapped[list] = mapped_column(
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
     )
@@ -1904,6 +1936,14 @@ class PersonalAccessToken(Base):
     )
     revoked_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
+    )
+
+    # Namen wie in Migration 0061 (seit 0.34 im Modell): `index=True`/`unique=True` an der
+    # Spalte erzeugten `ix_…` bzw. eine Unique-Constraint — `alembic check` meldete beides
+    # als abweichend. Der Abgleich läuft bei jeder Anfrage über den Hash.
+    __table_args__ = (
+        Index("uq_personal_access_tokens_hash", "token_hash", unique=True),
+        Index("idx_personal_access_tokens_pseudonym", "pseudonym"),
     )
 
 

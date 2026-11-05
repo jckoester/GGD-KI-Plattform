@@ -367,14 +367,20 @@ cd frontend && npm run lint
 
 ## Prüflauf und Push-Hook
 
-`scripts/test.sh` führt alles zusammen aus — Backend-Unit- und Integrationstests,
-Frontend-Tests, Svelte-Typprüfung und ESLint. Der Rückgabewert ist nur bei
-durchweg grünem Lauf 0.
+`scripts/test.sh` führt alles zusammen aus — Backend-Unit- und Integrationstests, den
+Abgleich von Modell und Schema (`alembic check`, seit 0.34), die Scraper-Tests
+(`scripts/tests`, seit 0.34), Frontend-Tests, Svelte-Typprüfung und ESLint. Der Rückgabewert
+ist nur bei durchweg grünem Lauf 0.
 
 ```bash
-scripts/test.sh              # alles, ~40 s
-scripts/test.sh --schnell    # ohne Integrationstests (wenn PostgreSQL nicht läuft)
+scripts/test.sh              # alles, ~2½ min
+scripts/test.sh --schnell    # ohne Integrationstests und alembic check (wenn PostgreSQL nicht läuft)
 ```
+
+`alembic check` läuft gegen die **Entwicklungsdatenbank** (`DATABASE_URL`) und verlangt, dass sie
+auf dem neuesten Stand ist (`alembic upgrade head`). Schlägt der Schritt fehl, steht ein Index,
+eine Spalte oder eine Bedingung nur in einer Migration oder nur im Modell — tragen Sie sie dort
+nach, wo sie fehlt. Sonst schlüge `alembic revision --autogenerate` vor, sie zu löschen.
 
 Bei Erfolg steht je Schritt eine Zeile da; schlägt einer fehl, erscheinen die
 letzten Ausgabezeilen und der Befehl zum Nachstellen. Die übrigen Schritte laufen
@@ -408,8 +414,8 @@ Danach läuft die Prüfung vor jedem `git push`. Bewusst umgehen geht mit
 ### Auf GitHub
 
 `.github/workflows/tests.yml` fährt bei jedem Push denselben Umfang wie
-`scripts/test.sh --schnell` — Frontend-Tests, `check`, `lint` und die
-Backend-Unit-Tests, in zwei parallelen Jobs auf Linux. Der Hook ist eine lokale
+`scripts/test.sh --schnell` — Frontend-Tests, `check`, `lint`, die
+Backend-Unit-Tests und (seit 0.34) die Scraper-Tests, in zwei parallelen Jobs auf Linux. Der Hook ist eine lokale
 Leitplanke (umgehbar, nur in dieser Arbeitskopie); der Workflow ist die Instanz,
 die unabhängig von der eigenen Maschine urteilt.
 

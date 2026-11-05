@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Führt alle automatischen Prüfungen des Projekts aus: Backend-Tests (Unit und
-# Integration), Frontend-Tests, Svelte-Typprüfung und ESLint.
+# Integration), Schema-Abgleich (alembic check), Scraper-Tests, Frontend-Tests,
+# Svelte-Typprüfung und ESLint.
 #
 #   scripts/test.sh              alles (~40 s)
 #   scripts/test.sh --schnell    ohne Integrationstests (ohne laufende PostgreSQL-Instanz)
@@ -141,6 +142,30 @@ else
     rm -f "$LETZTES_LOG"
   fi
 fi
+
+# Modell und Schema stimmen überein (seit 0.34). Bis dahin standen 14 Indizes nur in den
+# Migrationen; `alembic revision --autogenerate` hätte vorgeschlagen, sie zu löschen. Läuft
+# gegen die Entwicklungsdatenbank (DATABASE_URL), die dafür auf dem neuesten Stand sein muss.
+if [ "$SCHNELL" -eq 1 ]; then
+  printf '  %-22s%s— übersprungen (--schnell)%s\n' "Schema (alembic)" "$GELB" "$AUS"
+else
+  if ! schritt "Schema (alembic)" 'No new upgrade operations detected' \
+      "cd backend && venv/bin/alembic check"; then
+    if grep -q "Target database is not up to date" "$LETZTES_LOG" 2>/dev/null; then
+      echo "      ${GELB}Hinweis:${AUS} Die Entwicklungsdatenbank ist nicht auf dem neuesten Stand."
+      echo "      Nachziehen: cd backend && venv/bin/alembic upgrade head"
+    fi
+    rm -f "$LETZTES_LOG"
+  fi
+fi
+
+echo
+echo "${FETT}Skripte${AUS}"
+# Scraper und Bildungsplan-Import (`scripts/tests`, seit 0.34). Bis dahin lief keiner dieser
+# Tests im Prüflauf — ein seit Juli roter Test fiel erst bei einer Durchsicht auf. Von der
+# Repo-Wurzel aus: `scripts` ist dort das Paket (siehe CLAUDE.md, „scripts/-Paketkonflikt“).
+schritt "Scraper-Tests" '[0-9]+ (passed|failed).*' \
+  "\"$PYTHON\" -m pytest -q --disable-warnings --tb=short scripts/tests"
 
 echo
 echo "${FETT}Frontend${AUS}"

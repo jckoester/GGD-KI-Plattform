@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Entwicklung
+
+- Prüflauf (`scripts/test.sh`) und CI um die Scraper-Tests erweitert; der Prüflauf vergleicht außerdem Modell und Schema
+  (`alembic check`). Vierzehn Indizes, die bisher nur in Migrationen standen, sind im Modell nachgetragen.
+
 ### Geändert
 
 - Reiter „Assistenten“ der Gruppenseite: Die schulweiten Assistenten stehen nach Fachbezug geordnet — zuerst die des Fachs

@@ -166,15 +166,16 @@ class TestParseLeitperspektive:
         assert 'Sucht und Abhängigkeit' in titles
         assert 'Sicherheit und Unfallschutz' in titles
 
-    def test_lfdb_has_import_hinweis_and_no_aspekte(self):
-        # LFDB hat auf der BP-Seite keine Aspekt-Liste; die Inhalte stecken in
-        # einer PDF. Der Knoten muss einen Import-Hinweis tragen.
+    def test_lfdb_ohne_import_hinweis_und_ohne_aspekte(self):
+        # LFDB hat auf der BP-Seite keine Aspekt-Liste; die Inhalte stecken in einer PDF.
+        # Bis 16.07.2026 trug der Knoten deshalb einen Import-Hinweis. Seit dem PDF-Import
+        # (KS-Plan C4) kommen Baustein, Themenblock und Kompetenz aus der PDF, und der
+        # Übersichtsknoten bleibt hinweisfrei (`parsers.py`, `parse_leitperspektive`). Der
+        # Test hielt bis 0.34 den alten Stand fest und war seither rot.
         soup = load_fixture('leitperspektive_lfdb.html')
         node = parse_leitperspektive(soup, LP_LFDB_URL, 'LFDB')
         assert node['metadata']['kuerzel'] == 'LFDB'
-        assert 'import_hinweis' in node['metadata']
-        assert 'PDF' in node['metadata']['import_hinweis']
-        assert 'Hinweis' in node['content']
+        assert 'import_hinweis' not in node['metadata']
         # Keine Aspekte (kein Anker-Satz, keine passende Liste)
         aspekte = parse_leitperspektive_aspekt_list(soup, LP_LFDB_URL, 'LFDB')
         assert aspekte == []

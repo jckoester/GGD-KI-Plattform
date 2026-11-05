@@ -134,3 +134,8 @@ jobs:
           # das brach, als der Auflöser kam: Er verankert *und* der Wert stieg noch eine
           # Ebene auf, also landete die Suche oberhalb des Repos.
         run: pytest tests/unit -q --disable-warnings --tb=short
+
+      # Scraper und Bildungsplan-Import (seit 0.34). Von der Repo-Wurzel: `scripts` ist dort
+      # das Paket. Die Abhängigkeiten stehen schon oben in requirements-scripts.txt.
+      - name: Scraper-Tests
+        run: pytest scripts/tests -q --disable-warnings --tb=short
