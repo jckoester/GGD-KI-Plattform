@@ -1,4 +1,5 @@
 <script>
+  import { anteilKurz } from "$lib/eigene_bewertung.js";
   import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
   import { onMount } from "svelte";
@@ -359,6 +360,7 @@
             <th class="pb-3 pr-4">Status</th>
             <th class="pb-3 pr-4">Zielgruppe</th>
             <th class="pb-3 pr-4">Freigabe für</th>
+            <th class="pb-3 pr-4" title="Anteil „hilfreich“ unter den Daumen — ab 10 Bewertungen">Bewertung</th>
             <th class="pb-3 pr-4">Aktualisiert</th>
             <th class="pb-3">Aktionen</th>
           </tr>
@@ -404,6 +406,12 @@
               <!-- Freigabe für (Scope) -->
               <td class="py-3 pr-4 text-light-tx-2 dark:text-dark-tx-2">
                 {scopeLabel(item)}
+              </td>
+
+              <!-- Bewertung (0.33): Anteil „hilfreich“, ab der Mindestzahl -->
+              <td class="py-3 pr-4 text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap tabular-nums"
+                  title={anteilKurz(item.bewertung).titel}>
+                {anteilKurz(item.bewertung).text}
               </td>
 
               <!-- Aktualisiert -->

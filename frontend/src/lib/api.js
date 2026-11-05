@@ -2963,6 +2963,16 @@ export async function getGruppenSchuelersicht(groupId, jahrgang = null) {
   // { jahrgang, jahrgang_quelle, modelle_bekannt, fuer_die_gruppe, schulweit, eigene_unsichtbar }
 }
 
+// Wie kommt mein Assistent an? (0.33) — Gesamtstand der Daumen; Erstellerin oder Admin.
+export async function getAssistantRatings(id) {
+  const res = await fetch(`${BASE}/assistants/${id}/ratings`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { schueler, lehrkraefte, mindestzahl }
+}
+
 // Admin: der Eingang. Ohne `status` liefert der Server, was Arbeit macht
 // (offen + in Bearbeitung). `counts` folgt den übrigen Filtern, nicht dem Status.
 export async function getAdminFeedback({

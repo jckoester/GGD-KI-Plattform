@@ -9,6 +9,7 @@
     import { auswahlMitBestand, eigeneFaecher, fachDerGruppe } from "$lib/stores/myGroups.js";
     import { GETEILT_SCOPES, SCHOOLWIDE_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
     import { fachschaftHinweis } from "$lib/schuelersicht.js";
+    import EigeneBewertung from "$lib/components/EigeneBewertung.svelte";
     import {
         Bot,
         Send,
@@ -2326,6 +2327,11 @@
                                 {/each}
                             </div>
                         {/if}
+                    {/if}
+
+                    <!-- Wie er ankommt (0.33, Päckchen AK) — Erstellerin und Admins -->
+                    {#if !isNew}
+                        <EigeneBewertung assistantId={Number(assistantId)} />
                     {/if}
 
                     <!-- Status-Anzeige (nur bei bestehendem Assistenten) -->

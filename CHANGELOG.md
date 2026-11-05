@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Wie kommt mein Assistent an?** Im Editor eines eigenen Assistenten stehen unter „So kommt er an“ die Daumen aus dem
+  Chat — gesamt, getrennt nach Schüler:innen und Lehrkräften, mit Anteil „hilfreich“; „Meine Assistenten“ zeigt den Anteil
+  in einer eigenen Spalte. Zahlen erst ab 10 Bewertungen je Rolle, ohne Namen und ohne Chat.
+
 ## [0.32.1] – 2026-11-04
 
 Assistenten bekommen fehlende Metadaten nachgetragen; die Vorschau nimmt die Klasse aus der Gruppe. Keine Migration.
