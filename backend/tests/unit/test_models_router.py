@@ -79,7 +79,6 @@ async def test_list_models_filters_by_team_allowlist():
         client = AsyncMock()
         client.list_models.return_value = ["gpt-4o-mini", "gpt-4o"]
         client.get_team_info.return_value = {"models": ["gpt-4o-mini"]}
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 
@@ -137,7 +136,6 @@ async def test_list_models_returns_all_for_admin():
     with patch("app.chat.router.LiteLLMClient") as client_cls:
         client = AsyncMock()
         client.list_models.return_value = ["gpt-4o-mini", "gpt-4o", "gpt-4"]
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 
@@ -158,7 +156,6 @@ async def test_list_models_returns_all_for_teacher():
         client = AsyncMock()
         client.list_models.return_value = ["gpt-4o-mini", "gpt-4o"]
         client.get_team_info.return_value = {"models": ["gpt-4o-mini", "gpt-4o"]}
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 
@@ -179,7 +176,6 @@ async def test_list_models_fallback_on_litellm_error():
         client = AsyncMock()
         client.list_models.return_value = ["gpt-4o-mini", "gpt-4o"]
         client.get_team_info.side_effect = RuntimeError("Connection failed")
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 
@@ -200,7 +196,6 @@ async def test_list_models_fallback_on_missing_team_info():
         client = AsyncMock()
         client.list_models.return_value = ["gpt-4o-mini", "gpt-4o"]
         client.get_team_info.return_value = None
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 

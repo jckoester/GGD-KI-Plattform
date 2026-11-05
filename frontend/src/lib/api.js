@@ -448,15 +448,6 @@ export async function* streamChat(
         continue;
       }
 
-      if (currentEventType === "cost") {
-        try {
-          const { cost_usd } = JSON.parse(payload);
-          yield { type: "cost", cost_usd };
-        } catch {}
-        currentEventType = null;
-        continue;
-      }
-
       if (currentEventType === "crisis") {
         try {
           yield { type: "crisis", crisis: JSON.parse(payload) };

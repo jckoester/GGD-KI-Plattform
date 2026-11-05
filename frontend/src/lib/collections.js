@@ -21,9 +21,9 @@ import {
  * Die Kategorie eines Typs — sie muss beim Anlegen mitgeschickt werden und ist das
  * einzige Feld mit Datenbank-Constraint.
  *
- * ⚠️ Nicht raten: Die fünf Sammlungen liegen in **drei** Kategorien (`begriff` ist
- * `concept`, `methodenblatt`/`operatorenblatt` sind `document`, `methode`/`sozialform`
- * sind `knowledge`). Der erste Entwurf des Editors schrieb `knowledge` fest und
+ * ⚠️ Nicht raten: Die Sammlungen liegen in **verschiedenen** Kategorien (etwa `begriff` in
+ * `concept`, `methodenblatt`/`operatorenblatt` in `document`, `methode`/`sozialform` in
+ * `knowledge`) — maßgeblich ist `CONTENT_TYPES`, nicht eine Zahl in diesem Kommentar. Der erste Entwurf des Editors schrieb `knowledge` fest und
  * scheiterte im Live-Test mit 422.
  */
 export function kategorieVon(typ) {

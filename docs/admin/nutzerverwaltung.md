@@ -218,7 +218,7 @@ ein Aufräumlauf anfassen darf:
 | `geerbt` | Schüler:in der Quellklasse einer Unterrichtsgruppe | **Vererbungslauf** beim Login — er entfernt, wo die Quellklasse nicht mehr passt |
 | `code` | Selbstbeitritt per Beitrittscode | niemand — nur die Lehrkraft, durch Rücknahme einer Code-Runde |
 | `eigen` | Die Lehrkraft, die die Gruppe angelegt hat | niemand |
-| `manuell` | Admin über `POST /groups/{id}/members` | niemand |
+| `manuell` | Admin über `POST /groups/{id}/members` — **bis 0.33**; der Endpunkt ist entfernt, vorhandene Einträge bleiben | niemand |
 
 **Die Regel dahinter:** Ein Aufräumlauf darf nur entfernen, was er selbst hätte anlegen
 können. Alles andere ist die Entscheidung eines Menschen und fällt nicht von allein.
@@ -276,55 +276,38 @@ curl -s -b "session=$TOKEN" \
 
 Der Filter gilt nur für Unterrichtsgruppen: Eine Klasse ohne Lehrkraft ist der
 Normalfall, eine Fachschaft hat ohnehin nur welche. Ein Treffer ist deshalb immer ein
-Befund. Übernehmen kann die Gruppe dann eine Lehrkraft, die Sie als Mitglied eintragen
-(siehe unten) — oder Sie lassen sie stehen, bis klar ist, ob noch jemand den Jahresplan
-braucht.
+Befund. Was Sie dann tun können, steht unter [Verwaiste Unterrichtsgruppe](#verwaiste-unterrichtsgruppe):
+Eintragen lässt sich eine neue Lehrkraft seit 0.34 nicht mehr; bei Schulkonto-Gruppen übernimmt
+sie das Schulkonto.
 
-## Die Gruppen-API für Reparaturen
+## Die Gruppen-API
 
-Unter `/admin/groups` liegen acht Endpunkte (auflisten, anlegen, ansehen, ändern,
-löschen, Mitglieder lesen, Mitglied eintragen, Mitglied entfernen). Sie haben **bewusst
-keine Oberfläche**: Mitgliederpflege von Hand ist im Regelbetrieb ausgeschlossen, weil
-die Plattform keine Klarnamen zeigt — eine Liste aus Pseudonymen wäre nicht bedienbar
-(ADR-003, Ebene 2).
+Unter `/admin/groups` liegen sieben Endpunkte (auflisten, anlegen, ansehen, ändern, löschen,
+Mitglieder lesen, Mitglied entfernen). Sie haben **bewusst keine Oberfläche**: Mitgliederpflege
+von Hand ist im Regelbetrieb ausgeschlossen, weil die Plattform keine Klarnamen zeigt — eine
+Liste aus Pseudonymen wäre nicht bedienbar (ADR-003, Ebene 2).
 
-Für die **Reparatur** ist das etwas anderes: Es geht um genau eine Person, und die meldet
-sich selbst. Der typische Fall ist eine verwaiste Unterrichtsgruppe (siehe oben), die eine
-Lehrkraft übernehmen soll. Die Plattform kennt keine Namen; das Pseudonym muss deshalb von
-der Lehrkraft kommen:
+**Ein Mitglied eintragen** (`POST /admin/groups/{id}/members`) geht seit 0.34 nicht mehr. Der
+Endpunkt übernahm das Pseudonym ungeprüft — ein vertipptes ergab eine Mitgliedschaft, die
+niemandem gehört — und schrieb nichts ins Audit-Log. Mitgliedschaften entstehen über das
+Schulkonto, die Gruppen-Konfiguration, Beitrittscodes und das Anlegen einer Gruppe durch die
+Lehrkraft.
 
-1. Die Lehrkraft liest im **Profil** unter „Budget" ihre **Kennung** ab. Das sind die ersten
-   zwölf Zeichen ihres Pseudonyms, angezeigt in Vierergruppen (etwa `a3f9 c2b8 1e04`). Sie
-   nennt sie Ihnen.
-2. Sie suchen das volle Pseudonym zur Kennung. In der Oberfläche geht das unter
-   **Einstellungen → Nutzer & Sitzungen**: Die Suche findet die Kennung ohne Leerzeichen,
-   das volle Pseudonym steht im Tooltip. Auf der Kommandozeile:
+### Verwaiste Unterrichtsgruppe
 
-   ```bash
-   curl -s -b "session=$TOKEN" "https://.../api/admin/users?role=teacher" \
-     | jq -r '.users[].pseudonym | select(startswith("a3f9c2b81e04"))'
-   ```
+Wird die Lehrkraft einer Gruppe gelöscht, die sie selbst angelegt und per Beitrittscode gefüllt
+hat (etwa aus dem Stundenplan), bleibt die Gruppe mit ihren Schüler:innen zurück — ohne
+Lehrkraft. **Übernehmen kann sie eine andere Lehrkraft derzeit nicht:** Ein Beitrittscode macht
+zur Schüler:in, und ein Stundenplan-Angebot lässt sich nur einer Gruppe zuordnen, in der man
+schon Lehrkraft ist. Bis es dafür einen geprüften Weg gibt:
 
-   Kommt keine Zeile zurück, ist die Kennung vertippt, oder die Lehrkraft hat gerade kein
-   Konto (etwa nach 90 Tagen ohne Anmeldung gelöscht; nach der nächsten Anmeldung ist es
-   wieder da, mit demselben Pseudonym). Kommen zwei, fragen Sie nach mehr Zeichen.
-3. Sie tragen genau dieses Pseudonym ein:
+1. Die neue Lehrkraft legt die Gruppe neu an (aus ihrem Stundenplan oder von Hand) und gibt
+   einen neuen Beitrittscode aus.
+2. Die alte Gruppe lassen Sie stehen, bis klar ist, ob noch jemand ihre Chats oder ihren
+   Jahresplan braucht; dann löschen (`DELETE /admin/groups/{id}`).
 
-   ```bash
-   # Lehrkraft einer verwaisten Gruppe zuordnen
-   curl -s -X POST -b "session=$TOKEN" -H 'Content-Type: application/json' \
-     -d '{"pseudonym": "<volles Pseudonym aus Schritt 2>", "role_in_group": "teacher"}' \
-     "https://.../api/admin/groups/<id>/members"
-   ```
-
-⚠️ **Der Endpunkt prüft das Pseudonym nicht.** Anders als das Aufbuchen von Budget nimmt er
-keine Kennung an und fragt nicht nach, ob es das Konto gibt. Ein vertipptes oder gekürztes
-Pseudonym ergibt eine Mitgliedschaft, die niemandem gehört. Deshalb Schritt 2 nicht
-überspringen und das Pseudonym vollständig (64 Zeichen) einsetzen.
-
-Die so entstandene Mitgliedschaft trägt `herkunft = 'manuell'` und wird von **keinem**
-Aufräumlauf entfernt — auch nicht von der Rücknahme einer Beitrittscode-Runde. Das ist
-Absicht: Was ein Mensch entschieden hat, fällt nicht von allein.
+Gruppen aus dem Schulkonto betrifft das nicht: Dort trägt die Schule die neue Lehrkraft im
+Schulkonto ein, und die Plattform übernimmt sie beim nächsten Login.
 
 ## Unterrichtsgruppen manuell anlegen
 

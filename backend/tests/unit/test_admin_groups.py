@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from app.api.admin.groups import (
     GroupCreate,
-    MemberAdd,
     VALID_GROUP_TYPES,
     router as admin_groups_router,
 )
@@ -66,17 +65,6 @@ class TestGroupCreate:
         assert gc.slug == "kl.8a"
 
 
-class TestMemberAdd:
-    def test_valid_roles_accepted(self):
-        for role in ("teacher", "student", None):
-            m = MemberAdd(pseudonym="abc", role_in_group=role)
-            assert m.role_in_group == role
-
-    def test_empty_pseudonym_raises(self):
-        with pytest.raises(ValidationError):
-            MemberAdd(pseudonym="", role_in_group="student")
-
-
 # ── HTTP-Endpunkt-Tests ───────────────────────────────────────────────────────
 
 def test_create_group_invalid_type_returns_422():
@@ -127,30 +115,11 @@ def test_delete_group_with_referencing_assistants_returns_409():
     assert "3" in resp.json()["detail"]
 
 
-def test_add_member_invalid_role_returns_422():
-    """POST /groups/{id}/members mit ungültiger Rolle → 422."""
-    group = _make_group_mock()
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = group
-    db = MagicMock()
-    db.execute = AsyncMock(return_value=mock_result)
-
-    client = TestClient(_make_app(db))
-    resp = client.post("/groups/1/members", json={"pseudonym": "abc", "role_in_group": "principal"})
-    assert resp.status_code == 422
-    assert "Ungueltige Rolle" in resp.json()["detail"]
-
-
-def test_add_member_group_not_found_returns_404():
-    """POST /groups/{id}/members mit nicht existierender Gruppe → 404."""
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none.return_value = None
-    db = MagicMock()
-    db.execute = AsyncMock(return_value=mock_result)
-
-    client = TestClient(_make_app(db))
-    resp = client.post("/groups/999/members", json={"pseudonym": "abc", "role_in_group": "student"})
-    assert resp.status_code == 404
+def test_mitglied_eintragen_gibt_es_nicht_mehr():
+    """Entfernt in 0.34: ungeprüftes Pseudonym, kein Audit-Log. Lesen und Entfernen bleiben."""
+    client = TestClient(_make_app(MagicMock()))
+    resp = client.post("/groups/1/members", json={"pseudonym": "abc", "role_in_group": "teacher"})
+    assert resp.status_code == 405
 
 
 def test_remove_member_not_found_returns_404():

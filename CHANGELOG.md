@@ -5,14 +5,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
-### Entwicklung
+## [0.34.0] – 2026-11-05
 
-- Hilfe ohne „IServ“ (heißt jetzt „Schulkonto“), mit Wächtertest. LiteLLM-Vorlage für die Entwicklung auf die
-  Aufgaben-Aliase umgestellt; Anleitung zum Proxy-Start von Hand vervollständigt. `updates-und-wartung.md` behauptete,
-  Image und CI installierten aus `requirements.lock` — berichtigt.
-
-- Prüflauf (`scripts/test.sh`) und CI um die Scraper-Tests erweitert; der Prüflauf vergleicht außerdem Modell und Schema
-  (`alembic check`). Vierzehn Indizes, die bisher nur in Migrationen standen, sind im Modell nachgetragen.
+Kleine Reste aus Todo und Päckchenplan: ein Exportfehler, Feinheiten der Oberfläche, Aufräumen. Keine Migration.
 
 ### Behoben
 
@@ -21,12 +16,35 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- Reiter „Assistenten“ der Gruppenseite: Die schulweiten Assistenten stehen nach Fachbezug geordnet — zuerst die des Fachs
+  der Gruppe, dann die allgemeinen dieses Fachs, dann die übrigen — mit farbiger Fachmarke bzw. Fach-Schlagwörtern.
 - Die Ausgangsfassung des Bildungsplans heißt in der Oberfläche „V1“ statt „Basis“ — neben „V2“ und „V3“.
 - Seitenleiste und Admin-Seitenleiste rücken die zweite Ebene und die Gruppen eines Fachs stärker ein.
 - Feedback-Dialog, Warnung vor persönlichen Daten und erneute Anmeldung: Escape schließt, der Fokus bleibt im Dialog und
   kehrt danach zurück. Die Warnung setzt den Fokus auf „Bearbeiten“.
-- Reiter „Assistenten“ der Gruppenseite: Die schulweiten Assistenten stehen nach Fachbezug geordnet — zuerst die des Fachs
-  der Gruppe, dann die allgemeinen dieses Fachs, dann die übrigen — mit farbiger Fachmarke bzw. Fach-Schlagwörtern.
+
+### Entfernt
+
+- `POST /admin/groups/{id}/members` (Mitglied von Hand eintragen): übernahm das Pseudonym ungeprüft und schrieb nichts ins
+  Audit-Log. Lesen und Entfernen von Mitgliedschaften bleiben; vorhandene Einträge bleiben gültig. Wie eine verwaiste
+  Unterrichtsgruppe weitergeht, steht in `docs/admin/nutzerverwaltung.md`.
+
+### Entwicklung
+
+- Prüflauf (`scripts/test.sh`) und CI um die Scraper-Tests erweitert; der Prüflauf vergleicht außerdem Modell und Schema
+  (`alembic check`). Vierzehn Indizes, die bisher nur in Migrationen standen, sind im Modell nachgetragen.
+- Hilfe ohne „IServ“ (heißt jetzt „Schulkonto“), mit Wächtertest. LiteLLM-Vorlage für die Entwicklung auf die
+  Aufgaben-Aliase umgestellt; Anleitung zum Proxy-Start von Hand vervollständigt. `updates-und-wartung.md` behauptete,
+  Image und CI installierten aus `requirements.lock` — berichtigt.
+- Aufgeräumt: ungenutztes `LiteLLMClient.get_model_info()`, das tote SSE-Ereignis `cost` im Frontend, ungenutzte Importe.
+  Die Admin-Ausnahme beim Anlegen von Curricula ist als bewusste Verwaltungsbefugnis festgehalten.
+
+### Nach dem Update
+
+- Backend **und** Frontend neu bauen und starten (`docker compose up -d`); offene Browser-Tabs einmal neu laden.
+- Einen Office-Export mit Diagramm prüfen: Unter dem Bild darf keine Bildunterschrift mehr stehen (Prod nutzt Pandoc 3.11;
+  lokal ließ sich der Fehler mit 3.13 nicht nachstellen).
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.33.0] – 2026-11-05
 

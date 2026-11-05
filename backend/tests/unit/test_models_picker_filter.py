@@ -57,7 +57,6 @@ def _get_models(payload, *, allowlist=None, models=None):
         client.get_team_info.return_value = (
             {"models": allowlist} if allowlist is not None else None
         )
-        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
         response = TestClient(app).get("/models")

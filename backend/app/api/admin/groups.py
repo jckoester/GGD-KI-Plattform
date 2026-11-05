@@ -16,7 +16,6 @@ router = APIRouter(prefix="/groups", tags=["admin-groups"])
 VALID_GROUP_TYPES = {
     "school_class", "subject_department", "teaching_group", "activity_group", "teachers"
 }
-VALID_ROLES_IN_GROUP = {"teacher", "student"}
 
 
 # ── Pydantic Schemas ────────────────────────────────────────────────────────
@@ -33,11 +32,6 @@ class GroupUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     subject_id: Optional[int] = None
     sso_group_id: Optional[str] = None
-
-
-class MemberAdd(BaseModel):
-    pseudonym: str = Field(min_length=1)
-    role_in_group: Optional[str] = None
 
 
 class GroupOut(BaseModel):
@@ -248,58 +242,12 @@ async def list_members(
     return MemberListResponse(items=list(members), total=len(members))
 
 
-@router.post("/{group_id}/members", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
-async def add_member(
-    group_id: int,
-    request: MemberAdd,
-    _: JwtPayload = Depends(require_role("admin")),
-    db: AsyncSession = Depends(get_db),
-) -> MemberOut:
-    """Mitglied zu Gruppe hinzufuegen (Upsert)."""
-    # Validierung
-    if request.role_in_group is not None and request.role_in_group not in VALID_ROLES_IN_GROUP:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Ungueltige Rolle. Erlaubt: {', '.join(filter(None, VALID_ROLES_IN_GROUP))}"
-        )
-    
-    # Pruefen ob Gruppe existiert
-    result = await db.execute(select(Group).where(Group.id == group_id))
-    if result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Gruppe nicht gefunden")
-    
-    # Upsert: wenn (group_id, pseudonym) existiert, role_in_group aktualisieren
-    result = await db.execute(
-        select(GroupMembership)
-        .where(
-            and_(
-                GroupMembership.group_id == group_id,
-                GroupMembership.pseudonym == request.pseudonym
-            )
-        )
-    )
-    existing = result.scalar_one_or_none()
-    
-    if existing:
-        existing.role_in_group = request.role_in_group
-    else:
-        membership = GroupMembership(
-            group_id=group_id,
-            pseudonym=request.pseudonym,
-            role_in_group=request.role_in_group,
-            # `manuell`: von Hand eingetragen, also von keinem Aufräumlauf zu entfernen
-            # — und unterscheidbar von `code`, damit die Rücknahme einer Code-Runde
-            # (Alembic 0069) nicht versehentlich hier hineingreift.
-            herkunft="manuell",
-        )
-        db.add(membership)
-    
-    await db.commit()
-    
-    return MemberOut(
-        pseudonym=request.pseudonym,
-        role_in_group=request.role_in_group
-    )
+# ⚠️ **Kein `POST /{group_id}/members` mehr** (entfernt in 0.34, Entscheidung Jan 05.11.2026).
+# Der Endpunkt übernahm das Pseudonym ungeprüft — ein vertipptes ergab eine Mitgliedschaft, die
+# niemandem gehört — und schrieb nichts ins Audit-Log. Mitgliedschaften kommen aus dem
+# Schulkonto, der Gruppen-Config, Beitrittscodes und dem Anlegen durch die Lehrkraft. Die
+# Lücke, die er füllte (eine verwaiste Unterrichtsgruppe einer neuen Lehrkraft übergeben),
+# steht als Todo; Bestand mit `herkunft = 'manuell'` bleibt gültig.
 
 
 @router.delete("/{group_id}/members/{pseudonym}", status_code=status.HTTP_204_NO_CONTENT)

@@ -26,7 +26,7 @@ Freischaltungslogik:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Iterable
 from uuid import UUID
 

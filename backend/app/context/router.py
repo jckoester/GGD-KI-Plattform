@@ -1956,7 +1956,13 @@ async def create_curriculum_node(
     # Fachschafts-Zugehörigkeit prüfen: Mitgliedschaft in IRGENDEINER
     # subject_department-Gruppe des Fachs (robust gegen Alt-/Doppelgruppen mit
     # abweichender sso_group_id). Existiert für das Fach gar keine Fachschaft,
-    # wird nicht geprüft (Verhalten wie bisher). Admins sind ausgenommen.
+    # wird nicht geprüft (Verhalten wie bisher).
+    #
+    # **Admins sind ausgenommen — bewusst** (Entscheidung Jan, 05.11.2026, 0.34): eine
+    # Verwaltungsbefugnis, keine Abweichung von der Rollenregel „Admin verhält sich wie eine
+    # Lehrkraft“ (die gilt für Chat, Seitenleiste, Verlauf). Admins richten Curricula auch für
+    # Fächer ein, deren Fachschaft (noch) niemanden hat, und helfen dort aus. Dieselbe
+    # Befugnis gilt beim Bearbeiten (`docs/user/curriculum.md`).
     if department_group_id is not None and "admin" not in user.roles:
         if not await is_subject_department_member(db, subject_id, user.sub):
             raise HTTPException(

@@ -3,7 +3,6 @@ import dataclasses
 import time
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
@@ -39,7 +38,6 @@ from app.chat.image_models import (
     Bildart,
     alle_bildarten,
     bekanntes_seitenverhaeltnis,
-    default_bildart,
     get_bildart,
     standard_unter,
 )
@@ -56,7 +54,7 @@ from app.chat.image_store import (
     save_generated_image,
     unlink_paths,
 )
-from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
+from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
 from app.assistants import vorschlag as vorschlag_dienst
@@ -2390,7 +2388,6 @@ async def chat(
     _capability_map = await _get_model_info()
     _is_group_teacher = False
     if conversation_group_id is not None:
-        from app.planning.permissions import require_group_teacher
         import sqlalchemy as sa
         from app.db.models import GroupMembership as _GM
         _mbr = await db.execute(

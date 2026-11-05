@@ -826,18 +826,6 @@
                     pageTitle.set(item.title);
                     continue;
                 }
-                // Cost-Event
-                if (item.type === "cost") {
-                    messages[assistantIndex] = {
-                        ...messages[assistantIndex],
-                        cost_usd: item.cost_usd,
-                    };
-                    messages = messages;
-                    if (item.cost_usd != null) {
-                        totalCostUsd = (totalCostUsd ?? 0) + item.cost_usd;
-                    }
-                    continue;
-                }
                 // Krisen-Hilfe-Banner (ADR-008): an die **auslösende** Nachricht
                 // heften, nicht an die Antwort.
                 //
