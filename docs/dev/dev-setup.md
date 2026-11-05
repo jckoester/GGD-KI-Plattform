@@ -203,14 +203,22 @@ Pflicht-Variablen):
 ./infra/litellm_start_dev.sh          # Port 4000; PORT=… / CONFIG=… überschreibbar
 ```
 
-Oder von Hand:
+Oder von Hand — dann genau wie das Skript **aus `infra/` heraus und mit den Guardrails im
+`PYTHONPATH`**. Sonst bricht der Proxy beim Start mit `No module named 'moderation_core'` ab: Die
+Jugendschutz-Guardrails der Vorlagen liegen als Python-Module in `infra/guardrails/`.
 
 ```bash
-# aus dem Repo-Root, Proxy-venv aktiviert:
+# aus dem Repo-Root:
 source infra/litellm-venv/bin/activate
 set -a && source .env && set +a          # OPENAI_API_KEY, LITELLM_MASTER_KEY, … exportieren
-litellm --config infra/litellm_config.dev.yaml --port 4000
+export PYTHONPATH="$PWD/infra/guardrails${PYTHONPATH:+:$PYTHONPATH}"
+cd infra && litellm --config litellm_config.dev.yaml --port 4000
 ```
+
+> **Postgres.app:** Verbindungen ohne Passwort verlangen eine Freigabe je aufrufender App — beim
+> ersten Start erscheint ein Dialog. Aus einem losgelösten Prozess (`nohup`, eine Shell ohne
+> Fenster, ein Agent) kann er nicht erscheinen; die Verbindung schlägt dann scheinbar grundlos
+> fehl. Den Proxy einmal aus einem Terminal starten und die Freigabe erteilen.
 
 ### 5. Prüfen
 

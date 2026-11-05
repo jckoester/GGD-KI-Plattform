@@ -8,6 +8,8 @@
   import { ShieldCheck } from "lucide-svelte";
   import { getStepUpChallenge, stepUpDirect } from "$lib/api.js";
   import { ohneStepupFehler } from "$lib/stepup_rueckkehr.js";
+  // Rahmen aus Dialog.svelte (0.34): Rolle, Escape (= Abbrechen), Fokus im Dialog und zurück.
+  import Dialog from "$lib/components/Dialog.svelte";
 
   // action (approve|deny|read|export) + resourceId (request_id) binden das Step-up-Token
   // an genau diese Aktion/Ressource (Sicherheits-Audit #3).
@@ -55,19 +57,10 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-  <button
-    class="absolute inset-0 bg-black/50"
-    onclick={() => onCancel?.()}
-    aria-label="Dialog schließen"
-  ></button>
-  <div
-    class="relative bg-light-bg dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3
-           rounded-lg shadow-lg w-full max-w-sm p-6"
-  >
+<Dialog open onClose={() => onCancel?.()} titelId="stepup-titel" breite="max-w-sm mx-4">
     <div class="flex items-center gap-2 mb-1 text-light-tx dark:text-dark-tx">
       <ShieldCheck class="w-5 h-5" />
-      <h2 class="text-lg font-semibold">Erneute Anmeldung</h2>
+      <h2 id="stepup-titel" class="text-lg font-semibold">Erneute Anmeldung</h2>
     </div>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
       Diese Aktion ist besonders geschützt. Bitte bestätige kurz deine Identität.
@@ -139,5 +132,4 @@
     {:else}
       <p class="text-sm text-light-re dark:text-dark-re">{error ?? "Nicht verfügbar."}</p>
     {/if}
-  </div>
-</div>
+</Dialog>

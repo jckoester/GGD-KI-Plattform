@@ -19,32 +19,61 @@
 # Siehe docs/dev/dev-setup.md → "LiteLLM lokal starten".
 
 model_list:
-  # ── Chat-/Titel-Modell ──────────────────────────────────────────────────────
-  # Das Backend/die Assistenten fragen Modelle unter ihrem model_name an
-  # (CHAT_DEFAULT_MODEL / TITLE_MODEL in .env). Der Name bleibt "gpt-4", damit
-  # Assistenten-Configs unverändert funktionieren; dahinter liegt im Dev das
-  # günstige gpt-4o-mini. Für höhere Qualität auf openai/gpt-4o umstellen.
-  - model_name: gpt-4
+  # Aufgaben-Aliase wie in den Betriebsvorlagen (litellm_config.ionos.example.yaml): Die `.env`
+  # fragt genau diese Namen an (CHAT_DEFAULT_MODEL, TITLE_MODEL, VORSCHLAG_MODEL,
+  # BEGRIFFE_MODEL, EMBEDDING_MODEL, IMAGE_DEFAULT_MODEL). Hier liegt im Dev der günstige
+  # OpenAI-Weg dahinter — ein OPENAI_API_KEY genügt. Für die OpenAI-Modelle kennt LiteLLM die
+  # Preise selbst (USD, passend zu LITELLM_PRICE_CURRENCY=USD in .env.example); erst mit eigener
+  # `api_base` müssten sie unter `model_info` stehen.
+  #
+  # Bis 0.34 standen hier noch Produktnamen (`gpt-4`, `text-embedding-3-small`, `gpt-image-1.5`)
+  # aus der Zeit vor dem Namensschema (ADR-015) — die `.env.example` fragte sie nicht mehr an.
+
+  # ── Chat ────────────────────────────────────────────────────────────────────
+  - model_name: chat-standard
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Schüler-Assistenten laufen auf `chat-komplex` (config/assistants.example.yaml).
+  - model_name: chat-komplex
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── Hintergrundaufgaben (`system-` blendet sie im Modellwähler aus) ─────────
+  - model_name: system-titel
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: system-vorschlag
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: system-begriffe
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
   # ── Embeddings ──────────────────────────────────────────────────────────────
-  # model_name entspricht EMBEDDING_MODEL in .env (Default: text-embedding-3-small).
-  # Beim Tausch auch EMBEDDING_DIMENSIONS anpassen — die Vektorbreite hängt an einer
-  # Spalte und erfordert Migration + Re-Embedding: docs/runbooks/modellwechsel.md.
-  - model_name: text-embedding-3-small
+  # 1536 Dimensionen = EMBEDDING_DIMENSIONS in .env.example. Beim Tausch die Spaltenbreite
+  # beachten — Migration + Re-Embedding: docs/runbooks/modellwechsel.md.
+  - model_name: embedding-standard
     litellm_params:
       model: openai/text-embedding-3-small
       api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: embedding
 
-  # ── Bildgenerierung ─────────────────────────────────────────────────────────
-  # model_name entspricht IMAGE_DEFAULT_MODEL in .env (gpt-image-1.5).
-  # Optional — nur nötig, wenn Bildfunktionen lokal getestet werden.
-  - model_name: gpt-image-1.5
+  # ── Bildgenerierung (optional) ──────────────────────────────────────────────
+  # Nur nötig, wenn Bildfunktionen lokal getestet werden. `mode: image_generation` ist Pflicht,
+  # sonst erscheint das Modell nicht als Bildmodell.
+  - model_name: bild-standard
     litellm_params:
       model: openai/gpt-image-1
       api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: image_generation
 
 general_settings:
   # Voller Zugriff auf die Management-API (User/Teams/Keys/Budgets). Muss mit

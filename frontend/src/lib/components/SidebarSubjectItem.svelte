@@ -80,7 +80,7 @@
             {#each section.groups as group (group.groupId)}
                 {@const isGroupActive = $page.url.pathname === `/subjects/${section.slug}/groups/${group.groupId}`}
                 <div
-                    class="flex items-center group/item pl-7 pr-1 rounded-md transition-colors
+                    class="flex items-center group/item pl-10 pr-1 rounded-md transition-colors
                            {isGroupActive
                              ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
                              : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
@@ -120,7 +120,7 @@
             {#if $groupsConfig.allow_manual_teaching_groups}
                 {#each section.potentialGroups as pot (pot.classGroupId + "-" + pot.subjectId)}
                     <div
-                        class="flex items-center pl-7 pr-1 rounded-md
+                        class="flex items-center pl-10 pr-1 rounded-md
                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                     >
                         <span

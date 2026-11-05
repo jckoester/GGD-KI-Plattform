@@ -38,6 +38,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import Dialog from "$lib/components/Dialog.svelte";
 
     let { vorauswahlChat = false, onclose = () => {} } = $props();
 
@@ -65,10 +66,6 @@
 
     function schliessen() {
         onclose();
-    }
-
-    function beiTaste(ereignis) {
-        if (ereignis.key === "Escape") schliessen();
     }
 
     async function absenden() {
@@ -102,19 +99,12 @@
     }
 </script>
 
-<svelte:window onkeydown={beiTaste} />
-
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-    <div
-        class="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-lg p-6
-               bg-light-bg dark:bg-dark-bg
-               border border-light-ui-3 dark:border-dark-ui-3"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Feedback geben"
-    >
+<!-- Rahmen aus Dialog.svelte (0.34): Rolle, Escape, Fokus hinein, im Kreis und zurück. Die
+     Höhenbegrenzung geht über `breite` mit, die als Klassenliste am Rahmen landet. -->
+<Dialog open onClose={schliessen} titelId="feedback-titel"
+        breite="max-w-lg max-h-[85vh] overflow-y-auto mx-4">
         <div class="flex items-start justify-between gap-4">
-            <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx">
+            <h2 id="feedback-titel" class="text-lg font-semibold text-light-tx dark:text-dark-tx">
                 Feedback geben
             </h2>
             <button
@@ -268,5 +258,4 @@
                 </button>
             </div>
         {/if}
-    </div>
-</div>
+</Dialog>

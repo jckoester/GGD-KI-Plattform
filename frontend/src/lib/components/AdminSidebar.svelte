@@ -172,7 +172,7 @@
             </div>
         </div>
         {#if openSection === "settings" || openSection === "settings-texts" || openSection === "settings-guardrail"}
-            <div class="mt-1 space-y-1 pl-2">
+            <div class="mt-1 space-y-1 pl-5">
                 <button
                     onclick={() => goto(`/settings/models`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -441,7 +441,7 @@
             </div>
         </div>
         {#if openSection === "statistics"}
-            <div class="mt-1 space-y-1 pl-2">
+            <div class="mt-1 space-y-1 pl-5">
                 <button
                     onclick={() => goto(`/statistics/prompts`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -455,7 +455,7 @@
                     </div>
                 </button>
             </div>
-            <div class="mt-1 space-y-1 pl-2">
+            <div class="mt-1 space-y-1 pl-5">
                 <button
                     onclick={() => goto(`/statistics/costs`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -469,7 +469,7 @@
                     </div>
                 </button>
             </div>
-            <div class="mt-1 space-y-1 pl-2">
+            <div class="mt-1 space-y-1 pl-5">
                 <button
                     onclick={() => goto(`/statistics/vorab`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -483,7 +483,7 @@
                     </div>
                 </button>
             </div>
-            <div class="mt-1 space-y-1 pl-2">
+            <div class="mt-1 space-y-1 pl-5">
                 <button
                     onclick={() => goto(`/statistics/ratings`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx

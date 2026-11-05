@@ -53,7 +53,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 ## Häufige Fragen
 
 **Ich kann mich nicht einloggen.**
-Die Anmeldung läuft über dein Schulkonto (SSO). Wenn die Anmeldung fehlschlägt, prüfe zunächst, ob du dich in IServ normal einloggen kannst. Falls das Problem bestehen bleibt, wende dich an deine Lehrkraft oder den IT-Support der Schule.
+Die Anmeldung läuft über dein Schulkonto (SSO). Wenn die Anmeldung fehlschlägt, prüfe zunächst, ob du dich bei deinem Schulkonto sonst normal anmelden kannst. Falls das Problem bestehen bleibt, wende dich an deine Lehrkraft oder den IT-Support der Schule.
 
 **Mein Budget ist aufgebraucht — was jetzt?**
 Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das **jede Unterrichtswoche wächst**. Ist es aufgebraucht, werden neue Anfragen abgelehnt, bis in der nächsten Unterrichtswoche wieder Guthaben dazukommt — die [Profilseite](profil.md) nennt den Termin.

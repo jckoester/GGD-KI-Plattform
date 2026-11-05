@@ -77,3 +77,25 @@ def test_raw_tex_is_not_executed():
 async def test_async_wrapper():
     data = await pandoc.markdown_to_office("# Async", fmt="docx")
     assert data[:2] == b"PK"
+
+
+# ── Keine Bildunterschrift aus dem Alternativtext (0.34) ────────────────────────
+
+_PNG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+        "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+
+
+def test_reader_schaltet_abbildungen_ausdruecklich_ab():
+    """Unabhängig davon, was die Pandoc-Fassung voreinstellt (3.11 auf Prod, 3.13 lokal)."""
+    assert "-implicit_figures" in pandoc._READER
+
+
+@_needs_pandoc
+def test_alleinstehendes_bild_ohne_unterschrift():
+    """Befund 03.11.2026: „Strukturformel“ stand als Unterschrift unter jedem Diagramm."""
+    md = f"Vor dem Bild.\n\n![Strukturformel]({_PNG})\n\nNach dem Bild.\n"
+    data = pandoc.markdown_to_office_sync(md, fmt="docx")
+    xml = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode("utf-8")
+    assert "<w:t>Strukturformel</w:t>" not in xml, "kein sichtbarer Text aus dem Alternativtext"
+    assert "Caption" not in xml
+    assert 'descr="Strukturformel"' in xml, "der Alternativtext selbst bleibt"

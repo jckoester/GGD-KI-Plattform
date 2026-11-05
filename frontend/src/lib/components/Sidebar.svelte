@@ -254,7 +254,7 @@
                     {/if}
                 </div>
                 {#if openSection === 'assistants' && ($user?.roles.includes('teacher') || $user?.roles.includes('admin'))}
-                    <div class="mt-1 space-y-1 pl-2">
+                    <div class="mt-1 space-y-1 pl-5">
                         {#if $zeigtEintrag('assistants_my')}
                         <button
                             onclick={() => goto('/assistants/my')}
@@ -365,7 +365,7 @@
                     </button>
                 </div>
                 {#if openSection === 'knowledge'}
-                    <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         <!-- Für alle Rollen: Suche und der eigene Bestand. -->
                         <button
                             onclick={() => goto('/knowledge/search')}
@@ -506,7 +506,7 @@
                 </div>
 
                 {#if subjectsOpen}
-                    <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         {#each $visibleSidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
                             <SidebarSubjectItem
                                 {section}
@@ -549,7 +549,7 @@
                 </div>
 
                 {#if openSection === 'recent'}
-                    <div class="mt-1 space-y-1 pl-2">
+                    <div class="mt-1 space-y-1 pl-5">
                         {#if $recentConversations.length === 0}
                             <p
                                 class="text-sm text-light-tx-3 dark:text-dark-tx-3 px-3 py-1"

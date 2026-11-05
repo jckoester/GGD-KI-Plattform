@@ -7,7 +7,12 @@
     // ist „Bearbeiten"; „Trotzdem senden" bleibt jederzeit möglich. Es wird nichts
     // persistiert; der Scan lief lokal auf dem Schulserver, der Provider hat den
     // Text noch nicht gesehen.
+    //
+    // Rahmen aus Dialog.svelte (0.34): Escape und ein Klick daneben heißen „Bearbeiten“ — also
+    // nichts senden. Der Fokus steht auf „Bearbeiten“, der empfohlenen Aktion, nicht auf der
+    // Ankreuzbox, die Dialog.svelte sonst als erstes Eingabefeld wählte.
     import { TriangleAlert } from "lucide-svelte";
+    import Dialog from "$lib/components/Dialog.svelte";
     import {
         PII_CATEGORY_LABELS,
         segmentText,
@@ -24,21 +29,12 @@
     const labelFor = (cat) => PII_CATEGORY_LABELS[cat] ?? cat;
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-        class="absolute inset-0 bg-black/50"
-        onclick={() => onedit?.()}
-        aria-label="Schließen und Eingabe bearbeiten"
-    ></button>
-    <div
-        class="relative bg-light-bg dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3
-               rounded-lg shadow-lg w-full max-w-lg p-6"
-    >
+<Dialog open onClose={() => onedit?.()} titelId="pii-titel" breite="max-w-lg mx-4">
         <div
             class="flex items-center gap-2 mb-1 text-light-tx dark:text-dark-tx"
         >
             <TriangleAlert class="w-5 h-5 text-light-ye dark:text-dark-ye" />
-            <h2 class="text-lg font-semibold">
+            <h2 id="pii-titel" class="text-lg font-semibold">
                 Persönliche Daten in deiner Nachricht
             </h2>
         </div>
@@ -109,11 +105,11 @@
             <button
                 type="button"
                 onclick={() => onedit?.()}
+                data-autofocus
                 class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
                        hover:bg-primary-dark dark:hover:bg-primary transition-colors"
             >
                 Bearbeiten
             </button>
         </div>
-    </div>
-</div>
+</Dialog>

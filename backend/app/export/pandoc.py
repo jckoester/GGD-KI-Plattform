@@ -34,7 +34,14 @@ OFFICE_FORMATS = {"docx": ".docx", "odt": ".odt"}
 # Reader-Dialekt: CommonMark + Erweiterungen (Tabellen, Fußnoten, Task-Listen, Strikethrough …),
 # **ohne** raw_tex. `hard_line_breaks` spiegelt das `breaks: true` der Vorschau (marked) — ein
 # einzelner Zeilenumbruch wird zum Umbruch, nicht zum Leerzeichen (Parität, Schritt 7).
-_READER = "commonmark_x+hard_line_breaks"
+#
+# `-implicit_figures` (0.34): Ein Bild allein im Absatz wird sonst eine Abbildung, und der
+# Alternativtext steht als **Unterschrift** darunter — „Strukturformel“, „Schaltplan“,
+# „Funktionsgraph“ unter jedem vorgerenderten Diagramm (Befund 03.11.2026, 0.30). Ob die
+# Erweiterung bei `commonmark_x` voreingestellt ist, hängt an der Pandoc-Fassung (3.13: aus);
+# ausdrücklich abgeschaltet gilt es für jede. Der Alternativtext bleibt erhalten (`descr`).
+# Der PDF-Weg (markdown-it, weasyprint) kannte nie Unterschriften — jetzt gleich.
+_READER = "commonmark_x+hard_line_breaks-implicit_figures"
 
 
 class PandocError(Exception):

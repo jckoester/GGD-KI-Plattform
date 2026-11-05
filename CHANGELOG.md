@@ -7,11 +7,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Entwicklung
 
+- Hilfe ohne „IServ“ (heißt jetzt „Schulkonto“), mit Wächtertest. LiteLLM-Vorlage für die Entwicklung auf die
+  Aufgaben-Aliase umgestellt; Anleitung zum Proxy-Start von Hand vervollständigt. `updates-und-wartung.md` behauptete,
+  Image und CI installierten aus `requirements.lock` — berichtigt.
+
 - Prüflauf (`scripts/test.sh`) und CI um die Scraper-Tests erweitert; der Prüflauf vergleicht außerdem Modell und Schema
   (`alembic check`). Vierzehn Indizes, die bisher nur in Migrationen standen, sind im Modell nachgetragen.
 
+### Behoben
+
+- Office-Export (DOCX, ODT): Unter Diagrammen und Strukturformeln stand der Alternativtext („Strukturformel“, „Schaltplan“,
+  „Funktionsgraph“) als Bildunterschrift.
+
 ### Geändert
 
+- Die Ausgangsfassung des Bildungsplans heißt in der Oberfläche „V1“ statt „Basis“ — neben „V2“ und „V3“.
+- Seitenleiste und Admin-Seitenleiste rücken die zweite Ebene und die Gruppen eines Fachs stärker ein.
+- Feedback-Dialog, Warnung vor persönlichen Daten und erneute Anmeldung: Escape schließt, der Fokus bleibt im Dialog und
+  kehrt danach zurück. Die Warnung setzt den Fokus auf „Bearbeiten“.
 - Reiter „Assistenten“ der Gruppenseite: Die schulweiten Assistenten stehen nach Fachbezug geordnet — zuerst die des Fachs
   der Gruppe, dann die allgemeinen dieses Fachs, dann die übrigen — mit farbiger Fachmarke bzw. Fach-Schlagwörtern.
 

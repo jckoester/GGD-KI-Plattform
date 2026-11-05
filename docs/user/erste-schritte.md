@@ -2,7 +2,7 @@
 
 ## Anmelden
 
-Die Anmeldung bei ki@schule erfolgt über dein Schulkonto. Klick auf der Startseite auf **„Anmelden"** — du wirst zur gewohnten IServ-Anmeldung weitergeleitet. Nach erfolgreicher Anmeldung kehrst du automatisch zur Plattform zurück.
+Die Anmeldung bei ki@schule erfolgt über dein Schulkonto. Klick auf der Startseite auf **„Anmelden"** — du wirst zur gewohnten Anmeldeseite deines Schulkontos weitergeleitet. Nach erfolgreicher Anmeldung kehrst du automatisch zur Plattform zurück.
 
 Ein separater Account ist nicht notwendig. Wer ein Schulkonto hat, kann sofort loslegen.
 

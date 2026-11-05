@@ -17,11 +17,17 @@
 
 import { kontextknotenAnsicht } from './context_node_view.js'
 
-/** `2016.V2` → `V2`, `2016.V3` → `V3`, `2016` → `Basis`. */
+/**
+ * `2016.V2` → `V2`, `2016.V3` → `V3`, `2016` → `V1`.
+ *
+ * Die Ausgangsfassung heißt seit 0.34 „V1“, nicht mehr „Basis“: Neben „V2“ und „V3“ war das ein
+ * Bruch in der Reihe. Nur die Anzeige — in der Datenbank bleibt `bp_version = '2016'` ohne
+ * Suffix (Import, Frontier-Logik und Prüfsatz hängen daran).
+ */
 export function fassungsLabel(bpVersion) {
     if (!bpVersion) return null
     const marke = /\.(V\d+(?:\.\d+)?)$/.exec(bpVersion)
-    return marke ? marke[1] : 'Basis'
+    return marke ? marke[1] : 'V1'
 }
 
 /**

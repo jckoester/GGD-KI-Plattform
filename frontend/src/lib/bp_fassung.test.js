@@ -13,8 +13,8 @@ describe('fassungsLabel', () => {
         expect(fassungsLabel('2016.V3')).toBe('V3')
     })
 
-    it('die Ausgangsfassung heißt „Basis", nicht „2016"', () => {
-        expect(fassungsLabel('2016')).toBe('Basis')
+    it('die Ausgangsfassung heißt „V1", nicht „2016" (bis 0.34 „Basis")', () => {
+        expect(fassungsLabel('2016')).toBe('V1')
     })
 
     it('ohne Angabe kein Label', () => {
@@ -86,7 +86,7 @@ describe('mehrdeutigeFassungen', () => {
             { id: 'b', subject_id: 1, metadata_: { nr: '3.1.1', bp_version: '2016.V3' } },
         ]
         expect(mehrdeutigeFassungen(liste)).toEqual(
-            new Map([['a', 'Basis'], ['b', 'V3']]),
+            new Map([['a', 'V1'], ['b', 'V3']]),
         )
     })
 
@@ -142,7 +142,7 @@ describe('Knoten ohne Kompetenznummer (Operatoren)', () => {
             operator('b', '2016.V2'),
             operator('c', '2016.V3'),
         ])
-        expect([...markiert.values()]).toEqual(['Basis', 'V2', 'V3'])
+        expect([...markiert.values()]).toEqual(['V1', 'V2', 'V3'])
     })
 
     it('lässt einen einzelnen Operator unmarkiert', () => {

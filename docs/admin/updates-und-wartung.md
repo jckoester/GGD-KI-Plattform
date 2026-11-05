@@ -461,12 +461,14 @@ keine Datenmigration. Es wird **nichts** extern aufgerufen; das Modell läuft lo
 
 `backend/requirements.txt` listet die **direkten** Abhängigkeiten mit Ober-/Untergrenzen;
 `backend/requirements.lock` pinnt daraus **alle** (auch transitiven) Pakete auf exakte Versionen
-**mit Integritäts-Hashes** (Sicherheits-Audit #17 — reproduzierbare Installs, keine ungetesteten
-Majors). Produktion/CI installiert aus dem Lock:
+**mit Integritäts-Hashes** (Sicherheits-Audit #17).
 
-```bash
-uv pip install --require-hashes -r requirements.lock
-```
+> ⚠️ **Stand 0.34: Das Image und die CI installieren noch aus `requirements.txt`, nicht aus dem
+> Lock** (`backend/Dockerfile`, `.github/workflows/tests.yml`). Bis 0.33 stand hier, Produktion
+> und CI installierten aus dem Lock — das traf nicht zu. Die Umstellung ist geplant (Todo
+> „`requirements.lock` wird nirgends benutzt“). Bis dahin bestimmen die Grenzen in
+> `requirements.txt`, was ein Neubau installiert; der Lock ist eine Momentaufnahme, die mit
+> `requirements.txt` übereinstimmen soll.
 
 Zum Aktualisieren: die gewünschte Grenze in `requirements.txt` anpassen, Lock neu erzeugen und
 die Tests laufen lassen — erst danach ausrollen:
