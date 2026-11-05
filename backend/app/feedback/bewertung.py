@@ -146,6 +146,65 @@ async def bewertungen(db: AsyncSession, message_ids: list[UUID]) -> dict[UUID, i
     return {kennung: wert for kennung, wert in ergebnis.all()}
 
 
+# ── Bewertungen eigener Assistenten (0.33, Päckchen AK) ─────────────────────────
+
+#: Ab so vielen Bewertungen je Rolle sieht die Erstellerin Zahlen (Plan F1). Die Schwelle setzt
+#: der **Server** durch: Unter ihr stehen weder Zahlen noch Anteil in der Antwort. Benutzen nur
+#: wenige Schüler:innen einen Assistenten, wäre schon „1 Daumen runter“ eine Aussage über eine
+#: bestimmte Person — die Oberfläche auszublenden genügte nicht, die Zahl stünde im Netzwerk.
+MINDEST_EIGENE = 10
+
+
+class Rollenstand(BaseModel):
+    """Daumen einer Rolle — oder nur ``zu_wenige``, solange die Mindestzahl nicht erreicht ist."""
+
+    zu_wenige: bool
+    plus: int | None = None
+    minus: int | None = None
+    #: Anteil „hilfreich“ in Prozent, gerundet.
+    anteil: int | None = None
+
+
+class BewertungZusammenfassung(BaseModel):
+    """Gesamtstand eines Assistenten über alle Wochen und Modelle (Plan F2: nur gesamt),
+    Schüler:innen und Lehrkräfte getrennt (F3)."""
+
+    schueler: Rollenstand
+    lehrkraefte: Rollenstand
+
+
+def _stand(plus: int, minus: int) -> Rollenstand:
+    gesamt = plus + minus
+    if gesamt < MINDEST_EIGENE:
+        return Rollenstand(zu_wenige=True)
+    return Rollenstand(zu_wenige=False, plus=plus, minus=minus, anteil=round(100 * plus / gesamt))
+
+
+async def zusammenfassungen(
+    db: AsyncSession, assistant_ids: list[int],
+) -> dict[int, BewertungZusammenfassung]:
+    """Gesamtstand je Assistent aus `rating_counts` — mit der Mindestzahl je Rolle.
+
+    Kein Verlauf je Woche (F2): Er verkleinerte die Mengen und machte Rückschlüsse leichter.
+    """
+    summen: dict[tuple[int, str], tuple[int, int]] = {}
+    if assistant_ids:
+        for aid, rolle, plus, minus in (await db.execute(
+            sa.select(RatingCount.assistant_id, RatingCount.rolle,
+                      sa.func.sum(RatingCount.plus), sa.func.sum(RatingCount.minus))
+            .where(RatingCount.assistant_id.in_(assistant_ids))
+            .group_by(RatingCount.assistant_id, RatingCount.rolle)
+        )).all():
+            summen[(aid, rolle)] = (int(plus or 0), int(minus or 0))
+    return {
+        aid: BewertungZusammenfassung(
+            schueler=_stand(*summen.get((aid, "student"), (0, 0))),
+            lehrkraefte=_stand(*summen.get((aid, "teacher"), (0, 0))),
+        )
+        for aid in assistant_ids
+    }
+
+
 class BewertungIn(BaseModel):
     #: 1 = hilfreich, -1 = nicht hilfreich, 0 = zurücknehmen.
     rating: Literal[-1, 0, 1]

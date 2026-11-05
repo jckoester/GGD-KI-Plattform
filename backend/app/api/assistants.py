@@ -20,6 +20,7 @@ from app.core.paths import aufloesen
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility, Group
+from app.feedback.bewertung import MINDEST_EIGENE, BewertungZusammenfassung, zusammenfassungen
 from app.db.session import get_db
 from app.upload.extractor import extract_pdf, extract_plaintext
 from app.core.audit import audit
@@ -254,6 +255,22 @@ class AssistantResponse(BaseModel):
 class AssistantFullListResponse(BaseModel):
     items: list[AssistantResponse]
     total: int
+
+
+class MeinAssistent(AssistantResponse):
+    # Wie er ankommt (0.33, Päckchen AK) — Gesamtstand mit Mindestzahl, siehe
+    # `app/feedback/bewertung.py`. Nur in der eigenen Liste.
+    bewertung: Optional[BewertungZusammenfassung] = None
+
+
+class MeineAssistentenResponse(BaseModel):
+    items: list[MeinAssistent]
+    total: int
+
+
+class EigeneBewertungAntwort(BewertungZusammenfassung):
+    #: Die Schwelle, damit die Oberfläche „weniger als …“ sagen kann.
+    mindestzahl: int
 
 
 class AssistantImportResponse(AssistantResponse):
@@ -883,15 +900,15 @@ async def list_assistants(
 # ── Eigene Assistenten ───────────────────────────────────────────────────────
 # Muss VOR /{assistant_id} registriert werden, sonst matched FastAPI "mine" als int-ID.
 
-@router.get("/mine", response_model=AssistantFullListResponse)
+@router.get("/mine", response_model=MeineAssistentenResponse)
 async def list_my_assistants(
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
     current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
     db: AsyncSession = Depends(get_db),
-) -> AssistantFullListResponse:
-    """Gibt alle eigenen Assistenten zurueck (alle Status)."""
+) -> MeineAssistentenResponse:
+    """Gibt alle eigenen Assistenten zurueck (alle Status), mit dem Stand der Bewertungen."""
     stmt = select(Assistant).where(Assistant.created_by == current_user.sub)
     if status is not None:
         stmt = stmt.where(Assistant.status == status)
@@ -902,8 +919,13 @@ async def list_my_assistants(
     stmt = stmt.order_by(Assistant.updated_at.desc()).limit(limit).offset(offset)
     assistants = (await db.execute(stmt)).scalars().all()
 
-    return AssistantFullListResponse(
-        items=[AssistantResponse.model_validate(a) for a in assistants],
+    stand = await zusammenfassungen(db, [a.id for a in assistants])
+    return MeineAssistentenResponse(
+        items=[
+            MeinAssistent(**AssistantResponse.model_validate(a).model_dump(),
+                          bewertung=stand[a.id])
+            for a in assistants
+        ],
         total=total,
     )
 
@@ -1694,3 +1716,27 @@ async def export_assistant(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+# ── Wie kommt mein Assistent an? (0.33, Päckchen AK) ────────────────────────────
+
+
+@router.get("/{assistant_id}/ratings")
+async def get_assistant_ratings(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> EigeneBewertungAntwort:
+    """Gesamtstand der Daumen für den eigenen Assistenten — Erstellerin oder Admin (Plan F4).
+
+    Kolleg:innen, die einen geteilten Assistenten nur benutzen, bekommen 403 wie beim Editor;
+    in der Vorschau zählt Eigentum nicht (`_check_assistant_access`). Unter der Mindestzahl je
+    Rolle stehen keine Zahlen in der Antwort (`MINDEST_EIGENE`).
+    """
+    assistant = await db.get(Assistant, assistant_id)
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+    _check_assistant_access(assistant, current_user, "admin" in current_user.roles)
+    stand = (await zusammenfassungen(db, [assistant_id]))[assistant_id]
+    return EigeneBewertungAntwort(**stand.model_dump(), mindestzahl=MINDEST_EIGENE)
+
