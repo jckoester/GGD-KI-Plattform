@@ -1,0 +1,78 @@
+# Gegenprobe Diagramme zeichnen (0.36, Plan Schritt 5) — Plan: Release-0.36-Mathe-und-Diagramme-Plan.md
+#
+# Schüler:innen bitten im freien Chat um ein Diagramm. Gemessen wird nicht die Pädagogik, sondern
+# ob das, was das Modell schreibt, **sich zeichnen lässt**: ```mermaid mit Pele (mit und ohne
+# Reparatur), ```plot mit dem Plot-Renderer, ```circuitikz über den Sidecar. Dazu: LaTeX und
+# `style`-Zeilen in Mermaid-Beschriftungen (Befund aus Jans Test: `\(N₂ → NH₄⁺\)` stand wörtlich da).
+#
+#   python scripts/assistent_messung.py --szenarien scripts/szenarien/diagramme_zeichnen.yaml \
+#       --vorlage frei --modell chat-standard --lauf 1-standard --ziel "<Vault>/Plaene/Messungen-Pele"
+#   python scripts/diagramme_auswerten.py "<Vault>/Plaene/Messungen-Pele"/verlauf-1-*.json
+#
+# Die Themen sind so gewählt, dass Formeln mit Ladungen und Klammern naheliegen (Chemie, Biologie)
+# — dort scheiterten die Diagramme bisher.
+
+vorlagen:
+  frei:
+    lage: frei
+
+faelle:
+  - id: M1-stickstoff
+    titel: Stickstoffkreislauf als Flussdiagramm
+    stufe: 10
+    zuege:
+      - schueler: Kannst du mir den Stickstoffkreislauf als Mermaid-Diagramm zeichnen, mit den Formeln der Stoffe?
+
+  - id: M2-kohlenstoff
+    titel: Kohlenstoffkreislauf
+    stufe: 9
+    zuege:
+      - schueler: Zeichne mir bitte ein Diagramm zum Kohlenstoffkreislauf mit Fotosynthese und Zellatmung.
+
+  - id: M3-redox
+    titel: Redoxreaktion als Ablauf
+    stufe: 10
+    zuege:
+      - schueler: Mach mir ein Ablaufdiagramm, wie bei der Reaktion von Natrium mit Chlor Elektronen übertragen werden.
+
+  - id: M4-mindmap
+    titel: Mindmap Zelle
+    stufe: 8
+    zuege:
+      - schueler: Erstelle eine Mindmap zu den Zellorganellen einer Pflanzenzelle und ihren Aufgaben.
+
+  - id: M5-zeitstrahl
+    titel: Zeitstrahl Geschichte
+    stufe: 9
+    zuege:
+      - schueler: Kannst du mir einen Zeitstrahl zur Französischen Revolution als Diagramm machen?
+
+  - id: M6-protokoll
+    titel: Ablauf Versuchsprotokoll
+    stufe: 7
+    zuege:
+      - schueler: Zeig mir als Diagramm, wie ein Versuchsprotokoll aufgebaut ist.
+
+  - id: M7-stammbaum
+    titel: Stammbaum Erbgang
+    stufe: 10
+    zuege:
+      - schueler: Zeichne einen Stammbaum für einen rezessiven Erbgang über drei Generationen als Diagramm.
+
+  - id: P1-parabel
+    titel: Funktionsgraph Parabel
+    stufe: 9
+    zuege:
+      - schueler: Zeichne mir den Graphen von f(x) = (x-2)^2 - 1 mit Scheitelpunkt und Nullstellen.
+
+  - id: P2-exp
+    titel: Funktionsgraph Wachstum
+    stufe: 10
+    zuege:
+      - schueler: Kannst du mir die Funktionen 2^x und 0.5^x zusammen in ein Koordinatensystem zeichnen?
+
+  - id: S1-schaltung
+    titel: Schaltplan Parallelschaltung
+    stufe: 8
+    zuege:
+      - schueler: Zeichne mir einen Schaltplan mit einer Batterie und zwei parallel geschalteten Lämpchen mit je einem Schalter.

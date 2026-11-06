@@ -50,6 +50,14 @@ describe('mermaidReparieren (0.36)', () => {
         }
     })
 
+    it('LaTeX am Anfang einer Beschriftung wird repariert, die Trapezform nicht', () => {
+        const latex = 'graph LR\n  A[Luft] --> B[\\(N_2\\) (Stickstoff)]'
+        expect(gueltig(latex)).toBe(false)
+        expect(gueltig(mermaidReparieren(latex))).toBe(true)
+        const trapez = 'graph LR\n  A[\\Trapez/] --> B'
+        expect(mermaidReparieren(trapez)).toBe(trapez)
+    })
+
     it('Anführungszeichen im Text werden zu #quot;', () => {
         expect(mermaidReparieren('graph LR\n  A[Er sagt "hallo" (laut)] --> B'))
             .toContain('A["Er sagt #quot;hallo#quot; (laut)"]')

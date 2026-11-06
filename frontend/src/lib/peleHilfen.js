@@ -31,10 +31,11 @@ function inAnfuehrungszeichen(text) {
 
 // Kantentext |…|, der nicht schon mit Anführungszeichen beginnt.
 const KANTE = /\|(?!")([^|]+)\|/g;
-// Knoten ID[…]: keine andere Form ([( [/ [\ [[ ["), Inhalt darf eine Ebene runder Klammern
-// enthalten; danach muss etwas folgen, das hinter einem Knoten stehen kann.
+// Knoten ID[…]: keine andere Form ([( [/ [[ [" und [\ als Trapez — aber [\( ist LaTeX und wird
+// repariert), Inhalt darf eine Ebene runder Klammern enthalten; danach muss etwas folgen, das
+// hinter einem Knoten stehen kann.
 const KNOTEN =
-    /(\b[\w-]+)\[(?!["[/\\(])((?:[^[\]]|\([^()]*\))*?)\](?=\s*($|-|&|:::|\||;|\s[A-Za-z]))/g;
+    /(\b[\w-]+)\[(?!["[/(]|\\(?!\())((?:[^[\]]|\([^()]*\))*?)\](?=\s*($|-|&|:::|\||;|\s[A-Za-z]))/g;
 const UNBERUEHRT = /^\s*(style|classDef|class|click|linkStyle|%%)/;
 
 /** Die Quelle mit Beschriftungen in Anführungszeichen, wo Klammern sie sonst brechen. */

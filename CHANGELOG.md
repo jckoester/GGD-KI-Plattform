@@ -29,6 +29,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Render-Sidecar: neuer Endpunkt `POST /render/mermaid` (Pele, feste helle Farben, Satzspiegelbreite), Registry-Eintrag
   `mermaid` im Backend. Reparatur und Farbauflösung liegen in `peleHilfen` — im Frontend und als wortgleiche Kopie im
   Sidecar (ein Test prüft die Gleichheit).
+- Messung „Diagramme zeichnen“: Szenarien `diagramme_zeichnen.yaml`, Auswertung `diagramme_auswerten.py` (Mermaid roh
+  und repariert, Plot, Schaltplan).
 
 ### Nach dem Update
 
