@@ -114,6 +114,8 @@ describe('kopieren — Leiste an Diagrammen', () => {
         document.documentElement.classList.add('dark')
         const { datei } = diagramm('mermaid', 'graph TD; A-->B')
         await klick(datei)
+        // Pele wird beim ersten Diagramm erst geladen — im vollen Lauf dauert das länger als ein Tick.
+        await vi.waitFor(() => expect(triggerDownload).toHaveBeenCalled(), { timeout: 5000 })
         const [blob, name] = vi.mocked(triggerDownload).mock.calls[0]
         expect(name).toBe('diagramm.svg')
         const text = await blob.text()

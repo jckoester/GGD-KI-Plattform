@@ -11,6 +11,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   in hell und dunkel. Ältere Diagramme sehen im Chat daher etwas anders aus; in der Bibliothek gespeicherte bleiben,
   wie sie sind.
 
+### Behoben
+
+- Diagramme mit Klammern in einer Beschriftung (etwa `[Nitrat (NO₃⁻)]`) erschienen als Fehlermeldung mit Quelltext; sie
+  werden jetzt gezeichnet.
+
 ### Entwicklung
 
 - Frontend: Abhängigkeit `mermaid` durch `pele` 1.13.0 ersetzt (MIT, keine Abhängigkeiten, etwa ein Drittel der Größe).

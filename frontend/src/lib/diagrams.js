@@ -17,9 +17,12 @@
  * - **Farben über CSS-Variablen** (`--pele-*`, gesetzt in `hljs-theme.css` aus den
  *   semantischen Tokens). Der Wechsel hell/dunkel braucht kein neues Rendern.
  * - **Debounce** gegen Streaming-Flackern; erst der vollständige Block wird gerendert.
+ * - **Reparatur** vor dem Rendern (`mermaidReparatur.js`): Beschriftungen mit Klammern bekommen
+ *   Anführungszeichen. `data-source` behält die Quelle, wie das Modell sie schrieb.
  * - Ungültige Syntax zeigt eine dezente Meldung und die Quelle, statt die Seite zu brechen.
  */
 import { sanitizeSvg } from './serverRender.js';
+import { mermaidReparieren } from './mermaidReparatur.js';
 
 let _pelePromise = null;
 function loadPele() {
@@ -77,7 +80,8 @@ export function festeFarben(svg, palette = DATEI_FARBEN) {
 /** Das SVG eines Diagramms, sanitisiert — mit Variablen für die Seite. */
 export async function diagrammSvg(source) {
     const pele = await loadPele();
-    const { svg } = await pele.renderAsync(source, optionen());
+    // Klammern in Beschriftungen ohne Anführungszeichen — der häufigste Fehler der Modelle.
+    const { svg } = await pele.renderAsync(mermaidReparieren(source), optionen());
     return sanitizeSvg(svg);
 }
 
