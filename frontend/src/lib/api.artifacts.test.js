@@ -35,15 +35,14 @@ describe('saveImageToLibrary', () => {
 });
 
 describe('saveDiagramToLibrary', () => {
-    it('sendet kind/source/svg an /artifacts/from-diagram (mermaid)', async () => {
+    it('sendet kind/source an /artifacts/from-diagram (mermaid) — ohne SVG aus dem Browser', async () => {
         global.fetch = mockFetch(200, { id: 'a', created: true });
-        await saveDiagramToLibrary('mermaid', 'graph TD; A-->B', { svg: '<svg>x</svg>' });
+        await saveDiagramToLibrary('mermaid', 'graph TD; A-->B');
         const [url, opts] = global.fetch.mock.calls[0];
         expect(url).toBe('/api/artifacts/from-diagram');
         expect(JSON.parse(opts.body)).toEqual({
             kind: 'mermaid',
             source: 'graph TD; A-->B',
-            svg: '<svg>x</svg>',
             title: null,
             message_id: null,   // ohne Nachrichtenbezug: Herkunft bleibt unbekannt
         });
@@ -52,7 +51,6 @@ describe('saveDiagramToLibrary', () => {
     it('gibt die Nachrichten-ID mit, damit das Backend die Herkunft nachschlagen kann', async () => {
         global.fetch = mockFetch(200, { id: 'a', created: true });
         await saveDiagramToLibrary('mermaid', 'graph TD; A-->B', {
-            svg: '<svg>x</svg>',
             messageId: '11111111-2222-3333-4444-555555555555',
         });
         const [, opts] = global.fetch.mock.calls[0];
@@ -63,12 +61,12 @@ describe('saveDiagramToLibrary', () => {
         expect(body).not.toHaveProperty('provider_model');
     });
 
-    it('lässt svg für server-gerenderte Diagramme weg (null)', async () => {
+    it('schickt nie ein SVG mit — der Server rendert alle Diagramme selbst (0.36)', async () => {
         global.fetch = mockFetch(200, { id: 'a', created: false });
         await saveDiagramToLibrary('plot', 'functions: []');
         const body = JSON.parse(global.fetch.mock.calls[0][1].body);
         expect(body.kind).toBe('plot');
-        expect(body.svg).toBeNull();
+        expect(body).not.toHaveProperty('svg');
     });
 
     it('wirft ApiError bei 422', async () => {

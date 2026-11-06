@@ -2513,18 +2513,18 @@ export async function saveImageToLibrary(imageId, title = null) {
     return res.json()
 }
 
-// „In Bibliothek speichern": ein gerendertes Diagramm ablegen. `kind` ∈ circuit|plot|mermaid.
-// mermaid liefert zusätzlich das im Browser gerenderte SVG; circuit/plot werden serverseitig
-// aus `source` neu gerendert.
+// „In Bibliothek speichern": ein gerendertes Diagramm ablegen. `kind` ∈ circuit|plot|smiles|mermaid.
+// Alle werden serverseitig aus `source` neu gerendert (mermaid seit 0.36, Pele im Sidecar);
+// ein SVG aus dem Browser schickt der Client nicht mehr mit.
 // `messageId` belegt die Herkunft: Das Backend schlägt darüber das Anbietermodell nach.
 // Bewusst nur die ID — ein vom Browser behaupteter Modellname hätte in einer
 // Quellenangabe keinen Wert.
-export async function saveDiagramToLibrary(kind, source, { svg = null, title = null, messageId = null } = {}) {
+export async function saveDiagramToLibrary(kind, source, { title = null, messageId = null } = {}) {
     const res = await fetch(`${BASE}/artifacts/from-diagram`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, source, svg, title, message_id: messageId }),
+        body: JSON.stringify({ kind, source, title, message_id: messageId }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
     return res.json()

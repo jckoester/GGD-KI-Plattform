@@ -67,11 +67,12 @@ export const BIBLIOTHEKEN = [
         ],
     },
     {
-        gruppe: 'Render-Sidecar (Schaltpläne, Formeln im Export)',
+        gruppe: 'Render-Sidecar (Schaltpläne, Formeln und Diagramme im Export)',
         quelle: 'sidecar',
         eintraege: [
             { name: 'node-tikzjax', paket: 'node-tikzjax', lizenz: 'LPPL-1.3c' },
             { name: 'MathJax', paket: 'mathjax-full', lizenz: 'Apache-2.0' },
+            { name: 'Pele', paket: 'pele', lizenz: 'MIT' },
         ],
     },
     {

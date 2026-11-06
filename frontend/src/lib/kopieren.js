@@ -35,24 +35,6 @@ export const SVG_DATEINAME = {
     smiles: 'strukturformel.svg',
 };
 
-/**
- * Das SVG, das „In Bibliothek speichern" mitschickt — nur Mermaid braucht eins.
- *
- * Schaltplan und Funktionsgraph rendert der Server aus der Quelle neu; Mermaid kann er
- * nicht, er übernimmt das SVG des Browsers. Bis 0.12 war das das **angezeigte** — im
- * Dunkelmodus also helle Linien auf durchsichtigem Grund, in der Bibliothek und als PNG
- * kaum lesbar. Jetzt dieselbe helle Fassung wie beim Download.
- *
- * ⚠️ Ein schon gespeichertes Diagramm wird dadurch nicht hell: Die Bibliothek erkennt
- * es an seiner Quelle wieder und gibt das vorhandene zurück.
- *
- * Seit 0.36 (Pele) heißt „hell": feste Farben statt CSS-Variablen (`festeFarben`), weil die
- * Datei außerhalb der Seite keine Variablen auflösen kann.
- */
-export async function bibliotheksSvg(art, quelle) {
-    return art === 'mermaid' ? mermaidSvgHell(quelle) : null;
-}
-
 /** Ein SVG-Element als eigenständige Datei (mit Namensraum, sonst zeigt kein Programm es an). */
 export function svgDatei(svgText) {
     const text = /\sxmlns=/.test(svgText.slice(0, svgText.indexOf('>')))

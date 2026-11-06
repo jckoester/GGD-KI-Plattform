@@ -11,7 +11,7 @@ from typing import Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.render import cache
-from app.render.sidecar import RenderError, render_circuit
+from app.render.sidecar import RenderError, render_circuit, render_mermaid
 from app.render.plot import render_plot
 from app.render.smiles import render_smiles
 
@@ -32,6 +32,9 @@ RENDERERS: dict[str, Callable[[str], Awaitable[str]]] = {
     "circuit": render_circuit,   # CircuiTikZ → Node-Sidecar
     "plot": render_plot,         # Funktionsgraph → matplotlib in-process
     "smiles": render_smiles,     # Strukturformel → RDKit in-process (0.30)
+    # Diagramm → Pele im Node-Sidecar (0.36). Für Export und Bibliothek; im Chat rendert der
+    # Browser (Plan F6 a), mit CSS-Farben statt der festen hellen aus dem Sidecar.
+    "mermaid": render_mermaid,
 }
 
 

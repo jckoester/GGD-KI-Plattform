@@ -185,9 +185,10 @@ async def test_promote_diagram_render_error(monkeypatch):
         await promote.promote_diagram(object(), user=_user(), kind="circuit", source="x")
 
 
-async def test_promote_diagram_mermaid_uses_client_svg(monkeypatch):
-    # mermaid wird NICHT serverseitig gerendert — der Client-SVG wird übernommen.
-    render_spy = AsyncMock(side_effect=AssertionError("mermaid darf nicht serverseitig rendern"))
+async def test_promote_diagram_mermaid_rendert_serverseitig(monkeypatch):
+    """Seit 0.36 (Pele im Sidecar) wie die anderen Diagramme: aus der Quelle neu gerendert; ein
+    mitgeschicktes Browser-SVG zählt nicht."""
+    render_spy = AsyncMock(return_value={"svg": "<svg>pele</svg>", "error": None, "cached": False})
     monkeypatch.setattr(promote.service, "render", render_spy)
     monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
     captured = {}
@@ -200,18 +201,21 @@ async def test_promote_diagram_mermaid_uses_client_svg(monkeypatch):
 
     await promote.promote_diagram(
         object(), user=_user(), kind="mermaid", source="graph TD; A-->B",
-        svg="<svg>mermaid</svg>",
+        svg="<svg>vom Browser</svg>",
     )
-    render_spy.assert_not_called()
+    render_spy.assert_awaited_once()
+    assert render_spy.await_args.args[1:] == ("mermaid", "graph TD; A-->B")
     assert captured["kind"] == "mermaid"
-    assert captured["data"] == b"<svg>mermaid</svg>"
+    assert captured["data"] == b"<svg>pele</svg>"
     assert captured["mime_type"] == "image/svg+xml"
     assert captured["title"] == "Diagramm"
 
 
-async def test_promote_diagram_mermaid_requires_svg(monkeypatch):
+async def test_promote_diagram_mermaid_renderfehler(monkeypatch):
+    monkeypatch.setattr(promote.service, "render",
+                        AsyncMock(return_value={"svg": "<svg/>", "error": "Parse error", "cached": False}))
     with pytest.raises(promote.PromotionError):
-        await promote.promote_diagram(object(), user=_user(), kind="mermaid", source="graph TD;", svg=None)
+        await promote.promote_diagram(object(), user=_user(), kind="mermaid", source="graph TD;")
 
 
 async def test_promote_diagram_empty_source():
@@ -678,9 +682,10 @@ async def test_promote_diagram_uebernimmt_die_herkunft(monkeypatch):
         return SimpleNamespace(id=uuid4(), **kw)
 
     monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    monkeypatch.setattr(promote.service, "render",
+                        AsyncMock(return_value={"svg": "<svg>x</svg>", "error": None, "cached": False}))
     await promote.promote_diagram(
-        object(), user=_user(), kind="mermaid", source="graph TD; A-->B",
-        svg="<svg>x</svg>", message_id=uuid4(),
+        object(), user=_user(), kind="mermaid", source="graph TD; A-->B", message_id=uuid4(),
     )
 
     assert captured["provider_model"] == "mistral/mistral-small-latest"
@@ -697,8 +702,10 @@ async def test_promote_diagram_ohne_nachricht_bleibt_ohne_herkunft(monkeypatch):
         return SimpleNamespace(id=uuid4(), **kw)
 
     monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    monkeypatch.setattr(promote.service, "render",
+                        AsyncMock(return_value={"svg": "<svg>x</svg>", "error": None, "cached": False}))
     await promote.promote_diagram(
-        object(), user=_user(), kind="mermaid", source="graph TD; A-->B", svg="<svg>x</svg>"
+        object(), user=_user(), kind="mermaid", source="graph TD; A-->B"
     )
 
     assert captured["provider_model"] is None

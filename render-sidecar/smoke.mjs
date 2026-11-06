@@ -3,6 +3,7 @@
 //   node smoke.mjs   (bzw. npm run smoke)
 import { CircuitRenderPool } from './pool.mjs';
 import { wrapCircuit, renderMath } from './render.mjs';
+import { renderMermaid } from './mermaid.mjs';
 
 // Schaltungs-Körper (das, was zwischen \begin{document} und \end{document} steht) —
 // entspricht den Spike-Fällen (frontend/scripts/circuit_spike/eval.mjs).
@@ -67,6 +68,25 @@ try {
   allOk = allOk && okC;
 } catch (e) {
   console.log(`✗ MathJax: FEHLER — ${String(e.message ?? e).slice(0, 200)}`);
+  allOk = false;
+}
+
+// Mermaid (Pele, 0.36): Reparatur der Klammern, feste Farben, kaputte Quelle wirft
+try {
+  const svg = renderMermaid('flowchart LR\n  A[Nitrat (NO₃⁻)] -->|Aufnahme (Wurzel)| B[Pflanze]');
+  const okP = svg.startsWith('<svg') && svg.includes('Nitrat') && !svg.includes('var(');
+  console.log(`${okP ? '✓' : '✗'} Mermaid (Pele): ${svg.length} B, ohne var()`);
+  const lang = renderMermaid('flowchart LR\n' + Array.from({ length: 12 }, (_, i) => `  S${i}[Schritt ${i}] --> S${i + 1}[Schritt ${i + 1}]`).join('\n'));
+  const breite = Number(lang.match(/width="([\d.]+)"/)[1]);
+  console.log(`${breite <= 620 ? '✓' : '✗'} Lange LR-Kette passt auf die Seite: ${breite} px`);
+  allOk = allOk && breite <= 620;
+  allOk = allOk && okP;
+  let wirft = false;
+  try { renderMermaid('flowchart LR\n  A[Start --> B'); } catch { wirft = true; }
+  console.log(`${wirft ? '✓' : '✗'} Mermaid kaputt → Fehler`);
+  allOk = allOk && wirft;
+} catch (e) {
+  console.log(`✗ Mermaid: FEHLER — ${String(e.message ?? e).slice(0, 200)}`);
   allOk = false;
 }
 

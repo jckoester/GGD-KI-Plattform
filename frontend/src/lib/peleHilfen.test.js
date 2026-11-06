@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { render } from 'pele'
-import { mermaidReparieren } from './mermaidReparatur.js'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { mermaidReparieren } from './peleHilfen.js'
 
 const gueltig = (q) => { try { render(q); return true } catch { return false } }
 
@@ -50,5 +53,14 @@ describe('mermaidReparieren (0.36)', () => {
     it('Anführungszeichen im Text werden zu #quot;', () => {
         expect(mermaidReparieren('graph LR\n  A[Er sagt "hallo" (laut)] --> B'))
             .toContain('A["Er sagt #quot;hallo#quot; (laut)"]')
+    })
+})
+
+describe('peleHilfen — Kopie im Render-Sidecar', () => {
+    it('render-sidecar/peleHilfen.mjs ist wortgleich', () => {
+        const hier = dirname(fileURLToPath(import.meta.url))
+        const original = readFileSync(join(hier, 'peleHilfen.js'), 'utf8')
+        const kopie = readFileSync(join(hier, '../../../render-sidecar/peleHilfen.mjs'), 'utf8')
+        expect(kopie).toBe(original)
     })
 })

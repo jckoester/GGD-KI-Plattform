@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderMarkdown } from './markdown.js'
 import {
-    bibliotheksSvg, diagrammKnoepfe, formelKnopf, formelZumKopieren, svgDatei, texQuelle,
+    diagrammKnoepfe, formelKnopf, formelZumKopieren, svgDatei, texQuelle,
 } from './kopieren.js'
 import { triggerDownload } from './download.js'
 import { readFileSync } from 'node:fs'
@@ -134,24 +134,6 @@ describe('kopieren — Leiste an Diagrammen', () => {
     })
 })
 
-describe('kopieren — „In Bibliothek speichern"', () => {
-    it('schickt Mermaid hell mit — auch wenn die Seite dunkel ist', async () => {
-        document.documentElement.classList.add('dark')
-        try {
-            const svg = await bibliotheksSvg('mermaid', 'graph TD; A-->B')
-            expect(svg).not.toContain('var(')
-            expect(svg).toContain('#100f0f')
-        } finally {
-            document.documentElement.classList.remove('dark')
-        }
-    })
-
-    it('Server-Diagramme brauchen kein SVG vom Browser', async () => {
-        expect(await bibliotheksSvg('circuit', '\\draw (0,0) to[R] (2,0);')).toBeNull()
-        expect(await bibliotheksSvg('plot', 'f(x) = x^2')).toBeNull()
-    })
-})
-
 describe('kopieren — eingebunden', () => {
     // Die Svelte-Seite selbst hat keine Komponententests. Was hier steht, ist das
     // Mindeste: Fiele ein Aufruf weg, bliebe jeder Test oben grün.
@@ -166,6 +148,7 @@ describe('kopieren — eingebunden', () => {
         const bubble = readFileSync(join(SRC, 'lib', 'components', 'MessageBubble.svelte'), 'utf8')
         expect(bubble).toContain('formelKnopf(formel)')
         expect(bubble).toContain('diagrammKnoepfe(bar, block, kind, btnClass)')
-        expect(bubble).toContain('await bibliotheksSvg(kind, src)')
+        // Seit 0.36 rendert der Server auch Mermaid für die Bibliothek; der Chat schickt kein SVG.
+        expect(bubble).toContain('saveDiagramToLibrary(kind, src, { messageId')
     })
 })

@@ -50,6 +50,16 @@ async def test_circuit_and_plot_blocks_rendered():
     assert "render-block" in html          # Diagramme im zentrierten Block
 
 
+async def test_mermaid_wird_im_pdf_gerendert():
+    """0.36: ```mermaid über Pele im Sidecar — bis dahin stand im PDF der Quelltext."""
+    with patch("app.render.sidecar.render_mermaid",
+               new=AsyncMock(return_value='<svg viewBox="0 0 10 10" width="10" height="10"><text>A</text></svg>')) as m:
+        html = await export.render_markdown_for_pdf("```mermaid\ngraph TD; A-->B\n```")
+    m.assert_awaited_once()
+    assert "<svg" in html and "render-block" in html
+    assert "graph TD" not in html
+
+
 @pytest.mark.asyncio
 async def test_math_not_rendered_inside_code():
     with patch("app.render.sidecar.render_math", new=AsyncMock(return_value=_MATH_SVG)) as m:
@@ -116,3 +126,15 @@ def test_zu_breites_diagramm_wird_auf_den_satzspiegel_verkleinert():
     assert export._hoechstens_seitenbreit(schmal) == schmal
     ohne_masse = '<svg viewBox="0 0 10 10"></svg>'
     assert export._hoechstens_seitenbreit(ohne_masse) == ohne_masse
+
+
+def test_pele_css_groesse_fliegt_raus():
+    """0.36: Pele schreibt max-width:100%;height:auto ans Wurzel-<svg>. weasyprint behielt damit die
+    alte Höhe als leeren Rahmen — je eine halbe Seite Leerraum über und unter dem Diagramm."""
+    svg = ('<svg viewBox="0 0 400 100" width="400" height="100" '
+           'style="max-width:100%;height:auto;color:#100f0f;font-family:sans-serif"><g style="height:auto"/></svg>')
+    html = export._wrap("mermaid", svg, False)
+    wurzel = html[html.index("<svg"):html.index(">", html.index("<svg"))]
+    assert "max-width" not in wurzel and "height:auto" not in wurzel and "height: auto" not in wurzel
+    assert 'color="#100f0f"' in wurzel          # Präsentationsattribute bleiben (als Attribut)
+    assert '<g style="height: auto"/>' in html  # nur das Wurzelelement wird angefasst

@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
-    import { bibliotheksSvg, diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
+    import { diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild, rateMessage } from '$lib/api.js';
     import { DAUMEN, alsAnzeige, naechsteBewertung, zeigeDaumen } from '$lib/bewertung.js';
@@ -236,8 +236,7 @@
                     saveBtn.disabled = true;
                     const src = block.dataset.source ?? '';
                     try {
-                        const svg = await bibliotheksSvg(kind, src);
-                        const r = await saveDiagramToLibrary(kind, src, { svg, messageId: message.id ?? null });
+                        const r = await saveDiagramToLibrary(kind, src, { messageId: message.id ?? null });
                         saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
                     } catch (e) {
                         saveBtn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';

@@ -10,6 +10,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Diagramme (```mermaid) zeichnet jetzt Pele statt Mermaid: dieselbe Schreibweise, eigenes Layout, Farben der Plattform
   in hell und dunkel. Ältere Diagramme sehen im Chat daher etwas anders aus; in der Bibliothek gespeicherte bleiben,
   wie sie sind.
+- Export (PDF, DOCX, ODT): Diagramme erscheinen als Bild statt als Quelltext. Zu breite Diagramme setzt der Renderer
+  passend zur Seite neu, statt sie unlesbar klein zu schrumpfen.
+- „In Bibliothek speichern“ rendert Diagramme jetzt auf dem Server, wie Schaltpläne und Funktionsgraphen.
 
 ### Behoben
 
@@ -20,6 +23,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Frontend: Abhängigkeit `mermaid` durch `pele` 1.13.0 ersetzt (MIT, keine Abhängigkeiten, etwa ein Drittel der Größe).
   Diagramm-SVGs laufen jetzt durch denselben Sanitizer wie die Server-Diagramme.
+- Render-Sidecar: neuer Endpunkt `POST /render/mermaid` (Pele, feste helle Farben, Satzspiegelbreite), Registry-Eintrag
+  `mermaid` im Backend. Reparatur und Farbauflösung liegen in `peleHilfen` — im Frontend und als wortgleiche Kopie im
+  Sidecar (ein Test prüft die Gleichheit).
+
+### Nach dem Update
+
+- Render-Sidecar neu bauen: `docker compose build render-sidecar && docker compose up -d` (neue Abhängigkeit `pele`).
 
 ## [0.35.0] – 2026-11-05
 

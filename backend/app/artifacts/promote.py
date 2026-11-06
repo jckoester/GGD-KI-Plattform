@@ -5,11 +5,11 @@
 
 - **Bild** (`generate_image`): Bytes werden kopiert, der Bild-Prompt wandert als roher
   Quelltext (`source`) mit.
-- **circuit/plot** (server-gerendert): aus dem rohen Quelltext **serverseitig neu gerendert**
-  (deterministisch, nutzt den Render-Cache) — der Client-SVG wird bewusst nicht vertraut.
-- **mermaid** (nur Client-Rendering verfügbar): der bereits im Browser gerenderte SVG wird
-  übernommen; der rohe Quelltext (`source`) kommt mit. Die Auslieferung härtet SVGs per
-  CSP/nosniff ab (siehe `router.get_artifact_file`).
+- **circuit/plot/smiles/mermaid** (server-gerendert): aus dem rohen Quelltext **serverseitig neu
+  gerendert** (deterministisch, nutzt den Render-Cache) — der Client-SVG wird bewusst nicht
+  vertraut. Mermaid seit 0.36 (Pele im Sidecar); bis dahin übernahm die Bibliothek das im Browser
+  gerenderte SVG. Ein mitgeschicktes `svg` wird ignoriert. Die Auslieferung härtet SVGs zusätzlich
+  per CSP/nosniff ab (siehe `router.get_artifact_file`).
 
 Idempotenz, Eigentümer-Bindung und Quota liegen in `store.save_artifact` bzw. hier über den
 `origin_ref` (Herkunftsschlüssel). Eigentümer:in ist stets die eingeloggte Nutzer:in.
@@ -64,7 +64,7 @@ _DIAGRAM_DEFAULT_TITLE = {
     "smiles": "Strukturformel",
     "mermaid": "Diagramm",
 }
-_SERVER_RENDER_KINDS = ("circuit", "plot", "smiles")
+_SERVER_RENDER_KINDS = ("circuit", "plot", "smiles", "mermaid")
 DIAGRAM_KINDS = ("circuit", "plot", "smiles", "mermaid")
 
 
@@ -123,8 +123,8 @@ async def promote_diagram(
 ) -> tuple:
     """Promotet ein gerendertes Diagramm. Gibt (Artefakt, created) zurück.
 
-    circuit/plot werden serverseitig aus `source` neu gerendert; mermaid übernimmt den
-    Client-`svg`. Wirft `PromotionError` (leere Quelle, Render-Fehler, unbekannter Typ)
+    Alle Diagramme werden serverseitig aus `source` neu gerendert (mermaid seit 0.36); `svg`
+    bleibt aus Rückwärtsverträglichkeit im Aufruf, wird aber nicht mehr verwendet. Wirft `PromotionError` (leere Quelle, Render-Fehler, unbekannter Typ)
     bzw. `store.QuotaExceeded`.
     """
     source = (source or "").strip()
@@ -136,10 +136,6 @@ async def promote_diagram(
         if result.get("error"):
             raise PromotionError(result["error"])
         svg_out = result["svg"]
-    elif kind == "mermaid":
-        if not svg or "<svg" not in svg:
-            raise PromotionError("kein gerendertes Diagramm")
-        svg_out = svg
     else:
         raise PromotionError(f"unbekannter Diagrammtyp: {kind}")
 

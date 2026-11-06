@@ -65,12 +65,32 @@ async def test_render_error_leaves_fence(monkeypatch):
     assert out == md   # Fence unverändert (erscheint als Codeblock)
 
 
-async def test_mermaid_and_math_untouched(monkeypatch):
+async def test_mathe_bleibt_fuer_pandoc(monkeypatch):
+    """Mathe konvertiert Pandoc selbst (OMML) — kein Prärender."""
     monkeypatch.setattr(prerender.service, "render", AsyncMock())
-    md = "Formel $x^2$\n\n```mermaid\ngraph TD; A-->B\n```"
+    md = "Formel $x^2$ und $$y$$"
     out = await prerender.prerender_diagrams(MagicMock(), md)
     assert out == md
     prerender.service.render.assert_not_called()
+
+
+async def test_mermaid_wird_eingebettet(monkeypatch):
+    """Seit 0.36: Mermaid über Pele im Sidecar, als Bild mit Alternativtext „Diagramm“."""
+    render = AsyncMock(return_value={"svg": "<svg>pele</svg>", "error": None})
+    monkeypatch.setattr(prerender.service, "render", render)
+    md = "Vorher\n\n```mermaid\ngraph TD; A-->B\n```\n\nNachher"
+    out = await prerender.prerender_diagrams(MagicMock(), md)
+    render.assert_awaited_once()
+    assert render.await_args.args[1:] == ("mermaid", "graph TD; A-->B")
+    assert "![Diagramm](data:image/svg+xml;base64," in out
+    assert "```mermaid" not in out and out.startswith("Vorher") and out.endswith("Nachher")
+
+
+async def test_mermaid_renderfehler_bleibt_codeblock(monkeypatch):
+    monkeypatch.setattr(prerender.service, "render",
+                        AsyncMock(return_value={"svg": "<svg/>", "error": "Parse error"}))
+    md = "```mermaid\ngraph TD; A[x --> B\n```"
+    assert await prerender.prerender_diagrams(MagicMock(), md) == md
 
 
 async def test_multiple_fences(monkeypatch):

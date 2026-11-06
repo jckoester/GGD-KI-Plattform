@@ -1,4 +1,4 @@
-# render-sidecar (Phase 17): CircuiTikZ (node-tikzjax) + MathJax → SVG.
+# render-sidecar (Phase 17): CircuiTikZ (node-tikzjax) + MathJax → SVG; seit 0.36 Mermaid (Pele).
 # Interner Dienst — NUR vom Backend erreichbar, nie öffentlich exponieren.
 FROM node:22-slim
 

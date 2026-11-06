@@ -144,3 +144,29 @@ async def test_sidecar_unreachable_raises_render_error():
     with patch.object(sidecar, "_get_client", return_value=http):
         with pytest.raises(RenderError, match="erreichbar"):
             await sidecar.render_circuit("src")
+
+
+@pytest.mark.asyncio
+async def test_sidecar_render_mermaid_ok():
+    """0.36: Mermaid über Pele im Sidecar."""
+    http = MagicMock()
+    http.post = AsyncMock(return_value=_resp(200, {"svg": "<svg>pele</svg>"}))
+    with patch.object(sidecar, "_get_client", return_value=http):
+        svg = await sidecar.render_mermaid("graph TD; A-->B")
+    assert svg == "<svg>pele</svg>"
+    url = http.post.await_args.args[0]
+    assert url.endswith("/render/mermaid")
+    assert http.post.await_args.kwargs["json"] == {"source": "graph TD; A-->B"}
+
+
+@pytest.mark.asyncio
+async def test_sidecar_render_mermaid_422_raises():
+    http = MagicMock()
+    http.post = AsyncMock(return_value=_resp(422, {"error": "Parse error on line 2:"}))
+    with patch.object(sidecar, "_get_client", return_value=http):
+        with pytest.raises(RenderError, match="Parse error"):
+            await sidecar.render_mermaid("graph TD; A[x --> B")
+
+
+def test_mermaid_steht_in_der_registry():
+    assert service.RENDERERS["mermaid"] is sidecar.render_mermaid

@@ -17,12 +17,12 @@
  * - **Farben über CSS-Variablen** (`--pele-*`, gesetzt in `hljs-theme.css` aus den
  *   semantischen Tokens). Der Wechsel hell/dunkel braucht kein neues Rendern.
  * - **Debounce** gegen Streaming-Flackern; erst der vollständige Block wird gerendert.
- * - **Reparatur** vor dem Rendern (`mermaidReparatur.js`): Beschriftungen mit Klammern bekommen
+ * - **Reparatur** vor dem Rendern (`peleHilfen.js`): Beschriftungen mit Klammern bekommen
  *   Anführungszeichen. `data-source` behält die Quelle, wie das Modell sie schrieb.
  * - Ungültige Syntax zeigt eine dezente Meldung und die Quelle, statt die Seite zu brechen.
  */
 import { sanitizeSvg } from './serverRender.js';
-import { mermaidReparieren } from './mermaidReparatur.js';
+import { DATEI_FARBEN, festeFarben, mermaidReparieren } from './peleHilfen.js';
 
 let _pelePromise = null;
 function loadPele() {
@@ -43,39 +43,7 @@ function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/**
- * Feste Farben für ein Diagramm, das die Seite verlässt (Datei, Bibliothek) — hell, wie auf
- * Papier. Dieselben Werte wie die hellen Tokens in `hljs-theme.css`, nur mit weißem Grund.
- */
-export const DATEI_FARBEN = {
-    bg: '#ffffff',
-    fg: '#100f0f',
-    muted: '#575653',
-    line: '#100f0f',
-    surface: '#f2f0e5',
-    'surface-alt': '#e6e4d9',
-    border: '#cecdc3',
-    accent: '#205ea6',
-};
-
-/**
- * Pele-SVG ohne CSS-Variablen.
- *
- * Pele schreibt Farben über zwei Ebenen: `--_fg:var(--pele-fg,#1f1f1f)` im `style` des
- * Wurzelelements, darunter `fill="var(--_fg)"`. Außerhalb der Seite (Word, Inkscape, manche
- * Bildbetrachter) wird `var()` nicht ausgewertet. Erst `--pele-*` durch die Palette ersetzen
- * (sonst den Rückfallwert), dann die internen `--_x`.
- */
-export function festeFarben(svg, palette = DATEI_FARBEN) {
-    let s = svg.replace(/var\(--pele-([a-z0-9-]+),([^()]*)\)/g, (_, name, rueckfall) =>
-        palette[name] ?? rueckfall);
-    const intern = Object.fromEntries(
-        [...s.matchAll(/--(_[a-z0-9]+):([^;"]+)/g)].map((m) => [m[1], m[2]]));
-    for (let i = 0; i < 3; i++) {
-        s = s.replace(/var\(--(_[a-z0-9]+)\)/g, (ganz, name) => intern[name] ?? ganz);
-    }
-    return s.replace(/--_[a-z0-9]+:[^;"]+;?/g, '');
-}
+export { DATEI_FARBEN, festeFarben };
 
 /** Das SVG eines Diagramms, sanitisiert — mit Variablen für die Seite. */
 export async function diagrammSvg(source) {

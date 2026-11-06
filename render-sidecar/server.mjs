@@ -7,9 +7,11 @@
 //   GET  /health          → { status, pool }
 //   POST /render/circuit  { source }        → { svg }   | { error }
 //   POST /render/math     { tex, display }  → { svg }   | { error }   (MathJax → SVG)
+//   POST /render/mermaid  { source }        → { svg }   | { error }   (Pele → SVG, 0.36)
 import http from 'node:http';
 import { CircuitRenderPool } from './pool.mjs';
 import { wrapCircuit, renderMath, sha256, BoundedCache } from './render.mjs';
+import { renderMermaid } from './mermaid.mjs';
 
 const HOST = process.env.RENDER_SIDECAR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.RENDER_SIDECAR_PORT ?? 3200);
@@ -81,6 +83,25 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { svg });
       } catch (e) {
         return send(res, 422, { error: String(e?.message ?? e).slice(0, 500) });
+      }
+    }
+
+    if (req.method === 'POST' && req.url === '/render/mermaid') {
+      const { source } = await readJson(req);
+      if (typeof source !== 'string' || !source.trim()) {
+        return send(res, 400, { error: 'source (string) erforderlich' });
+      }
+      const hash = sha256(source);
+      const key = 'mermaid:' + hash;
+      const hit = cache.get(key);
+      if (hit !== undefined) return send(res, 200, { svg: hit, cached: true });
+      try {
+        // idPrefix aus dem Hash: Zwei Diagramme in einem Dokument bekommen verschiedene IDs.
+        const svg = renderMermaid(source, `pele-${hash.slice(0, 8)}-`);
+        cache.set(key, svg);
+        return send(res, 200, { svg });
+      } catch (e) {
+        return send(res, 422, { error: String(e?.message ?? e).split('\n')[0].slice(0, 500) });
       }
     }
 

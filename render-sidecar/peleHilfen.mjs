@@ -1,5 +1,13 @@
 /**
- * Häufigsten Fehler in Mermaid-Quellen der Modelle beheben, bevor gerendert wird (0.36).
+ * Gemeinsame Helfer für Pele-Diagramme (0.36) — im Frontend **und** im Render-Sidecar.
+ *
+ * ⚠️ **Zwei Kopien, ein Inhalt.** `render-sidecar/peleHilfen.mjs` ist eine wortgleiche Kopie dieser
+ * Datei (der Sidecar ist ein eigenes Paket mit eigenem Docker-Build). `peleHilfen.test.js` prüft,
+ * dass beide gleich sind. Deshalb hier keine Importe.
+ *
+ * ## mermaidReparieren
+ *
+ * Häufigsten Fehler in Mermaid-Quellen der Modelle beheben, bevor gerendert wird.
  *
  * **Der Fehler.** Klammern in einer Beschriftung ohne Anführungszeichen —
  * `B[Ammonium (NH₄⁺) im Boden]`, `-->|Fixierung (Bakterien)|`. Mermaid liest `(` als Beginn einer
@@ -43,4 +51,38 @@ export function mermaidReparieren(quelle) {
                     HEIKEL.test(text) ? `${id}[${inAnfuehrungszeichen(text)}]` : ganz);
         })
         .join('\n');
+}
+
+/**
+ * Feste Farben für ein Diagramm, das die Seite verlässt (Datei, Bibliothek, Export) — hell, wie
+ * auf Papier. Dieselben Werte wie die hellen Tokens in `hljs-theme.css`, nur mit weißem Grund.
+ */
+export const DATEI_FARBEN = {
+    bg: '#ffffff',
+    fg: '#100f0f',
+    muted: '#575653',
+    line: '#100f0f',
+    surface: '#f2f0e5',
+    'surface-alt': '#e6e4d9',
+    border: '#cecdc3',
+    accent: '#205ea6',
+};
+
+/**
+ * Pele-SVG ohne CSS-Variablen.
+ *
+ * Pele schreibt Farben über zwei Ebenen: `--_fg:var(--pele-fg,#1f1f1f)` im `style` des
+ * Wurzelelements, darunter `fill="var(--_fg)"`. Außerhalb der Seite (Word, WeasyPrint, Inkscape)
+ * wird `var()` nicht ausgewertet. Erst `--pele-*` durch die Palette ersetzen (sonst den
+ * Rückfallwert), dann die internen `--_x`.
+ */
+export function festeFarben(svg, palette = DATEI_FARBEN) {
+    let s = svg.replace(/var\(--pele-([a-z0-9-]+),([^()]*)\)/g, (_, name, rueckfall) =>
+        palette[name] ?? rueckfall);
+    const intern = Object.fromEntries(
+        [...s.matchAll(/--(_[a-z0-9]+):([^;"]+)/g)].map((m) => [m[1], m[2]]));
+    for (let i = 0; i < 3; i++) {
+        s = s.replace(/var\(--(_[a-z0-9]+)\)/g, (ganz, name) => intern[name] ?? ganz);
+    }
+    return s.replace(/--_[a-z0-9]+:[^;"]+;?/g, '');
 }

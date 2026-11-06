@@ -6,6 +6,7 @@ im PDF nicht. Diese Funktion **prä-rendert** vor weasyprint:
   - ```circuitikz    → node-tikzjax-SVG (Sidecar)
   - ```plot          → matplotlib-SVG (in-process)
   - ```smiles        → RDKit-SVG mit Elektronenpaaren (in-process, 0.30)
+  - ```mermaid       → Pele-SVG mit festen hellen Farben (Sidecar, 0.36)
 …und bettet das SVG in die HTML ein, die weasyprint dann zu PDF macht.
 
 Token-basiert (markdown-it-py + `dollarmath`): Mathe wird nur außerhalb von Code erkannt.
@@ -42,6 +43,7 @@ _FENCE_KINDS = {
     "circuitikz": "circuit", "circuittikz": "circuit", "circuit": "circuit",
     "plot": "plot",
     "smiles": "smiles",
+    "mermaid": "mermaid",
 }
 _MATH_INLINE = {"math_inline", "math_inline_double"}
 
@@ -116,8 +118,25 @@ def _hoechstens_seitenbreit(svg: str) -> str:
     return _WURZEL_SVG.sub(_repl, svg, count=1)
 
 
+_CSS_GROESSE = re.compile(r"max-width:\s*100%;?\s*|height:\s*auto;?\s*")
+
+
+def _ohne_css_groesse(svg: str) -> str:
+    """``max-width:100%`` und ``height:auto`` aus dem ``style`` des Wurzel-<svg> entfernen.
+
+    Pele (Mermaid, 0.36) schreibt beides fürs Browserfenster hinein. weasyprint behält damit die
+    alte Höhe als leeren Rahmen (siehe :func:`_hoechstens_seitenbreit`) — im ersten Export stand
+    über und unter dem Diagramm je eine halbe Seite Leerraum.
+    """
+    def _repl(m: re.Match) -> str:
+        return m.group(0).replace(
+            m.group(1), _STYLE_ATTR_RE.sub(lambda s: f'style="{_CSS_GROESSE.sub("", s.group(1))}"', m.group(1))
+        )
+    return _WURZEL_SVG.sub(_repl, svg, count=1)
+
+
 def _wrap(kind: str, svg: str, display: bool) -> str:
-    svg = _svg_style_to_attrs(svg)
+    svg = _svg_style_to_attrs(_ohne_css_groesse(svg))
     if kind == "math" and not display:
         return svg  # inline (SVG trägt vertical-align + ex-Sizing selbst)
     # Display-Mathe / Diagramme: zentrierter Block, nie breiter als die Seite. Eine Reihe
@@ -146,6 +165,8 @@ async def _render_one(kind: str, content: str, display: bool) -> str:
         return await render_plot(content)
     if kind == "smiles":
         return await render_smiles(content)
+    if kind == "mermaid":
+        return await sidecar.render_mermaid(content)
     raise RenderError(f"unbekannter Render-Typ: {kind}")
 
 

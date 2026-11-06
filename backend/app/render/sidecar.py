@@ -1,6 +1,7 @@
 """Client zum Node-Render-Sidecar (Phase 17).
 
-Der Sidecar (`render-sidecar/`) rendert CircuiTikZ→SVG (node-tikzjax) und KaTeX-Mathe.
+Der Sidecar (`render-sidecar/`) rendert CircuiTikZ→SVG (node-tikzjax), MathJax-Mathe und seit 0.36
+Mermaid (Pele, mit fester heller Farbe).
 Reines Rendering — kein LLM, kein Provider. Dieser Client spricht ihn intern an
 (localhost/compose-Netz). Fehler/Timeout → `RenderError` (der Service macht daraus einen
 Fehler-Platzhalter, statt die Antwort zu sprengen).
@@ -33,11 +34,11 @@ async def close() -> None:
         _client = None
 
 
-async def render_circuit(source: str) -> str:
-    """POST /render/circuit → SVG (str). Wirft RenderError bei Fehler/Timeout."""
-    url = f"{settings.render_sidecar_url.rstrip('/')}/render/circuit"
+async def _post_svg(pfad: str, nutzlast: dict) -> str:
+    """POST an den Sidecar → SVG (str). Wirft RenderError bei Fehler, Timeout oder leerem SVG."""
+    url = f"{settings.render_sidecar_url.rstrip('/')}{pfad}"
     try:
-        resp = await _get_client().post(url, json={"source": source})
+        resp = await _get_client().post(url, json=nutzlast)
     except httpx.TimeoutException as e:
         raise RenderError("Render-Timeout (Sidecar)") from e
     except httpx.HTTPError as e:
@@ -57,24 +58,19 @@ async def render_circuit(source: str) -> str:
     raise RenderError(msg or f"Sidecar-Status {resp.status_code}")
 
 
+async def render_circuit(source: str) -> str:
+    """POST /render/circuit → SVG (str). Wirft RenderError bei Fehler/Timeout."""
+    return await _post_svg("/render/circuit", {"source": source})
+
+
 async def render_math(tex: str, display: bool = False) -> str:
     """POST /render/math → MathJax-SVG (str). Wirft RenderError bei Fehler/Timeout."""
-    url = f"{settings.render_sidecar_url.rstrip('/')}/render/math"
-    try:
-        resp = await _get_client().post(url, json={"tex": tex, "display": bool(display)})
-    except httpx.TimeoutException as e:
-        raise RenderError("Render-Timeout (Sidecar)") from e
-    except httpx.HTTPError as e:
-        raise RenderError(f"Sidecar nicht erreichbar: {e}") from e
+    return await _post_svg("/render/math", {"tex": tex, "display": bool(display)})
 
-    if resp.status_code == 200:
-        svg = resp.json().get("svg")
-        if not svg or not isinstance(svg, str):
-            raise RenderError("Sidecar lieferte kein SVG")
-        return svg
 
-    try:
-        msg = resp.json().get("error") or resp.text[:200]
-    except Exception:
-        msg = resp.text[:200]
-    raise RenderError(msg or f"Sidecar-Status {resp.status_code}")
+async def render_mermaid(source: str) -> str:
+    """POST /render/mermaid → Pele-SVG mit festen Farben (0.36). Wirft RenderError bei Fehler.
+
+    Der Sidecar repariert vorher Klammern in Beschriftungen (`peleHilfen.mjs`), wie das Frontend.
+    """
+    return await _post_svg("/render/mermaid", {"source": source})
