@@ -2,7 +2,7 @@
  * Was `/about` unter „Verwendete Bibliotheken" nennt (0.12).
  *
  * Bis 0.12 stand dort eine Auswahl — fünf Einträge fürs Frontend, sieben fürs Backend;
- * KaTeX, Mermaid, DOMPurify, WeasyPrint, Pandoc und andere fehlten. Jetzt alle
+ * KaTeX, Mermaid (seit 0.36 Pele), DOMPurify, WeasyPrint, Pandoc und andere fehlten. Jetzt alle
  * **direkten** Abhängigkeiten. `bibliotheken.test.js` gleicht sie mit `package.json`,
  * `backend/requirements.txt` und `render-sidecar/package.json` ab: Eine neue
  * Abhängigkeit ohne Eintrag hier macht ihn rot.
@@ -29,7 +29,7 @@ export const BIBLIOTHEKEN = [
             { name: 'lucide-svelte', paket: 'lucide-svelte', lizenz: 'ISC' },
             { name: 'marked', paket: 'marked', lizenz: 'MIT' },
             { name: 'marked-footnote', paket: 'marked-footnote', lizenz: 'MIT' },
-            { name: 'Mermaid', paket: 'mermaid', lizenz: 'MIT' },
+            { name: 'Pele', paket: 'pele', lizenz: 'MIT' },
         ],
     },
     {

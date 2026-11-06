@@ -9,14 +9,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Mermaid rendert in jsdom nicht (kein Layout) — die Attrappe gibt die Quelle zurück,
-// die sie bekommen hat. So ist prüfbar, mit welchem Thema gerendert wurde.
-vi.mock('mermaid', () => ({
-    default: {
-        initialize: vi.fn(),
-        render: vi.fn(async (_id, quelle) => ({ svg: `<svg data-quelle="${quelle}"></svg>` })),
-    },
-}))
+// Pele rendert ohne Layout-Engine (eigene Schriftmetriken) — auch in jsdom, also ohne Attrappe.
 vi.mock('./download.js', () => ({ triggerDownload: vi.fn() }))
 
 const zwischenablage = vi.fn(async () => {})
@@ -117,13 +110,16 @@ describe('kopieren — Leiste an Diagrammen', () => {
         expect(zwischenablage).toHaveBeenCalledWith('graph TD; A-->B')
     })
 
-    it('„SVG" rendert Mermaid im hellen Thema — auch wenn die Seite dunkel ist', async () => {
+    it('„SVG" liefert das Diagramm mit festen hellen Farben — auch wenn die Seite dunkel ist', async () => {
         document.documentElement.classList.add('dark')
         const { datei } = diagramm('mermaid', 'graph TD; A-->B')
         await klick(datei)
         const [blob, name] = vi.mocked(triggerDownload).mock.calls[0]
         expect(name).toBe('diagramm.svg')
-        expect(await blob.text()).toContain('"theme": "default"')
+        const text = await blob.text()
+        expect(text).not.toContain('var(')
+        expect(text).toContain('#100f0f')
+        expect(text).toContain('>A<')
         document.documentElement.classList.remove('dark')
     })
 
@@ -140,7 +136,9 @@ describe('kopieren — „In Bibliothek speichern"', () => {
     it('schickt Mermaid hell mit — auch wenn die Seite dunkel ist', async () => {
         document.documentElement.classList.add('dark')
         try {
-            expect(await bibliotheksSvg('mermaid', 'graph TD; A-->B')).toContain('"theme": "default"')
+            const svg = await bibliotheksSvg('mermaid', 'graph TD; A-->B')
+            expect(svg).not.toContain('var(')
+            expect(svg).toContain('#100f0f')
         } finally {
             document.documentElement.classList.remove('dark')
         }

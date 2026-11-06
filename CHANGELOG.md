@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Diagramme (```mermaid) zeichnet jetzt Pele statt Mermaid: dieselbe Schreibweise, eigenes Layout, Farben der Plattform
+  in hell und dunkel. Ältere Diagramme sehen im Chat daher etwas anders aus; in der Bibliothek gespeicherte bleiben,
+  wie sie sind.
+
+### Entwicklung
+
+- Frontend: Abhängigkeit `mermaid` durch `pele` 1.13.0 ersetzt (MIT, keine Abhängigkeiten, etwa ein Drittel der Größe).
+  Diagramm-SVGs laufen jetzt durch denselben Sanitizer wie die Server-Diagramme.
+
 ## [0.35.0] – 2026-11-05
 
 Rollenbehauptung im Schüler-Chat (Päckchen AL). Keine Migration.

@@ -1,7 +1,29 @@
-/* Mermaid-Diagramme (Phase 15): zentriert, gerendertes SVG skaliert mit */
+/* Mermaid-Diagramme (Phase 15; seit 0.36 mit Pele): zentriert, gerendertes SVG skaliert mit.
+   Pele liest seine Farben aus diesen Variablen; der Wechsel hell/dunkel braucht deshalb kein
+   neues Rendern. Abbildung auf die semantischen Tokens (Messungen-Pele/befunde.md). Für Dateien
+   gelten feste helle Werte (`DATEI_FARBEN` in diagrams.js). */
 .mermaid-block {
     margin: 0.75rem 0;
     text-align: center;
+    --pele-bg: var(--color-light-bg-2);
+    --pele-fg: var(--color-light-tx);
+    --pele-muted: var(--color-light-tx-2);
+    --pele-line: var(--color-light-tx);
+    --pele-surface: var(--color-light-bg);
+    --pele-surface-alt: var(--color-light-ui-2);
+    --pele-border: var(--color-light-ui-3);
+    --pele-accent: var(--color-light-bl);
+}
+
+.dark .mermaid-block {
+    --pele-bg: var(--color-dark-bg-2);
+    --pele-fg: var(--color-dark-tx);
+    --pele-muted: var(--color-dark-tx-2);
+    --pele-line: var(--color-dark-tx);
+    --pele-surface: var(--color-dark-ui);
+    --pele-surface-alt: var(--color-dark-ui-2);
+    --pele-border: var(--color-dark-ui-3);
+    --pele-accent: var(--color-dark-bl);
 }
 
 .mermaid-block svg {

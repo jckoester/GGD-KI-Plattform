@@ -45,6 +45,9 @@ export const SVG_DATEINAME = {
  *
  * ⚠️ Ein schon gespeichertes Diagramm wird dadurch nicht hell: Die Bibliothek erkennt
  * es an seiner Quelle wieder und gibt das vorhandene zurück.
+ *
+ * Seit 0.36 (Pele) heißt „hell": feste Farben statt CSS-Variablen (`festeFarben`), weil die
+ * Datei außerhalb der Seite keine Variablen auflösen kann.
  */
 export async function bibliotheksSvg(art, quelle) {
     return art === 'mermaid' ? mermaidSvgHell(quelle) : null;
@@ -127,7 +130,7 @@ function leistenKnopf(leiste, klasse, text, titel, aktion) {
 /**
  * „Code kopieren" und „SVG" in die Hover-Leiste eines gerenderten Diagramms.
  *
- * Die Quelle liegt in `data-source`. Mermaid wird fürs SVG im **hellen** Thema neu
+ * Die Quelle liegt in `data-source`. Mermaid wird fürs SVG mit **festen hellen** Farben neu
  * gerendert (`mermaidSvgHell`); die Server-Diagramme (Schaltplan, Funktionsgraph)
  * kennen keinen Dunkelmodus und gehen so, wie sie dastehen.
  */
