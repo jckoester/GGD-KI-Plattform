@@ -1,4 +1,4 @@
-# Server-Rendering (Phase 17, Strukturformeln 0.30)
+# Server-Rendering (Phase 17, Strukturformeln 0.30, Mermaid 0.36)
 
 Serverseitiges Rendern von Inhalten, die der Browser nicht (sicher) selbst rendern kann:
 
@@ -20,10 +20,11 @@ Chat/Knoten (Browser)            PDF-Export (Backend)
         ▼                                 ▼
    app/render/router.py  ──►  app/render/service.py (Registry + Cache rendered_svg)
                                     │              │
-                            circuit │              │ plot, smiles
+                   circuit, mermaid │              │ plot, smiles
                                     ▼              ▼
                      render-sidecar (Node)   app/render/plot.py (matplotlib, in-process)
                      node-tikzjax + MathJax  app/render/smiles.py (RDKit, in-process)
+                     + Pele (Mermaid)
 ```
 
 ## Node-Render-Sidecar (`render-sidecar/`)
@@ -31,7 +32,16 @@ Chat/Knoten (Browser)            PDF-Export (Backend)
 Eigener Node-Dienst, weil das Backend Python ist und die einzige heute funktionierende
 circuitikz-fähige Engine (`node-tikzjax`) Node-only ist. **Nur intern erreichbar.**
 
-- `server.mjs` — Node-`http`: `GET /health`, `POST /render/circuit`, `POST /render/math`.
+- `server.mjs` — Node-`http`: `GET /health`, `POST /render/circuit`, `POST /render/math`,
+  `POST /render/mermaid` (seit 0.36).
+- `mermaid.mjs` — **Pele** (`github.com/obsidianmd/pele`, MIT) rendert ohne DOM, synchron, unter
+  10 ms; deshalb im Hauptthread wie MathJax. Davor `mermaidReparieren` (Klammern in Beschriftungen
+  in Anführungszeichen), danach `festeFarben` (keine CSS-Variablen — Word und weasyprint werten
+  `var()` nicht aus). `maxWidth: 620` (Satzspiegel): Pele setzt ein zu breites Diagramm neu,
+  statt dass es geschrumpft wird.
+- `peleHilfen.mjs` — **wortgleiche Kopie** von `frontend/src/lib/peleHilfen.js` (der Sidecar ist
+  ein eigenes Paket mit eigenem Docker-Build). `peleHilfen.test.js` im Frontend prüft die
+  Gleichheit; geändert wird im Frontend, dann kopiert.
 - `pool.mjs` — **Worker-Pool** für CircuiTikZ: TeX ist turing-vollständig → per-Render-Timeout
   terminiert den Worker (Runaway-Kill) und startet einen frischen; Pool-Größe = Concurrency-Cap.
 - `render.mjs` — `wrapCircuit` (TeX-Dokument) · `renderMath` = **MathJax → SVG**
@@ -45,19 +55,26 @@ Env: `RENDER_SIDECAR_HOST/PORT`, `RENDER_POOL_SIZE`, `RENDER_TIMEOUT_MS`, `RENDE
 
 - `router.py` — `POST /render/{kind}` (Pseudonym-Auth). Antwort `{svg, cached, error}` — bei
   Fehlern immer ein **Fehler-Platzhalter-SVG** (`service.ERROR_SVG`), nie eine gesprengte Antwort.
-- `service.py` — **Renderer-Registry** `RENDERERS = {"circuit": …, "plot": …}`. Ablauf:
+- `service.py` — **Renderer-Registry** `RENDERERS = {"circuit", "plot", "smiles", "mermaid"}`. Ablauf:
   Hash → Cache-Treffer? → sonst Renderer → **nur Erfolge** in den Cache. `svg_hash(kind, source)`.
 - `cache.py` — Tabelle `rendered_svg (hash PK, svg, created_at)` (content-adressiert,
   deterministisch). Aufräumen altersbasiert: `cleanup_rendered_svg` (Cron, siehe unten).
   **`RENDERER_FASSUNG`** (seit 0.30): Ändert sich die Zeichnung eines Renderers, erhöhen Sie
   dort seine Zahl — sie geht in den Hash ein, sonst liefert der Cache zur gleichen Quelle weiter
-  das alte Bild. Renderer ohne Eintrag (Schaltplan, Graph) behalten ihren Schlüssel.
-- `sidecar.py` — httpx-Client zum Sidecar (`render_circuit`, `render_math`); Timeout/Fehler →
+  das alte Bild. Stand 0.36: `smiles` 3, `plot` 2 (Achsen-Standards); der Schaltplan behält seinen
+  Schlüssel aus Phase 17.
+- `sidecar.py` — httpx-Client zum Sidecar (`render_circuit`, `render_math`, `render_mermaid`, alle
+  über `_post_svg`); Timeout/Fehler →
   `RenderError` (`app/render/errors.py`).
 - `plot.py` — Plots **in-process** (kein Sidecar): `lark`-Grammatik (Präzedenz `^`>unär->`*`/`/`>
   `+`/`-`, explizites `*`, nur `x`/`pi`/`e`/Funktions-Whitelist) → Transformer baut eine
   vektorisierte **numpy**-Funktion (**eval-frei**); `PlotSpec` (Pydantic/YAML); matplotlib
   **OO-`Figure`-API** (thread-safe) in `to_thread` mit Timeout → SVG. `**` wird als `^` akzeptiert.
+  **Aussehen (0.36):** ein Bündel `PlotStil` mit `STANDARD` — Achsen durch den Ursprung mit Pfeil
+  und „x“/„y“, Teilstriche 1/2/2,5/5 × 10ⁿ, gleiche Einheit bei Spannenverhältnis ≤ 3 (Figur passt
+  sich an), y-Bereich ohne `range` auf das 2-/98-%-Quantil gekappt, wenn Ausreißer ihn sprengen,
+  Flexoki-Farben, Legende ab zwei Funktionen. `_zeichne()` ist vom SVG-Export getrennt; Tests
+  prüfen Achsenwerte. Wer `STANDARD` ändert, erhöht `RENDERER_FASSUNG["plot"]`.
 
 ## Frontend (`renderServerBlocks`)
 

@@ -288,3 +288,15 @@
     Bewertungen, ohne Namen. „Meine Assistenten“ zeigt den Anteil „hilfreich“ in einer Spalte.
   link: /help/assistenten
 
+
+- id: "0.36-diagramme"
+  version: "0.36.0"
+  datum: 2026-11-06
+  rollen: [student, teacher]
+  titel: "Diagramme klappen jetzt fast immer"
+  text: >-
+    Diagramme im Chat zeichnet ein neuer, schnellerer Renderer. Beschriftungen mit Klammern
+    wie „Nitrat (NO₃⁻)“, an denen Diagramme bisher oft scheiterten, sind kein Problem mehr.
+    Funktionsgraphen haben Achsen wie im Heft, und im Export (PDF, Word, ODT) erscheinen
+    Diagramme als Bild statt als Quelltext.
+  link: /help/diagramme

@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.36.0] – 2026-11-06
+
+Diagramme mit Pele, Diagramme im Export, Achsen-Standards für Funktionsgraphen (Päckchen M, erster Teil). Keine
+Migration.
+
 ### Geändert
 
 - Diagramme (```mermaid) zeichnet jetzt Pele statt Mermaid: dieselbe Schreibweise, eigenes Layout, Farben der Plattform
@@ -34,7 +39,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
-- Render-Sidecar neu bauen: `docker compose build render-sidecar && docker compose up -d` (neue Abhängigkeit `pele`).
+- Backend, Frontend und **Render-Sidecar** neu bauen und starten: `docker compose build && docker compose up -d` (neue
+  Abhängigkeit `pele` im Sidecar); offene Browser-Tabs einmal neu laden.
+- Einen Word-Export mit Diagramm in Microsoft Word öffnen (geprüft ist nur LibreOffice).
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.35.0] – 2026-11-05
 

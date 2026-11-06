@@ -28,8 +28,8 @@ beides. Endpunkt `POST /artifacts/{id}/export?format=&save=` (`save=false` Downl
 
 - Pandoc: **`--sandbox`** (kein Datei-/Netzzugriff), Reader ohne `raw_tex`, Timeout + Größenlimit.
 - Diagramme werden als **Bild-Daten-URI** eingebettet — lokale Bilddateien würde `--sandbox`
-  ohnehin blocken. Prärender: `circuit`/`plot` → SVG (Render-Pipeline), `mermaid` bleibt v1
-  Codeblock, Mathe konvertiert Pandoc selbst.
+  ohnehin blocken. Prärender: `circuit`/`plot`/`smiles`/`mermaid` → SVG (Render-Pipeline;
+  Mermaid seit 0.36 über Pele im Sidecar), Mathe konvertiert Pandoc selbst.
 
 ## Dialekt-Parität (Vorschau vs. Export)
 

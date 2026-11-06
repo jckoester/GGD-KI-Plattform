@@ -163,7 +163,7 @@ for await (const event of streamChat(messages, conversationId, modelId)) {
 Die zugehörigen SSE-Events und ihr Format sind in
 [chat-streaming.md](chat-streaming.md) dokumentiert.
 
-## Rich-Rendering im Markdown (KaTeX, Mermaid)
+## Rich-Rendering im Markdown (KaTeX, Mermaid/Pele)
 
 Ein **zentraler** Renderer `frontend/src/lib/markdown.js` (`renderMarkdown`) speist Chat
 (`MessageBubble`), Wissensgraph (`/knowledge/[id]`), Curriculum-Tabelle und Hilfeseiten —
@@ -187,14 +187,18 @@ eine Erweiterung dort wirkt überall. Pipeline: `marked` → `DOMPurify.sanitize
   durch einen Platzhalter ersetzt und erst **nach** der Sanitisierung wieder eingesetzt —
   DOMPurify bleibt strikt fürs Markdown und zerschießt die KaTeX-Inline-Styles nicht.
 
-### Diagramme (Mermaid, asynchron)
+### Diagramme (Mermaid-Schreibweise, gerendert mit Pele seit 0.36)
 
-- Mermaid rendert **asynchron** und passt nicht in den synchronen `renderMarkdown`. Der
+- Das Rendern ist **asynchron** (lazy geladen) und passt nicht in den synchronen `renderMarkdown`. Der
   Code-Renderer erzeugt für ```mermaid daher nur einen **Platzhalter**
   `<div class="mermaid-block">QUELLE</div>`; die Svelte-Action
   `frontend/src/lib/diagrams.js → renderDiagrams` rendert ihn nach dem Mount im DOM.
-- **Lazy:** `import('mermaid')` → eigener (~6 MB) Chunk, erst beim ersten Diagramm geladen.
-- `securityLevel: 'strict'`, Theme aus der `dark`-Klasse von `documentElement`. **Debounce
+- **Lazy:** `import('pele/lazy')` (`renderAsync`) → kleine Teile je Diagrammtyp, erst beim ersten
+  Diagramm geladen.
+- Vorher `mermaidReparieren` (`peleHilfen.js`), danach **`sanitizeSvg`** wie bei den
+  Server-Diagrammen (Pele schreibt kein `<foreignObject>`); `links: false`, `images: false`.
+  **Farben** über `--pele-*` aus den Tokens (`hljs-theme.css`, hell und `.dark`) — der
+  Themawechsel braucht kein neues Rendern. Dateien (SVG-Download) bekommen `festeFarben`. **Debounce
   (250 ms)** gegen Streaming-Flackern (rendert erst, wenn der Inhalt zur Ruhe kommt);
   `data-processed` vor dem `await` gegen Doppel-Render; Fehlerfall → `.mermaid-error` + Quelltext.
 - Eingehängt via `use:renderDiagrams` in `MessageBubble` (neben `use:copyButtons`) und

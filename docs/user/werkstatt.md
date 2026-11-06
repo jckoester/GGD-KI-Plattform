@@ -56,6 +56,9 @@ Fassung — deine ungespeicherten Änderungen werden also zuerst gesichert.
   schulweite Formatvorlage. PDF- und Word-Layout sehen ähnlich, aber nicht identisch aus — das ist
   technisch bedingt.
 - **Formeln** werden in Word zu echten, bearbeitbaren Word-Formeln.
+- **Diagramme, Schaltpläne, Funktionsgraphen und Strukturformeln** erscheinen in allen drei
+  Formaten als Bild. Ein sehr breites Diagramm wird dabei passend zur Seite neu angeordnet, damit
+  die Schrift lesbar bleibt — es kann also anders aussehen als in der Vorschau.
 - Ein paar Feinheiten unterscheiden Vorschau und Export: **Fußnoten** (`[^1]`) stehen in Vorschau
   und PDF gesammelt am Ende, in Word/ODT unten auf der jeweiligen Seite; **Ankreuz-Listen**
   (`- [ ]`) zeigt die Vorschau als Kästchen, der Export als `[ ]`/`[x]`.

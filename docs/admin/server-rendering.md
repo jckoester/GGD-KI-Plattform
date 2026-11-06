@@ -1,8 +1,9 @@
 # Server-Rendering-Sidecar (Phase 17)
 
 Damit Assistenten **Schaltpläne** (CircuiTikZ) und **Funktionsgraphen** zeichnen und **Formeln**
-im PDF-Export erscheinen, läuft ein kleiner interner Render-Dienst mit: `render-sidecar`
-(CircuiTikZ via node-tikzjax, Mathe via MathJax). Reines Rendering — **keine KI, keine Kosten,
+und **Diagramme** im Export erscheinen, läuft ein kleiner interner Render-Dienst mit:
+`render-sidecar` (CircuiTikZ via node-tikzjax, Mathe via MathJax, seit 0.36 Mermaid-Diagramme via
+Pele). Reines Rendering — **keine KI, keine Kosten,
 keine externen Aufrufe**; der Dienst ist **nur intern** erreichbar.
 
 ## Produktivbetrieb (Docker Compose)
@@ -35,7 +36,10 @@ Der Betrieb bricht **nicht** ab, es degradiert nur:
 
 - **Im Chat:** Schaltpläne zeigen einen Fehler-Platzhalter statt des Bildes (Plots laufen
   in-process im Backend und funktionieren weiter).
-- **Im PDF-Export:** Formeln/Schaltpläne erscheinen als Quelltext statt gerendert.
+- **Im Export (PDF, Word, ODT):** Formeln (PDF), Schaltpläne und Diagramme erscheinen als
+  Quelltext statt gerendert.
+- **„In Bibliothek speichern“** scheitert für Schaltpläne und Diagramme mit einer Fehlermeldung.
+  Diagramme im Chat zeichnet der Browser selbst; sie sind nicht betroffen.
 
 Prüfen, ob er läuft: `docker compose ps render-sidecar` bzw. Logs `docker compose logs render-sidecar`.
 
@@ -55,7 +59,7 @@ Lokal ist der Sidecar ein **eigener Prozess** (wie LiteLLM), der separat gestart
 
 ```bash
 cd render-sidecar
-npm install          # einmalig (node-tikzjax + mathjax-full)
+npm install          # einmalig und nach Updates (node-tikzjax, mathjax-full, pele)
 npm start            # http://127.0.0.1:3200
 ```
 

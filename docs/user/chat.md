@@ -106,6 +106,9 @@ was du selbst schreibst.
       flowchart LR
         A[Frage] --> B[Antwort]
 
+  Die Farben passen sich hell und dunkel an. Beschriftungen mit Klammern, etwa
+  `[Nitrat (NO₃⁻)]`, sind kein Problem. Im Export (PDF, Word, ODT) erscheinen Diagramme als Bild.
+
 Die Darstellung passiert automatisch auf deinem Gerät. Wenn du die LaTeX-Schreibweise nicht
 kennst, bitte die KI einfach, etwas „als Formel" zu schreiben — sie kümmert sich um die
 richtige Notation. Versteht die Darstellung eine Formel nicht, erscheint **„Formel nicht

@@ -36,10 +36,10 @@ Quota-Verbrauch. Der partielle Unique-Index ist der DB-Backstop gegen Doppelklic
 
 - **Bild** — Bytes aus `generated_images` kopieren; der Bild-Prompt (`GeneratedImage.prompt`,
   seit 0038) wandert als `source` mit. `origin_ref = image:<image_id>`.
-- **circuit / plot** — **serverseitig** aus `source` neu gerendert (`render.service.render`,
-  nutzt den Render-Cache); der Client-SVG wird bewusst **nicht** vertraut.
-- **mermaid** — es gibt keinen Server-Renderer; der bereits im Browser gerenderte SVG wird
-  übernommen. `origin_ref = <kind>:<svg_hash(kind, source)>`.
+- **circuit / plot / smiles / mermaid** — **serverseitig** aus `source` neu gerendert
+  (`render.service.render`, nutzt den Render-Cache); ein Client-SVG wird **nicht** übernommen.
+  Mermaid seit 0.36 (Pele im Sidecar); bis dahin kam das SVG aus dem Browser.
+  `origin_ref = <kind>:<svg_hash(kind, source)>`.
 
 ## Endpunkte (`router.py`, Prefix `/artifacts`)
 

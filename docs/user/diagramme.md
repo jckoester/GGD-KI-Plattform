@@ -9,6 +9,8 @@ nichts installieren oder zeichnen können, sondern nur danach fragen.
 - **Elektrische Schaltpläne** — z. B. „Zeichne den Schaltplan einer Reihenschaltung mit zwei
   Widerständen und einer Lampe."
 - **Funktionsgraphen** — z. B. „Zeichne den Graphen von f(x) = x² − 2 im Bereich −4 bis 4."
+  Die Achsen gehen durch den Ursprung und tragen Pfeile; haben x und y ähnliche Spannen, gilt auf
+  beiden Achsen dieselbe Einheit. Eine Polstelle wie bei 1/x sprengt den Bildausschnitt nicht.
 - **Strukturformeln** (Chemie) — z. B. „Zeichne die Strukturformel von Ethanol" oder „Zeige die
   Grenzformeln des Phenolat-Ions". Mehr dazu [unten](#strukturformeln).
 
