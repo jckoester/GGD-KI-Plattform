@@ -13,6 +13,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Export (PDF, DOCX, ODT): Diagramme erscheinen als Bild statt als Quelltext. Zu breite Diagramme setzt der Renderer
   passend zur Seite neu, statt sie unlesbar klein zu schrumpfen.
 - „In Bibliothek speichern“ rendert Diagramme jetzt auf dem Server, wie Schaltpläne und Funktionsgraphen.
+- Funktionsgraphen (```plot): Achsen durch den Ursprung mit Pfeil und Beschriftung, Teilstriche in 1-, 2-, 2,5- und
+  5er-Schritten, gleiche Einheit auf beiden Achsen bei vergleichbaren Spannen, y-Bereich ohne Ausreißer an Polstellen
+  (etwa 1/x), Farben der Plattform, Legende erst ab zwei Funktionen.
 
 ### Behoben
 

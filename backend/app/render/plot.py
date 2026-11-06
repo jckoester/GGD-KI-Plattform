@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np
@@ -211,49 +212,166 @@ def parse_plot_spec(source: str) -> PlotSpec:
         raise PlotError(f"ungültige Plot-Spec: {str(e)[:200]}")
 
 
-def _render_sync(spec: PlotSpec) -> str:
-    """Kompiliert die Terme und rendert matplotlib→SVG (synchron, in einem Thread)."""
-    import matplotlib  # lazy: Import kostet ~1 s, nur bei Plot-Nutzung
-    from matplotlib.figure import Figure
+@dataclass(frozen=True)
+class PlotStil:
+    """Wie ein Funktionsgraph aussieht — ein Bündel statt verstreuter matplotlib-Aufrufe (0.36, F7).
 
-    # Text als Vektor-Pfade statt <use>/Glyph-Referenzen → self-contained SVG, das die
-    # DOMPurify-Sanitisierung im Frontend unbeschadet übersteht (nur <path> + inline style).
-    matplotlib.rcParams["svg.fonttype"] = "path"
+    Heute gibt es nur :data:`STANDARD`. Die Naht für spätere Vorlagen je Fach, Assistent oder
+    Person (Todo „Diagramm-Vorlagen je Kontext“): Wer einen anderen Stil will, reicht ein anderes
+    Bündel durch; der Cache-Schlüssel müsste ihn dann mitführen (`cache.svg_hash`). Wer
+    :data:`STANDARD` ändert, erhöht `cache.RENDERER_FASSUNG["plot"]` — sonst liefert der Cache
+    weiter das alte Bild.
+    """
+
+    breite_zoll: float = 6.0
+    hoehe_zoll: float = 4.5
+    schriftgroesse: float = 10.0
+    #: Flexoki-Töne (600), wie die übrige Plattform; Gelb zuletzt (wenig Kontrast auf Weiß).
+    farben: tuple[str, ...] = ("#205ea6", "#af3029", "#66800b", "#bc5215",
+                               "#5e409d", "#24837b", "#a02f6f", "#ad8301")
+    vordergrund: str = "#100f0f"
+    linienbreite: float = 1.8
+    #: Achsen durch den Ursprung, mit Pfeil und „x“/„y“ am Ende.
+    achsenpfeile: bool = True
+    #: Gleiche Einheit auf beiden Achsen, solange die Spannen höchstens um diesen Faktor abweichen.
+    gleiche_skalierung_bis: float = 3.0
+    #: „Schöne“ Teilstriche: 1, 2, 2,5 oder 5 × 10ⁿ.
+    tick_schritte: tuple[float, ...] = (1, 2, 2.5, 5, 10)
+    max_ticks: int = 10
+    #: Ohne `range`: y-Bereich auf diese Quantile kappen, wenn die Extremwerte ihn sonst sprengen
+    #: (e^x, 1/x nahe der Polstelle) — und nur dann, wenn die volle Spanne mehr als
+    #: `y_kappen_ab` × die Quantilspanne beträgt.
+    y_quantil: float = 0.02
+    y_kappen_ab: float = 4.0
+    gitter_breite: float = 0.5
+    gitter_deckkraft: float = 0.35
+
+
+STANDARD = PlotStil()
+
+
+def _y_bereich(ys_alle: list[np.ndarray], punkte_y: list[float], stil: PlotStil):
+    """Automatischer y-Bereich: gekappt, wenn Ausreißer ihn sprengen; sonst ``None`` (matplotlib)."""
+    werte = np.concatenate([y[np.isfinite(y)] for y in ys_alle] + [np.asarray(punkte_y, float)]) \
+        if ys_alle or punkte_y else np.array([])
+    if werte.size < 2:
+        return None
+    unten, oben = np.quantile(werte, [stil.y_quantil, 1 - stil.y_quantil])
+    voll = float(werte.max() - werte.min())
+    if oben <= unten or voll <= stil.y_kappen_ab * float(oben - unten):
+        return None
+    unten = min(unten, *punkte_y) if punkte_y else unten
+    oben = max(oben, *punkte_y) if punkte_y else oben
+    rand = 0.1 * float(oben - unten)
+    return float(unten - rand), float(oben + rand)
+
+
+def _zeichne(spec: PlotSpec, stil: PlotStil = STANDARD):
+    """Kompiliert die Terme und zeichnet die Figur (ohne Export) — getrennt, damit testbar."""
+    from matplotlib.figure import Figure
+    from matplotlib.ticker import FuncFormatter, MaxNLocator
 
     xs = np.linspace(spec.domain[0], spec.domain[1], SAMPLES)
-    fig = Figure(figsize=(6.0, 4.0))
+    fig = Figure(figsize=(stil.breite_zoll, stil.hoehe_zoll), facecolor="white")
     ax = fig.subplots()
+    ax.tick_params(labelsize=stil.schriftgroesse - 1, colors=stil.vordergrund)
 
-    has_legend = False
+    ys_alle, beschriftet = [], 0
     with np.errstate(all="ignore"):  # div/0, log(neg) → nan/inf → matplotlib zeigt Lücken
-        for func_str in spec.functions:
+        for n, func_str in enumerate(spec.functions):
             label, expr = _split_label_expr(func_str)
             f = compile_expr(expr)
             ys = np.asarray(f(xs), dtype=float)
             if ys.ndim == 0:
                 ys = np.full_like(xs, float(ys))
-            ax.plot(xs, ys, label=label)
-            has_legend = True
+            ys_alle.append(ys)
+            ax.plot(xs, ys, label=label, color=stil.farben[n % len(stil.farben)],
+                    linewidth=stil.linienbreite)
+            beschriftet += bool(label)
 
+    punkte_y = []
     for p in spec.points:
         x0, y0 = float(p[0]), float(p[1])
-        ax.plot([x0], [y0], "o", color="black")
+        punkte_y.append(y0)
+        ax.plot([x0], [y0], "o", color=stil.vordergrund, markersize=5, zorder=5)
         if len(p) > 2 and p[2]:
-            ax.annotate(str(p[2]), (x0, y0), textcoords="offset points", xytext=(6, 6))
+            ax.annotate(str(p[2]), (x0, y0), textcoords="offset points", xytext=(6, 6),
+                        fontsize=stil.schriftgroesse, color=stil.vordergrund)
 
     for a in spec.asymptotes:
-        ax.axvline(float(a), linestyle="--", linewidth=0.8, color="gray")
+        ax.axvline(float(a), linestyle="--", linewidth=0.9, color="#878580")
 
     ax.set_xlim(spec.domain[0], spec.domain[1])
     if spec.range is not None:
         ax.set_ylim(spec.range[0], spec.range[1])
-    ax.axhline(0, linewidth=0.6, color="black")
-    ax.axvline(0, linewidth=0.6, color="black")
-    if spec.grid:
-        ax.grid(True, linewidth=0.4, alpha=0.6)
-    if has_legend:
-        ax.legend(fontsize="small")
+    elif (gekappt := _y_bereich(ys_alle, punkte_y, stil)) is not None:
+        ax.set_ylim(*gekappt)
 
+    for achse in (ax.xaxis, ax.yaxis):
+        achse.set_major_locator(MaxNLocator(nbins=stil.max_ticks, steps=list(stil.tick_schritte)))
+
+    (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+    verhaeltnis = (y1 - y0) / (x1 - x0) if x1 > x0 else 0
+    if verhaeltnis and 1 / stil.gleiche_skalierung_bis <= verhaeltnis <= stil.gleiche_skalierung_bis:
+        ax.set_aspect("equal", adjustable="box")
+        # Die Figur dem Seitenverhältnis anpassen — sonst bleibt neben einer schmalen, hohen
+        # Parabel die halbe Fläche leer. Die längere Seite behält die Breite der Vorgabe.
+        lang = stil.breite_zoll
+        breite, hoehe = (lang, max(3.0, lang * verhaeltnis)) if verhaeltnis <= 1 \
+            else (max(3.0, lang / verhaeltnis), lang)
+        fig.set_size_inches(breite, hoehe)
+
+    if spec.grid:
+        ax.grid(True, linewidth=stil.gitter_breite, alpha=stil.gitter_deckkraft, color="#878580")
+        ax.set_axisbelow(True)
+
+    if stil.achsenpfeile:
+        _achsen_durch_den_ursprung(ax, stil, FuncFormatter)
+    else:
+        ax.axhline(0, linewidth=0.6, color=stil.vordergrund)
+        ax.axvline(0, linewidth=0.6, color=stil.vordergrund)
+
+    # Legende nur, wenn sie etwas unterscheidet: ab zwei beschrifteten Funktionen.
+    if beschriftet > 1:
+        ax.legend(fontsize=stil.schriftgroesse - 1, frameon=False)
+    fig.tight_layout()
+    return fig
+
+
+def _achsen_durch_den_ursprung(ax, stil: PlotStil, FuncFormatter) -> None:
+    """Achsen wie im Heft: durch den Nullpunkt (sonst am Rand), Pfeil und „x“/„y“ am Ende."""
+    (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+    for seite in ("top", "right"):
+        ax.spines[seite].set_visible(False)
+    ax.spines["bottom"].set_position(("data", 0) if y0 <= 0 <= y1 else ("axes", 0))
+    ax.spines["left"].set_position(("data", 0) if x0 <= 0 <= x1 else ("axes", 0))
+    for seite in ("bottom", "left"):
+        ax.spines[seite].set_color(stil.vordergrund)
+        ax.spines[seite].set_linewidth(0.9)
+    # Pfeilspitzen am Ende der Achsen (Koordinaten: Achse in Datenwerten, Ende relativ).
+    ax.plot(1, 0 if y0 <= 0 <= y1 else y0, ">", color=stil.vordergrund, markersize=5,
+            transform=ax.get_yaxis_transform(), clip_on=False)
+    ax.plot(0 if x0 <= 0 <= x1 else x0, 1, "^", color=stil.vordergrund, markersize=5,
+            transform=ax.get_xaxis_transform(), clip_on=False)
+    ax.annotate("x", xy=(1, 0 if y0 <= 0 <= y1 else y0), xycoords=ax.get_yaxis_transform(),
+                xytext=(0, 6), textcoords="offset points", ha="right",
+                fontsize=stil.schriftgroesse, color=stil.vordergrund, style="italic")
+    ax.annotate("y", xy=(0 if x0 <= 0 <= x1 else x0, 1), xycoords=ax.get_xaxis_transform(),
+                xytext=(6, 0), textcoords="offset points", va="top",
+                fontsize=stil.schriftgroesse, color=stil.vordergrund, style="italic")
+    # Kreuzen sich die Achsen im Ursprung, steht dort nur eine 0 (an der x-Achse).
+    if x0 <= 0 <= x1 and y0 <= 0 <= y1:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: "" if abs(v) < 1e-12 else f"{v:g}"))
+
+
+def _render_sync(spec: PlotSpec, stil: PlotStil = STANDARD) -> str:
+    """Zeichnet und exportiert matplotlib→SVG (synchron, in einem Thread)."""
+    import matplotlib  # lazy: Import kostet ~1 s, nur bei Plot-Nutzung
+
+    # Text als Vektor-Pfade statt <use>/Glyph-Referenzen → self-contained SVG, das die
+    # DOMPurify-Sanitisierung im Frontend unbeschadet übersteht (nur <path> + inline style).
+    matplotlib.rcParams["svg.fonttype"] = "path"
+    fig = _zeichne(spec, stil)
     buf = io.StringIO()
     fig.savefig(buf, format="svg")
     svg = buf.getvalue()

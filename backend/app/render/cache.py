@@ -15,12 +15,15 @@ from app.db.models import RenderedSvg
 
 #: Ausgabe-Fassung je Renderer (0.30). Wer die Zeichnung eines Renderers ändert, erhöht hier
 #: die Zahl — sonst liefert der Cache weiter das alte Bild zur gleichen Quelle. Renderer ohne
-#: Eintrag behalten ihren bisherigen Schlüssel (Schaltplan, Graph: unverändert seit Phase 17).
+#: Eintrag behalten ihren bisherigen Schlüssel (Schaltplan: unverändert seit Phase 17).
 RENDERER_FASSUNG: dict[str, int] = {
     # 2 — 03.11.2026: Elektronenpaare nach der gelesenen Beschriftung, Vorgabe Valenzstrich
     # 3 — 03.11.2026: Moleküle als flache Gruppen statt verschachtelter <svg>, Stile als
     #     Attribute (Export: weasyprint, Word, LibreOffice); geladenes C behält seine Ladung
     "smiles": 3,
+    # 2 — 06.11.2026 (0.36): Achsen-Standards (`PlotStil`): Achsen durch den Ursprung mit Pfeil,
+    #     schöne Teilstriche, gleiche Skalierung, gekappter y-Bereich, Plattformfarben
+    "plot": 2,
 }
 
 

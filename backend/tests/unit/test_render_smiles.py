@@ -166,8 +166,9 @@ def test_cache_schluessel_traegt_die_fassung():
     from app.render import cache
     alt = hashlib.sha256("smiles\x00CCO".encode()).hexdigest()
     assert cache.svg_hash("smiles", "CCO") != alt
-    # Schaltplan und Graph behalten ihren Schlüssel aus Phase 17.
-    assert cache.svg_hash("plot", "x") == hashlib.sha256("plot\x00x".encode()).hexdigest()
+    # Der Schaltplan behält seinen Schlüssel aus Phase 17; der Graph hat seit 0.36 Fassung 2.
+    assert cache.svg_hash("circuit", "x") == hashlib.sha256("circuit\x00x".encode()).hexdigest()
+    assert cache.svg_hash("plot", "x") != hashlib.sha256("plot\x00x".encode()).hexdigest()
 
 
 def test_keine_verschachtelten_svg():

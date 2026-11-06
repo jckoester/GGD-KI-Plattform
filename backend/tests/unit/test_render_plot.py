@@ -120,3 +120,74 @@ async def test_render_plot_bad_spec_raises_render_error():
 
 def test_plot_registered():
     assert "plot" in service.RENDERERS
+
+
+# ── Achsen-Standards (0.36, Plan F7): geprüft an Achsenwerten, nicht an Pixeln ──────────────
+
+def _figur(quelle: str):
+    from app.render.plot import _zeichne, parse_plot_spec
+    fig = _zeichne(parse_plot_spec(quelle))
+    return fig, fig.axes[0]
+
+
+def test_stil_ist_ein_buendel_mit_vorgaben():
+    from app.render.plot import STANDARD, PlotStil
+    assert isinstance(STANDARD, PlotStil)
+    assert STANDARD.farben[0] == "#205ea6"   # Flexoki-Blau, wie die Plattform
+
+
+def test_polstelle_sprengt_den_y_bereich_nicht():
+    """1/x: Ohne Kappung reichte die y-Achse bis ±200, die Kurve war ein Strich."""
+    _, ax = _figur("functions: ['f(x) = 1/x']\ndomain: [-5, 5]")
+    unten, oben = ax.get_ylim()
+    assert -20 < unten < 0 < oben < 20
+
+
+def test_vorgegebener_bereich_bleibt():
+    _, ax = _figur("functions: ['f(x) = 1/x']\ndomain: [-5, 5]\nrange: [-100, 100]")
+    assert ax.get_ylim() == (-100, 100)
+
+
+def test_gewoehnliche_funktion_wird_nicht_gekappt():
+    _, ax = _figur("functions: ['f(x) = x^2']\ndomain: [-3, 3]")
+    assert ax.get_ylim()[1] >= 9
+
+
+def test_gleiche_skalierung_nur_bei_vergleichbaren_spannen():
+    _, parabel = _figur("functions: ['f(x) = x^2 - 2']\ndomain: [-3, 3]")
+    _, sinus = _figur("functions: ['f(x) = sin(x)']\ndomain: [-6.3, 6.3]")
+    assert parabel.get_aspect() == 1.0
+    assert sinus.get_aspect() == "auto"
+
+
+def test_schoene_teilstriche():
+    import math
+    _, ax = _figur("functions: ['f(x) = 0.37*x + 1.3']\ndomain: [-7.3, 13.9]")
+    for achse in (ax.xaxis, ax.yaxis):
+        werte = achse.get_majorticklocs()
+        schritt = werte[1] - werte[0]
+        mantisse = schritt / 10 ** math.floor(math.log10(schritt))
+        assert any(abs(mantisse - m) < 1e-9 for m in (1, 2, 2.5, 5)), schritt
+
+
+def test_achsen_durch_den_ursprung_sonst_am_rand():
+    _, mitte = _figur("functions: ['f(x) = x']\ndomain: [-3, 3]")
+    _, rechts = _figur("functions: ['f(x) = 0.5*x + 1']\ndomain: [2, 20]")
+    assert mitte.spines["left"].get_position() == ("data", 0)
+    assert mitte.spines["bottom"].get_position() == ("data", 0)
+    assert rechts.spines["left"].get_position() == ("axes", 0)
+    assert not mitte.spines["top"].get_visible() and not mitte.spines["right"].get_visible()
+
+
+def test_legende_erst_ab_zwei_funktionen():
+    _, eine = _figur("functions: ['f(x) = x']\ndomain: [-3, 3]")
+    _, zwei = _figur("functions: ['f(x) = x', 'g(x) = -x']\ndomain: [-3, 3]")
+    assert eine.get_legend() is None
+    assert zwei.get_legend() is not None
+
+
+def test_farben_aus_der_palette():
+    from app.render.plot import STANDARD
+    _, ax = _figur("functions: ['f(x) = x', 'g(x) = -x']\ndomain: [-3, 3]")
+    farben = [linie.get_color() for linie in ax.get_lines()[:2]]
+    assert farben == list(STANDARD.farben[:2])
