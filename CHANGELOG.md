@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Schaltpläne werden mit europäischen Symbolen (DIN/IEC) gezeichnet, etwa der Widerstand als Rechteck.
+
+### Behoben
+
+- Schaltpläne ohne `circuitikz`-Umgebung oder mit eigener Präambel erschienen als Fehlermeldung; sie werden jetzt gezeichnet.
+
+### Entwicklung
+
+- Messung „Schaltpläne“: Szenarien `schaltplaene.yaml`; `diagramme_auswerten.py --seite` schreibt eine HTML-Übersicht
+  der gezeichneten Pläne zum fachlichen Abhaken.
+- Render-Sidecar: `circuitikz.mjs` bereitet die Quelle auf; neuer Prüfschritt „Sidecar-Tests“ (`node --test
+  render-sidecar/test/`) in `scripts/test.sh` und CI.
+
 ## [0.36.0] – 2026-11-06
 
 Diagramme mit Pele, Diagramme im Export, Achsen-Standards für Funktionsgraphen (Päckchen M, erster Teil). Keine

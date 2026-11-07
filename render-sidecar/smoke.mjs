@@ -55,6 +55,27 @@ for (const c of circuits) {
   }
 }
 
+// 0.37: Quelle wie von chat-komplex (ohne Umgebung) bzw. chat-standard ([american]) — die Aufbereitung
+// in circuitikz.mjs muss beide zeichenbar machen.
+for (const [name, tex] of [
+  ['ohne Umgebung', String.raw`\draw (0,0) to[battery1,l=$U$] (0,3) to[R,l=$R$] (3,3) to[lamp] (3,0) -- (0,0);`],
+  ['[american] mit Präambel', String.raw`\documentclass{standalone}
+\usepackage{circuitikz}
+\begin{document}
+\begin{circuitikz}[american]
+\draw (0,0) to[battery1] (0,3) to[R] (3,3) -- (3,0) -- (0,0);
+\end{circuitikz}
+\end{document}`],
+]) {
+  try {
+    const svg = await pool.render(wrapCircuit(tex));
+    console.log(`✓ Aufbereitung ${name}: SVG ${svg.length} B`);
+  } catch (e) {
+    console.log(`✗ Aufbereitung ${name}: FEHLER — ${String(e.message ?? e).slice(0, 120)}`);
+    allOk = false;
+  }
+}
+
 // MathJax-Mathe (→ SVG) + mhchem
 try {
   const math = renderMath(String.raw`\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`, true);

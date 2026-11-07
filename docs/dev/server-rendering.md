@@ -61,8 +61,8 @@ Env: `RENDER_SIDECAR_HOST/PORT`, `RENDER_POOL_SIZE`, `RENDER_TIMEOUT_MS`, `RENDE
   deterministisch). Aufräumen altersbasiert: `cleanup_rendered_svg` (Cron, siehe unten).
   **`RENDERER_FASSUNG`** (seit 0.30): Ändert sich die Zeichnung eines Renderers, erhöhen Sie
   dort seine Zahl — sie geht in den Hash ein, sonst liefert der Cache zur gleichen Quelle weiter
-  das alte Bild. Stand 0.36: `smiles` 3, `plot` 2 (Achsen-Standards); der Schaltplan behält seinen
-  Schlüssel aus Phase 17.
+  das alte Bild. Stand 0.37: `smiles` 3, `plot` 2 (Achsen-Standards), `circuit` 1 (europäische
+  Symbole, Aufbereitung); Mermaid hat keine Fassung.
 - `sidecar.py` — httpx-Client zum Sidecar (`render_circuit`, `render_math`, `render_mermaid`, alle
   über `_post_svg`); Timeout/Fehler →
   `RenderError` (`app/render/errors.py`).

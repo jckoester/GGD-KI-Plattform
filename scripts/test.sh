@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Führt alle automatischen Prüfungen des Projekts aus: Backend-Tests (Unit und
-# Integration), Schema-Abgleich (alembic check), Scraper-Tests, Frontend-Tests,
+# Integration), Schema-Abgleich (alembic check), Scraper-Tests, Sidecar-Tests, Frontend-Tests,
 # Svelte-Typprüfung und ESLint.
 #
 #   scripts/test.sh              alles (~40 s)
@@ -166,6 +166,10 @@ echo "${FETT}Skripte${AUS}"
 # Repo-Wurzel aus: `scripts` ist dort das Paket (siehe CLAUDE.md, „scripts/-Paketkonflikt“).
 schritt "Scraper-Tests" '[0-9]+ (passed|failed).*' \
   "\"$PYTHON\" -m pytest -q --disable-warnings --tb=short scripts/tests"
+# Render-Sidecar (0.37): die abhängigkeitsfreien Module (Aufbereitung der CircuiTikZ-Quelle). Der
+# TeX-Motor selbst steckt im Smoke-Test (`npm run smoke`), der braucht node_modules des Sidecars.
+schritt "Sidecar-Tests" 'pass [0-9]+' \
+  "node --test render-sidecar/test/"
 
 echo
 echo "${FETT}Frontend${AUS}"

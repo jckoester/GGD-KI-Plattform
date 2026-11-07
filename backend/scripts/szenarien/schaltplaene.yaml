@@ -1,0 +1,124 @@
+# Schaltpläne zeichnen (0.37) — Plan: Release-0.37-Schaltplaene-Plan.md, F6
+#
+# Bitten um einen Schaltplan. Gemessen wird automatisch, ob er sich zeichnen lässt
+# (`diagramme_auswerten.py`), und von Hand, ob er fachlich stimmt (Übersichtsseite `--seite`).
+#
+#   python scripts/assistent_messung.py --szenarien scripts/szenarien/schaltplaene.yaml \
+#       --vorlage frei --modell chat-standard --lauf 1-frei-standard-w1 \
+#       --ziel "<Vault>/Plaene/Messungen-Schaltplaene"
+#   python scripts/diagramme_auswerten.py --seite "<Vault>/Plaene/Messungen-Schaltplaene/lauf-1.html" \
+#       "<Vault>/Plaene/Messungen-Schaltplaene"/verlauf-1-*.json
+#
+# Stufen ab 8: `chat-komplex` ist auf Dev für Klasse 7 nicht freigegeben.
+# Lehrkraft-Fälle (Arbeitsblatt) laufen hier mit dem Schüler:innen-Konto des Messskripts — es geht in
+# Lauf 1 um die Zeichenbarkeit, nicht um die Behandlung.
+
+vorlagen:
+  frei:
+    lage: frei
+
+faelle:
+  - id: S01-grundstromkreis
+    titel: Grundstromkreis
+    stufe: 8
+    zuege:
+      - schueler: Zeichne mir einen Schaltplan für einen einfachen Stromkreis mit Batterie, Schalter und Lampe.
+        muss: [Batterie, Schalter und Lampe in einer geschlossenen Masche]
+
+  - id: S02-reihe
+    titel: Reihenschaltung
+    stufe: 8
+    zuege:
+      - schueler: Zeichne einen Schaltplan mit zwei Lampen in Reihe an einer Batterie.
+        muss: [beide Lampen in derselben Masche hintereinander]
+
+  - id: S03-parallel
+    titel: Parallelschaltung
+    stufe: 8
+    zuege:
+      - schueler: Zeichne einen Schaltplan mit zwei Lampen parallel an einer Batterie.
+        muss: [zwei Zweige, jede Lampe in einem eigenen Zweig]
+
+  - id: S04-parallel-schalter
+    titel: Parallelschaltung mit Schalter je Zweig
+    stufe: 8
+    zuege:
+      - schueler: Zeichne einen Schaltplan mit einer Batterie und zwei parallel geschalteten Lämpchen mit je einem Schalter.
+        muss: [je Zweig ein Schalter in Reihe zur Lampe]
+
+  - id: S05-wechsel
+    titel: Wechselschaltung
+    stufe: 9
+    zuege:
+      - schueler: Zeichne den Schaltplan einer Wechselschaltung, mit der man eine Lampe von zwei Stellen aus ein- und ausschalten kann.
+        muss: [zwei Wechselschalter, zwei Verbindungsleitungen zwischen ihnen]
+
+  - id: S06-messgeraete
+    titel: Ampere- und Voltmeter
+    stufe: 9
+    zuege:
+      - schueler: Zeichne einen Stromkreis mit Batterie, Widerstand, einem Amperemeter für die Stromstärke und einem Voltmeter für die Spannung am Widerstand.
+        muss: [Amperemeter in Reihe, Voltmeter parallel zum Widerstand]
+
+  - id: S07-led
+    titel: LED mit Vorwiderstand
+    stufe: 9
+    zuege:
+      - schueler: Zeichne mir einen Schaltplan für eine LED mit Vorwiderstand an einer 9-V-Batterie.
+        muss: [LED in Durchlassrichtung, Vorwiderstand in Reihe]
+
+  - id: S08-motor
+    titel: Motor mit Schalter
+    stufe: 8
+    zuege:
+      - schueler: Zeichne einen Schaltplan mit einem Elektromotor, einem Schalter und einer Batterie.
+        muss: [Motor-Symbol (M im Kreis), Schalter in Reihe]
+
+  - id: S09-dimmer
+    titel: Potentiometer als Dimmer
+    stufe: 10
+    zuege:
+      - schueler: Zeichne einen Schaltplan, bei dem man die Helligkeit einer Lampe mit einem Potentiometer regeln kann.
+        muss: [Potentiometer (oder einstellbarer Widerstand) in Reihe zur Lampe]
+
+  - id: S10-spannungsteiler
+    titel: Spannungsteiler
+    stufe: 10
+    zuege:
+      - schueler: Zeichne einen unbelasteten Spannungsteiler aus zwei Widerständen R1 und R2 an einer Spannungsquelle U, mit der Teilspannung U2 an R2.
+        muss: [R1 und R2 in Reihe, U2 an R2 gekennzeichnet]
+
+  - id: S11-arduino-led
+    titel: Potentialschienen — LED an einem Arduino-Pin
+    stufe: 10
+    zuege:
+      - schueler: Zeichne den Schaltplan für eine LED mit Vorwiderstand an Pin 13 eines Arduino, in der Darstellung mit Potentialschienen (5 V oben, GND unten).
+        muss: [Pin als Quelle, LED und Widerstand nach GND, Masse-/Versorgungssymbole statt geschlossener Masche]
+
+  - id: S12-arduino-taster
+    titel: Potentialschienen — Taster mit Pull-down
+    stufe: 11
+    zuege:
+      - schueler: Zeichne den Schaltplan für einen Taster an einem Arduino-Eingang mit Pull-down-Widerstand, als Potentialschienen-Darstellung.
+        muss: [Taster zwischen 5 V und Pin, Pull-down zwischen Pin und GND]
+
+  - id: S13-gemischt
+    titel: Gemischte Schaltung
+    stufe: 10
+    zuege:
+      - schueler: Zeichne eine Schaltung, in der R1 in Reihe zu einer Parallelschaltung aus R2 und R3 liegt.
+        muss: [R1 vor der Verzweigung, R2 und R3 parallel]
+
+  - id: S14-kondensator
+    titel: Kondensator laden und entladen
+    stufe: 11
+    zuege:
+      - schueler: Zeichne einen Schaltplan zum Laden und Entladen eines Kondensators über einen Widerstand mit einem Umschalter.
+        muss: [Umschalter zwischen Laden (mit Quelle) und Entladen (ohne Quelle), R in Reihe zu C]
+
+  - id: S15-arbeitsblatt
+    titel: Arbeitsblatt — drei Schaltungen zum Vergleichen
+    stufe: 12
+    zuege:
+      - schueler: Ich brauche für ein Arbeitsblatt drei Schaltpläne zum Vergleichen, jeweils mit zwei Lampen und einem Schalter, aber unterschiedlich verschaltet.
+        muss: [drei zeichenbare, verschiedene Schaltungen]

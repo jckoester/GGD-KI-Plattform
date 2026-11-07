@@ -9,11 +9,9 @@ import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js';
 
 export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
-// Umschließt die CircuiTikZ-Quelle zum vollständigen TeX-Dokument. Die Quelle enthält
-// üblicherweise \begin{circuitikz}…\end{circuitikz}; \usepackage muss vor \begin{document}.
-export function wrapCircuit(source) {
-  return `\\usepackage{circuitikz}\n\\begin{document}\n${source}\n\\end{document}`;
-}
+// TeX-Dokument für CircuiTikZ: seit 0.37 in `circuitikz.mjs` (Reparatur der Modellquelle,
+// europäische Symbole). Hier re-exportiert, damit Aufrufer (server, smoke) unverändert bleiben.
+export { wrapCircuit } from './circuitikz.mjs';
 
 // MathJax TeX→SVG. Für den PDF-Export (D5): **self-contained SVG** (fontCache:'none', Glyphen als
 // Pfade) — weasyprint bettet es ohne CSS/Font-Abhängigkeit perfekt ein. `AllPackages` enthält

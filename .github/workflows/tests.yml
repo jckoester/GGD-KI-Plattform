@@ -139,3 +139,7 @@ jobs:
       # das Paket. Die Abhängigkeiten stehen schon oben in requirements-scripts.txt.
       - name: Scraper-Tests
         run: pytest scripts/tests -q --disable-warnings --tb=short
+
+      # Render-Sidecar (seit 0.37): nur die abhängigkeitsfreien Module — Node ist auf dem Runner vorhanden.
+      - name: Sidecar-Tests
+        run: node --test render-sidecar/test/
