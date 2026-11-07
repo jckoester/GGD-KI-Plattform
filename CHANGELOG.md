@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Entwicklung
+
+- Sidecar-Tests laufen auch mit Node 24 (CI): Testdateien über ein Muster statt über das Verzeichnis.
+
 ## [0.37.0] – 2026-11-07
 
 ### Neu

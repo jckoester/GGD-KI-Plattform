@@ -142,4 +142,4 @@ jobs:
 
       # Render-Sidecar (seit 0.37): nur die abhängigkeitsfreien Module — Node ist auf dem Runner vorhanden.
       - name: Sidecar-Tests
-        run: node --test render-sidecar/test/
+        run: node --test 'render-sidecar/test/*.test.mjs'

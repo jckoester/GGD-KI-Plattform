@@ -169,7 +169,7 @@ schritt "Scraper-Tests" '[0-9]+ (passed|failed).*' \
 # Render-Sidecar (0.37): die abhängigkeitsfreien Module (Aufbereitung der CircuiTikZ-Quelle). Der
 # TeX-Motor selbst steckt im Smoke-Test (`npm run smoke`), der braucht node_modules des Sidecars.
 schritt "Sidecar-Tests" 'pass [0-9]+' \
-  "node --test render-sidecar/test/"
+  "node --test 'render-sidecar/test/*.test.mjs'"
 
 echo
 echo "${FETT}Frontend${AUS}"
