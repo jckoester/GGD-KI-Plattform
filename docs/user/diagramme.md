@@ -7,7 +7,7 @@ nichts installieren oder zeichnen können, sondern nur danach fragen.
 
 - **Diagramme** (Flussdiagramme, Abläufe, Strukturen) — z. B. „Zeichne ein Flussdiagramm für …".
 - **Elektrische Schaltpläne** — z. B. „Zeichne den Schaltplan einer Reihenschaltung mit zwei
-  Widerständen und einer Lampe."
+  Widerständen und einer Lampe." Mehr dazu [unten](#schaltpläne).
 - **Funktionsgraphen** — z. B. „Zeichne den Graphen von f(x) = x² − 2 im Bereich −4 bis 4."
   Die Achsen gehen durch den Ursprung und tragen Pfeile; haben x und y ähnliche Spannen, gilt auf
   beiden Achsen dieselbe Einheit. Eine Polstelle wie bei 1/x sprengt den Bildausschnitt nicht.
@@ -24,6 +24,30 @@ dargestellt wird. Fährst du mit der Maus über die Grafik, erscheinen oben rech
 - **„In Bibliothek"** — legt die Grafik dauerhaft ab; sonst verschwindet sie mit dem Chat
   (→ [Bibliothek](bibliothek.md)).
 - **„GeoGebra"** — nur bei Funktionsgraphen: eine `.ggb`-Datei zum Weiterbearbeiten.
+
+## Schaltpläne
+
+Schaltpläne erscheinen mit den **Symbolen aus dem Unterricht** (DIN/IEC): der Widerstand als
+Rechteck, der Schalter als einfacher Hebel.
+
+Am besten gelingen sie mit dem Assistenten **„Schaltpläne zeichnen“** (Physik, ab Klasse 8). Fragst
+du im Chat nach einem Schaltplan, schlägt der Chat ihn dir vor. Er kennt bewährte Vorlagen und
+zeichnet deshalb sauberer als der Chat ohne Assistenten:
+
+- Grundstromkreis, Reihen- und Parallelschaltung, gemischte Schaltungen;
+- Amperemeter und Voltmeter, LED mit Vorwiderstand, Motor, Potentiometer, Kondensator;
+- Wechselschaltung und Umschalter;
+- Spannungsteiler;
+- **Potentialschienen** wie bei Arduino-Schaltungen: 5 V oben, GND unten.
+
+Auf Wunsch zeichnet er mehrere Pläne zum Vergleichen, etwa für ein Arbeitsblatt.
+
+**Ist der Schaltplan deine Aufgabe**, zum Beispiel eine Hausaufgabe, zeichnet der Assistent ihn
+dir nicht vor. Er hilft dir Schritt für Schritt zu deinem eigenen Plan, und den fertigen
+bekommst du zum Vergleich, wenn du deinen beschrieben hast. Zum Verstehen oder Wiederholen
+zeichnet er sofort.
+
+Ob der Assistent an deiner Schule für Schüler:innen freigeschaltet ist, entscheidet die Schule.
 
 ## Strukturformeln
 

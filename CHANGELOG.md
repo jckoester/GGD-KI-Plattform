@@ -5,10 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.37.0] – 2026-11-07
+
 ### Neu
 
 - Assistent „Schaltpläne zeichnen“ (Physik, Klasse 8–13, für alle): zeichnet Schaltpläne mit den Symbolen aus dem
   Unterricht, auch mit Potentialschienen; im freien Chat wird er vorgeschlagen, wenn jemand nach einem Schaltplan fragt.
+  Ist der Schaltplan die Aufgabe einer Schüler:in, hilft er ihr zum eigenen Plan, statt ihn vorzuzeichnen.
 
 ### Geändert
 
@@ -31,6 +34,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `diagramme_auswerten.py`: Geometrie-Heuristik für Schaltpläne (Leitungsenden in Bauteilen, Überlappungen).
 - Baustein `schaltplaene` (Bauteilliste, Regeln, zehn geprüfte Vorlagen); der Smoke-Test des Sidecars zeichnet jede Vorlage.
 - `assistent_messung.py`: Der Kopf einer Szenariodatei kann `audience` und `scope` setzen.
+
+### Nach dem Update
+
+- Backend, Frontend und **Render-Sidecar** neu bauen und starten: `docker compose build && docker compose up -d`; offene
+  Browser-Tabs einmal neu laden.
+- Danach (der Seed läuft im neuen Image): `docker compose exec backend python scripts/seed_assistants.py --dry-run`, dann
+  ohne `--dry-run` — legt „Schaltpläne zeichnen“ an. Wer eine eigene `config/assistants.yaml` pflegt, übernimmt den
+  Eintrag aus `config/assistants.example.yaml` oder ruft den Seed mit `--config config/assistants.example.yaml` auf.
+- Für Schüler:innen: `chat-komplex` unter `/settings/models` für die Jahrgänge 8–13 freischalten (bei den
+  Rückfall-Assistenten meist schon geschehen). Soll der Assistent nur Lehrkräften zur Verfügung stehen, im Editor die
+  Zielgruppe auf Lehrkräfte stellen.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.36.0] – 2026-11-06
 

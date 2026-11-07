@@ -68,7 +68,9 @@ passen zu vielen Fächern:
 Dazu kommen Assistenten für **bestimmte Aufgaben**. Mit der Plattform kommen zwei für
 Chemie: **stöchiometrische Berechnungen** (rechnen mit Massen, Stoffmengen, Volumina und
 Konzentrationen) und **Reaktionsgleichungen** (aufstellen und ausgleichen, bis zur
-Redoxgleichung), beide ab Klasse 8. Deine Schule und deine Lehrkräfte können weitere anlegen.
+Redoxgleichung), beide ab Klasse 8. Für Physik kommt **Schaltpläne zeichnen** dazu, ebenfalls
+ab Klasse 8 (→ [Schaltpläne](diagramme.md#schaltpläne)). Deine Schule und deine Lehrkräfte
+können weitere anlegen.
 
 **Wo du sie findest:**
 

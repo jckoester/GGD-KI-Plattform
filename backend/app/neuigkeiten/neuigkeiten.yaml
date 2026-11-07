@@ -300,3 +300,16 @@
     Funktionsgraphen haben Achsen wie im Heft, und im Export (PDF, Word, ODT) erscheinen
     Diagramme als Bild statt als Quelltext.
   link: /help/diagramme
+
+
+- id: "0.37-schaltplaene"
+  version: "0.37.0"
+  datum: 2026-11-07
+  rollen: [teacher]
+  titel: "Schaltpläne wie im Unterricht"
+  text: >-
+    Schaltpläne erscheinen jetzt mit den Symbolen aus dem Unterricht. Der neue Assistent
+    „Schaltpläne zeichnen“ (Physik) zeichnet sie sauber, vom Grundstromkreis bis zu
+    Potentialschienen am Arduino, auf Wunsch mehrere zum Vergleichen für ein Arbeitsblatt.
+    Schüler:innen zeichnet er ihre Aufgabe nicht vor, sondern hilft ihnen zum eigenen Plan.
+  link: /help/diagramme

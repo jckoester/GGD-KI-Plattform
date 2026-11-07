@@ -19,6 +19,10 @@ automatisch mit `docker compose up`. Merkmale:
 
 Nach Änderungen am Sidecar-Code: `docker compose build render-sidecar && docker compose up -d`.
 
+**Schaltpläne** zeichnet der Sidecar seit 0.37 immer mit **europäischen Symbolen** (DIN/IEC), auch
+wenn ein Modell amerikanische anfordert; Schalter erscheinen als Schulsymbol. Fehlende Umgebung,
+eigene Präambel und Zeichen wie Ω oder µ repariert er selbst.
+
 ## Konfiguration (Env)
 
 | Variable | Wo | Default | Bedeutung |

@@ -265,6 +265,7 @@ an. Bausteine hängt er nur beim Anlegen an.
 |---|---|---|---|
 | stöchiometrische Berechnungen | bestimmte Aufgabe, Fach Chemie | 8–13 | chemie |
 | Reaktionsgleichungen | bestimmte Aufgabe, Fach Chemie | 8–13 | chemie |
+| Schaltpläne zeichnen (seit 0.37) | bestimmte Aufgabe, Fach Physik, **für alle** | 8–13 | physik, technik, schaltplan |
 | Rechnen mit Größen und Einheiten | allgemein | 5–13 | physik, chemie, nwt, biologie |
 | Mathe-Aufgaben | allgemein | 5–13 | mathematik |
 | Versuchsplanung und -auswertung | allgemein | 5–13 | biologie, chemie, physik, bnt, nwt |
@@ -290,6 +291,14 @@ an. Bausteine hängt er nur beim Anlegen an.
   beiden Chemie-Assistenten bieten unter „Darunter anbieten“ allgemeine an: Stöchiometrie
   „Rechnen mit Größen und Einheiten“, Reaktionsgleichungen zusätzlich „Versuchsplanung und
   -auswertung“.
+
+**Ausnahme „Schaltpläne zeichnen“:** Der Assistent ist für Lehrkräfte und Schüler:innen
+(`audience: all`) und trägt nur den Baustein `schaltplaene` (Bauteilnamen, Regeln, geprüfte
+Vorlagen), nicht „Begleiten statt lösen“. Bausteine gelten für jede Rolle, eine Lehrkraft würde
+sonst durch ihr Arbeitsblatt gefragt. Für Schüler:innen enthält sein Prompt einen eigenen Absatz:
+Ist der Schaltplan ihre Aufgabe, führt er zum eigenen Plan, statt ihn vorzuzeichnen. Soll er
+Schüler:innen nicht zur Verfügung stehen, stellen Sie im Editor die Zielgruppe auf Lehrkräfte.
+Für Schüler:innen braucht er `chat-komplex` in den Jahrgängen 8 bis 13.
 
 **Tags entscheiden über die Fachseiten.** Ein allgemeiner Assistent steht auf der Seite eines
 Fachs, wenn eines seiner Tags die `slug` des Fachs aus `config/subjects.yaml` ist. Weichen

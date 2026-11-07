@@ -44,7 +44,24 @@ circuitikz-fähige Engine (`node-tikzjax`) Node-only ist. **Nur intern erreichba
   Gleichheit; geändert wird im Frontend, dann kopiert.
 - `pool.mjs` — **Worker-Pool** für CircuiTikZ: TeX ist turing-vollständig → per-Render-Timeout
   terminiert den Worker (Runaway-Kill) und startet einen frischen; Pool-Größe = Concurrency-Cap.
-- `render.mjs` — `wrapCircuit` (TeX-Dokument) · `renderMath` = **MathJax → SVG**
+- `circuitikz.mjs` (seit 0.37, abhängigkeitsfrei) — `circuitikzAufbereiten` und `wrapCircuit`.
+  Modelle schreiben CircuiTikZ selten so, wie node-tikzjax es braucht; die Aufbereitung macht
+  daraus genau eine Umgebung im TeX-Dokument mit `\usepackage{amsmath}` und
+  `\usepackage[european]{circuitikz}`:
+  - Präambel (`\documentclass`, `\usepackage`, `\begin{document}`) wird entfernt; fehlt die
+    Umgebung, wird sie ergänzt (eine `tikzpicture` bleibt).
+  - `[american]`/`[US]` an der Umgebung und `\ctikzset{american}` fallen weg — europäische
+    Symbole (DIN/IEC) sind Vorgabe.
+  - **Schalter:** `switch`/`spst`/`closing switch`/`cspst` werden `nos` (Schulsymbol ohne
+    Bogenpfeil), `opening switch`/`ospst` werden `ncs`.
+  - **Zeichen**, die der TeX-Motor nicht kennt: schmale Leerzeichen (U+2007/2009/202F) werden
+    normale, Ω/µ/μ/°/× werden `\ensuremath{…}`.
+
+  ⚠️ **Im Sidecar steckt CircuiTikZ 1.0 (Februar 2020).** Neuere Namen wie `elmech` (Motor) gibt es
+  nicht; der Baustein `schaltplaene` (`backend/app/assistants/bausteine/schaltplaene.md`) nennt
+  nur geprüfte Namen, und der Smoke-Test zeichnet jede seiner Vorlagen. Eine neuere Fassung hieße
+  Paketdateien in `tex_files.tar.gz` tauschen oder TeX Live im Container (Todo).
+- `render.mjs` — `wrapCircuit` (aus `circuitikz.mjs`) · `renderMath` = **MathJax → SVG**
   (`fontCache:'none'`, `AllPackages` inkl. mhchem; das `<svg>` trägt `vertical-align` + ex-Sizing
   für die Inline-Baseline) · `BoundedCache`.
 
