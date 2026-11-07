@@ -25,7 +25,8 @@ RENDERER_FASSUNG: dict[str, int] = {
     #     schöne Teilstriche, gleiche Skalierung, gekappter y-Bereich, Plattformfarben
     "plot": 2,
     # 1 — 07.11.2026 (0.37): europäische Symbole, Umgebung ergänzt, Präambel/`[american]` entfernt
-    "circuit": 1,
+    # 2 — 07.11.2026 (0.37): Schalter als Schulsymbol (`switch` → `nos`, Öffner → `ncs`)
+    "circuit": 2,
 }
 
 

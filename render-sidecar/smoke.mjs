@@ -76,6 +76,24 @@ for (const [name, tex] of [
   }
 }
 
+// 0.37: Jede Vorlage des Bausteins „Schaltpläne“ muss zeichnen — sonst brächte er dem Modell einen
+// Plan bei, der scheitert. Die Datei liegt im Backend; im Docker-Image des Sidecars fehlt sie (übersprungen).
+{
+  const pfad = new URL('../backend/app/assistants/bausteine/schaltplaene.md', import.meta.url);
+  const fs = await import('node:fs');
+  if (fs.existsSync(pfad)) {
+    const vorlagen = [...fs.readFileSync(pfad, 'utf8').matchAll(/```circuitikz\n([\s\S]*?)```/g)].map((m) => m[1]);
+    let gut = 0;
+    for (const v of vorlagen) {
+      try { await pool.render(wrapCircuit(v)); gut++; } catch { console.log(`✗ Baustein-Vorlage: ${v.slice(0, 60)}…`); }
+    }
+    console.log(`${gut === vorlagen.length ? '✓' : '✗'} Baustein „Schaltpläne“: ${gut}/${vorlagen.length} Vorlagen zeichnen`);
+    allOk = allOk && gut === vorlagen.length;
+  } else {
+    console.log('– Baustein „Schaltpläne“ nicht gefunden (Docker-Image) — übersprungen');
+  }
+}
+
 // MathJax-Mathe (→ SVG) + mhchem
 try {
   const math = renderMath(String.raw`\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`, true);

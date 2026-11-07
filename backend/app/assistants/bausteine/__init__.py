@@ -31,6 +31,18 @@ class Baustein:
 
 #: Reihenfolge = Reihenfolge im Systemtext, wenn ein Assistent mehrere wählt.
 BAUSTEINE: tuple[Baustein, ...] = (
+    # 0.37: fachlich, nicht pädagogisch — wie ein Schaltplan geschrieben wird, damit er zeichnet und
+    # stimmt. Gemessen (Plaene/Messungen-Schaltplaene): Regeln, Bauteilliste und Vorlagen hoben die
+    # Zeichenbarkeit von 55/67 auf 34/34 und nahmen die Geometriefehler (Leitung endet in einem
+    # Bauteil) von 10/67 auf 0/34. ⚠️ Nur Bauteilnamen, die CircuiTikZ 1.0 im Render-Sidecar kennt;
+    # `test_schaltplaene_*` prüft die Vorlagen gegen die Liste, `render-sidecar/smoke.mjs` zeichnet sie.
+    Baustein(
+        "schaltplaene",
+        "Schaltpläne",
+        "Wie ein ```circuitikz-Schaltplan geschrieben wird: zulässige Bauteile, Regeln für Leitungen, "
+        "geprüfte Vorlagen (Reihe, parallel, Messgeräte, Spannungsteiler, Wechselschaltung, "
+        "Potentialschienen) — für Assistenten, die Schaltpläne zeichnen.",
+    ),
     Baustein(
         "begleiten_statt_loesen",
         "Begleiten statt lösen",

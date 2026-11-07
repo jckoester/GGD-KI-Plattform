@@ -157,6 +157,10 @@ haben. Sie stehen **einmal**, in zwei Bausteinen (`backend/app/assistants/bauste
   bei einer Aufgabe begleiten.
 - `grundton`: Lehrkraft-Behauptung, andere Assistenten, Begriffsfragen und fremde Anliegen,
   Ton. Für alle Schüler-Assistenten.
+- `schaltplaene` (0.37): fachlich, nicht pädagogisch — wie ein ```circuitikz-Schaltplan
+  geschrieben wird: zulässige Bauteilnamen (nur solche, die CircuiTikZ 1.0 im Render-Sidecar kennt),
+  Regeln für Leitungen, zehn geprüfte Vorlagen. Steht vor den beiden anderen. `test_assistent_bausteine.py`
+  prüft die Vorlagen gegen die Namensliste, `render-sidecar/smoke.mjs` zeichnet jede.
 
 Getrennt, damit ein Assistent, der keine Aufgabe begleitet, nur den Grundton tragen kann.
 Übungsreihen und Abfragen (Lernen, Grammatik) lässt „Begleiten statt lösen“ selbst zu: Sieht der

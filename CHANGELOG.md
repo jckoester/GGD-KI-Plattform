@@ -7,11 +7,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
-- Schaltpläne werden mit europäischen Symbolen (DIN/IEC) gezeichnet, etwa der Widerstand als Rechteck.
+- Schaltpläne werden mit europäischen Symbolen (DIN/IEC) gezeichnet, etwa der Widerstand als Rechteck; Schalter erscheinen
+  als einfaches Schulsymbol statt mit Bogenpfeil.
 
 ### Behoben
 
 - Schaltpläne ohne `circuitikz`-Umgebung oder mit eigener Präambel erschienen als Fehlermeldung; sie werden jetzt gezeichnet.
+- Schaltpläne mit Ω, µ, °, × oder schmalen Leerzeichen in Beschriftungen oder mit `\text{…}` erschienen als Fehlermeldung.
 - Fachbegriffe-Import: Knoten, deren Einbettung einmal gescheitert war, wurden bei jedem späteren Import als „von Hand
   geändert“ übersprungen.
 
@@ -21,6 +23,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   der gezeichneten Pläne zum fachlichen Abhaken.
 - Render-Sidecar: `circuitikz.mjs` bereitet die Quelle auf; neuer Prüfschritt „Sidecar-Tests“ (`node --test
   render-sidecar/test/`) in `scripts/test.sh` und CI.
+- `diagramme_auswerten.py`: Geometrie-Heuristik für Schaltpläne (Leitungsenden in Bauteilen, Überlappungen).
+- Baustein `schaltplaene` (Bauteilliste, Regeln, zehn geprüfte Vorlagen); der Smoke-Test des Sidecars zeichnet jede Vorlage.
 
 ## [0.36.0] – 2026-11-06
 

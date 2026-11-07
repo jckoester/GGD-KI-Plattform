@@ -34,6 +34,28 @@ test('Präambel des Modells fällt weg', () => {
 
 test('das Dokument lädt CircuiTikZ europäisch', () => {
   const d = wrapCircuit('\\draw (0,0) to[R] (2,0);');
-  assert.match(d, /^\\usepackage\[european\]\{circuitikz\}\n\\begin\{document\}\n\\begin\{circuitikz\}/);
+  assert.match(d, /^\\usepackage\{amsmath\}\n\\usepackage\[european\]\{circuitikz\}\n\\begin\{document\}\n\\begin\{circuitikz\}/);
   assert.match(d, /\\end\{circuitikz\}\n\\end\{document\}$/);
+});
+
+test('Schalter werden zum Schulsymbol (nos), Öffner zu ncs; andere bleiben', () => {
+  const s = circuitikzAufbereiten(
+    '\\draw (0,0) to[switch, l=$S$] (2,0) to[spst] (4,0) to[closing switch,l=$T$] (6,0)'
+    + ' to[opening switch] (8,0) to[push button] (10,0) to[toggle switch] (12,0);');
+  assert.match(s, /to\[nos, l=\$S\$\]/);
+  assert.match(s, /to\[nos\] \(4,0\)/);
+  assert.match(s, /to\[nos,l=\$T\$\]/);
+  assert.match(s, /to\[ncs\] \(8,0\)/);
+  assert.match(s, /to\[push button\]/);
+  assert.match(s, /to\[toggle switch\]/);
+});
+
+test('Zeichen, die TeX nicht kennt, werden ersetzt; Umlaute bleiben', () => {
+  const s = circuitikzAufbereiten('\\draw (0,0) node[left]{Pin\u202f13} to[R, l=$100\\,Ω$] (2,0) node[right]{20 °C, 5 µA, 2 × L, Lämpchen};');
+  assert.match(s, /\{Pin 13\}/);
+  assert.match(s, /100\\,\\ensuremath\{\\Omega\}/);
+  assert.match(s, /20 \\ensuremath\{\^\\circ\}C/);
+  assert.match(s, /5 \\ensuremath\{\\mu\}A/);
+  assert.match(s, /2 \\ensuremath\{\\times\} L/);
+  assert.match(s, /Lämpchen/);
 });

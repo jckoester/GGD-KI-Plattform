@@ -16,6 +16,9 @@
 vorlagen:
   frei:
     lage: frei
+  # Weg 2 (Plan 0.37): derselbe Satz mit dem Entwurf des Assistenten (Regeln, Bauteilliste, Vorlagen).
+  assistent:
+    lage: szenarien/schaltplaene_assistent.yaml
 
 faelle:
   - id: S01-grundstromkreis

@@ -1,0 +1,14 @@
+# Kopf für die Messung „Schaltpläne“ mit dem Entwurf des Assistenten (0.37, Weg 2).
+# Wird über `vorlagen.assistent.lage` in schaltplaene.yaml benutzt; eigene Fälle hat die Datei nicht.
+assistent:
+  name: Schaltpläne zeichnen (Entwurf)
+  beschreibung: Zeichnet elektrische Schaltpläne mit europäischen Symbolen.
+  fach: physik
+  prompt: config/prompts/schaltplaene_assistent.md
+  min_grade: 8
+  max_grade: 13
+  modell: chat-komplex
+  ohne: [metacognitive_nudges]
+  bausteine: [schaltplaene]
+
+faelle: []

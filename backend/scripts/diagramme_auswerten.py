@@ -34,6 +34,44 @@ ZAUN = re.compile(r"```[ \t]*(mermaid|plot|circuitikz|circuittikz|circuit)[ \t]*
 LATEX = re.compile(r"\\\(|\\\[|\\ce\{|\\frac|\$[^$\n]+\$")
 
 
+KOORD = r"\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)"
+
+
+def geometriefehler(quelle: str) -> int:
+    """Heuristik (0.37): Leitungsenden mitten in einem Bauteil und überlappende Bauteile zählen.
+
+    Erfasst nur gerade Strecken zwischen festen Koordinaten in `\\draw`-Pfaden (`to[…]`, `--`);
+    relative Koordinaten, Knotenanschlüsse (`S.out 1`) und `|-` bleiben außen vor. Sie unterschätzt
+    also eher — eine Zahl zum Vergleichen zwischen Läufen, kein Urteil über einen Plan.
+    """
+    bauteile, punkte = [], []
+    for pfad in re.findall(r"\\draw(.*?);", quelle, re.S):
+        letzte, op = None, None
+        for x, y, to, strich in re.findall(KOORD + r"|(to\s*\[[^\]]*\])|(--)", pfad):
+            if x:
+                p = (float(x), float(y))
+                punkte.append(p)
+                if letzte is not None and op and op.startswith("to"):
+                    name = re.match(r"to\s*\[\s*([^,\]]*)", op).group(1).strip()
+                    if name not in ("short", "open", ""):
+                        bauteile.append((letzte, p))
+                letzte, op = p, None
+            else:
+                op = to or strich
+
+    def innen(p, a, b):
+        (x1, y1), (x2, y2) = a, b
+        if abs((x2 - x1) * (p[1] - y1) - (y2 - y1) * (p[0] - x1)) > 1e-6:
+            return False
+        t = ((p[0] - x1) * (x2 - x1) + (p[1] - y1) * (y2 - y1)) / max(1e-9, (x2 - x1) ** 2 + (y2 - y1) ** 2)
+        return 1e-6 < t < 1 - 1e-6
+
+    mitte = sum(1 for p in set(punkte) for a, b in bauteile if innen(p, a, b))
+    ueber = sum(1 for i, (a, b) in enumerate(bauteile) for c, d in bauteile[i + 1:]
+                if {a, b} == {c, d})
+    return mitte + ueber
+
+
 def bloecke(antwort: str):
     for art, quelle in ZAUN.findall(antwort or ""):
         art = art.lower()
@@ -116,6 +154,9 @@ async def main(dateien: list[str], seite: Path | None = None) -> None:
                 svg = await render_circuit(quelle)
                 befund = "gültig"
                 s["circuit gültig"] += 1
+                if geometriefehler(quelle):
+                    befund += " · Geometrie?"
+                    s["circuit mit Geometriefehler"] += 1
             except RenderError as e:
                 befund = f"KAPUTT: {str(e)[:80]}"
             s["circuit"] += 1
