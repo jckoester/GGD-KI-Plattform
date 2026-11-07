@@ -12,6 +12,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Behoben
 
 - Schaltpläne ohne `circuitikz`-Umgebung oder mit eigener Präambel erschienen als Fehlermeldung; sie werden jetzt gezeichnet.
+- Fachbegriffe-Import: Knoten, deren Einbettung einmal gescheitert war, wurden bei jedem späteren Import als „von Hand
+  geändert“ übersprungen.
 
 ### Entwicklung
 

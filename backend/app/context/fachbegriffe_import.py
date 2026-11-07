@@ -125,6 +125,14 @@ SEED_HASH = "seed_hash"
 SEED_ID = "seed_id"
 #: Alles, was der Import an Verwaltungsangaben an den Knoten schreibt.
 SEED_SCHLUESSEL = (SEED_QUELLE, SEED_HASH, SEED_ID)
+#: Was die Plattform selbst an den Knoten schreibt, ohne dass jemand ihn bearbeitet hätte.
+#:
+#: ⚠️ `embedding_error` setzt die Einbettung im Hintergrund, wenn der Proxy nicht antwortet —
+#: auch direkt nach einem Import. Stünde der Schlüssel im Hash, hielte der nächste Import den
+#: Knoten für von Hand geändert und übersprünge ihn; und weil eine spätere erfolgreiche
+#: Einbettung den Schlüssel nicht löscht, für immer (07.11.2026, aufgefallen an
+#: `test_erneuter_import_haengt_an_die_neue_fachschaft` ohne laufenden Proxy).
+TECHNISCHE_SCHLUESSEL = ("embedding_error",)
 
 
 
@@ -632,14 +640,16 @@ def bereinige_metadata(knotentyp: str, metadata: dict) -> list[str]:
 def stand_hash(titel: str, content: str, metadata: dict, aliase: list[str]) -> str:
     """Fingerabdruck dessen, was der Seed am Knoten verantwortet.
 
-    Die Seed-Schlüssel selbst bleiben draußen — sonst hinge der Hash von sich selbst ab.
+    Die Seed-Schlüssel selbst bleiben draußen — sonst hinge der Hash von sich selbst ab. Ebenso
+    die technischen (:data:`TECHNISCHE_SCHLUESSEL`): Sie ändern sich, ohne dass jemand arbeitet.
 
     ⚠️ **Auch `seed_id`**, und zwar nicht aus Bequemlichkeit: Die Kennung ist Identität,
     nicht Inhalt. Stünde sie im Hash, hielte der Lauf nach der Migration (Alembic 0079)
     sechsunddreißig unveränderte Knoten für handverändert und rührte keinen davon mehr
     an — die Idempotenz wäre genau dort gebrochen, wo sie gebraucht wird.
     """
-    ohne_seed = {k: v for k, v in (metadata or {}).items() if k not in SEED_SCHLUESSEL}
+    ohne_seed = {k: v for k, v in (metadata or {}).items()
+                 if k not in SEED_SCHLUESSEL and k not in TECHNISCHE_SCHLUESSEL}
     roh = json.dumps(
         [titel, content, ohne_seed, list(aliase)], sort_keys=True, ensure_ascii=False
     )

@@ -394,6 +394,18 @@ class TestStandHash:
         )
         assert ohne == mit
 
+    def test_eine_gescheiterte_einbettung_zaehlt_nicht(self, seed):
+        """`embedding_error` schreibt die Plattform, nicht ein Mensch (07.11.2026).
+
+        Mit dem Schlüssel im Hash übersprang der nächste Import den Knoten als „von Hand
+        geändert“ — und weil eine spätere Einbettung ihn nicht löscht, für immer.
+        """
+        ohne = seed.stand_hash("T", "Text", {"x": 1}, [])
+        mit = seed.stand_hash(
+            "T", "Text", {"x": 1, "embedding_error": "All connection attempts failed"}, []
+        )
+        assert ohne == mit
+
     def test_die_kennung_zaehlt_nicht(self, seed):
         """⚠️ Der Grund ist nicht Symmetrie, sondern die Migration (Alembic 0079).
 
