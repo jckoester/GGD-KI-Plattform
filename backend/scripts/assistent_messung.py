@@ -144,6 +144,10 @@ def profil_laden(szenarien: Path, *, kopf_aus: Path | None = None, frei: bool = 
         "operator_faecher": [str(f) for f in kopf.get("operator_faecher") or []],
         # 0.26: Bausteine hinter dem Prompt (`app/assistants/bausteine/`).
         "bausteine": [str(b) for b in kopf.get("bausteine") or []],
+        # 0.37: Zielgruppe wie im Seed. Heißt der Messassistent wie ein ausgelieferter, überschreibt
+        # der Lauf dessen Zeile; ohne diese Felder würde ein Assistent für alle zum Schüler-Assistenten.
+        "audience": kopf.get("audience", "student"),
+        "scope": kopf.get("scope", "all_students"),
     }
     return profil, _faelle_normalisieren(faelle)
 
@@ -322,7 +326,7 @@ def assistent(conn, profil: dict, prompt_datei: Path | None = None,
     # `fach: null` im Kopf = fachübergreifend (Rückfall-Assistenten).
     chemie = (_eins(conn, "SELECT id FROM subjects WHERE slug = %s", profil["fach"])
               if profil["fach"] else None)
-    werte = dict(system_prompt=prompt, subject_id=chemie, audience="student", scope="all_students",
+    werte = dict(system_prompt=prompt, subject_id=chemie, audience=profil["audience"], scope=profil["scope"],
                  status="active", min_grade=profil["min_grade"], max_grade=profil["max_grade"],
                  model=profil["modell"], tool_groups="[]",
                  disabled_augmentations="{" + ",".join(ohne) + "}",

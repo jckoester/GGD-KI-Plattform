@@ -60,7 +60,7 @@
 # In `in_assistent` zusätzlich: `aktuell` (Assistent der Konversation), `erwartet` bleiben|wechsel|beenden.
 
 assistenten:
-  spezifisch: [stöchiometrische Berechnungen, Reaktionsgleichungen]
+  spezifisch: [stöchiometrische Berechnungen, Reaktionsgleichungen, Schaltpläne zeichnen]
   rueckfall: [Rechnen mit Größen und Einheiten, Mathe-Aufgaben, Versuchsplanung und -auswertung,
               "Auswerten von Diagrammen, Tabellen und Statistiken", "Analysieren von Texten, Quellen und Bildern",
               Argumentieren und Erörtern, Überarbeiten eigener Texte, Grammatik und Rechtschreibung,
@@ -510,6 +510,31 @@ faelle:
    nicht: ["Recherche, Referat und Präsentation"]}
 - {text: "Ich muss für den Informatikvortrag erklären, wie das Internet funktioniert, wie strukturier ich das?",
    stufe: 8, art: nachbar, soll: ["Recherche, Referat und Präsentation"], nicht: [Programmieren]}
+
+# ── Schaltpläne zeichnen (0.37): Positive aus schaltplaene.yaml, Nachbarn ohne Zeichenbitte ──
+
+- {quelle: "schaltplaene.yaml#S01-grundstromkreis", stufe: 8, art: positiv, soll: [Schaltpläne zeichnen]}
+- {quelle: "schaltplaene.yaml#S05-wechsel", stufe: 9, art: positiv, soll: [Schaltpläne zeichnen]}
+- {quelle: "schaltplaene.yaml#S06-messgeraete", stufe: 9, art: positiv, soll: [Schaltpläne zeichnen],
+   nicht: [Versuchsplanung und -auswertung]}
+- {quelle: "schaltplaene.yaml#S11-arduino-led", stufe: 10, art: positiv, soll: [Schaltpläne zeichnen],
+   nicht: [Programmieren]}
+- {quelle: "schaltplaene.yaml#S13-gemischt", stufe: 10, art: positiv, soll: [Schaltpläne zeichnen],
+   nicht: [Rechnen mit Größen und Einheiten]}
+- {quelle: "schaltplaene.yaml#S14-kondensator", stufe: 11, art: positiv, soll: [Schaltpläne zeichnen]}
+- {text: "Berechne den Strom durch R2, wenn R1 = 100 Ohm und R2 = 220 Ohm in Reihe an 12 V liegen", stufe: 9,
+   art: nachbar, soll: [Rechnen mit Größen und Einheiten], nicht: [Schaltpläne zeichnen]}
+- {text: "Der Code für meinen Arduino-Taster liest immer LOW, auch wenn ich drücke", stufe: 10,
+   art: nachbar, soll: [Programmieren], nicht: [Schaltpläne zeichnen]}
+- {text: "Wir sollen einen Versuch planen, wie die Stromstärke von der Spannung an einem Draht abhängt", stufe: 9,
+   art: nachbar, soll: [Versuchsplanung und -auswertung], nicht: [Schaltpläne zeichnen]}
+- {text: "In unserer Messtabelle steigt die Stromstärke nicht gleichmäßig mit der Spannung, was bedeutet das?",
+   stufe: 9, art: nachbar, soll: ["Auswerten von Diagrammen, Tabellen und Statistiken"],
+   darf: [Versuchsplanung und -auswertung], nicht: [Schaltpläne zeichnen]}
+- {text: "Frag mich ab, was in der Arbeit über Reihen- und Parallelschaltung drankommt", stufe: 8,
+   art: nachbar, soll: [Lernen und Prüfungsvorbereitung], nicht: [Schaltpläne zeichnen]}
+- {text: "Warum geht im Haus nicht das ganze Licht aus, wenn eine Glühbirne kaputt ist?", stufe: 8,
+   art: begriff, soll: [], nicht: [Schaltpläne zeichnen]}
 
 # ── Fachfremd: keine Tätigkeit, die ein Assistent begleitet ──────────────────
 

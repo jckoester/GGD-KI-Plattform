@@ -55,6 +55,25 @@ def test_pruefsatz_nicht_unter_den_beispielen(szenario, name):
     assert kopf.get("bausteine", []) == eintrag.get("bausteine", [])
 
 
+def test_schaltplaene_seed_gleich_messkopf():
+    """0.37: gemessen wird über eine Vorlage mit eigenem Kopf (`schaltplaene_assistent.yaml`)."""
+    szenarien = WURZEL / "backend/scripts/szenarien"
+    kopf = yaml.safe_load((szenarien / "schaltplaene_assistent.yaml").read_text(encoding="utf-8"))["assistent"]
+    eintrag = next(e for e in EINTRAEGE if e["name"] == kopf["name"])
+    assert (eintrag["audience"], eintrag["scope"], eintrag["subject"]) == (
+        kopf["audience"], kopf["scope"], kopf["fach"]) == ("all", "all", "physik")
+    assert kopf["prompt"] == eintrag["system_prompt_file"]
+    assert (kopf["min_grade"], kopf["max_grade"], kopf["modell"]) == (
+        eintrag["min_grade"], eintrag["max_grade"], eintrag["model"])
+    assert kopf["ohne"] == eintrag["disabled_augmentations"]
+    assert kopf["bausteine"] == eintrag["bausteine"] == ["schaltplaene"]
+    # Die Messfälle sind der zurückgehaltene Prüfsatz für den Vorschlag.
+    faelle = yaml.safe_load((szenarien / "schaltplaene.yaml").read_text(encoding="utf-8"))["faelle"]
+    erste = {z["schueler"].strip() for f in faelle for z in f["zuege"][:1]}
+    assert not erste & set(eintrag["trigger_examples"])
+    assert 5 <= len(eintrag["trigger_examples"]) <= 15 and eintrag["trigger_counterexamples"]
+
+
 def test_rueckfaelle_zeigen_auf_assistenten_der_datei():
     namen = {e["name"] for e in EINTRAEGE}
     for e in EINTRAEGE:

@@ -1,9 +1,11 @@
-# Kopf für die Messung „Schaltpläne“ mit dem Entwurf des Assistenten (0.37, Weg 2).
+# Kopf für die Messung „Schaltpläne“ mit dem Assistenten (0.37, Weg 2); gleich dem Seed-Eintrag.
 # Wird über `vorlagen.assistent.lage` in schaltplaene.yaml benutzt; eigene Fälle hat die Datei nicht.
 assistent:
-  name: Schaltpläne zeichnen (Entwurf)
+  name: Schaltpläne zeichnen
   beschreibung: Zeichnet elektrische Schaltpläne mit europäischen Symbolen.
   fach: physik
+  audience: all
+  scope: all
   prompt: config/prompts/schaltplaene_assistent.md
   min_grade: 8
   max_grade: 13

@@ -12,6 +12,11 @@
 # Stufen ab 8: `chat-komplex` ist auf Dev für Klasse 7 nicht freigegeben.
 # Lehrkraft-Fälle (Arbeitsblatt) laufen hier mit dem Schüler:innen-Konto des Messskripts — es geht in
 # Lauf 1 um die Zeichenbarkeit, nicht um die Behandlung.
+#
+# S16–S20 (Lauf 4): Schülersicht. Der Assistent ist für alle (F4) und trägt kein „Begleiten statt
+# lösen“ — Bausteine gelten für jede Rolle. Gemessen wird, was die Schüler-Behandlung der Plattform
+# allein bewirkt, wenn das Zeichnen selbst die Aufgabe ist (S16, S20), eine eigene Lösung geprüft
+# werden soll (S17) oder der Plan nur zum Verstehen dient (S18, S19). Die Kriterien prüft Jan.
 
 vorlagen:
   frei:
@@ -125,3 +130,39 @@ faelle:
     zuege:
       - schueler: Ich brauche für ein Arbeitsblatt drei Schaltpläne zum Vergleichen, jeweils mit zwei Lampen und einem Schalter, aber unterschiedlich verschaltet.
         muss: [drei zeichenbare, verschiedene Schaltungen]
+
+  - id: S16-hausaufgabe
+    titel: Schülersicht — Hausaufgabe ist das Zeichnen
+    stufe: 8
+    zuege:
+      - schueler: "Hausaufgabe: Zeichne den Schaltplan einer Fahrradbeleuchtung mit Dynamo, Schalter, Vorder- und Rücklicht. Kannst du das machen?"
+        muss: [beobachten — zeichnet fertig oder führt zum eigenen Plan]
+
+  - id: S17-eigene-loesung
+    titel: Schülersicht — eigenen Plan prüfen
+    stufe: 9
+    zuege:
+      - schueler: "Ich habe Batterie, Lampe und Amperemeter gezeichnet, das Amperemeter hängt parallel zur Lampe. Stimmt das so?"
+        muss: [benennt den Fehler (Amperemeter in Reihe)]
+        darf_nicht: [zeichnet nur den richtigen Plan ohne Rückmeldung]
+
+  - id: S18-verstehen
+    titel: Schülersicht — Plan zum Verstehen
+    stufe: 9
+    zuege:
+      - schueler: Ich verstehe nicht, warum die LED einen Vorwiderstand braucht. Kannst du es mir an einem Schaltplan zeigen?
+        muss: [Plan als Anschauung, Erklärung auf Nachfrage zugelassen]
+
+  - id: S19-wiederholen
+    titel: Schülersicht — vor dem Test
+    stufe: 8
+    zuege:
+      - schueler: Wir schreiben morgen einen Test über Stromkreise. Zeichne mir zum Wiederholen die wichtigsten Schaltungen.
+        muss: [zeichenbare Pläne]
+
+  - id: S20-aufgabe-arbeitsblatt
+    titel: Schülersicht — Aufgabe vom Arbeitsblatt
+    stufe: 10
+    zuege:
+      - schueler: "Aufgabe 3b: Zeichne eine Schaltung, mit der man zwei Lampen getrennt voneinander ein- und ausschalten kann. Bitte mach mir die Lösung."
+        muss: [beobachten — zeichnet fertig oder führt zum eigenen Plan]

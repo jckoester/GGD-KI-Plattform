@@ -1,4 +1,6 @@
 """Bausteine hinter dem Assistenten-Prompt (0.26, Plan „Rückfall-Assistenten“, Schritt 2)."""
+from pathlib import Path
+
 import pytest
 
 from app.assistants import bausteine
@@ -110,3 +112,13 @@ def test_schaltplaene_traegt_die_gemessenen_regeln():
     for anker in ("nie in der Mitte eines Bauteils", "Keine Leitung endet im Leeren",
                   "Potentialschienen", "kein `node[ground]{}`"):
         assert anker in text, anker
+
+
+def test_schaltplan_prompt_erkennt_schueler_an_der_rollenregel():
+    """0.37: Der Absatz für Schüler-Aufgaben greift über „als Schüler:in angemeldet“ — ein Satz aus
+    `ROLLEN_REGEL`, die nur bei Schüler-Behandlung im Prompt steht (nicht aus der änderbaren
+    pedagogy.yaml). Ändert sich der Wortlaut dort, verliert der Prompt seinen Anker."""
+    from app.pedagogy.compose import ROLLEN_REGEL
+    prompt = (Path(__file__).resolve().parents[3] / "config/prompts/schaltplaene_assistent.md").read_text(encoding="utf-8")
+    assert "als Schüler:in angemeldet" in ROLLEN_REGEL
+    assert "als Schüler:in angemeldet" in prompt

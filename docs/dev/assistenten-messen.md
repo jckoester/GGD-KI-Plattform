@@ -30,7 +30,10 @@ venv/bin/python scripts/assistent_messung.py --szenarien scripts/szenarien/reakt
 
 Das Skript legt den Assistenten aus dem **Kopf der Szenariodatei** an oder bringt ihn auf den
 Stand der Promptdatei (Name, Fach — `null` = fachübergreifend —, Klassenstufen, Modell,
-abgeschaltete Augmentierungen, Fächer für Operatoren `operator_faecher` — nur die, die es hier gibt), spielt jeden Fall als neue Konversation mit der Stufe des Falls
+abgeschaltete Augmentierungen, Fächer für Operatoren `operator_faecher` — nur die, die es hier gibt —, Bausteine, Zielgruppe
+`audience`/`scope`, ohne Angabe `student`/`all_students`). Heißt der Messassistent wie ein
+ausgelieferter, überschreibt der Lauf dessen Zeile; der Kopf muss dann dem Seed-Eintrag gleichen
+(`test_assistenten_seed_datei.py`). Danach spielt das Skript jeden Fall als neue Konversation mit der Stufe des Falls
 durch und schreibt ein Protokoll (`verlauf-<lauf>.md` zum Abhaken, `.json` zum Vergleichen). Die
 Konversationen werden danach gelöscht.
 

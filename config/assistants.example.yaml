@@ -149,6 +149,56 @@ assistants:
       - Warum löst sich Kochsalz in Wasser?
       - Was macht ein Katalysator?
 
+  # ── Schaltpläne (0.37, Plan Release-0.37-Schaltplaene) ─────────────────────────────────────────
+  #
+  # Für alle (F4): Lehrkräfte für Material, Schüler:innen zum Anschauen; ob Schüler:innen ihn
+  # bekommen, entscheidet die Schule. Kein „Begleiten statt lösen“: Bausteine gelten für jede Rolle,
+  # eine Lehrkraft würde sonst durch ihr Arbeitsblatt gefragt. Für Schüler:innen greift die
+  # Schüler-Behandlung der Plattform. Regeln, Bauteilnamen und Vorlagen stehen im Baustein
+  # `schaltplaene` (nur Namen, die CircuiTikZ 1.0 im Render-Sidecar kennt). Gemessen mit
+  # `scripts/szenarien/schaltplaene.yaml`, Vorlage `assistent` (Kopf `schaltplaene_assistent.yaml`).
+
+  - name: Schaltpläne zeichnen
+    description: >
+      Zeichnet elektrische Schaltpläne mit den Symbolen aus dem Unterricht, vom einfachen
+      Stromkreis bis zur Potentialschienen-Darstellung am Arduino; auf Wunsch mehrere zum
+      Vergleichen, etwa für ein Arbeitsblatt.
+    audience: all
+    scope: all
+    status: active
+    subject: physik
+    min_grade: 8
+    max_grade: 13
+    model: chat-komplex
+    disabled_augmentations: [metacognitive_nudges]
+    system_prompt_file: config/prompts/schaltplaene_assistent.md
+    bausteine: [schaltplaene]
+    tags: [physik, technik, schaltplan]
+    suggest: specific
+    suggestion_text: >-
+      Für Schaltpläne gibt es einen Assistenten, der sie mit den Symbolen aus dem Unterricht
+      zeichnet.
+    trigger_examples:
+      - kannst du mir einen schaltplan zeichnen mit zwei batterien und einer lampe
+      - Mach mir bitte einen Schaltplan für eine Klingel mit Taster
+      - Ich brauche einen Schaltkreis mit drei Widerständen in Reihe als Zeichnung
+      - wie sieht der schaltplan aus wenn eine lampe und ein motor parallel hängen
+      - Zeichne eine Schaltung mit einer Diode in Sperrrichtung
+      - Schaltskizze für eine Ampel mit drei LEDs am Arduino
+      - Kannst du die Schaltung als Schaltbild darstellen, Batterie, Widerstand und Kondensator in Reihe?
+      - Zeichne zwei Schaltpläne, einmal mit Glühlampe und einmal mit LED, zum Vergleichen
+      - schaltplan mit fotowiderstand und lampe bitte
+      - Ich will eine Schaltung, bei der ein Schalter zwei Lampen gleichzeitig ausmacht, zeichne sie mir
+    trigger_counterexamples:
+      - Was ist der Unterschied zwischen Reihen- und Parallelschaltung?
+      - Berechne den Gesamtwiderstand von 10 Ohm und 20 Ohm in Reihe
+      - Wie funktioniert eine LED?
+      - Erklär mir das ohmsche Gesetz
+      - Zeichne mir den Graphen von U gegen I für einen Widerstand
+      - Mach ein Mindmap zum Thema Elektrizität
+      - Warum leuchtet die Lampe heller, wenn ich mehr Batterien nehme?
+      - Wie programmiere ich eine blinkende LED am Arduino?
+
   # ── Allgemeine Assistenten: die Rückfallebene, einer je Tätigkeit (0.26) ──────────────────────
   # Landkarte vom 28.10.2026, Plan „Rückfall-Assistenten“. Fachübergreifend (kein `subject`); die
   # Fächer in `tags` dienen nur der Sortierung. Pflege durch den Admin (Entscheidung 1).

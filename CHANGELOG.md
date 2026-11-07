@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Assistent „Schaltpläne zeichnen“ (Physik, Klasse 8–13, für alle): zeichnet Schaltpläne mit den Symbolen aus dem
+  Unterricht, auch mit Potentialschienen; im freien Chat wird er vorgeschlagen, wenn jemand nach einem Schaltplan fragt.
+
 ### Geändert
 
 - Schaltpläne werden mit europäischen Symbolen (DIN/IEC) gezeichnet, etwa der Widerstand als Rechteck; Schalter erscheinen
@@ -25,6 +30,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   render-sidecar/test/`) in `scripts/test.sh` und CI.
 - `diagramme_auswerten.py`: Geometrie-Heuristik für Schaltpläne (Leitungsenden in Bauteilen, Überlappungen).
 - Baustein `schaltplaene` (Bauteilliste, Regeln, zehn geprüfte Vorlagen); der Smoke-Test des Sidecars zeichnet jede Vorlage.
+- `assistent_messung.py`: Der Kopf einer Szenariodatei kann `audience` und `scope` setzen.
 
 ## [0.36.0] – 2026-11-06
 

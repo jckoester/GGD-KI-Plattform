@@ -37,6 +37,14 @@ def test_pruefwerte_sind_text(tmp_path):
     assert profil["ohne"] == M.VORGABE_OHNE and profil["modell"] == M.VORGABE_MODELL
 
 
+
+def test_zielgruppe_aus_dem_kopf():
+    """0.37: Ohne Angabe Schüler-Assistent; der Schaltplan-Kopf misst den Assistenten für alle."""
+    profil, _ = M.profil_laden(_SKRIPTE / "szenarien/schaltplaene.yaml", vorlage="assistent")
+    assert (profil["audience"], profil["scope"]) == ("all", "all")
+    profil, _ = M.profil_laden(_SKRIPTE / "szenarien/stoechiometrie.yaml")
+    assert (profil["audience"], profil["scope"]) == ("student", "all_students")
+
 def test_kopf_ohne_name_bricht_ab(tmp_path):
     datei = tmp_path / "s.yaml"
     datei.write_text("assistent: {prompt: x.md}\nfaelle: []\n", encoding="utf-8")
