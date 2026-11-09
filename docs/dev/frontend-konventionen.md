@@ -187,6 +187,39 @@ eine Erweiterung dort wirkt überall. Pipeline: `marked` → `DOMPurify.sanitize
   durch einen Platzhalter ersetzt und erst **nach** der Sanitisierung wieder eingesetzt —
   DOMPurify bleibt strikt fürs Markdown und zerschießt die KaTeX-Inline-Styles nicht.
 
+### Formeln eingeben (MathLive, seit 0.38)
+
+- **Eigene Nachrichten** zeigen Formeln gesetzt: `MessageBubble` rendert den Text der
+  Nutzer:in mit `renderInlineMath` (Formeln über KaTeX, alles andere escapet, kein Markdown).
+  Begrenzer und Währungsschutz wie bei den Antworten.
+- **Formel-Dialog** (`FormelDialog.svelte`, Σ-Knopf neben dem Eingabefeld): MathLive
+  (`<math-field>`) liefert LaTeX; die Nachricht bleibt Text. Die Logik liegt testbar außerhalb
+  der Komponente:
+  - `formel.js`: `formelAmCursor` (welche Formel steht am Cursor — gleiche Begrenzer wie
+    `markdown.js`), `formelEinsetzen` (setzt `\(…\)` bzw. `\[…\]`, ersetzt oder entfernt),
+    `bereinigeLatex` (Platzhalter raus, MathLive-Befehle ohne KaTeX-Gegenstück ersetzen).
+  - `formel_editor.js`: `mathliveLaden` (einmal, per `import('mathlive')` — eigener Chunk,
+    rund 230 KB gzip, erst beim ersten Öffnen), `einstellen`, `feldEinrichten`,
+    `tottasteAbfangen`.
+- **Ausgabe:** `getValue('latex-expanded')` statt `latex` — das löst `\exponentialE`,
+  `\imaginaryI`, `\differentialD` auf. Was danach noch fehlt, ersetzt `bereinigeLatex`; die
+  Vorschau (`formelVorschau` in `markdown.js`, `throwOnError: true`) zeigt, ob KaTeX die
+  Formel setzt, und sperrt sonst „Einfügen“.
+- ⚠️ **Keine Anfragen nach außen:** MathLive lädt Schriften und Klänge relativ zum eigenen
+  Skript. `einstellen` setzt `fontsDirectory`, `soundsDirectory`, `keypressSound` und
+  `plonkSound` auf `null`; die Schriften kommen aus `katex.min.css` (gleiche Namen). Die
+  Adressen `esm.run` und `aws-sdk` stehen in MathLive nur in Fehlermeldungen (Compute Engine
+  und Sprachausgabe über Amazon werden nie geladen). Ein Test hält die Einstellungen fest.
+- ⚠️ **Tottasten (`^` auf deutscher Tastatur) in Chrome:** Chrome meldet `keydown key="Dead"`
+  vor der Zusammensetzung. MathLive leitet daraus über den Tastencode ein Zeichen ab
+  (`IntlBackslash` ist bei US-Belegung `\`), wechselt in den LaTeX-Modus, und aus `^2` wird
+  `\^`. Außerdem liefert `compositionend` das `^` samt Folgezeichen (`"^("`), was MathLive
+  falsch auswertet. `tottasteAbfangen` hält das Dead-keydown von MathLive fern und gibt
+  mehrteilige Zusammensetzungen Zeichen für Zeichen weiter. Safari ist nicht betroffen.
+- Escape schaltet in MathLive in den LaTeX-Modus; `feldEinrichten` nimmt die Belegung heraus,
+  damit Escape den Dialog schließt. Das Kontextmenü ist auf Ausschneiden, Kopieren,
+  Einfügen und Alles auswählen gekürzt.
+
 ### Diagramme (Mermaid-Schreibweise, gerendert mit Pele seit 0.36)
 
 - Das Rendern ist **asynchron** (lazy geladen) und passt nicht in den synchronen `renderMarkdown`. Der

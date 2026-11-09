@@ -110,8 +110,8 @@ was du selbst schreibst.
   `[Nitrat (NO₃⁻)]`, sind kein Problem. Im Export (PDF, Word, ODT) erscheinen Diagramme als Bild.
 
 Die Darstellung passiert automatisch auf deinem Gerät. Wenn du die LaTeX-Schreibweise nicht
-kennst, bitte die KI einfach, etwas „als Formel" zu schreiben — sie kümmert sich um die
-richtige Notation. Versteht die Darstellung eine Formel nicht, erscheint **„Formel nicht
+kennst, nimm den [Formel-Editor](#formeln-eingeben) oder bitte die KI, etwas „als Formel" zu
+schreiben — sie kümmert sich um die richtige Notation. Versteht die Darstellung eine Formel nicht, erscheint **„Formel nicht
 darstellbar"**; ein Klick zeigt den Quelltext.
 
 **Weiterverwenden.** Fährst du über eine abgesetzte Formel, erscheint **„Kopieren"**: In der
@@ -123,6 +123,36 @@ Auch **elektrische Schaltpläne**, **Funktionsgraphen** und **Strukturformeln** 
 Elektronenpaaren) stellt der Chat als Grafik dar — was dabei geht und wie du eine Grafik
 weiterverwendest, steht unter
 [Diagramme, Schaltpläne, Funktionsgraphen & Strukturformeln](diagramme.md).
+
+### Formeln eingeben
+
+Mit dem Knopf **Σ** neben dem Eingabefeld öffnest du den **Formel-Editor**. Du tippst die
+Formel ungefähr so wie in einen Taschenrechner und siehst darunter sofort, wie sie im Chat
+aussehen wird. **Einfügen** (oder Enter) setzt sie an die Stelle, an der der Cursor im Text
+steht. Steht der Cursor schon in einer Formel, öffnet **Σ** genau diese zum Ändern.
+
+| Du tippst | Ergebnis |
+|---|---|
+| `3/4`, `1/2x` | Bruch: $\frac{3}{4}$, $\frac{1}{2x}$ |
+| `x^2` | Hochzahl: $x^2$ |
+| `a_n` | Index: $a_n$ |
+| `sqrt` | Wurzel: $\sqrt{2}$ |
+| `pi`, `alpha`, `Delta` | $\pi$, $\alpha$, $\Delta$ |
+| `*` | Malpunkt: $a\cdot b$ |
+| `<=`, `>=`, `!=`, `+-` | $\le$, $\ge$, $\ne$, $\pm$ |
+| `->`, `infty` | $\to$, $\infty$ |
+| `9,81` | Dezimalzahl mit Komma |
+
+- Aus einem Bruch oder einer Hochzahl kommst du mit **→** oder der **Leertaste** wieder
+  heraus. Ziffern in der Hochzahl verlassen sie von selbst, Buchstaben nicht: Nach `x^n`
+  erst → drücken, dann `+1`.
+- `/` macht alles zum Zähler, was ohne Rechenzeichen davorsteht. Aus `5 m/s` wird deshalb
+  ein Bruch mit „5m“ oben. **Einheiten** schreibst du besser hinter der Formel in den Text.
+- **Integral, Summe, Grenzwert, n-te Wurzel** und **gemischte Zahlen** findest du auf der
+  Bildschirmtastatur (Tastatursymbol im Feld); mit **Tab** springst du zwischen ihren
+  Feldern. Auf Tablet und Handy erscheint die Bildschirmtastatur von selbst.
+- Wer **LaTeX** kann, braucht den Editor nicht: Schreib die Formel direkt in die Nachricht,
+  zwischen `$…$` oder `\(…\)`. Deine Nachricht zeigt sie dann ebenfalls gesetzt.
 
 ## Rollenspiele
 

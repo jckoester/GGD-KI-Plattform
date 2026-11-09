@@ -1,7 +1,7 @@
 <script>
     import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2, Pencil, ThumbsUp, ThumbsDown } from 'lucide-svelte';
     import { goto } from '$app/navigation';
-    import { renderMarkdown } from '$lib/markdown.js';
+    import { renderInlineMath, renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
@@ -391,7 +391,9 @@
     <div class="flex justify-end">
         <div class="bg-primary dark:bg-primary-dark text-white rounded-xl rounded-br-none px-4 py-2 max-w-[80%]">
             {#if message.content}
-                <p class="whitespace-pre-wrap">{message.content}</p>
+                <!-- Nur Formeln gerendert (0.38), der übrige Text bleibt Text: renderInlineMath escapt ihn -->
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                <p class="whitespace-pre-wrap">{@html renderInlineMath(message.content)}</p>
             {/if}
             {#if message.uploadedAttachments?.length}
                 <div class="flex flex-wrap gap-1 {message.content ? 'mt-2' : ''}">

@@ -407,6 +407,23 @@ export function renderMarkdown(text, { dokuLinks = false, ohneFett = false } = {
 }
 
 /**
+ * Vorschau einer einzelnen Formel (Formel-Dialog, 0.38): HTML oder die Fehlermeldung von
+ * KaTeX — mit denselben Einstellungen wie im Chat, damit die Vorschau hält, was sie zeigt.
+ *
+ * @returns {{html: string, fehler: null} | {html: null, fehler: string}}
+ */
+export function formelVorschau(tex, abgesetzt = false) {
+    try {
+        return {
+            html: katex.renderToString(tex, { displayMode: !!abgesetzt, throwOnError: true, output: 'htmlAndMathml' }),
+            fehler: null,
+        };
+    } catch (e) {
+        return { html: null, fehler: String(e.rawMessage ?? e.message).slice(0, 200) };
+    }
+}
+
+/**
  * Nur Formeln rendern, kein Markdown — für Titel und andere einzeilige Felder.
  *
  * Bildungsplan-Kompetenzen führen ihre Formeln **im Titel**

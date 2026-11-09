@@ -313,3 +313,15 @@
     Potentialschienen am Arduino, auf Wunsch mehrere zum Vergleichen für ein Arbeitsblatt.
     Schüler:innen zeichnet er ihre Aufgabe nicht vor, sondern hilft ihnen zum eigenen Plan.
   link: /help/diagramme
+
+
+- id: "0.38-formeleingabe"
+  version: "0.38.0"
+  datum: 2026-11-08
+  rollen: [student, teacher]
+  titel: "Formeln eingeben ohne LaTeX"
+  text: >-
+    Mit dem Knopf Σ neben dem Eingabefeld schreibst du Brüche, Wurzeln und Hochzahlen
+    so, wie sie aussehen sollen, auf Tablet und Handy mit einer eigenen Mathe-Tastatur. Die
+    Formel landet an der Cursorstelle, und deine Nachricht zeigt sie gesetzt.
+  link: /help/chat#formeln-eingeben

@@ -11,6 +11,7 @@
         X,
         Info,
         Search,
+        Sigma,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { hatteAnhaenge, istAbbruch, istBearbeitbar, letzteEigeneIndex, wirkungsHinweis } from "$lib/chat_bearbeiten.js";
@@ -28,6 +29,8 @@
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
     import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
+    import FormelDialog from "$lib/components/FormelDialog.svelte";
+    import { formelAmCursor, formelEinsetzen } from "$lib/formel.js";
     import { scanForPii, shouldScanForPii } from "$lib/pii_gate.js";
     import { chatFehlertext } from "$lib/chat_errors.js";
     import { goto } from "$app/navigation";
@@ -406,6 +409,31 @@
     // Antwort lesbar bleibt (0.15.1, `$lib/chat_eingabe.js`).
     let kompakt = $derived(istKompakt($sichtbareHoehe));
     let enterModusWert = $derived(enterModus($user?.preferences));
+
+    // Formel-Dialog (0.38): Formel an der Cursorstelle einsetzen oder die dortige ändern.
+    let formel = $state(null); // { bereich, start, abgesetzt } solange der Dialog offen ist
+
+    function formelOeffnen() {
+        const von = textarea?.selectionStart ?? input.length;
+        const bis = textarea?.selectionEnd ?? von;
+        const vorhanden = formelAmCursor(input, von);
+        if (vorhanden && bis <= vorhanden.ende) {
+            formel = { bereich: vorhanden, start: vorhanden.tex, abgesetzt: vorhanden.abgesetzt };
+        } else {
+            // Eine Auswahl wird zum Startwert (etwa getipptes `x^2`) und dann ersetzt.
+            formel = { bereich: { start: von, ende: bis }, start: input.slice(von, bis), abgesetzt: false };
+        }
+    }
+
+    async function formelUebernehmen(tex) {
+        const { text, cursor } = formelEinsetzen(input, formel.bereich, tex, formel.abgesetzt);
+        input = text;
+        formel = null;
+        await tick();
+        adjustTextareaHeight();
+        textarea?.focus();
+        textarea?.setSelectionRange(cursor, cursor);
+    }
 
     function adjustTextareaHeight() {
         if (!textarea) return;
@@ -1545,6 +1573,15 @@
                 />
             {/if}
 
+            {#if formel}
+                <FormelDialog
+                    start={formel.start}
+                    abgesetzt={formel.abgesetzt}
+                    onEinfuegen={formelUebernehmen}
+                    onClose={() => (formel = null)}
+                />
+            {/if}
+
             <!-- PII-Eingabe-Gate (Phase 14) -->
             {#if piiDialogOpen}
                 <PiiWarningDialog
@@ -1722,6 +1759,22 @@
                            disabled:opacity-50 disabled:cursor-not-allowed
                            focus:outline-none focus:ring-2 focus:ring-primary"
                 ></textarea>
+
+                <!-- Formel-Knopf (0.38) -->
+                <button
+                    type="button"
+                    onclick={formelOeffnen}
+                    disabled={isStreaming}
+                    title="Formel einfügen – steht der Cursor in einer Formel, wird sie geändert"
+                    aria-label="Formel einfügen"
+                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui dark:hover:bg-dark-ui
+                           disabled:opacity-40 disabled:cursor-not-allowed shrink-0
+                           transition-colors"
+                >
+                    <Sigma class="w-5 h-5" />
+                </button>
 
                 <!-- Kontext-Lookup-Button -->
                 <button

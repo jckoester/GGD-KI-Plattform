@@ -5,9 +5,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.38.0] – 2026-11-08
+
+### Neu
+
+- Formel-Editor im Chat: Der Knopf Σ neben dem Eingabefeld öffnet ihn; Brüche, Wurzeln und Hochzahlen lassen sich
+  ohne LaTeX eingeben, auf Tablet und Handy mit Bildschirmtastatur. Die Formel wird an der Cursorstelle eingefügt;
+  steht der Cursor in einer Formel, wird diese geändert.
+- Formeln in der eigenen Nachricht erscheinen gesetzt, auch selbst getipptes LaTeX (`$…$`, `\(…\)`).
+
 ### Entwicklung
 
+- Neue Abhängigkeit `mathlive` (MIT), im Frontend nur beim ersten Öffnen des Formel-Editors geladen.
 - Sidecar-Tests laufen auch mit Node 24 (CI): Testdateien über ein Muster statt über das Verzeichnis.
+
+### Nach dem Update
+
+- Backend und Frontend neu bauen und starten: `docker compose build && docker compose up -d` (neue Abhängigkeit
+  `mathlive` im Frontend); offene Browser-Tabs einmal neu laden. Keine Migration, keine Konfiguration.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.37.0] – 2026-11-07
 

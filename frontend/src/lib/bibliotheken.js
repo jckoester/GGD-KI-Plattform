@@ -29,6 +29,7 @@ export const BIBLIOTHEKEN = [
             { name: 'lucide-svelte', paket: 'lucide-svelte', lizenz: 'ISC' },
             { name: 'marked', paket: 'marked', lizenz: 'MIT' },
             { name: 'marked-footnote', paket: 'marked-footnote', lizenz: 'MIT' },
+            { name: 'MathLive', paket: 'mathlive', lizenz: 'MIT' },
             { name: 'Pele', paket: 'pele', lizenz: 'MIT' },
         ],
     },

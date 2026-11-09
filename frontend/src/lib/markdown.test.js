@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // renderMarkdown nutzt DOMPurify → braucht im Test ein DOM (Produktion: Browser).
 import { describe, it, expect } from 'vitest'
-import { renderInlineMath, renderMarkdown } from './markdown.js'
+import { formelVorschau, renderInlineMath, renderMarkdown } from './markdown.js'
 
 // KaTeX schreibt class="katex" in seine Ausgabe — verlässlicher Marker.
 const hasKatex = (html) => html.includes('katex')
@@ -482,5 +482,39 @@ describe('renderMarkdown — Formel, die KaTeX nicht versteht (0.30)', () => {
         const html = renderMarkdown('$x^2$ und $\\gibtsnicht$')
         expect(html).toContain('class="katex"')
         expect(html).toContain('formel-fehler')
+    })
+})
+
+describe('renderInlineMath — die eigene Nachricht im Chat (0.38)', () => {
+    it('rendert selbst getipptes TeX und eingefügte Formeln', () => {
+        expect(hasKatex(renderInlineMath('Ist $x^2$ gerade?'))).toBe(true)
+        expect(hasKatex(renderInlineMath('Ist \\(\\frac{1}{2x}\\) definiert?'))).toBe(true)
+    })
+
+    it('lässt Dollar als Währung Text', () => {
+        expect(renderInlineMath('Das kostet 5 $ und 10 $.')).toBe('Das kostet 5 $ und 10 $.')
+        expect(renderInlineMath('zwischen $5 und $10')).toBe('zwischen $5 und $10')
+    })
+
+    it('behält Zeilenumbrüche (die Blase setzt whitespace-pre-wrap)', () => {
+        expect(renderInlineMath('Zeile 1\nZeile 2 mit $a$')).toMatch(/^Zeile 1\nZeile 2 mit /)
+    })
+
+    it('rendert eine abgesetzte Formel über mehrere Zeilen', () => {
+        expect(renderInlineMath('$$\na+b\n$$')).toContain('katex-display')
+    })
+})
+
+describe('formelVorschau — Vorschau im Formel-Dialog', () => {
+    it('liefert HTML für eine gültige Formel', () => {
+        const v = formelVorschau('\\frac{1}{2}')
+        expect(v.fehler).toBeNull()
+        expect(hasKatex(v.html)).toBe(true)
+    })
+
+    it('liefert die Meldung für eine Formel, die KaTeX nicht kennt', () => {
+        const v = formelVorschau('\\placeholder{}')
+        expect(v.html).toBeNull()
+        expect(v.fehler).toMatch(/placeholder/)
     })
 })
