@@ -83,7 +83,7 @@ model_list:
       model: openai/openai/gpt-oss-120b     # doppeltes `openai/`: Provider + Anbieter-ID
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
-      reasoning_effort: low                 # gpt-oss lehnt `none` ab
+      reasoning_effort: high                # gpt-oss lehnt `none` ab; nicht `low`, s. u.
       allowed_openai_params: ["reasoning_effort"]
     model_info:
       supports_function_calling: true       # PFLICHT — sonst fallen alle Funktionen aus
@@ -117,6 +117,13 @@ EMBEDDING_DIMENSIONS=1024
 EMBEDDING_SEND_DIMENSIONS=false            # BGE-M3 lehnt den Parameter ab
 IMAGE_PRICES='{"black-forest-labs/FLUX.1-schnell":0.032}'
 ```
+
+> ⚠️ **`chat-standard` braucht `reasoning_effort: high`.** Ob das Modell im Wissensspeicher
+> nachschlägt, entscheidet es beim Denken; mit `low` tat es das in 4 von 16 Läufen, mit `high`
+> in 15 von 16 (gemessen 26.09.2026). Auf einer Installation mit niedrigerem Wert gab der freie
+> Chat Schüler:innen außerdem fertige Lösungen, trotz der Lernverhalten-Leitplanken aus
+> `pedagogy.yaml` (beobachtet 10.11.2026, nicht systematisch gemessen). Bis 0.38 stand hier
+> fälschlich `low`; die Vorlage `infra/litellm_config.ionos.example.yaml` hatte schon `high`.
 
 ---
 

@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Admin-Doku „Modell-Szenarien“: `chat-standard` mit `reasoning_effort: high` statt `low`, wie in der Vorlage.
+  Bitte die eigene `infra/litellm_config.yaml` prüfen; mit niedrigerem Wert gab der freie Chat Schüler:innen
+  fertige Lösungen.
+
 ## [0.38.0] – 2026-11-08
 
 ### Neu
