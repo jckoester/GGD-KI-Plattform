@@ -77,6 +77,12 @@ Absätze oder Listen in Zellen, und Pandocs HTML-Leser erkennt `$…$` in Zellen
 Pandoc kann keine Zellfarben setzen: Die Priorität im Stundenentwurf steht seit 0.39 als Kürzel
 mit Legende (`PRIO_LEGENDE`). `python-docx` ist entfallen.
 
+⚠️ **Pandoc schreibt Tabellen ohne Linien** — im ODT ausdrücklich (`fo:border="none"` an den
+Zellstilen), im DOCX über die rahmenlose Formatvorlage „Table“. In der Textverarbeitung sah das aus
+wie Text mit Tabulatoren. `export.nachbearbeitung.nachbearbeiten` setzt nach jedem Office-Export
+(auch Werkstatt) Rahmen direkt an Tabelle bzw. Zellen und dreht mit `quer=True` die Seite
+(Curriculum). Es bearbeitet die fertige Datei, nicht die Vorlage — Schulvorlagen bleiben gültig.
+
 ## Vorlagen-Governance (Schritt 6)
 
 `export.templates`: PDF-**CSS** in `site_config` (`export_css`) → `extra_css` im Template;

@@ -38,7 +38,9 @@ Unter **Einstellungen → Export-Vorlagen** (`/settings/export`, nur Admin):
   (Überschriften, Schriften, Ränder) Pandoc via `--reference-doc` übernimmt. Am einfachsten: ein
   bestehendes Dokument mit den gewünschten Formatvorlagen speichern und hochladen. **Seit 0.39
   gilt es für alle Word-/ODT-Exporte**: Material-Werkstatt, Stundenentwurf und Curriculum.
-  Tabellen (Stundenentwurf, Curriculum) nehmen die Tabellen-Formatvorlage „Table“.
+  Tabellen nehmen die Tabellen-Formatvorlage „Table“; ihre **Linien setzt der Export aber selbst**
+  (dünn, schwarz) — sie gelten auch mit Schulvorlage. Das Curriculum kommt im **Querformat**; gedreht
+  wird die Seite der Vorlage, ihre Ränder bleiben.
 
 Das **PDF-CSS gilt nur für Werkstatt-Dokumente**; Stundenentwurf und Curriculum haben ein eigenes
 PDF-Layout, das fremde Regeln leicht zerschießen.

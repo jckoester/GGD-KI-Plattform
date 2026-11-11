@@ -228,9 +228,12 @@ def _ausfuehren(cmd: list[str], eingabe: bytes) -> bytes:
 
 
 def _office_schreiben(
-    eingabe: bytes, *, von: str, fmt: str, reference_doc: Optional[str]
+    eingabe: bytes, *, von: str, fmt: str, reference_doc: Optional[str], quer: bool = False
 ) -> bytes:
-    """Eingabe im Format `von` → DOCX/ODT. Office-Formate brauchen eine Ausgabedatei."""
+    """Eingabe im Format `von` → DOCX/ODT. Office-Formate brauchen eine Ausgabedatei.
+
+    Danach Tabellenlinien und auf Wunsch Querformat (`app.export.nachbearbeitung`).
+    """
     if fmt not in OFFICE_FORMATS:
         raise PandocError(f"nicht unterstütztes Format: {fmt!r}")
     binary = _pandoc_bin()
@@ -244,7 +247,9 @@ def _office_schreiben(
             else:
                 logger.warning("reference-doc nicht gefunden, ignoriere: %s", reference_doc)
         _ausfuehren(cmd, eingabe)
-        return out_path.read_bytes()
+        from app.export.nachbearbeitung import nachbearbeiten
+
+        return nachbearbeiten(out_path.read_bytes(), fmt, quer=quer)
 
 
 def markdown_to_office_sync(
@@ -289,7 +294,7 @@ def markdown_zu_json_sync(markdown: str) -> dict:
 
 
 def json_zu_office_sync(
-    dokument: dict, *, fmt: str, reference_doc: Optional[str] = None
+    dokument: dict, *, fmt: str, reference_doc: Optional[str] = None, quer: bool = False
 ) -> bytes:
     """Schreibt ein Pandoc-JSON-Dokument als DOCX/ODT.
 
@@ -298,4 +303,5 @@ def json_zu_office_sync(
     """
     return _office_schreiben(
         json.dumps(dokument).encode("utf-8"), von="json", fmt=fmt, reference_doc=reference_doc,
+        quer=quer,
     )

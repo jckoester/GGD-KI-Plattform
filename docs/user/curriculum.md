@@ -137,7 +137,7 @@ Kompetenz zu ersetzen ist. Nichts wird stillschweigend gelöscht.
 
 - **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte
 - **DOCX** (Word) oder **ODT** (LibreOffice) — zum Weiterbearbeiten außerhalb der Plattform,
-  mit Formeln als bearbeitbare Formeln
+  im Querformat und mit Formeln als bearbeitbare Formeln
 - **YAML** — die maschinenlesbare Fassung
 
 Das YAML ist die einzige Form, die sich wieder einlesen lässt. Änderungen in Word oder

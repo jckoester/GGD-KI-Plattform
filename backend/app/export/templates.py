@@ -11,10 +11,8 @@ Fehlt eine Vorlage, greift die eingebaute Default-Optik (kein Hard-Fail). Persö
 """
 from __future__ import annotations
 
-import io
 import logging
 import tempfile
-import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -109,20 +107,6 @@ def _a4(fmt: str, xml: str) -> str:
     return xml
 
 
-def _zip_mit_ersetzung(roh: bytes, name: str, ersetzen) -> bytes:
-    """Schreibt das ZIP neu, Reihenfolge und Kompression je Eintrag bleiben (ODT: `mimetype` zuerst,
-    unkomprimiert)."""
-    quelle = zipfile.ZipFile(io.BytesIO(roh))
-    out = io.BytesIO()
-    with zipfile.ZipFile(out, "w") as ziel:
-        for info in quelle.infolist():
-            daten = quelle.read(info.filename)
-            if info.filename == name:
-                daten = ersetzen(daten.decode("utf-8")).encode("utf-8")
-            ziel.writestr(info, daten, compress_type=info.compress_type)
-    return out.getvalue()
-
-
 def eingebaute_vorlage(fmt: str) -> Optional[Path]:
     """Pandocs Vorlage auf A4 — einmal je Prozess erzeugt. None ohne Pandoc."""
     if fmt not in REFERENCE_FORMATS:
@@ -140,7 +124,9 @@ def eingebaute_vorlage(fmt: str) -> Optional[Path]:
         return None
     eintrag = "word/document.xml" if fmt == "docx" else "styles.xml"
     pfad = Path(tempfile.mkdtemp(prefix="ggd-vorlage-")) / f"reference.{fmt}"
-    pfad.write_bytes(_zip_mit_ersetzung(roh, eintrag, lambda xml: _a4(fmt, xml)))
+    from app.export.nachbearbeitung import zip_mit_ersetzung
+
+    pfad.write_bytes(zip_mit_ersetzung(roh, {eintrag: lambda xml: _a4(fmt, xml)}))
     _eingebaut[fmt] = pfad
     return pfad
 

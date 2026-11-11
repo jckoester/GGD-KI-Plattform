@@ -451,7 +451,7 @@ def _hinweise_bloecke(hinweise: str, material: str) -> list[dict]:
 async def render_curriculum_office(
     db: AsyncSession, tree: dict, fmt: str, reference_doc: str | None = None
 ) -> bytes:
-    """Curriculum als DOCX oder ODT — zum Weiterbearbeiten außerhalb der Plattform.
+    """Curriculum als DOCX oder ODT, im Querformat — zum Weiterbearbeiten außerhalb der Plattform.
 
     Zurück kommt eine solche Fassung nicht: Der Import liest YAML. Aufbau wie im PDF; IK, PK und
     Konkretisierung sind Markdown (Formeln in Kompetenztiteln, Listen in der Konkretisierung).
@@ -499,4 +499,7 @@ async def render_curriculum_office(
             else:
                 zeilen = [[[o.schlicht(o.text("(keine Einträge)"))], [], [], []]]
             dok.append(o.tabelle(_KOPF, zeilen, list(_SPALTEN_ANTEILE)))
-    return await o.dokument_zu_office(dok, api_version=api, fmt=fmt, reference_doc=reference_doc)
+    # Querformat: vier Spalten Volltext (Jan, 11.11.2026).
+    return await o.dokument_zu_office(
+        dok, api_version=api, fmt=fmt, reference_doc=reference_doc, quer=True,
+    )

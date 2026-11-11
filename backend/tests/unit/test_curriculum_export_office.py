@@ -74,3 +74,16 @@ async def test_spaltenbreiten_wie_im_pdf():
     t = next(b for b in ast["blocks"] if b["t"] == "Table")
     breiten = [s[1]["c"] for s in t["c"][2]]
     assert [round(b / sum(breiten), 2) for b in breiten] == [0.24, 0.28, 0.26, 0.22]
+
+
+@pytest.mark.parametrize("fmt, eintrag, merkmal", [
+    ("docx", "word/document.xml", '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape" />'),
+    ("odt", "styles.xml", 'fo:page-width="29.7cm" fo:page-height="21cm"'),
+])
+async def test_querformat_mit_linien(fmt, eintrag, merkmal):
+    """Jan, 11.11.2026: Curricula im Querformat, Tabellen mit Linien."""
+    data = await render_curriculum_office(None, _baum(), fmt, reference_doc=vorlage(fmt))
+    z = zipfile.ZipFile(io.BytesIO(data))
+    assert merkmal in z.read(eintrag).decode()
+    linien = z.read("word/document.xml" if fmt == "docx" else "content.xml").decode()
+    assert ("<w:tblBorders>" if fmt == "docx" else "0.5pt solid") in linien

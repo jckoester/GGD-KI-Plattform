@@ -169,13 +169,14 @@ async def dokument_zu_office(
     api_version: list,
     fmt: str,
     reference_doc: Optional[str] = None,
+    quer: bool = False,
 ) -> bytes:
-    """Schreibt die Blöcke als DOCX/ODT.
+    """Schreibt die Blöcke als DOCX/ODT, mit `quer` im Querformat. Tabellen bekommen Linien.
 
     Kein `title` in den Metadaten: Pandoc setzte ihn als eigene Titelzeile vor das Dokument,
     zusätzlich zur Überschrift, die der Export selbst baut.
     """
     dokument = {"pandoc-api-version": api_version, "meta": {}, "blocks": bloecke}
     return await asyncio.to_thread(
-        pandoc.json_zu_office_sync, dokument, fmt=fmt, reference_doc=reference_doc,
+        pandoc.json_zu_office_sync, dokument, fmt=fmt, reference_doc=reference_doc, quer=quer,
     )

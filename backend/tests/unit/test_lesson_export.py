@@ -611,3 +611,18 @@ def test_geplant_min_fuer_den_assistenten():
               {"dauer_min": 10, "status": "offen"}, {"dauer_min": None}, "kaputt"]
     assert geplant_min(phasen) == 25
     assert geplant_min(None) == 0
+
+
+@_needs_pandoc
+@pytest.mark.parametrize("fmt", ["docx", "odt"])
+async def test_office_tabelle_mit_linien_hochkant(fmt):
+    """Ohne Linien sah die Tabelle in der Textverarbeitung wie Text mit Tabulatoren aus."""
+    import io
+    import zipfile
+
+    z = zipfile.ZipFile(io.BytesIO(await _office(_make_export(), fmt)))
+    if fmt == "docx":
+        xml = z.read("word/document.xml").decode()
+        assert "<w:tblBorders>" in xml and 'w:orient="landscape"' not in xml
+    else:
+        assert "0.5pt solid" in z.read("content.xml").decode()

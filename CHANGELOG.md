@@ -9,13 +9,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- Stundenentwurf auch als ODT, Curriculum auch als DOCX und ODT. Formeln werden bearbeitbare Formeln, Markdown in
+- Stundenentwurf auch als ODT, Curriculum auch als DOCX und ODT (im Querformat). Formeln werden bearbeitbare Formeln, Markdown in
   Phasenbeschreibungen und Konkretisierungen bleibt formatiert, Diagramme erscheinen als Bild.
 - Die schulweite Word-/ODT-Vorlage gilt für alle Office-Exporte: Werkstatt, Stundenentwurf, Curriculum.
 
 ### Geändert
 
 - Office-Exporte ohne Schulvorlage kommen auf A4 (bisher US-Letter bzw. ohne Seitenformat).
+- Tabellen in DOCX und ODT haben Linien, auch mit Schulvorlage (bisher unsichtbar).
 - Stundenentwurf als DOCX: Priorität als Kürzel mit Legende statt farbiger Zelle.
 - Rohes HTML in Werkstatt-Dokumenten: `<br>`, `<sub>` und `<sup>` wirken in Vorschau, PDF, DOCX und ODT; andere
   Tags fallen überall weg, ihr Text bleibt. Bisher zeigte das PDF sie als Text, DOCX ließ auch `<br>` weg.
