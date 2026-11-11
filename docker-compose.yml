@@ -254,7 +254,11 @@ services:
         condition: service_healthy
     command: >
       sh -c "printenv >> /etc/environment &&
-             echo '0 2 * * * root python /app/scripts/cleanup_inactive_accounts.py >> /proc/1/fd/1 2>&1' > /etc/cron.d/ggd-ki &&
+             # ⚠️ cron startet Jobs mit PATH=/usr/bin:/bin — das Python des Images liegt aber
+             # unter /usr/local/bin. Ohne diese Zeile scheiterte JEDER Lauf mit
+             # `python: not found` (bis 0.39.1, auf Prod seit Mai 2026 unbemerkt).
+             echo 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' > /etc/cron.d/ggd-ki &&
+             echo '0 2 * * * root python /app/scripts/cleanup_inactive_accounts.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '30 2 * * * root python /app/scripts/cleanup_stale_conversations.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '50 2 * * * root python /app/scripts/cleanup_feedback.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '55 2 * * * root python /app/scripts/cleanup_audit_log.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&

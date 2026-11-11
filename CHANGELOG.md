@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.39.2] – 2026-11-11
+
+### Behoben
+
+- Automatische Läufe im Cron-Container (Budget-Aufbuchung, Löschfristen, Kurs, Aufräumen, Stundenplan …) liefen
+  nicht: `python: not found`.
+
+### Nach dem Update
+
+- Nur der Cron-Dienst ändert sich: `docker compose up -d cron`. Kein Neubau nötig.
+- Die Läufe holen beim ersten Mal nach, was seit Mai liegen blieb — auch die Löschfristen. Vorher ansehen:
+  `docker compose exec cron python /app/scripts/cleanup_inactive_accounts.py --dry-run`, ebenso
+  `cleanup_stale_conversations.py`. Die Budget-Aufbuchung von Hand anstoßen (sonst erst Montag 05:00):
+  `docker compose exec backend python scripts/weekly_budget_accrual.py`.
+
 ## [0.39.1] – 2026-11-11
 
 ### Behoben
