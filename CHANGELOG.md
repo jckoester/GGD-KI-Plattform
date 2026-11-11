@@ -11,10 +11,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Automatische Läufe im Cron-Container (Budget-Aufbuchung, Löschfristen, Kurs, Aufräumen, Stundenplan …) liefen
   nicht: `python: not found`.
+- Berichtigung zu 0.39.1: Das Seitenformat fehlte nicht, A4 war schon in 0.39.0 gesetzt. Neu ist seit 0.39.1 nur,
+  dass DOCX mit einer Schulvorlage ohne Seitenformat auf A4 kommt statt auf Words Voreinstellung.
+
+### Entwicklung
+
+- Export-Tests prüfen XML-Attribute einzeln; mit Pandoc 3.11 (CI, Prod) scheiterten sie an der Reihenfolge.
 
 ### Nach dem Update
 
-- Nur der Cron-Dienst ändert sich: `docker compose up -d cron`. Kein Neubau nötig.
+- Neu bauen und starten: `docker compose build && docker compose up -d` — der Cron-Dienst bekommt dabei seinen neuen
+  Startbefehl. Keine Migration, keine Konfiguration.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 - Die Läufe holen beim ersten Mal nach, was seit Mai liegen blieb — auch die Löschfristen. Vorher ansehen:
   `docker compose exec cron python /app/scripts/cleanup_inactive_accounts.py --dry-run`, ebenso
   `cleanup_stale_conversations.py`. Die Budget-Aufbuchung von Hand anstoßen (sonst erst Montag 05:00):
@@ -24,7 +32,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
-- DOCX mit einer Schulvorlage ohne Seitenformat kommt auf A4 statt auf Words Voreinstellung.
+- DOCX ohne Schulvorlage (Stundenentwurf, Werkstatt) kommt auf A4; auf dem Server fehlte das Seitenformat.
 
 ## [0.39.0] – 2026-11-11
 
