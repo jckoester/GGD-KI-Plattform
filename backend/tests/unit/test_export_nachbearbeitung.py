@@ -46,6 +46,19 @@ def test_docx_quer_ohne_format_setzt_a4_quer():
     assert neu == '<w:sectPr><w:footnotePr /><w:pgSz w:w="16838" w:h="11906" w:orient="landscape" /></w:sectPr>'
 
 
+def test_docx_ohne_format_wird_a4():
+    """Pandoc 3.11 (Prod, CI) lässt das pgSz der eingebauten Vorlage fallen, 3.13 nicht."""
+    xml = '<w:sectPr><w:footnotePr /><w:pgMar w:top="1134" /></w:sectPr>'
+    assert nb._docx_seitenformat(xml) == (
+        '<w:sectPr><w:footnotePr /><w:pgSz w:w="11906" w:h="16838" /><w:pgMar w:top="1134" /></w:sectPr>'
+    )
+
+
+def test_docx_eigenes_format_bleibt():
+    xml = '<w:sectPr><w:pgSz w:w="12240" w:h="15840" /></w:sectPr>'
+    assert nb._docx_seitenformat(xml) == xml
+
+
 def test_odt_quer_tauscht_auch_bei_anderen_einheiten():
     tag = ('<style:page-layout-properties fo:page-width="8.5in" fo:page-height="11in" '
            'style:print-orientation="portrait" fo:margin-top="1in"/>')

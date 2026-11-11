@@ -76,7 +76,24 @@ def _odt_linien(xml: str) -> str:
 # ── Querformat ────────────────────────────────────────────────────────────────
 
 _PGSZ_RE = re.compile(r"<w:pgSz\b([^>]*?)/>")
+_A4_DOCX = '<w:pgSz w:w="11906" w:h="16838" />'
 _A4_QUER_DOCX = '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape" />'
+
+
+def _docx_seitenformat(xml: str, pgsz: str = _A4_DOCX) -> str:
+    """Setzt `pgsz` vor die Ränder bzw. ans Ende von sectPr, wenn kein Seitenformat da ist.
+
+    ⚠️ Pandoc 3.11 (Prod, CI) übernimmt das `pgSz` der eingebauten A4-Vorlage nicht ins
+    Dokument, 3.13 schon — ohne `pgSz` nimmt Word seine Voreinstellung (US: Letter). Deshalb
+    sichert die Nachbearbeitung A4 unabhängig von der Pandoc-Fassung. Eine Schulvorlage mit
+    eigenem Seitenformat bleibt unberührt.
+    """
+    if _PGSZ_RE.search(xml):
+        return xml
+    for marke in ("<w:pgMar", "</w:sectPr>"):
+        if marke in xml:
+            return xml.replace(marke, pgsz + marke)
+    return xml
 
 
 def _attr(attrs: str, name: str) -> str | None:
@@ -94,11 +111,7 @@ def _docx_quer(xml: str) -> str:
 
     if _PGSZ_RE.search(xml):
         return _PGSZ_RE.sub(drehen, xml)
-    # Ohne Seitenformat (Vorlage ohne pgSz): A4 quer vor die Ränder bzw. ans Ende von sectPr.
-    for marke in ("<w:pgMar", "</w:sectPr>"):
-        if marke in xml:
-            return xml.replace(marke, _A4_QUER_DOCX + marke)
-    return xml
+    return _docx_seitenformat(xml, _A4_QUER_DOCX)
 
 
 _EINHEIT_CM = {"cm": 1.0, "mm": 0.1, "in": 2.54, "pt": 2.54 / 72}
@@ -130,9 +143,9 @@ def _odt_quer(xml: str) -> str:
 
 
 def nachbearbeiten(data: bytes, fmt: str, *, quer: bool = False) -> bytes:
-    """Linien an alle Tabellen; mit `quer` die Seiten ins Querformat."""
+    """Linien an alle Tabellen; DOCX ohne Seitenformat wird A4; mit `quer` Querformat."""
     if fmt == "docx":
-        schritte = [_docx_linien] + ([_docx_quer] if quer else [])
+        schritte = [_docx_linien, _docx_quer if quer else _docx_seitenformat]
         return zip_mit_ersetzung(data, {"word/document.xml": _nacheinander(schritte)})
     if fmt == "odt":
         ersetzungen = {"content.xml": _odt_linien}

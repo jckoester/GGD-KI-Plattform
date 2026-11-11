@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.39.1] – 2026-11-11
+
+### Behoben
+
+- DOCX ohne Schulvorlage (Stundenentwurf, Werkstatt) kommt auf A4; auf dem Server fehlte das Seitenformat.
+
 ## [0.39.0] – 2026-11-11
 
 ### Neu

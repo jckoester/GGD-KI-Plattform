@@ -78,12 +78,16 @@ async def test_spaltenbreiten_wie_im_pdf():
 
 @pytest.mark.parametrize("fmt, eintrag, merkmal", [
     ("docx", "word/document.xml", '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape" />'),
-    ("odt", "styles.xml", 'fo:page-width="29.7cm" fo:page-height="21cm"'),
+    # Einzeln geprüft: Reihenfolge und Leerraum der Attribute hängen an der Pandoc-Fassung.
+    ("odt", "styles.xml", ('fo:page-width="29.7cm"', 'fo:page-height="21cm"',
+                           'style:print-orientation="landscape"')),
 ])
 async def test_querformat_mit_linien(fmt, eintrag, merkmal):
     """Jan, 11.11.2026: Curricula im Querformat, Tabellen mit Linien."""
     data = await render_curriculum_office(None, _baum(), fmt, reference_doc=vorlage(fmt))
     z = zipfile.ZipFile(io.BytesIO(data))
-    assert merkmal in z.read(eintrag).decode()
+    xml = z.read(eintrag).decode()
+    for m in (merkmal,) if isinstance(merkmal, str) else merkmal:
+        assert m in xml
     linien = z.read("word/document.xml" if fmt == "docx" else "content.xml").decode()
     assert ("<w:tblBorders>" if fmt == "docx" else "0.5pt solid") in linien
