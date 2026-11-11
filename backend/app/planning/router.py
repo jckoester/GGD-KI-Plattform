@@ -1597,7 +1597,7 @@ async def get_review_status(
 @router.get("/lessons/{node_id}/export")
 async def export_lesson(
     node_id: UUID,
-    format: str = "md",  # md | pdf | docx
+    format: str = "md",  # md | pdf | docx | odt
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
@@ -1612,7 +1612,7 @@ async def export_lesson(
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
     await require_group_teacher(group_id, user, db)
 
-    from app.planning.lesson_export import build_lesson_export, export_docx, export_markdown, export_pdf
+    from app.planning.lesson_export import build_lesson_export, export_markdown, export_office, export_pdf
 
     data = await build_lesson_export(db, node_id)
 
@@ -1632,12 +1632,24 @@ async def export_lesson(
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
-    elif format == "docx":
-        content = export_docx(data)
-        filename = f"{data.datum}-{data.gruppe_slug}-{data.titel_slug}.docx"
+    elif format in ("docx", "odt"):
+        # Seit 0.39 über Pandoc, mit der schulweiten Vorlage wie in der Werkstatt.
+        from app.export import pandoc
+        from app.export import templates as export_templates
+        from app.export.document import EXPORT_MIME
+
+        try:
+            content = await export_office(
+                db, data, format, reference_doc=export_templates.vorlage(format),
+            )
+        except pandoc.PandocUnavailable:
+            raise HTTPException(status_code=503, detail="Office-Export ist auf diesem Server nicht verfügbar.")
+        except pandoc.PandocError as exc:
+            raise HTTPException(status_code=422, detail=f"Export fehlgeschlagen: {exc}")
+        filename = f"{data.datum}-{data.gruppe_slug}-{data.titel_slug}.{format}"
         return Response(
             content=content,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            media_type=EXPORT_MIME[format],
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     else:

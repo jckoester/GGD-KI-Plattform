@@ -5,11 +5,37 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.39.0] – 2026-11-11
+
+### Neu
+
+- Stundenentwurf auch als ODT, Curriculum auch als DOCX und ODT. Formeln werden bearbeitbare Formeln, Markdown in
+  Phasenbeschreibungen und Konkretisierungen bleibt formatiert, Diagramme erscheinen als Bild.
+- Die schulweite Word-/ODT-Vorlage gilt für alle Office-Exporte: Werkstatt, Stundenentwurf, Curriculum.
+
+### Geändert
+
+- Office-Exporte ohne Schulvorlage kommen auf A4 (bisher US-Letter bzw. ohne Seitenformat).
+- Stundenentwurf als DOCX: Priorität als Kürzel mit Legende statt farbiger Zelle.
+- Rohes HTML in Werkstatt-Dokumenten: `<br>`, `<sub>` und `<sup>` wirken in Vorschau, PDF, DOCX und ODT; andere
+  Tags fallen überall weg, ihr Text bleibt. Bisher zeigte das PDF sie als Text, DOCX ließ auch `<br>` weg.
+
 ### Behoben
 
 - Admin-Doku „Modell-Szenarien“: `chat-standard` mit `reasoning_effort: high` statt `low`, wie in der Vorlage.
   Bitte die eigene `infra/litellm_config.yaml` prüfen; mit niedrigerem Wert gab der freie Chat Schüler:innen
   fertige Lösungen.
+- Export als DOCX/ODT: Formeln in `\(…\)` und `\[…\]` erscheinen als Formel statt als Text in Klammern.
+
+### Entwicklung
+
+- Abhängigkeit `python-docx` (und damit `lxml`) entfernt; Office-Exporte laufen über Pandoc (`app/export/office.py`).
+
+### Nach dem Update
+
+- Backend und Frontend neu bauen und starten: `docker compose build && docker compose up -d`; offene Browser-Tabs
+  einmal neu laden. Keine Migration, keine Konfiguration.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.38.0] – 2026-11-08
 

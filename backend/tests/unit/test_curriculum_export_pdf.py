@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.context.curriculum_export import _build_pdf_kapitel, _render_markdown
+from app.context.curriculum_export import _build_pdf_kapitel
 
 # Der Sidecar laeuft im Unit-Test nicht; sein SVG wird gestellt.
 _MATH_SVG = '<svg class="mathjax"><path d="M0"/></svg>'
@@ -63,22 +63,6 @@ class TestBuildPdfKapitel:
         assert e["pk_items"] == [{"html": "PK_05.1"}]
 
 
-class TestRenderMarkdown:
-    def test_list_becomes_ul(self):
-        html = _render_markdown("- Farbe\n- Geruch\n- Dichte")
-        assert "<ul>" in html and html.count("<li>") == 3
-        assert "Farbe" in html
-
-    def test_empty_is_empty(self):
-        assert _render_markdown("") == ""
-        assert _render_markdown(None) == ""
-
-    def test_raw_html_escaped(self):
-        """Roh-HTML in der Quelle wird escaped (html=False), kein Injection."""
-        html = _render_markdown("<script>alert(1)</script>")
-        assert "<script>" not in html
-
-
 class TestFormelnImPdf:
     """Bildungsplan-Kompetenzen tragen Formeln im Titel — auch im PDF.
 
@@ -131,12 +115,13 @@ class TestFormelnImPdf:
         assert e["ik_items"][0]["html"] == "3.1.1 Zahlen vergleichen"
 
     @pytest.mark.asyncio
-    async def test_titel_wird_escapet(self):
-        """Das Template gibt mit `| safe` aus — der Renderer muss selbst escapen."""
+    async def test_titel_ohne_fremdes_html(self):
+        """Das Template gibt mit `| safe` aus — der Renderer darf kein fremdes Tag durchlassen.
+        Seit 0.39 fällt es weg, statt als Text zu erscheinen (Plan F5); der Text bleibt."""
         tree = _tree_with_entry(
             entry={"ik": [{"node_id": "ik1", "nr": "x", "partiell": False}]},
             ik_refs=[{"node_id": "ik1", "title": "<script>alert(1)</script>", "nr": "x"}],
         )
         e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
         assert "<script>" not in e["ik_items"][0]["html"]
-        assert "&lt;script&gt;" in e["ik_items"][0]["html"]
+        assert e["ik_items"][0]["html"] == "alert(1)"

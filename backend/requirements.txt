@@ -57,7 +57,6 @@ pyflakes>=3.2,<4.0
 # Runtime - Auth
 bcrypt>=4.0.0,<5.0
 jsonschema>=4.22.0,<5.0
-python-docx>=1.1,<2.0
 
 # Runtime - PII-Erkennung (Datensparsamkeit, Phase 14)
 # spaCy ist an die Modell-Minor-Version gebunden → 3.8.x. Das deutsche NER-Modell wird

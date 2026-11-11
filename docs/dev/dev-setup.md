@@ -10,7 +10,7 @@ direkt gestartet; der LiteLLM-Proxy läuft als Prozess in der backend-venv (sieh
 - Node.js 20+ (`node --version`)
 - PostgreSQL erreichbar (lokal installiert oder als einzelner Docker-Container)
 - LiteLLM-Proxy lokal in der backend-venv (Abschnitt unten)
-- **Pandoc** — nur für den Office-Export (DOCX/ODT) der Material-Werkstatt (Phase 19):
+- **Pandoc** — für den Office-Export (DOCX/ODT) von Werkstatt, Stundenentwurf und Curriculum:
   `brew install pandoc` (macOS) bzw. `apt-get install pandoc` (Linux). Fehlt es, ist der
   Office-Export deaktiviert (Feature-Flag) — der Rest läuft normal.
 

@@ -29,7 +29,7 @@ from app.export.pandoc import PandocUnavailable
 def _stub_templates(monkeypatch):
     """Schulweite Vorlagen (Schritt 6) neutralisieren — kein DB/Filesystem im Export-Test."""
     monkeypatch.setattr(artifacts_router.export_templates, "get_export_css", AsyncMock(return_value=""))
-    monkeypatch.setattr(artifacts_router.export_templates, "reference_path", lambda fmt: None)
+    monkeypatch.setattr(artifacts_router.export_templates, "vorlage", lambda fmt: None)
     # Vorgabe: Herkunftszeile aus — ein Update ändert bestehende Exporte nicht von selbst.
     monkeypatch.setattr(
         artifacts_router.export_templates, "get_export_provenance", AsyncMock(return_value=False)

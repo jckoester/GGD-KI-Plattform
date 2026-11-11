@@ -1545,11 +1545,11 @@ async def search_context_nodes(
 @router.get("/curricula/{curriculum_id}/export")
 async def export_curriculum(
     curriculum_id: UUID,
-    format: str = Query("yaml", pattern="^(yaml|pdf)$"),
+    format: str = Query("yaml", pattern="^(yaml|pdf|docx|odt)$"),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(get_current_user),
 ):
-    """Exportiert ein Curriculum als YAML oder PDF."""
+    """Exportiert ein Curriculum als YAML (Austausch), PDF (Lesen) oder DOCX/ODT (Weiterbearbeiten)."""
     from app.context.service import load_curriculum_tree
     from app.context.curriculum_export import build_curriculum_export_dict, render_curriculum_pdf
 
@@ -1575,6 +1575,27 @@ async def export_curriculum(
             content=yaml_text.encode("utf-8"),
             media_type="application/x-yaml",
             headers={"Content-Disposition": f'attachment; filename="{filename_base}.yaml"'},
+        )
+    elif format in ("docx", "odt"):
+        # Seit 0.39 — über Pandoc, mit der schulweiten Vorlage wie in der Werkstatt.
+        from fastapi.responses import Response
+        from app.context.curriculum_export import render_curriculum_office
+        from app.export import pandoc
+        from app.export import templates as export_templates
+        from app.export.document import EXPORT_MIME
+
+        try:
+            data = await render_curriculum_office(
+                db, tree, format, reference_doc=export_templates.vorlage(format),
+            )
+        except pandoc.PandocUnavailable:
+            raise HTTPException(status_code=503, detail="Office-Export ist auf diesem Server nicht verfügbar.")
+        except pandoc.PandocError as exc:
+            raise HTTPException(status_code=422, detail=f"Export fehlgeschlagen: {exc}")
+        return Response(
+            content=data,
+            media_type=EXPORT_MIME[format],
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.{format}"'},
         )
     else:
         from fastapi.responses import Response

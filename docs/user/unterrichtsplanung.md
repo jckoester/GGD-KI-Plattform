@@ -163,7 +163,7 @@ liegst oder einen Überhang hast.
 **Gestrichene Phasen** — in der Nachbereitung oder vom Assistenten beim Umplanen
 gestrichen — bleiben grau und durchgestrichen in der Tabelle stehen, zählen aber nicht
 zur Unterrichtszeit: Die Zeitspalte zeigt „–", die folgenden Phasen rücken nach vorn, und
-der Zeitbudget-Balken lässt sie weg. Das gilt ebenso im PDF-, DOCX- und Markdown-Export.
+der Zeitbudget-Balken lässt sie weg. Das gilt ebenso im PDF-, DOCX-, ODT- und Markdown-Export.
 Eine *offene* Phase zählt dagegen mit.
 
 - **Priorität** (farbiges Pill): *Kern*, *Übung* oder *Vertiefung*. Sie steuert
@@ -236,8 +236,13 @@ eigenen kleinen Modellaufruf und zählt zu deinem Budget — Bruchteile eines Ce
 ### Export
 
 Den fertigen Entwurf exportierst du über die Export-Zeile im Kopf als **Markdown**
-(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**. Alle drei
-führen Kompetenzen und Fachbegriffe getrennt auf.
+(zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF**, **DOCX** (Word) oder **ODT**
+(LibreOffice). Alle führen Kompetenzen und Fachbegriffe getrennt auf.
+
+In Word und LibreOffice werden **Formeln** zu bearbeitbaren Formeln, Listen und Fettdruck aus den
+Phasenbeschreibungen bleiben erhalten, Diagramme erscheinen als Bild. Die Priorität steht dort als
+Kürzel (K, Ü, V) mit einer Legende unter der Tabelle. Hat deine Schule eine Word- oder ODT-Vorlage
+hinterlegt, nutzt der Export sie.
 
 ### Mit dem Stundenassistenten planen
 

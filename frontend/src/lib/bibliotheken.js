@@ -58,7 +58,6 @@ export const BIBLIOTHEKEN = [
             { name: 'markdown-it-py', paket: 'markdown-it-py', lizenz: 'MIT' },
             { name: 'mdit-py-plugins', paket: 'mdit-py-plugins', lizenz: 'MIT' },
             { name: 'pdfminer.six', paket: 'pdfminer.six', lizenz: 'MIT' },
-            { name: 'python-docx', paket: 'python-docx', lizenz: 'MIT' },
             { name: 'NumPy', paket: 'numpy', lizenz: 'BSD-3-Clause' },
             { name: 'Matplotlib', paket: 'matplotlib', lizenz: 'Matplotlib-Lizenz (PSF-basiert)' },
             { name: 'Lark', paket: 'lark', lizenz: 'MIT' },

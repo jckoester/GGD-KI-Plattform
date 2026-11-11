@@ -116,3 +116,56 @@ def test_upload_reference_validation(monkeypatch, tmp_path):
     monkeypatch.setattr(et.settings, "export_reference_max_bytes", 3)
     big = client.post("/export-templates/reference/docx", files={"file": ("r.docx", _PK)})
     assert big.status_code == 413
+
+
+# ── Eingebaute Vorlage A4 und Vorrang der Schulvorlage (0.39) ──────────────────
+
+import io as _io
+import zipfile as _zipfile
+
+from app.export import pandoc as _pandoc
+
+_needs_pandoc = pytest.mark.skipif(not _pandoc.pandoc_available(), reason="pandoc nicht installiert")
+
+
+def test_a4_ersetzt_pandocs_letter_im_odt():
+    xml = '<style:page-layout-properties fo:page-width="8.5in" fo:page-height="11in" fo:margin-top="1in"/>'
+    neu = et._a4("odt", xml)
+    assert 'fo:page-width="21cm"' in neu and 'fo:page-height="29.7cm"' in neu
+    assert 'fo:margin-top="2cm"' in neu
+
+
+def test_a4_ergaenzt_das_fehlende_format_im_docx():
+    neu = et._a4("docx", "<w:sectPr><w:footnotePr/></w:sectPr>")
+    # pgSz steht hinter footnotePr — die Reihenfolge schreibt das Schema vor.
+    assert neu.index("<w:footnotePr/>") < neu.index('<w:pgSz w:w="11906" w:h="16838"')
+    assert et._a4("docx", neu) == neu, "ein vorhandenes Format bleibt"
+
+
+@_needs_pandoc
+@pytest.mark.parametrize("fmt, eintrag, merkmal", [
+    ("docx", "word/document.xml", '<w:pgSz w:w="11906" w:h="16838"'),
+    ("odt", "styles.xml", 'fo:page-width="21cm"'),
+])
+def test_eingebaute_vorlage_ist_a4(monkeypatch, tmp_path, fmt, eintrag, merkmal):
+    monkeypatch.setattr(et.settings, "export_template_dir", str(tmp_path))
+    pfad = et.vorlage(fmt)
+    assert pfad and pfad.endswith(f"reference.{fmt}")
+    z = _zipfile.ZipFile(pfad)
+    assert merkmal in z.read(eintrag).decode()
+    if fmt == "odt":
+        erster = z.infolist()[0]
+        assert erster.filename == "mimetype" and erster.compress_type == _zipfile.ZIP_STORED
+
+
+def test_schulvorlage_hat_vorrang(monkeypatch, tmp_path):
+    monkeypatch.setattr(et.settings, "export_template_dir", str(tmp_path))
+    et.save_reference("docx", b"PK-schule")
+    assert et.vorlage("docx") == str(tmp_path / "reference.docx")
+
+
+def test_ohne_pandoc_keine_eingebaute(monkeypatch, tmp_path):
+    monkeypatch.setattr(et.settings, "export_template_dir", str(tmp_path))
+    monkeypatch.setattr(et, "_eingebaut", {})
+    monkeypatch.setattr(_pandoc.settings, "pandoc_bin", "definitiv-kein-pandoc-xyz")
+    assert et.vorlage("odt") is None

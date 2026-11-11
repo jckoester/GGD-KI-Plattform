@@ -203,6 +203,33 @@ def _klammer_mathe_regel(state, silent: bool) -> bool:
     return False
 
 
+# ── Rohes HTML (0.39, Plan F5) ────────────────────────────────────────────────
+# `html: False` zeigte jedes Tag als Text — aus `<br>` in einer Tabellenzelle (37 von 707
+# Antworten auf dev) wurde sichtbares „<br>“ im PDF. Jetzt gilt in allen Wegen der Werkstatt
+# dieselbe Regel (Vorschau `markdown.js` mit `wieImExport`, Office `app.export.pandoc`):
+# `<br>`, `<sub>`, `<sup>` wirken, jedes andere Tag fällt weg, sein Text bleibt.
+EXPORT_TAGS = ("br", "sub", "sup")
+_TAG_RE = re.compile(r"</?([A-Za-z][A-Za-z0-9-]*)(?:\s[^<>]*)?/?>")
+
+
+def _html_tag_regel(state, silent: bool) -> bool:
+    if state.src[state.pos] != "<":
+        return False
+    m = _TAG_RE.match(state.src, state.pos)
+    if not m:
+        return False
+    if not silent:
+        name = m.group(1).lower()
+        token = state.push("html_inline", "", 0)
+        if name in EXPORT_TAGS:
+            zu = m.group(0).startswith("</")
+            token.content = "<br>" if name == "br" else f"<{'/' if zu else ''}{name}>"
+        else:
+            token.content = ""
+    state.pos = m.end()
+    return True
+
+
 def _build_md() -> MarkdownIt:
     # commonmark + GFM-Tabellen/Strikethrough — nähert den PDF-Export an die Vorschau (marked,
     # GFM) an (Phase-19-Parität). Zusätzlich von curriculum-/lesson-PDF genutzt (additiv, sicher).
@@ -212,6 +239,7 @@ def _build_md() -> MarkdownIt:
     # kennen sie; ohne das Plugin stand im PDF als einzigem Format `[^1]` als Rohtext.
     md.use(footnote_plugin)
     md.inline.ruler.before("escape", "klammer_mathe", _klammer_mathe_regel)
+    md.inline.ruler.before("escape", "export_tags", _html_tag_regel)
 
     def _from_map(self, tokens, idx, options, env):
         return env.get("_render_map", {}).get(id(tokens[idx]), "")

@@ -11,6 +11,10 @@ Fehlt eine Vorlage, greift die eingebaute Default-Optik (kein Hard-Fail). Persö
 """
 from __future__ import annotations
 
+import io
+import logging
+import tempfile
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -22,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.paths import aufloesen
 from app.db.models import SiteConfig
+
+logger = logging.getLogger(__name__)
 
 EXPORT_CSS_KEY = "export_css"
 # Herkunftszeile am Ende exportierter Dokumente. Vorgabe **aus**: Ein Update soll
@@ -67,6 +73,85 @@ def reference_path(fmt: str) -> Optional[Path]:
         return None
     path = template_dir() / f"reference.{fmt}"
     return path if path.exists() else None
+
+
+# ── Eingebaute Vorlage: Pandocs eigene, auf A4 ────────────────────────────────
+#
+# ⚠️ Pandocs mitgelieferte reference.odt ist **US-Letter** (8.5 × 11 in), die reference.docx legt
+# gar kein Seitenformat fest — Word nimmt dann seine Voreinstellung, mit US-Einstellung Letter.
+# Bis 0.38 kamen Werkstatt-Dokumente ohne Schulvorlage deshalb so heraus; der Stundenentwurf war
+# A4, weil `python-docx` das Format ausdrücklich setzte. Seit 0.39 erzeugt der Server beim ersten
+# Gebrauch eine Abwandlung von Pandocs Vorlage — A4, Ränder 2 cm oben/unten, 2,5 cm links/rechts
+# wie im PDF — statt eine Binärdatei mitzuliefern, die zu einer anderen Pandoc-Fassung gehört.
+
+_A4_DOCX = (
+    '<w:pgSz w:w="11906" w:h="16838" />'
+    '<w:pgMar w:top="1134" w:right="1418" w:bottom="1134" w:left="1418" '
+    'w:header="709" w:footer="709" w:gutter="0" />'
+)
+_eingebaut: dict[str, Path] = {}
+
+
+def _a4(fmt: str, xml: str) -> str:
+    if fmt == "docx":
+        if "<w:pgSz" in xml:
+            return xml
+        return xml.replace("</w:sectPr>", _A4_DOCX + "</w:sectPr>", 1)
+    for alt, neu in (
+        ('fo:page-width="8.5in"', 'fo:page-width="21cm"'),
+        ('fo:page-height="11in"', 'fo:page-height="29.7cm"'),
+        ('fo:margin-top="1in"', 'fo:margin-top="2cm"'),
+        ('fo:margin-bottom="1in"', 'fo:margin-bottom="2cm"'),
+        ('fo:margin-left="1in"', 'fo:margin-left="2.5cm"'),
+        ('fo:margin-right="1in"', 'fo:margin-right="2.5cm"'),
+    ):
+        xml = xml.replace(alt, neu, 1)
+    return xml
+
+
+def _zip_mit_ersetzung(roh: bytes, name: str, ersetzen) -> bytes:
+    """Schreibt das ZIP neu, Reihenfolge und Kompression je Eintrag bleiben (ODT: `mimetype` zuerst,
+    unkomprimiert)."""
+    quelle = zipfile.ZipFile(io.BytesIO(roh))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as ziel:
+        for info in quelle.infolist():
+            daten = quelle.read(info.filename)
+            if info.filename == name:
+                daten = ersetzen(daten.decode("utf-8")).encode("utf-8")
+            ziel.writestr(info, daten, compress_type=info.compress_type)
+    return out.getvalue()
+
+
+def eingebaute_vorlage(fmt: str) -> Optional[Path]:
+    """Pandocs Vorlage auf A4 — einmal je Prozess erzeugt. None ohne Pandoc."""
+    if fmt not in REFERENCE_FORMATS:
+        return None
+    if fmt in _eingebaut and _eingebaut[fmt].is_file():
+        return _eingebaut[fmt]
+    from app.export import pandoc
+
+    try:
+        roh = pandoc._ausfuehren(
+            [pandoc._pandoc_bin(), "--print-default-data-file", f"reference.{fmt}"], b"",
+        )
+    except pandoc.PandocError:
+        logger.warning("Eingebaute %s-Vorlage nicht erzeugt (Pandoc fehlt oder Fehler)", fmt)
+        return None
+    eintrag = "word/document.xml" if fmt == "docx" else "styles.xml"
+    pfad = Path(tempfile.mkdtemp(prefix="ggd-vorlage-")) / f"reference.{fmt}"
+    pfad.write_bytes(_zip_mit_ersetzung(roh, eintrag, lambda xml: _a4(fmt, xml)))
+    _eingebaut[fmt] = pfad
+    return pfad
+
+
+def vorlage(fmt: str) -> Optional[str]:
+    """Die Vorlage für Pandoc `--reference-doc`: die der Schule, sonst die eingebaute (A4).
+
+    Gilt seit 0.39 für alle Office-Exporte — Werkstatt, Stundenentwurf, Curriculum.
+    """
+    pfad = reference_path(fmt) or eingebaute_vorlage(fmt)
+    return str(pfad) if pfad else None
 
 
 def has_reference(fmt: str) -> bool:

@@ -1,4 +1,4 @@
-"""Export-Funktionen für Stundenentwürfe: Markdown, PDF, DOCX."""
+"""Export-Funktionen für Stundenentwürfe: Markdown, PDF, DOCX/ODT."""
 
 from __future__ import annotations
 
@@ -324,141 +324,79 @@ async def export_pdf(data: LessonExport) -> bytes:
     return weasyprint.HTML(string=html_str, base_url=str(_TEMPLATES_DIR)).write_pdf()
 
 
-#: Spaltenanteile der Phasentabelle im DOCX in Prozent — Zeit, Prio, Phase, Sozialform/Methode,
+#: Spaltenanteile der Phasentabelle in DOCX/ODT in Prozent — Zeit, Prio, Phase, Sozialform/Methode,
 #: Material. Angelehnt an `templates/lesson.html` (PDF: 12/6/34/23/25), die Prio-Spalte aber 8 statt
 #: 6: Word zieht beidseits Zellränder ab, und bei 6 % brach der Kopf „Prio" um.
 _SPALTEN_ANTEILE = (12, 8, 34, 23, 23)
 
+_PRIO_KUERZEL = {"kern": "K", "uebung": "Ü", "vertiefung": "V"}
+#: Unter der Tabelle. Seit 0.39 ohne Zellfarbe — Pandoc kann keine setzen (Plan F3).
+PRIO_LEGENDE = "Prio: K = Kern · Ü = Übung · V = Vertiefung"
 
-def export_docx(data: LessonExport) -> bytes:
-    try:
-        from docx import Document
-        from docx.shared import Pt, Cm, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.oxml.ns import qn
-        from docx.oxml import OxmlElement
-    except ImportError as e:
-        raise RuntimeError(f"DOCX-Export benötigt 'python-docx' ({e}).") from e
 
-    import io
+async def export_office(
+    db: AsyncSession, data: LessonExport, fmt: str, reference_doc: Optional[str] = None
+) -> bytes:
+    """Stundenentwurf als DOCX oder ODT über Pandoc (seit 0.39; bis dahin `python-docx`).
 
-    prio_labels = {"kern": "Kern", "uebung": "Übung", "vertiefung": "Vertiefung"}
-    prio_abbr = {"kern": "K", "uebung": "Ü", "vertiefung": "V"}
-    prio_hex = {"kern": "4A7FB5", "uebung": "5BA37A", "vertiefung": "B07FB8"}
-
-    def _shade_cell(cell, hex_color: str) -> None:
-        """Hintergrundfarbe einer Tabellenzelle setzen (python-docx kann das nicht direkt)."""
-        shd = OxmlElement("w:shd")
-        shd.set(qn("w:val"), "clear")
-        shd.set(qn("w:color"), "auto")
-        shd.set(qn("w:fill"), hex_color)
-        cell._tc.get_or_add_tcPr().append(shd)
-
-    doc = Document()
-
-    # A4 wie das PDF — die Vorlage von python-docx ist US-Letter.
-    for section in doc.sections:
-        section.page_width = Cm(21)
-        section.page_height = Cm(29.7)
-        # Seitenränder
-        section.top_margin = Cm(2)
-        section.bottom_margin = Cm(2)
-        section.left_margin = Cm(2.5)
-        section.right_margin = Cm(2.5)
-
-    # Kopf
-    h = doc.add_heading(data.titel, 0)
-    h.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-    meta_parts = []
-    if data.datum:
-        meta_parts.append(data.datum)
-    if data.gruppe:
-        meta_parts.append(data.gruppe)
-    if data.ue_titel:
-        meta_parts.append(f"UE: {data.ue_titel}")
-    if meta_parts:
-        doc.add_paragraph(" · ".join(meta_parts)).runs[0].font.size = Pt(10)
-
-    if data.stundenziel:
-        p = doc.add_paragraph()
-        p.add_run("Stundenziel: ").bold = True
-        p.add_run(data.stundenziel)
+    Stundenziel, Beschreibungen, Kompetenzen und Fachbegriffe sind Markdown wie in der Werkstatt:
+    Formeln werden Word-Formeln, Diagramme Bilder. Inhalt und Reihenfolge wie im PDF.
+    """
+    from app.export import office as o
 
     total, ohne = zeitbudget(data.phasen)
-    budget_text = f"Zeitbudget: {total}′ / {data.verfuegbare_min}′ verfügbar"
-    if total > data.verfuegbare_min:
-        budget_text += f" (+{total - data.verfuegbare_min}′ Überhang)"
-    budget_text += ohne_dauer_zusatz(ohne)
-    doc.add_paragraph(budget_text).runs[0].font.size = Pt(9)
+    teile: dict[str, str] = {}
+    if data.stundenziel:
+        teile["ziel"] = f"**Stundenziel:** {data.stundenziel}"
+    for i, phase in enumerate(data.phasen):
+        teile[f"p{i}"] = phase.beschreibung or ""
+    if data.kompetenzen:
+        teile["kompetenzen"] = "**Kompetenzen:** " + ", ".join(
+            kompetenz_kurz(r) for r in data.kompetenzen)
+    if data.fachbegriffe:
+        teile["begriffe"] = "**Fachbegriffe:** " + ", ".join(
+            begriff_mit_aliasen(r) for r in data.fachbegriffe)
+    bloecke, api = await o.markdown_zu_bloecken(db, teile)
 
-    doc.add_paragraph()
+    dok = [o.ueberschrift(1, o.text(data.titel))]
+    kopf = [t for t in (data.datum, data.gruppe, f"UE: {data.ue_titel}" if data.ue_titel else "") if t]
+    if kopf:
+        dok.append(o.absatz(o.text(" · ".join(kopf))))
+    dok += bloecke.get("ziel", [])
+
+    budget = f"Zeitbudget: {total}′ / {data.verfuegbare_min}′ verfügbar"
+    if total > data.verfuegbare_min:
+        budget += f" (+{total - data.verfuegbare_min}′ Überhang)"
+    dok.append(o.absatz(o.text(budget + ohne_dauer_zusatz(ohne))))
 
     if data.phasen:
-        table = doc.add_table(rows=1, cols=5)
-        table.style = "Table Grid"
-        hdr = table.rows[0].cells
-        for i, label in enumerate(["Zeit", "Prio", "Phase", "Sozialform / Methode", "Material"]):
-            hdr[i].text = label
-            hdr[i].paragraphs[0].runs[0].bold = True
-
-        for phase, zeit in zip(data.phasen, zeitspalte(data.phasen)):
-            row = table.add_row().cells
-            row[0].text = zeit
-
-            # Prio: farbige Zelle + Kürzel (K/Ü/V), weiß zentriert — analog zur App.
-            prio_cell = row[1]
-            prio_cell.text = prio_abbr.get(phase.prio, "?")
-            _shade_cell(prio_cell, prio_hex.get(phase.prio, "888888"))
-            p = prio_cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.runs[0]
-            run.bold = True
-            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-
-            name = f"{phase.name} (gestrichen)" if phase.gestrichen else phase.name
-            row[2].text = f"{name}\n{phase.beschreibung}" if phase.beschreibung else name
+        zeilen = []
+        for i, (phase, zeit) in enumerate(zip(data.phasen, zeitspalte(data.phasen))):
+            name = [o.fett(o.text(phase.name))]
             if phase.gestrichen:
-                for absatz in row[2].paragraphs:
-                    for lauf in absatz.runs:
-                        lauf.font.strike = True
-
-            # Sozialform (fett) über Methode stapeln.
-            mc = row[3]
-            mc.text = phase.sozialform or phase.methode or ""
+                name += o.text(" (gestrichen)")
+            phase_zelle = [o.schlicht(name), *bloecke[f"p{i}"]]
+            if phase.gestrichen:
+                phase_zelle = o.durchstreichen(phase_zelle)
+            sozial = []
             if phase.sozialform:
-                mc.paragraphs[0].runs[0].bold = True
-                if phase.methode:
-                    mc.add_paragraph(phase.methode)
+                sozial.append(o.schlicht([o.fett(o.text(phase.sozialform))]))
+            if phase.methode:
+                sozial.append(o.schlicht(o.text(phase.methode)))
+            material = [o.schlicht(o.text(m)) for m in phase.material if m]
+            zeilen.append([
+                [o.schlicht(o.text(zeit))],
+                [o.schlicht([o.fett(o.text(_PRIO_KUERZEL.get(phase.prio, "?")))])],
+                phase_zelle,
+                sozial,
+                material,
+            ])
+        dok.append(o.tabelle(
+            ["Zeit", "Prio", "Phase", "Sozialform / Methode", "Material"],
+            zeilen,
+            [a / 100 for a in _SPALTEN_ANTEILE],
+        ))
+        dok.append(o.absatz(o.text(PRIO_LEGENDE)))
 
-            row[4].text = "\n".join(m for m in phase.material if m)
-
-        # Spaltenbreiten wie im PDF (`lesson.html`). Ohne sie teilt Word die Breite gleichmäßig:
-        # Die Prio-Spalte war so breit wie die Phasenspalte, die dadurch Wörter trennte.
-        # Gesetzt an Spalte (`gridCol`, liest LibreOffice) und Zelle (`tcW`, liest Word).
-        section = doc.sections[0]
-        nutzbar = section.page_width - section.left_margin - section.right_margin
-        table.autofit = False
-        for i, anteil in enumerate(_SPALTEN_ANTEILE):
-            breite = int(nutzbar * anteil / 100)
-            table.columns[i].width = breite
-            for cell in table.columns[i].cells:
-                cell.width = breite
-
-    # Kompetenzen und Begriffe unter der Tabelle, wie im PDF (`lesson.html`). Bis 0.18 fehlten
-    # beide im DOCX. Formeln in Titeln bleiben TeX-Quelle — python-docx kann kein OMML.
-    for label, eintraege in (
-        ("Kompetenzen", [kompetenz_kurz(r) for r in data.kompetenzen]),
-        ("Fachbegriffe", [begriff_mit_aliasen(r) for r in data.fachbegriffe]),
-    ):
-        if eintraege:
-            p = doc.add_paragraph()
-            p.paragraph_format.space_before = Pt(6)
-            p.add_run(f"{label}: ").bold = True
-            p.add_run(", ".join(eintraege))
-            for run in p.runs:
-                run.font.size = Pt(9)
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+    dok += bloecke.get("kompetenzen", []) + bloecke.get("begriffe", [])
+    return await o.dokument_zu_office(dok, api_version=api, fmt=fmt, reference_doc=reference_doc)

@@ -94,8 +94,8 @@
         <h1 class="text-2xl font-semibold">Export-Vorlagen</h1>
     </div>
     <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-        Schulweites Layout für exportierte Dokumente der Material-Werkstatt. Fehlt eine Vorlage,
-        greift die eingebaute Standard-Optik.
+        Schulweites Layout für exportierte Dokumente. Fehlt eine Vorlage, greift die eingebaute
+        Standard-Optik (A4).
     </p>
 
     <InfoBanner message="PDF-Exporte werden über CSS gestaltet; Word/ODT über ein hochgeladenes Referenzdokument (dessen Formatvorlagen Pandoc übernimmt). PDF- und Word-Layout lassen sich nicht exakt angleichen." />
@@ -137,6 +137,8 @@
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">PDF: eigenes CSS</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-2">
                 Ergänzt/überschreibt die Standard-Vorlage (z. B. Schriftart, Farben, Kopf-/Fußzeile).
+                Gilt nur für Dokumente der Material-Werkstatt; Stundenentwurf und Curriculum haben
+                ein eigenes PDF-Layout.
             </p>
             <textarea
                 bind:value={css}
@@ -166,7 +168,8 @@
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">Word/ODT: Referenzdokument</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3">
                 Ein Dokument im jeweiligen Format, dessen Formatvorlagen (Schriften, Überschriften,
-                Ränder) übernommen werden.
+                Ränder) übernommen werden. Gilt für alle Word- und ODT-Exporte: Material-Werkstatt,
+                Stundenentwurf und Curriculum.
             </p>
             <div class="space-y-2">
                 {#each REFS as r}

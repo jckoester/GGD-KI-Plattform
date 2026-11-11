@@ -291,23 +291,6 @@ def _parse_material_for_pdf(text: str) -> list[dict]:
     return parts
 
 
-_md_parser = None
-
-
-def _render_markdown(text: str) -> str:
-    """Rendert Konkretisierungs-Markdown zu HTML (Listen, Betonung etc.).
-
-    Roh-HTML in der Quelle wird escaped (html=False) – sicher fürs PDF-Template.
-    """
-    if not text:
-        return ""
-    global _md_parser
-    if _md_parser is None:
-        from markdown_it import MarkdownIt
-        _md_parser = MarkdownIt("commonmark", {"html": False})
-    return _md_parser.render(text)
-
-
 async def _build_pdf_kapitel(tree: dict) -> list[dict]:
     """Reichert die Curriculum-Struktur fürs PDF-Template an.
 
@@ -408,3 +391,112 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
     return pdf_bytes
+
+
+# ── DOCX/ODT-Export (0.39, Päckchen K) ────────────────────────────────────────
+
+#: Spaltenanteile wie im PDF (`curriculum_pdf.html`: PK 24 · IK 28 · Konkretisierung 26 · H&M 22).
+_SPALTEN_ANTEILE = (0.24, 0.28, 0.26, 0.22)
+_KOPF = ["PK", "IK", "Konkretisierung", "Hinweise & Material"]
+
+
+def _ik_pk_texte(e: dict, ls: dict) -> tuple[list[str], list[str]]:
+    """IK- und PK-Volltexte wie im PDF (`_build_pdf_kapitel`); teilweise IK mit „(T)"."""
+    ik_titel = {r["node_id"]: r.get("title") for r in ls.get("ik_refs", [])}
+    pk_titel = {r["node_id"]: r.get("title") for r in ls.get("pk_refs", [])}
+    iks, pks = [], []
+    for ik in e.get("ik") or []:
+        if isinstance(ik, dict):
+            t = ik_titel.get(ik.get("node_id")) or ik.get("nr") or ""
+            if t:
+                iks.append(t + (" (T)" if ik.get("partiell") else ""))
+        elif isinstance(ik, str) and ik:
+            iks.append(ik)
+    for pk in e.get("pk") or []:
+        t = (pk_titel.get(pk.get("node_id")) or pk.get("pk_id") or "") if isinstance(pk, dict) else pk
+        if t:
+            pks.append(t)
+    return iks, pks
+
+
+def _liste(texte: list[str]) -> str:
+    # Ein Eintrag je Punkt; Zeilenumbrüche im Titel würden die Liste zerreißen.
+    return "\n".join("- " + " ".join(t.split()) for t in texte)
+
+
+def _hinweise_bloecke(hinweise: str, material: str) -> list[dict]:
+    """Hinweise und Material als Klartext wie im PDF: Verweise mit ihrer Beschriftung —
+    Leitperspektive und Kompetenz fett, LP-Aspekt kursiv, Material fett. Kein Markdown."""
+    from app.export import office as o
+
+    bloecke = []
+    teile = []
+    for teil in _parse_hinweise_for_pdf(hinweise):
+        if teil["kind"] == "text":
+            teile += o.text(teil["text"])
+        elif teil["kind"] == "lpa":
+            teile.append({"t": "Emph", "c": o.text(teil["label"])})
+        else:
+            teile.append(o.fett(o.text(teil["label"])))
+    if teile:
+        bloecke.append(o.schlicht(teile))
+    teile = []
+    for teil in _parse_material_for_pdf(material):
+        teile += o.text(teil["text"]) if teil["kind"] == "text" else [o.fett(o.text(teil["label"]))]
+    if teile:
+        bloecke.append(o.schlicht(teile))
+    return bloecke
+
+
+async def render_curriculum_office(
+    db: AsyncSession, tree: dict, fmt: str, reference_doc: str | None = None
+) -> bytes:
+    """Curriculum als DOCX oder ODT — zum Weiterbearbeiten außerhalb der Plattform.
+
+    Zurück kommt eine solche Fassung nicht: Der Import liest YAML. Aufbau wie im PDF; IK, PK und
+    Konkretisierung sind Markdown (Formeln in Kompetenztiteln, Listen in der Konkretisierung).
+    """
+    from app.config import settings
+    from app.export import office as o
+
+    teile: dict[str, str] = {}
+    gerueste = []  # (kapitel, [(ls, [eintrag-Schlüssel])])
+    for k, kap in enumerate(tree.get("kapitel", [])):
+        lss = []
+        for l, ls in enumerate(kap.get("lernsequenzen", [])):
+            schluessel = []
+            for i, e in enumerate((ls.get("metadata") or {}).get("eintraege", [])):
+                s = f"{k}.{l}.{i}"
+                iks, pks = _ik_pk_texte(e, ls)
+                teile[f"pk{s}"] = _liste(pks)
+                teile[f"ik{s}"] = _liste(iks)
+                teile[f"ko{s}"] = e.get("konkretisierung") or ""
+                schluessel.append((s, e))
+            lss.append((ls, schluessel))
+        gerueste.append((kap, lss))
+    bloecke, api = await o.markdown_zu_bloecken(db, teile)
+
+    meta = tree.get("metadata", {})
+    dok = []
+    schule = settings.export_school_name or meta.get("schule", "")
+    if schule:
+        dok.append(o.absatz(o.text(schule)))
+    dok.append(o.ueberschrift(1, o.text(tree.get("title", ""))))
+    dok.append(o.absatz(o.text(
+        f"{meta.get('schulart', '')} | Kl. {meta.get('jahrgangsstufe', '')} | BP {meta.get('bp_version', '')}"
+    )))
+    for kap, lss in gerueste:
+        std = (kap.get("metadata") or {}).get("std")
+        dok.append(o.ueberschrift(2, o.text(f"{kap.get('title') or ''}" + (f" ({std} Std.)" if std else ""))))
+        for ls, schluessel in lss:
+            std = (ls.get("metadata") or {}).get("std")
+            dok.append(o.ueberschrift(3, o.text(f"{ls.get('title') or '–'}" + (f" ({std} Std.)" if std else ""))))
+            if schluessel:
+                zeilen = [[
+                    bloecke[f"pk{s}"], bloecke[f"ik{s}"], bloecke[f"ko{s}"],
+                    _hinweise_bloecke(e.get("hinweise") or "", e.get("material") or ""),
+                ] for s, e in schluessel]
+            else:
+                zeilen = [[[o.schlicht(o.text("(keine Einträge)"))], [], [], []]]
+            dok.append(o.tabelle(_KOPF, zeilen, list(_SPALTEN_ANTEILE)))
+    return await o.dokument_zu_office(dok, api_version=api, fmt=fmt, reference_doc=reference_doc)

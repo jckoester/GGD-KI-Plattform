@@ -138,3 +138,20 @@ def test_pele_css_groesse_fliegt_raus():
     assert "max-width" not in wurzel and "height:auto" not in wurzel and "height: auto" not in wurzel
     assert 'color="#100f0f"' in wurzel          # Präsentationsattribute bleiben (als Attribut)
     assert '<g style="height: auto"/>' in html  # nur das Wurzelelement wird angefasst
+
+
+# ── Rohes HTML (0.39, Plan F5) ──────────────────────────────────────────────────
+
+async def test_br_sub_sup_wirken_andere_tags_fallen_weg():
+    from app.render.export import render_markdown_for_pdf
+
+    html = await render_markdown_for_pdf("a<br/>b H<sub>2</sub>O x<SUP>2</SUP> <u>unter</u> a < b")
+    assert "a<br>b" in html and "H<sub>2</sub>O" in html and "x<sup>2</sup>" in html
+    assert "<u>" not in html and "&lt;u&gt;" not in html and "unter" in html
+    assert "a &lt; b" in html, "ein einzelnes < ist kein Tag"
+
+
+async def test_tags_im_code_bleiben_text():
+    from app.render.export import render_markdown_for_pdf
+
+    assert "<code>&lt;br&gt;</code>" in await render_markdown_for_pdf("`<br>`")

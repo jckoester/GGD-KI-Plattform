@@ -2086,7 +2086,7 @@ export async function getFachplaene() {
  * Lädt ein Curriculum als YAML oder PDF herunter.
  * @param {string} curriculumId - UUID des Curriculums
  * @param {string} filename - Dateiname für den Download
- * @param {'yaml'|'pdf'} format - Exportformat
+ * @param {'yaml'|'pdf'|'docx'|'odt'} format - Exportformat
  */
 export async function exportCurriculum(curriculumId, filename, format = 'yaml') {
     const res = await fetch(`${BASE}/context/curricula/${curriculumId}/export?format=${format}`, {

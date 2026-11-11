@@ -8,7 +8,8 @@ exportieren.
 
 - **PDF** wird über weasyprint erzeugt (bereits für den Curriculum-Export vorhanden) — **keine**
   zusätzliche Abhängigkeit.
-- **DOCX/ODT** laufen über **Pandoc**. Im Docker-Image ist `pandoc` enthalten (Dockerfile). Fehlt
+- **DOCX/ODT** laufen über **Pandoc** — seit 0.39 auch für Stundenentwurf und Curriculum (bis dahin
+  baute `python-docx` den Stundenentwurf). Im Docker-Image ist `pandoc` enthalten (Dockerfile). Fehlt
   Pandoc, ist der Office-Export **automatisch deaktiviert** (Feature-Flag) — PDF und der Rest der
   Plattform funktionieren normal; ein Office-Export-Versuch meldet „nicht verfügbar" (HTTP 503).
 
@@ -35,9 +36,16 @@ Unter **Einstellungen → Export-Vorlagen** (`/settings/export`, nur Admin):
   Farben, Kopf-/Fußzeile). Wird in `site_config` (`export_css`) gespeichert.
 - **Word/ODT-Referenzdokument** — je ein hochgeladenes `.docx`/`.odt`, dessen Formatvorlagen
   (Überschriften, Schriften, Ränder) Pandoc via `--reference-doc` übernimmt. Am einfachsten: ein
-  bestehendes Dokument mit den gewünschten Formatvorlagen speichern und hochladen.
+  bestehendes Dokument mit den gewünschten Formatvorlagen speichern und hochladen. **Seit 0.39
+  gilt es für alle Word-/ODT-Exporte**: Material-Werkstatt, Stundenentwurf und Curriculum.
+  Tabellen (Stundenentwurf, Curriculum) nehmen die Tabellen-Formatvorlage „Table“.
 
-Fehlt eine Vorlage, greift die eingebaute Default-Optik. **PDF- und DOCX-Layout lassen sich
+Das **PDF-CSS gilt nur für Werkstatt-Dokumente**; Stundenentwurf und Curriculum haben ein eigenes
+PDF-Layout, das fremde Regeln leicht zerschießen.
+
+Fehlt eine Vorlage, greift die eingebaute Default-Optik — seit 0.39 auf **A4** (Ränder 2 cm
+oben/unten, 2,5 cm links/rechts). Pandocs eigene Vorlage ist US-Letter (ODT) bzw. legt gar kein
+Format fest (DOCX); bis 0.38 kamen Werkstatt-Dokumente ohne Schulvorlage deshalb so heraus. **PDF- und DOCX-Layout lassen sich
 prinzipiell nicht exakt angleichen** (verschiedene Layout-Systeme) — „ungefähr gleich" ist das
 erreichbare Ziel. Persönliche (nutzereigene) Vorlagen sind noch nicht vorgesehen.
 

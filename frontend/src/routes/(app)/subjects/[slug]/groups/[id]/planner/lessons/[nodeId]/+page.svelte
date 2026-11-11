@@ -487,6 +487,7 @@
             </button>
             <button onclick={() => download('pdf')} class={exportBtn}>PDF</button>
             <button onclick={() => download('docx')} class={exportBtn}>DOCX</button>
+            <button onclick={() => download('odt')} class={exportBtn}>ODT</button>
           </div>
         </div>
       </div>

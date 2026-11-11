@@ -518,3 +518,25 @@ describe('formelVorschau — Vorschau im Formel-Dialog', () => {
         expect(v.fehler).toMatch(/placeholder/)
     })
 })
+
+describe('renderMarkdown — rohes HTML wie im Export (0.39, wieImExport)', () => {
+    const quelle = 'a<br/>b H<sub>2</sub>O x<SUP>2</SUP> <u>unter</u>\n\n| A |\n|---|\n| x<br>y |'
+
+    it('lässt nur br, sub und sup wirken; andere Tags fallen weg, ihr Text bleibt', () => {
+        const html = renderMarkdown(quelle, { wieImExport: true })
+        expect(html).toContain('a<br>b')
+        expect(html).toContain('H<sub>2</sub>O')
+        expect(html).toContain('x<sup>2</sup>')
+        expect(html).toContain('x<br>y')
+        expect(html).not.toContain('<u>')
+        expect(html).toContain('unter')
+    })
+
+    it('lässt Tags im Code als Text stehen', () => {
+        expect(renderMarkdown('`<u>x</u>`', { wieImExport: true })).toContain('&lt;u&gt;')
+    })
+
+    it('ändert im Chat nichts', () => {
+        expect(renderMarkdown(quelle)).toContain('<u>unter</u>')
+    })
+})

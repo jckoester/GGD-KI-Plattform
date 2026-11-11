@@ -1,4 +1,4 @@
-"""Tests für lesson_export.py: export_markdown (golden), PDF/DOCX (smoke)."""
+"""Tests für lesson_export.py: export_markdown (golden), PDF/DOCX/ODT."""
 
 import pytest
 from app.planning.lesson_export import ExportPhase, LessonExport, export_markdown, _slugify
@@ -235,97 +235,141 @@ def test_begriffe_mit_aliasen():
     assert kopf["fachbegriffe"] == ["elektrophile Substitution (σ-Komplex, Arenium-Ion)"]
 
 
-# ── DOCX smoke ────────────────────────────────────────────────────────────────
+# ── DOCX/ODT über Pandoc (seit 0.39; bis dahin python-docx) ──────────────────────
+
+_needs_pandoc = pytest.mark.skipif(
+    not __import__("app.export.pandoc", fromlist=["x"]).pandoc_available(),
+    reason="pandoc nicht installiert",
+)
 
 
-def test_export_docx_returns_bytes():
-    pytest.importorskip("docx")
-    from app.planning.lesson_export import export_docx
+async def _office(export, fmt="docx") -> bytes:
+    from app.export.templates import vorlage
+    from app.planning.lesson_export import export_office
 
-    result = export_docx(_make_export())
-    assert isinstance(result, bytes)
-    assert len(result) > 1000  # non-trivial docx
-    # DOCX magic bytes (PK zip header)
-    assert result[:2] == b"PK"
+    return await export_office(None, export, fmt, reference_doc=vorlage(fmt))
 
 
-def test_export_docx_empty_phasen():
-    pytest.importorskip("docx")
-    from app.planning.lesson_export import export_docx
+def _ast(data: bytes) -> dict:
+    """Das DOCX, von Pandoc zurückgelesen — Absätze, Tabellen, Formatierung als Struktur."""
+    import json
+    import subprocess
 
-    export = _make_export(phasen=[])
-    result = export_docx(export)
-    assert isinstance(result, bytes)
-    assert result[:2] == b"PK"
-
-
-def _docx_bloecke(export) -> list[str]:
-    """Der Körper des DOCX in Reihenfolge: Absatztexte, Tabellen als „<tabelle>"."""
-    import io
-
-    from docx import Document
-
-    from app.planning.lesson_export import export_docx
-
-    koerper = Document(io.BytesIO(export_docx(export))).element.body
-    return ["<tabelle>" if el.tag.endswith("}tbl") else "".join(t.text or "" for t in el.iter() if t.tag.endswith("}t"))
-            for el in koerper if el.tag.endswith(("}p", "}tbl"))]
+    roh = subprocess.run(["pandoc", "-f", "docx", "-t", "json"], input=data,
+                         capture_output=True, check=True).stdout
+    return json.loads(roh)
 
 
-def test_docx_kompetenzen_und_begriffe_unter_der_tabelle():
+def _klartext(knoten) -> str:
+    if isinstance(knoten, list):
+        return "".join(_klartext(k) for k in knoten)
+    if isinstance(knoten, dict):
+        t = knoten.get("t")
+        if t == "Str":
+            return knoten["c"]
+        if t in ("Space", "SoftBreak"):
+            return " "
+        if t == "LineBreak":
+            return "\n"
+        if t == "Math":
+            return f"${knoten['c'][1]}$"
+        return _klartext(knoten.get("c", []))
+    return ""
+
+
+def _gliederung(ast: dict) -> list[str]:
+    """Der Körper in Reihenfolge: Absatztexte, Tabellen als „<tabelle>"."""
+    return ["<tabelle>" if b["t"] == "Table" else _klartext(b) for b in ast["blocks"]]
+
+
+def _tabelle(ast: dict) -> list[list[dict]]:
+    """Die Datenzeilen der ersten Tabelle, je Zelle die Blöcke."""
+    t = next(b for b in ast["blocks"] if b["t"] == "Table")
+    return [[zelle[4] for zelle in zeile[1]] for zeile in t["c"][4][0][3]]
+
+
+@_needs_pandoc
+@pytest.mark.parametrize("fmt", ["docx", "odt"])
+async def test_office_liefert_datei(fmt):
+    assert (await _office(_make_export(), fmt))[:2] == b"PK"
+    assert (await _office(_make_export(phasen=[]), fmt))[:2] == b"PK"
+
+
+@_needs_pandoc
+async def test_docx_kompetenzen_und_begriffe_unter_der_tabelle():
     """Bis 0.18 fehlten beide im DOCX; MD und PDF führten sie. Lage wie im PDF: unter der Tabelle."""
-    pytest.importorskip("docx")
     se = {"typ": "concept", "code": None, "titel": "elektrophile Substitution", "partiell": False,
           "aliase": ["σ-Komplex", "Arenium-Ion"]}
-    bloecke = _docx_bloecke(_make_export(refs=_make_export().refs + [se]))
+    bloecke = _gliederung(_ast(await _office(_make_export(refs=_make_export().refs + [se]))))
     tabelle = bloecke.index("<tabelle>")
     assert bloecke.index("Kompetenzen: 3.1.2, K1[…]") > tabelle
     assert bloecke.index("Fachbegriffe: elektrophile Substitution (σ-Komplex, Arenium-Ion)") > tabelle
 
 
-def test_docx_ohne_refs_keine_absaetze():
-    pytest.importorskip("docx")
-    bloecke = _docx_bloecke(_make_export(refs=[]))
+@_needs_pandoc
+async def test_docx_ohne_refs_keine_absaetze():
+    bloecke = _gliederung(_ast(await _office(_make_export(refs=[]))))
     assert not any(b.startswith(("Kompetenzen:", "Fachbegriffe:")) for b in bloecke)
 
 
-def test_docx_nur_begriffe():
-    pytest.importorskip("docx")
-    bloecke = _docx_bloecke(_make_export(refs=_BEGRIFFE))
+@_needs_pandoc
+async def test_docx_nur_begriffe():
+    bloecke = _gliederung(_ast(await _office(_make_export(refs=_BEGRIFFE))))
     assert "Fachbegriffe: Benzol, Mesomerie" in bloecke
     assert not any(b.startswith("Kompetenzen:") for b in bloecke)
 
 
-def test_docx_ist_a4():
-    """Die Vorlage von python-docx ist US-Letter; das PDF ist A4."""
-    pytest.importorskip("docx")
+@_needs_pandoc
+async def test_docx_prio_als_kuerzel_mit_legende():
+    """Seit 0.39 ohne Zellfarbe (Pandoc kann keine setzen, Plan F3) — Kürzel und Legende."""
+    from app.planning.lesson_export import PRIO_LEGENDE
+
+    ast = _ast(await _office(_make_export()))
+    assert [_klartext(z[1]) for z in _tabelle(ast)] == ["K", "K", "Ü"]
+    assert PRIO_LEGENDE in _gliederung(ast)
+
+
+@_needs_pandoc
+@pytest.mark.parametrize("fmt", ["docx", "odt"])
+async def test_office_ist_a4(fmt):
+    """Pandocs eigene Vorlage ist US-Letter (ODT) bzw. ohne Format (DOCX) — die eingebaute A4."""
     import io
+    import zipfile
 
-    from docx import Document
-
-    from app.planning.lesson_export import export_docx
-
-    section = Document(io.BytesIO(export_docx(_make_export()))).sections[0]
-    assert round(section.page_width.cm, 1) == 21.0
-    assert round(section.page_height.cm, 1) == 29.7
+    z = zipfile.ZipFile(io.BytesIO(await _office(_make_export(), fmt)))
+    if fmt == "docx":
+        assert '<w:pgSz w:w="11906" w:h="16838"' in z.read("word/document.xml").decode()
+    else:
+        assert 'fo:page-width="21cm"' in z.read("styles.xml").decode()
 
 
-def test_docx_spaltenbreiten_wie_im_pdf():
+@_needs_pandoc
+async def test_docx_spaltenbreiten_wie_im_pdf():
     """Bis 0.18 waren alle fünf Spalten gleich breit; die Phasenspalte trennte Wörter."""
-    pytest.importorskip("docx")
+    from app.planning.lesson_export import _SPALTEN_ANTEILE
+
+    t = next(b for b in _ast(await _office(_make_export()))["blocks"] if b["t"] == "Table")
+    breiten = [s[1]["c"] for s in t["c"][2]]
+    gesamt = sum(breiten)  # Pandoc liest die Breiten auf eine eigene Grundlage zurück
+    for breite, anteil in zip(breiten, _SPALTEN_ANTEILE):
+        assert abs(breite / gesamt * 100 - anteil) < 0.5
+    assert breiten[2] > 3 * breiten[1]  # Phase ≫ Prio
+
+
+@_needs_pandoc
+async def test_docx_formeln_und_markdown_in_der_beschreibung():
+    """Neu in 0.39: Beschreibungen sind Markdown wie in der Werkstatt, Formeln Word-Formeln."""
+    export = _make_export()
+    export.phasen[0].beschreibung = "Mit $x^2$ und \\(\\frac{1}{2}\\)\n\n- **Liste**"
+    export.stundenziel = "Gleichung \\(E = mc^2\\) erklären"
+    data = await _office(export)
     import io
+    import zipfile
 
-    from docx import Document
-
-    from app.planning.lesson_export import _SPALTEN_ANTEILE, export_docx
-
-    doc = Document(io.BytesIO(export_docx(_make_export())))
-    tabelle = doc.tables[0]
-    gesamt = sum(c.width for c in tabelle.columns)
-    for spalte, anteil in zip(tabelle.columns, _SPALTEN_ANTEILE):
-        assert abs(spalte.width / gesamt * 100 - anteil) < 0.5
-        assert all(zelle.width == spalte.width for zelle in spalte.cells)
-    assert tabelle.columns[2].width > 3 * tabelle.columns[1].width  # Phase ≫ Prio
+    xml = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode()
+    assert xml.count("<m:oMath>") == 3
+    zelle = _tabelle(_ast(data))[0][2]
+    assert [b["t"] for b in zelle][-1] == "BulletList"
 
 
 def test_pdf_prio_farbe_schlaegt_zeilenstreifen():
@@ -411,13 +455,13 @@ class TestFormelnImStundenPdf:
         assert "[…]" in html
 
     @pytest.mark.asyncio
-    async def test_titel_wird_escapet(self):
-        """Das Template gibt mit `| safe` aus."""
+    async def test_titel_ohne_fremdes_html(self):
+        """Das Template gibt mit `| safe` aus. Seit 0.39 fällt ein fremdes Tag weg (Plan F5)."""
         html = await self._pdf_html(_make_export(refs=[
             {"typ": "ik", "code": "", "titel": "<script>alert(1)</script>", "partiell": False},
         ]))
-        assert "<script>alert(1)</script>" not in html
-        assert "&lt;script&gt;" in html
+        assert "<script>" not in html
+        assert "alert(1)" in html
 
     @pytest.mark.asyncio
     async def test_ohne_kompetenzen_kein_block(self):
@@ -470,19 +514,14 @@ def test_markdown_ohne_fehlende_dauer_kein_zusatz():
     assert "ohne Dauer" not in export_markdown(_make_export())
 
 
-def test_docx_mit_phase_ohne_dauer():
-    import io
-
-    from docx import Document
-
-    from app.planning.lesson_export import export_docx
-
-    doc = Document(io.BytesIO(export_docx(_mit_skizze())))
-    zeiten = [zeile.cells[0].text for zeile in doc.tables[0].rows[1:]]
+@_needs_pandoc
+async def test_docx_mit_phase_ohne_dauer():
+    ast = _ast(await _office(_mit_skizze()))
+    zeiten = [_klartext(z[0]) for z in _tabelle(ast)]
     # Die Skizze beginnt bei 15. Danach steht die Uhr: Wann die Sicherung beginnt, weiß
     # niemand. Bis 03.10.2026 stand hier „15–30′" — die fehlende Dauer als 0 gezählt.
     assert zeiten == ["0–15′", "ab 15′", "–"]
-    budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
+    budget = next(b for b in _gliederung(ast) if b.startswith("Zeitbudget"))
     assert "30′ / 90′ verfügbar · 1 Phase ohne Dauer" in budget
 
 
@@ -543,20 +582,15 @@ def test_markdown_gestrichene_sichtbar_und_nicht_gezaehlt():
     assert "30′ geplant / 90′ verfügbar" in md
 
 
-def test_docx_gestrichene_durchgestrichen_ohne_zeit():
-    import io
-
-    from docx import Document
-
-    from app.planning.lesson_export import export_docx
-
-    doc = Document(io.BytesIO(export_docx(_mit_gestrichener())))
-    zeilen = doc.tables[0].rows[1:]
-    assert [z.cells[0].text for z in zeilen] == ["0–15′", "–", "15–30′"]
-    name = zeilen[1].cells[2].paragraphs[0]
-    assert name.text.startswith("Erarbeitung (gestrichen)")
-    assert all(lauf.font.strike for lauf in name.runs)
-    budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
+@_needs_pandoc
+async def test_docx_gestrichene_durchgestrichen_ohne_zeit():
+    ast = _ast(await _office(_mit_gestrichener()))
+    zeilen = _tabelle(ast)
+    assert [_klartext(z[0]) for z in zeilen] == ["0–15′", "–", "15–30′"]
+    name = zeilen[1][2][0]
+    assert _klartext(name).startswith("Erarbeitung (gestrichen)")
+    assert all(i["t"] == "Strikeout" for i in name["c"]), "die ganze Zeile durchgestrichen"
+    budget = next(b for b in _gliederung(ast) if b.startswith("Zeitbudget"))
     assert "30′ / 90′ verfügbar" in budget
 
 

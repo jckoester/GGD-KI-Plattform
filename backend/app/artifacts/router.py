@@ -365,7 +365,7 @@ async def export_document(
 
     # Schulweite Vorlagen (Schritt 6): CSS für PDF, reference-doc für DOCX/ODT.
     extra_css = await export_templates.get_export_css(db) if format == "pdf" else ""
-    ref = export_templates.reference_path(format)
+    ref = export_templates.vorlage(format)
 
     # Herkunftszeile — schulweit abschaltbar, und nur wenn ein Modell bekannt ist.
     herkunft = None
@@ -378,7 +378,7 @@ async def export_document(
     try:
         data, mime = await doc_export.export_document(
             db, markdown=record.source or "", title=record.title, fmt=format,
-            reference_doc=str(ref) if ref else None, extra_css=extra_css,
+            reference_doc=ref, extra_css=extra_css,
             herkunft=herkunft,
         )
     except pandoc.PandocUnavailable:

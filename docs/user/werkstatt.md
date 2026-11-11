@@ -59,6 +59,9 @@ Fassung — deine ungespeicherten Änderungen werden also zuerst gesichert.
 - **Diagramme, Schaltpläne, Funktionsgraphen und Strukturformeln** erscheinen in allen drei
   Formaten als Bild. Ein sehr breites Diagramm wird dabei passend zur Seite neu angeordnet, damit
   die Schrift lesbar bleibt — es kann also anders aussehen als in der Vorschau.
+- **HTML im Text:** Wirksam sind nur `<br>` (Zeilenumbruch, etwa in einer Tabellenzelle),
+  `<sub>` und `<sup>` (tief- und hochgestellt). Andere HTML-Befehle lässt die Werkstatt weg,
+  ihr Text bleibt stehen — in der Vorschau wie im Export.
 - Ein paar Feinheiten unterscheiden Vorschau und Export: **Fußnoten** (`[^1]`) stehen in Vorschau
   und PDF gesammelt am Ende, in Word/ODT unten auf der jeweiligen Seite; **Ankreuz-Listen**
   (`- [ ]`) zeigt die Vorschau als Kästchen, der Export als `[ ]`/`[x]`.

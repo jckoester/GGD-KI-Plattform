@@ -30,7 +30,8 @@
     let error = $state(null);
 
     let dirty = $derived(title !== savedTitle || markdown !== savedMarkdown);
-    let preview = $derived(renderMarkdown(markdown));
+    // Vorschau nach den Regeln des Exports (0.39): nur <br>, <sub>, <sup> als rohes HTML.
+    let preview = $derived(renderMarkdown(markdown, { wieImExport: true }));
 
     async function load() {
         loading = true;

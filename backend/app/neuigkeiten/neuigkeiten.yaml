@@ -325,3 +325,14 @@
     so, wie sie aussehen sollen, auf Tablet und Handy mit einer eigenen Mathe-Tastatur. Die
     Formel landet an der Cursorstelle, und deine Nachricht zeigt sie gesetzt.
   link: /help/chat#formeln-eingeben
+
+- id: "0.39-export-word"
+  version: "0.39.0"
+  datum: 2026-11-11
+  rollen: [teacher]
+  titel: "Stundenentwurf und Curriculum für Word und LibreOffice"
+  text: >-
+    Stundenentwürfe exportierst du jetzt auch als ODT, Curricula auch als DOCX und ODT. Formeln
+    werden dabei zu bearbeitbaren Formeln, Listen und Diagramme bleiben erhalten. Ohne
+    Schulvorlage kommen Word-Dateien jetzt auf A4.
+  link: /help/unterrichtsplanung#export

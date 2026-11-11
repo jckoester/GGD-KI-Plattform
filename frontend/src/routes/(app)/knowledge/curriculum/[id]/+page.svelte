@@ -235,6 +235,28 @@
                     >
                         PDF
                     </button>
+                    <button
+                        onclick={() => handleExport("docx")}
+                        disabled={exporting}
+                        title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        DOCX
+                    </button>
+                    <button
+                        onclick={() => handleExport("odt")}
+                        disabled={exporting}
+                        title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        ODT
+                    </button>
                 </div>
             </div>
 
@@ -293,6 +315,28 @@
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 PDF
+            </button>
+            <button
+                onclick={() => handleExport("docx")}
+                disabled={exporting}
+                title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
+                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx dark:text-dark-tx font-medium
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                DOCX
+            </button>
+            <button
+                onclick={() => handleExport("odt")}
+                disabled={exporting}
+                title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
+                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx dark:text-dark-tx font-medium
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                ODT
             </button>
         </div>
     {/if}

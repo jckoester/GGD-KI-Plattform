@@ -111,6 +111,24 @@ renderer.strong = function({ tokens }) {
     return _ohneFett ? inhalt : `<strong>${inhalt}</strong>`;
 };
 
+/**
+ * Rohes HTML in Werkstatt-Dokumenten (0.39, Plan F5): `wieImExport` lässt nur `<br>`, `<sub>`
+ * und `<sup>` wirken, jedes andere Tag fällt weg, sein Text bleibt — dieselbe Regel wie im
+ * PDF (`app/render/export.py`) und in DOCX/ODT (`app/export/pandoc.py`). Sonst zeigte die
+ * Vorschau `<u>` unterstrichen, und im Export verschwand es. Im Chat bleibt alles, wie es war.
+ */
+let _wieImExport = false;
+const EXPORT_TAG = /^<\/?(br|sub|sup)\b[^<>]*>$/i;
+
+renderer.html = function({ text }) {
+    if (!_wieImExport) return text;
+    return text.replace(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?\/?>/g, (tag) => {
+        if (!EXPORT_TAG.test(tag)) return '';
+        const name = tag.match(/[A-Za-z]+/)[0].toLowerCase();
+        return name === 'br' ? '<br>' : tag.startsWith('</') ? `</${name}>` : `<${name}>`;
+    });
+};
+
 function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -365,10 +383,11 @@ function escapeAttr(s) {
 // Anführungszeichen, `"[^"]*"` deckt sie deshalb ab.
 const TAG = '<(?:[^>"]|"[^"]*")*>';
 
-export function renderMarkdown(text, { dokuLinks = false, ohneFett = false } = {}) {
+export function renderMarkdown(text, { dokuLinks = false, ohneFett = false, wieImExport = false } = {}) {
     if (!text) return '';
     _dokuLinks = dokuLinks;
     _ohneFett = ohneFett;
+    _wieImExport = wieImExport;
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
     _mathStore = {};
     _mathCount = 0;
