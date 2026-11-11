@@ -91,10 +91,9 @@ DOCX/ODT-**reference-doc** auf Disk (`EXPORT_TEMPLATE_DIR`, cwd-unabhängig). Ad
 Schule oder die **eingebaute**: Pandocs eigene, beim ersten Gebrauch auf A4 umgeschrieben
 (`eingebaute_vorlage`). ⚠️ Pandocs reference.odt ist US-Letter, die reference.docx legt kein Format
 fest. Erzeugt statt mitgeliefert, damit sie zur installierten Pandoc-Fassung passt.
-⚠️ Pandoc 3.11 (Prod, CI) übernimmt das `pgSz` dieser Vorlage nicht ins DOCX, 3.13 schon. Deshalb setzt
-`nachbearbeitung._docx_seitenformat` A4, wenn das fertige DOCX kein Seitenformat hat; ein Format der
-Schulvorlage bleibt. Tests, die XML vergleichen, prüfen Attribute einzeln — Reihenfolge und Leerraum
-hängen an der Pandoc-Fassung.
+Hat eine Schulvorlage kein Seitenformat, setzt `nachbearbeitung._docx_seitenformat` A4. ⚠️ Tests, die
+Pandoc-Ausgabe prüfen, vergleichen Attribute einzeln: Pandoc 3.11 (Prod, CI) schreibt sie alphabetisch
+(`w:h` vor `w:w`) und lässt im ODT Zeilenumbrüche zwischen ihnen stehen, 3.13 nicht.
 
 ## Frontend
 

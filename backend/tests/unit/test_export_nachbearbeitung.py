@@ -47,7 +47,7 @@ def test_docx_quer_ohne_format_setzt_a4_quer():
 
 
 def test_docx_ohne_format_wird_a4():
-    """Pandoc 3.11 (Prod, CI) lässt das pgSz der eingebauten Vorlage fallen, 3.13 nicht."""
+    """Schulvorlage ohne Seitenformat: A4 statt Words Voreinstellung."""
     xml = '<w:sectPr><w:footnotePr /><w:pgMar w:top="1134" /></w:sectPr>'
     assert nb._docx_seitenformat(xml) == (
         '<w:sectPr><w:footnotePr /><w:pgSz w:w="11906" w:h="16838" /><w:pgMar w:top="1134" /></w:sectPr>'

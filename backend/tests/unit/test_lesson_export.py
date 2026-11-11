@@ -338,7 +338,11 @@ async def test_office_ist_a4(fmt):
 
     z = zipfile.ZipFile(io.BytesIO(await _office(_make_export(), fmt)))
     if fmt == "docx":
-        assert '<w:pgSz w:w="11906" w:h="16838"' in z.read("word/document.xml").decode()
+        # Attribute einzeln: Pandoc 3.11 (CI, Prod) schreibt sie alphabetisch (`w:h` vor `w:w`).
+        import re
+
+        pgsz = re.search(r"<w:pgSz\b[^>]*>", z.read("word/document.xml").decode()).group(0)
+        assert 'w:w="11906"' in pgsz and 'w:h="16838"' in pgsz
     else:
         assert 'fo:page-width="21cm"' in z.read("styles.xml").decode()
 

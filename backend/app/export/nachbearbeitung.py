@@ -83,10 +83,9 @@ _A4_QUER_DOCX = '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape" />'
 def _docx_seitenformat(xml: str, pgsz: str = _A4_DOCX) -> str:
     """Setzt `pgsz` vor die Ränder bzw. ans Ende von sectPr, wenn kein Seitenformat da ist.
 
-    ⚠️ Pandoc 3.11 (Prod, CI) übernimmt das `pgSz` der eingebauten A4-Vorlage nicht ins
-    Dokument, 3.13 schon — ohne `pgSz` nimmt Word seine Voreinstellung (US: Letter). Deshalb
-    sichert die Nachbearbeitung A4 unabhängig von der Pandoc-Fassung. Eine Schulvorlage mit
-    eigenem Seitenformat bleibt unberührt.
+    Die eingebaute Vorlage bringt A4 schon mit; das hier greift bei einer Schulvorlage ohne
+    Seitenformat, bei der Word sonst seine Voreinstellung nähme (US: Letter). Ein Format der
+    Schulvorlage bleibt unberührt.
     """
     if _PGSZ_RE.search(xml):
         return xml
