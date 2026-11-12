@@ -112,7 +112,7 @@
         <section class="mt-6">
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">Herkunft am Dokumentende</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-2">
-                Hängt exportierten Dokumenten eine Zeile an, die Werkzeug, Modell und Datum
+                Hängt exportierten Dokumenten eine Zeile an, die Plattform, Modell und Datum
                 nennt — die Angaben, die für eine Quellenangabe in GFS, Seminarkurs oder
                 Facharbeit nötig sind. Sie erscheint <strong>nur</strong>, wenn das Dokument
                 aus einer KI-Antwort stammt; von Hand geschriebene Dokumente bleiben
@@ -137,7 +137,7 @@
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">PDF: eigenes CSS</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-2">
                 Ergänzt/überschreibt die Standard-Vorlage (z. B. Schriftart, Farben, Kopf-/Fußzeile).
-                Gilt nur für Dokumente der Material-Werkstatt; Stundenentwurf und Curriculum haben
+                Gilt nur für Dokumente der Werkstatt; Stundenentwurf und Curriculum haben
                 ein eigenes PDF-Layout.
             </p>
             <textarea
@@ -168,7 +168,7 @@
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">Word/ODT: Referenzdokument</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3">
                 Ein Dokument im jeweiligen Format, dessen Formatvorlagen (Schriften, Überschriften,
-                Ränder) übernommen werden. Gilt für alle Word- und ODT-Exporte: Material-Werkstatt,
+                Ränder) übernommen werden. Gilt für alle Word- und ODT-Exporte: Werkstatt,
                 Stundenentwurf und Curriculum.
             </p>
             <div class="space-y-2">

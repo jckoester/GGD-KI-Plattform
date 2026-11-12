@@ -1,5 +1,5 @@
 /**
- * Reine Helfer für die Artefaktbibliothek (`/library`, Phase 18, Schritt 3).
+ * Reine Helfer für die Werkstatt (`/workshop`, bis 0.40 `/library`; Phase 18, Schritt 3).
  *
  * DOM-nahe Aktionen (PNG-Konvertierung, Datei-Download) liegen in der Seite; hier nur
  * pure, testbare Formatierung/Zuordnung.
@@ -76,11 +76,11 @@ const _UMLAUTS = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' };
 
 // Titel → sicherer Dateiname-Stamm.
 export function slugify(title) {
-    const s = (title || 'artefakt')
+    const s = (title || 'produkt')
         .toLowerCase()
         .replace(/[äöüß]/g, (c) => _UMLAUTS[c])
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
         .slice(0, 60);
-    return s || 'artefakt';
+    return s || 'produkt';
 }

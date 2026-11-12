@@ -74,7 +74,7 @@ export function renderDiagrams(node) {
             block.setAttribute('data-processed', ''); // vor await: re-entrante process()-Läufe überspringen
             const source = (block.textContent ?? '').trim();
             if (!source) continue;
-            block.dataset.source = source; // Rohquelle für „In Bibliothek speichern" bewahren
+            block.dataset.source = source; // Rohquelle für „In der Werkstatt speichern" bewahren
             try {
                 block.innerHTML = await diagrammSvg(source);
             } catch {

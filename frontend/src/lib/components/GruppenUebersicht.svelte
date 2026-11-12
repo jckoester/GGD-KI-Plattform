@@ -403,10 +403,10 @@
           meine Bausteine →
         </a>
         <a
-          href="/library?subject_id={subject?.id}"
+          href="/workshop?subject_id={subject?.id}"
           class="text-light-bl dark:text-dark-bl hover:underline"
         >
-          {subject ? `Artefakte in ${subject.name}` : 'Bibliothek'} →
+          {subject ? `Produkte in ${subject.name}` : 'Werkstatt'} →
         </a>
       </div>
     </div>
@@ -425,7 +425,7 @@
           </span>
           <!-- Die Herkunft verschwindet nicht, sie teilt nur nicht mehr die Liste. -->
           <span class="shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
-            {eintrag.art === 'artefakt' ? 'Artefakt' : 'Baustein'}
+            {eintrag.art === 'artefakt' ? 'Produkt' : 'Baustein'}
           </span>
           <span class="shrink-0 w-20 text-right text-xs text-light-tx-2 dark:text-dark-tx-2">
             {datum(eintrag.datum)}

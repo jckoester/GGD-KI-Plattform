@@ -111,7 +111,7 @@ def test_start_kennt_die_echten_ziele():
     """Gegen ein Auseinanderlaufen: Wer eine neue Schreibstelle in `config/` baut, trägt
     sie hier ein — sonst meldet der Start sie nicht."""
     wozu = " ".join(z.wozu for z in [*schreibbar.config_ziele(), *schreibbar.daten_ziele()])
-    for teil in ("/budget", "/settings/holidays", "Bilder", "Bibliothek", "Export-Vorlagen"):
+    for teil in ("/budget", "/settings/holidays", "Bilder", "Werkstatt", "Export-Vorlagen"):
         assert teil in wozu
 
 

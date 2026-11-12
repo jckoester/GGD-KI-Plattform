@@ -74,7 +74,39 @@ describe('slugify', () => {
     it('erzeugt sichere Dateinamen-Stämme (inkl. Umlaute)', () => {
         expect(slugify('Mein Schaltplan')).toBe('mein-schaltplan');
         expect(slugify('Übung: f(x)')).toBe('uebung-f-x');
-        expect(slugify('')).toBe('artefakt');
-        expect(slugify('  ---  ')).toBe('artefakt');
+        expect(slugify('')).toBe('produkt');
+        expect(slugify('  ---  ')).toBe('produkt');
+    });
+});
+
+// 0.40: Die Bibliothek heißt „Werkstatt“ und liegt unter /workshop. Alte Adressen leiten um.
+import { load as ladeAlteListe } from '../routes/(app)/library/+page.js';
+import { load as ladeAltenEditor } from '../routes/(app)/library/[id]/edit/+page.js';
+import { load as ladeTools } from '../routes/(app)/tools/+page.js';
+
+function umleitung(fn, arg) {
+    try {
+        fn(arg);
+    } catch (e) {
+        return { status: e.status, location: e.location };
+    }
+    throw new Error('keine Umleitung');
+}
+
+describe('alte Adressen (0.40)', () => {
+    it('/library → /workshop, Filter bleibt', () => {
+        expect(umleitung(ladeAlteListe, { url: new URL('http://x/library?subject_id=3') }))
+            .toEqual({ status: 301, location: '/workshop?subject_id=3' });
+        expect(umleitung(ladeAlteListe, { url: new URL('http://x/library') }))
+            .toEqual({ status: 301, location: '/workshop' });
+    });
+
+    it('/library/<id>/edit → /workshop/<id>/edit', () => {
+        expect(umleitung(ladeAltenEditor, { params: { id: '42' }, url: new URL('http://x/library/42/edit') }))
+            .toEqual({ status: 301, location: '/workshop/42/edit' });
+    });
+
+    it('/tools → Werkzeuge in der Assistentenliste', () => {
+        expect(umleitung(ladeTools, {})).toEqual({ status: 301, location: '/assistants?erstellt=alle' });
     });
 });

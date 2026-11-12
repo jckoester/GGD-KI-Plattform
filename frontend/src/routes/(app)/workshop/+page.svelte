@@ -56,7 +56,7 @@
             usedBytes = data.used_bytes ?? 0;
             quotaBytes = data.quota_bytes ?? 0;
         } catch (err) {
-            error = err.message ?? 'Bibliothek konnte nicht geladen werden.';
+            error = err.message ?? 'Werkstatt konnte nicht geladen werden.';
         } finally {
             loading = false;
         }
@@ -76,7 +76,7 @@
         error = null;
         try {
             const doc = await createDocument('Neues Dokument', '');
-            await goto(`/library/${doc.id}/edit`);
+            await goto(`/workshop/${doc.id}/edit`);
         } catch (err) {
             creatingDoc = false;
             error = err.message ?? 'Dokument konnte nicht angelegt werden.';
@@ -204,12 +204,12 @@
 </script>
 
 <PageBody breit>
-  <StufenHinweis eintrag="library" />
+  <StufenHinweis eintrag="workshop" />
     <div class="max-w-5xl mx-auto">
         <div class="flex items-center justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
                 <Library class="w-6 h-6" />
-                <h1 class="text-2xl font-semibold">Bibliothek</h1>
+                <h1 class="text-2xl font-semibold">Werkstatt</h1>
             </div>
             <button
                 type="button"
@@ -225,7 +225,7 @@
         {#if filterSubjectId != null}
             <div class="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                    Nur Artefakte aus Chats
+                    Nur Produkte aus Chats
                     {#if filterFach}
                         im Fach <span class="font-medium text-light-tx dark:text-dark-tx">{filterFach.name}</span>.
                     {:else}
@@ -233,7 +233,7 @@
                     {/if}
                     Was ohne Chat entstanden ist, steht nur in der vollen Liste.
                 </p>
-                <a href="/library" class="text-sm text-light-bl dark:text-dark-bl hover:underline">
+                <a href="/workshop" class="text-sm text-light-bl dark:text-dark-bl hover:underline">
                     alle anzeigen
                 </a>
             </div>
@@ -267,7 +267,7 @@
             <div class="flex items-center justify-center py-12">
                 <div class="flex flex-col items-center gap-2 text-light-tx-2 dark:text-dark-tx-2">
                     <Loader2 class="w-6 h-6 animate-spin" />
-                    <p>Bibliothek wird geladen…</p>
+                    <p>Werkstatt wird geladen…</p>
                 </div>
             </div>
         {:else if items.length === 0}
@@ -279,15 +279,15 @@
                         Hier ist noch nichts{filterFach ? ` aus ${filterFach.name}` : ''}.
                     </p>
                     <p class="text-sm mt-1">
-                        <a href="/library" class="text-light-bl dark:text-dark-bl hover:underline">
-                            Alle Artefakte anzeigen
+                        <a href="/workshop" class="text-light-bl dark:text-dark-bl hover:underline">
+                            Alle Produkte anzeigen
                         </a>
                     </p>
                 {:else}
-                    <p class="text-lg">Deine Bibliothek ist noch leer.</p>
+                    <p class="text-lg">Deine Werkstatt ist noch leer.</p>
                     <p class="text-sm mt-1">
                         Speichere Bilder oder Diagramme aus dem Chat über
-                        „In Bibliothek speichern“.
+                        „In der Werkstatt speichern“.
                     </p>
                 {/if}
             </div>
@@ -361,7 +361,7 @@
                                     <button
                                         type="button"
                                         onclick={() => copyZitat(item)}
-                                        title="Werkzeug, Modell und Datum als Textbaustein"
+                                        title="Plattform, Modell und Datum als Textbaustein"
                                         class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                                text-light-tx-2 dark:text-dark-tx-2
                                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
@@ -375,7 +375,7 @@
                                 {/if}
                                 {#if item.kind === 'document'}
                                     <a
-                                        href="/library/{item.id}/edit"
+                                        href="/workshop/{item.id}/edit"
                                         class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                                text-light-tx-2 dark:text-dark-tx-2
                                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"

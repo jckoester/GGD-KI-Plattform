@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Geändert
 
 - Der Menüpunkt „Werkzeuge“ entfällt; `/tools` leitet auf die Werkzeuge in der Assistentenliste um.
+- „Bibliothek“ heißt jetzt „Werkstatt“ (Menü, Seiten, Knöpfe im Chat, Meldungen); gespeicherte Bilder, Diagramme und
+  Dokumente heißen „Produkte“. Neue Adresse `/workshop`; `/library` leitet um.
+- Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.
 
 ### Nach dem Update
 
@@ -23,7 +26,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Seed erst mit `--dry-run`, dann ohne: Er trägt „Stellt her“ bei vorhandenen Assistenten nach, wenn die Angabe leer
   ist („Schaltpläne zeichnen“ → Diagramme).
 - Eigene Assistenten, die Diagramme oder Dokumente herstellen: im Editor „Stellt her“ setzen.
-- `config/ui_levels.yaml`: `tools` aus den Stufen streichen; der Start meldet den Schlüssel sonst als entfallen.
+- `config/ui_levels.yaml`: `tools` streichen und `library` in `workshop` umbenennen; Stufentexte nach
+  `ui_levels.example.yaml` anpassen. Ohne Anpassung bleibt die Navigation vollständig, der Start meldet beide Schlüssel.
 
 ## [0.39.2] – 2026-11-11
 

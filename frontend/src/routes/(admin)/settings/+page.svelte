@@ -131,7 +131,7 @@
             <FileText class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
             <div class="font-medium text-light-tx dark:text-dark-tx">Export-Vorlagen</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Schulweites Layout für PDF/Word/ODT der Material-Werkstatt
+                Schulweites Layout für PDF/Word/ODT der Werkstatt
             </div>
         </a>
         <!-- Fachbegriffe in jedes Fach (0.15.2) -->

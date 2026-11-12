@@ -19,7 +19,7 @@
         Database,
         FolderHeart,
         Search,
-        Library,
+        Hammer,
     Check,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
@@ -304,17 +304,17 @@
             </div>
 
         {/if}
-        {#if $zeigtEintrag('library')}
-    <!-- Bibliothek (alle Rollen) -->
+        {#if $zeigtEintrag('workshop')}
+    <!-- Werkstatt (alle Rollen; bis 0.40 „Bibliothek“) -->
             <div class="mt-2">
                 <button
-                    onclick={() => goto('/library')}
+                    onclick={() => goto('/workshop')}
                     class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
                            hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {$page.url.pathname.startsWith('/library') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                           {$page.url.pathname.startsWith('/workshop') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                 >
-                    <Library class="w-4 h-4" />
-                    Bibliothek
+                    <Hammer class="w-4 h-4" />
+                    Werkstatt
                 </button>
             </div>
 

@@ -49,7 +49,7 @@ BEKANNTE_EINTRAEGE = frozenset({
     "chat",              # Neuer Chat
     "assistants",        # Assistenten (Übersicht)
     "assistants_my",     # Meine Assistenten (Lehrkraft)
-    "library",           # Bibliothek
+    "workshop",          # Werkstatt (bis 0.40 `library`, „Bibliothek“)
     "knowledge",         # Wissensbereich (Suche, Meine Bausteine, Graph)
     "curricula",         # Curricula
     "education_plans",   # Bildungspläne und Leitperspektiven
@@ -65,6 +65,13 @@ BEKANNTE_EINTRAEGE = frozenset({
 #: „stellt her“ und steht in der Assistentenliste — die Seite `/tools` gibt es nicht mehr.
 ENTFALLEN: dict[str, str] = {
     "tools": "0.40",
+}
+
+#: Umbenannte Schlüssel: alt → (neu, seit). Der alte **wirkt weiter** als der neue (Plan 0.40,
+#: F5) — sonst verlöre die Schuldatei auf Prod beim Update stumm einen Menüpunkt. Gemeldet
+#: wird er trotzdem, mit der Bitte, ihn umzubenennen.
+UMBENANNT: dict[str, tuple[str, str]] = {
+    "library": ("workshop", "0.40"),   # „Bibliothek“ heißt seit 0.40 „Werkstatt“
 }
 
 
@@ -116,6 +123,41 @@ class RollenStufen(BaseModel):
 
     #: Was beim Laden übergangen wurde — für die Meldung, nicht für die Anwendung.
     ignoriert: tuple[str, ...] = ()
+    #: Alte Schlüssel, die unter neuem Namen übernommen wurden (`UMBENANNT`) — für die Meldung.
+    umbenannt: tuple[str, ...] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _alte_namen_uebernehmen(cls, daten):
+        """`library` → `workshop` usw., **bevor** die übrigen Prüfungen laufen.
+
+        Vorher, weil sonst eine Datei mit altem *und* neuem Namen an „Eintrag in zwei Stufen“
+        scheiterte. Steht der neue Name schon irgendwo, fällt der alte einfach weg.
+        """
+        if not isinstance(daten, dict) or not isinstance(daten.get("stufen"), list):
+            return daten
+        stufen = [dict(st) if isinstance(st, dict) else st for st in daten["stufen"]]
+        vorhanden = {
+            e for st in stufen if isinstance(st, dict) for e in st.get("eintraege") or []
+        }
+        gefunden: list[str] = []
+        for st in stufen:
+            if not isinstance(st, dict) or not isinstance(st.get("eintraege"), list):
+                continue
+            neu_liste = []
+            for e in st["eintraege"]:
+                if e in UMBENANNT:
+                    gefunden.append(e)
+                    neu = UMBENANNT[e][0]
+                    if neu in vorhanden:
+                        continue
+                    vorhanden.add(neu)
+                    e = neu
+                neu_liste.append(e)
+            st["eintraege"] = neu_liste
+        if not gefunden:
+            return daten
+        return {**daten, "stufen": stufen, "umbenannt": tuple(sorted(set(gefunden)))}
 
     @model_validator(mode="after")
     def _nur_bekannte_eintraege(self):
@@ -239,6 +281,15 @@ def _meldung_zu_ignorierten(rolle: str, unbekannt: tuple[str, ...]) -> str:
     )
 
 
+def _meldung_zu_umbenannten(rolle: str, alt: tuple[str, ...]) -> str:
+    """Alter Schlüssel in der Schuldatei: wirkt weiter, soll aber umbenannt werden."""
+    teile = [f"{e!r} heißt seit {UMBENANNT[e][1]} {UMBENANNT[e][0]!r}" for e in alt]
+    return (
+        f"Rolle {rolle!r}: {', '.join(teile)} — bitte in config/ui_levels.yaml umbenennen. "
+        "Bis dahin gilt der alte Name; die Navigation ist vollständig."
+    )
+
+
 def _nachgereichte_eintraege(cfg: UiLevels, beispiel: Path) -> dict[str, list[str]]:
     """Rolle → Einträge, die die Beispieldatei kennt und die eigene Datei nicht.
 
@@ -293,6 +344,8 @@ def load_ui_levels(path: Path | None = None) -> UiLevels:
     for rolle, stufen in cfg.rollen.items():
         if stufen.ignoriert:
             logger.warning("KONFIGURATION: %s", _meldung_zu_ignorierten(rolle, stufen.ignoriert))
+        if stufen.umbenannt:
+            logger.warning("KONFIGURATION: %s", _meldung_zu_umbenannten(rolle, stufen.umbenannt))
     for rolle, fehlend in _nachgereichte_eintraege(
         cfg, Path(str(p).replace(".yaml", ".example.yaml"))
     ).items():

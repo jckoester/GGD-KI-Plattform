@@ -249,7 +249,7 @@ export function zuletztEntstanden(bausteine = [], artefakte = [], limit = 6) {
       titel: a.title,
       typ: a.kind,
       datum: a.created_at,
-      href: `/library`,
+      href: `/workshop`,
     })),
   ]
   return eintraege

@@ -131,7 +131,7 @@ def inhalt_aus_artefakt(artifact: Artifact) -> str:
     """
     quelle = (artifact.source or "").strip()
     if not quelle:
-        raise UebernahmeFehler("Das Artefakt hat keinen Inhalt zum Übernehmen.")
+        raise UebernahmeFehler("Das Produkt hat keinen Inhalt zum Übernehmen.")
     if artifact.kind == "mermaid":
         return f"```mermaid\n{quelle}\n```"
     return quelle
@@ -151,11 +151,11 @@ def ablehnungsgrund(artifact: Artifact) -> str | None:
     """Warum nicht — in einem Satz für die Oberfläche. ``None``, wenn es geht."""
     if artifact.kind not in UEBERNEHMBARE_KINDS:
         return (
-            "Aus dieser Artefaktart lässt sich kein Baustein machen — übernehmbar sind "
+            "Aus dieser Art Produkt lässt sich kein Baustein machen — übernehmbar sind "
             "Dokumente und Mermaid-Diagramme."
         )
     if not (artifact.source or "").strip():
-        return "Das Artefakt hat keinen Inhalt zum Übernehmen."
+        return "Das Produkt hat keinen Inhalt zum Übernehmen."
     return None
 
 
@@ -163,7 +163,7 @@ def pruefe(artifact: Artifact, content_type: str, roles: list[str]) -> None:
     """Artefaktart und Bausteinart gegen die Rolle. Wirft ``UebernahmeFehler``."""
     if artifact.kind not in UEBERNEHMBARE_KINDS:
         raise UebernahmeFehler(
-            f"Aus einem Artefakt der Art „{artifact.kind}“ lässt sich kein Baustein "
+            f"Aus einem Produkt der Art „{artifact.kind}“ lässt sich kein Baustein "
             "machen — übernehmbar sind Dokumente und Mermaid-Diagramme."
         )
     erlaubt = angebotene_typen(roles)

@@ -31,10 +31,10 @@ rollen:
       - stufe: 2
         name: Sammeln und nachschlagen
         beschreibung: >-
-          Dazu die Bibliothek für erzeugtes Material und der Wissensbereich mit Suche
-          und eigenen Bausteinen.
+          Dazu die Werkstatt für deine Bilder, Diagramme und Dokumente und die
+          Bibliothek mit Suche und eigenen Bausteinen.
         aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
-        eintraege: [library, knowledge]
+        eintraege: [workshop, knowledge]
 
   teacher:
     startstufe: 1
@@ -48,10 +48,10 @@ rollen:
       - stufe: 2
         name: Eigene Assistenten und Material
         beschreibung: >-
-          Eigene Assistenten bauen, Material in der Werkstatt erzeugen und in der
-          Bibliothek ablegen; Fach- und Gruppenseiten.
+          Eigene Assistenten bauen, Material in der Werkstatt erzeugen und
+          aufbewahren; Fach- und Gruppenseiten.
         aufwand: Ohne Vorbereitung nutzbar.
-        eintraege: [assistants_my, library, subjects]
+        eintraege: [assistants_my, workshop, subjects]
 
       - stufe: 3
         name: Unterricht planen
@@ -64,7 +64,7 @@ rollen:
       - stufe: 4
         name: Wissen strukturieren
         beschreibung: >-
-          Wissensbereich mit Knotenverwaltung, Sammlungen, Curricula, Bildungsplänen
+          Die Bibliothek mit Bausteinen, Sammlungen, Curricula, Bildungsplänen
           und Leitperspektiven.
-        aufwand: Setzt Vertrautheit mit dem Kontextspeicher voraus.
+        aufwand: Setzt Vertrautheit mit den Bausteinen voraus.
         eintraege: [knowledge, curricula, education_plans]

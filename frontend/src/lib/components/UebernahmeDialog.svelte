@@ -145,8 +145,8 @@
             Als Baustein speichern
         </h2>
         <p class="mt-1 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            „{artefakt.title}" bekommt einen Platz im Wissensgraphen. Das Artefakt bleibt
-            in der Bibliothek erhalten.
+            „{artefakt.title}" bekommt einen Platz in der Bibliothek. Das Produkt bleibt
+            in der Werkstatt erhalten.
         </p>
 
         {#if laedt}
@@ -210,7 +210,7 @@
                 <div class="mt-4 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
                             bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2">
                     <p class="text-sm text-light-tx dark:text-dark-tx">
-                        Dieses Artefakt ist bereits als
+                        Dieses Produkt ist bereits als
                         <a
                             href="/knowledge/{vorschlag.vorhandener_baustein_id}"
                             class="text-light-bl dark:text-dark-bl underline"

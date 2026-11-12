@@ -45,3 +45,18 @@ describe("Knopftext „Als Dokument bearbeiten“", () => {
         expect(anleitung).toContain("„Als Dokument bearbeiten\"");
     });
 });
+
+describe("nach dem Speichern: Link in die Werkstatt (0.40, F11)", () => {
+    const quelle = readFileSync(join(SRC, "lib/components/MessageBubble.svelte"), "utf8");
+
+    it("Bild und Diagramm zeigen „In der Werkstatt ✓“ als Link auf /workshop", () => {
+        expect(quelle).toMatch(/<a href="\/workshop"[^>]*>In der Werkstatt ✓<\/a>/);
+        expect(quelle).toContain("link.href = '/workshop'");
+        expect(quelle).toContain("link.textContent = 'In der Werkstatt ✓'");
+    });
+
+    it("nur ein Fehler setzt den Bildzustand zurück, „gespeichert“ bleibt", () => {
+        const speichern = quelle.slice(quelle.indexOf("async function saveImage"), quelle.indexOf("function imageSaveTitle"));
+        expect(speichern.indexOf("setTimeout")).toBeGreaterThan(speichern.indexOf("catch"));
+    });
+});

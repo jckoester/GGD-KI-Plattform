@@ -14,7 +14,7 @@ Geprüft wird durch **Anlegen und Löschen einer Probedatei** — dasselbe, was 
 geschieht. `os.access` beantwortet nur eine verwandte Frage: für die reale statt die
 wirksame Nutzerkennung, und auf Netzlaufwerken mit Rechteabbildung mitunter falsch.
 
-Dieselbe Prüfung gilt beim Start für die Ablagen unter `data/` (Bilder, Bibliothek,
+Dieselbe Prüfung gilt beim Start für die Ablagen unter `data/` (Bilder, Werkstatt,
 Export-Vorlagen). Sie legen ihr Verzeichnis beim ersten Schreiben selbst an; fehlt es noch,
 wird der nächste vorhandene Vorfahr geprüft — dort entstünde es.
 
@@ -75,7 +75,7 @@ def daten_ziele() -> list[Schreibziel]:
 
     return [
         Schreibziel(aufloesen(settings.image_storage_dir), "erzeugte Bilder"),
-        Schreibziel(aufloesen(settings.artifact_storage_dir), "Bibliothek"),
+        Schreibziel(aufloesen(settings.artifact_storage_dir), "Werkstatt"),
         Schreibziel(aufloesen(settings.export_template_dir), "Export-Vorlagen"),
     ]
 

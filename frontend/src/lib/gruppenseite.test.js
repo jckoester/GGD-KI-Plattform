@@ -285,7 +285,7 @@ describe('zuletztEntstanden', () => {
     const liste = zuletztEntstanden([baustein('b1', '2026-09-01T10:00:00Z')],
                                     [artefakt('a1', '2026-09-02T10:00:00Z')])
     expect(liste.find((e) => e.art === 'baustein').href).toBe('/knowledge/b1')
-    expect(liste.find((e) => e.art === 'artefakt').href).toBe('/library')
+    expect(liste.find((e) => e.art === 'artefakt').href).toBe('/workshop')
   })
 
   it('kappt auf die gewünschte Länge', () => {

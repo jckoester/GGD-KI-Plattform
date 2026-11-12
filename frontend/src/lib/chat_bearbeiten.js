@@ -36,7 +36,7 @@ const WIRKUNGEN = {
 
 /**
  * Was die Antwort, die ersetzt würde, schon bewirkt hat — als Satz, oder null.
- * Ein Bild zählt auch ohne Werkzeugnamen: Es steht in der Bibliothek.
+ * Ein Bild zählt auch ohne Werkzeugnamen: Es steht in der Werkstatt.
  */
 export function wirkungsHinweis(antwort) {
   if (!antwort) return null;
@@ -45,7 +45,7 @@ export function wirkungsHinweis(antwort) {
   const eindeutig = [...new Set(teile)];
   if (!eindeutig.length) return null;
   return `Die bisherige Antwort hat ${eindeutig.join(" und ")}. Das bleibt bestehen — `
-    + "zurücknehmen lässt es sich über den Verlauf der Planung bzw. in der Bibliothek.";
+    + "zurücknehmen lässt es sich über den Verlauf der Planung bzw. in der Werkstatt.";
 }
 
 /** Hatte die Nachricht Anhänge? Deren Inhalt lebt nur im Browser und muss neu hinzu. */

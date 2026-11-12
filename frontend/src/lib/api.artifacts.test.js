@@ -25,11 +25,11 @@ describe('saveImageToLibrary', () => {
         expect(JSON.parse(opts.body)).toEqual({ image_id: 'img-123', title: null });
     });
 
-    it('wirft ApiError mit Status bei voller Bibliothek (409)', async () => {
-        global.fetch = mockFetch(409, { detail: 'Deine Bibliothek ist voll.' });
+    it('wirft ApiError mit Status bei voller Werkstatt (409)', async () => {
+        global.fetch = mockFetch(409, { detail: 'Deine Werkstatt ist voll.' });
         await expect(saveImageToLibrary('img-123')).rejects.toMatchObject({
             status: 409,
-            message: 'Deine Bibliothek ist voll.',
+            message: 'Deine Werkstatt ist voll.',
         });
     });
 });

@@ -83,7 +83,7 @@
         try {
             if (keepInLibrary) {
                 await saveDocumentExport(id, fmt);
-                exportMsg = `${fmt.toUpperCase()} in der Bibliothek gespeichert.`;
+                exportMsg = `${fmt.toUpperCase()} in der Werkstatt gespeichert.`;
             } else {
                 const blob = await getDocumentExportBlob(id, fmt);
                 triggerDownload(blob, `${slugify(title)}.${fmt}`);
@@ -102,8 +102,8 @@
     <!-- Kopfleiste -->
     <div class="flex items-center gap-3 px-4 py-2 border-b border-light-ui-3 dark:border-dark-ui-3">
         <a
-            href="/library"
-            aria-label="Zurück zur Bibliothek"
+            href="/workshop"
+            aria-label="Zurück zur Werkstatt"
             class="p-1.5 rounded-lg text-light-tx-2 dark:text-dark-tx-2
                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors shrink-0"
         >
@@ -152,7 +152,7 @@
         {/each}
         <label class="flex items-center gap-1 ml-1 cursor-pointer select-none">
             <input type="checkbox" bind:checked={keepInLibrary} class="accent-primary" />
-            In Bibliothek behalten
+            In der Werkstatt behalten
         </label>
         {#if exportMsg}
             <span class="text-light-tx-2 dark:text-dark-tx-2">{exportMsg}</span>

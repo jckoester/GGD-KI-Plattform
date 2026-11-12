@@ -34,7 +34,7 @@ def _rolle(**abweichung) -> dict:
         "startstufe": 1,
         "stufen": [
             {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat"]},
-            {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["library"]},
+            {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["workshop"]},
         ],
     }
     basis.update(abweichung)
@@ -59,13 +59,13 @@ def test_schuelerinnen_sehen_bibliothek_und_wissen_erst_auf_stufe_2():
     """Der Kern der Entscheidung: Was am Anfang leer ist, kostet nur Aufmerksamkeit."""
     cfg = UiLevels.model_validate(yaml.safe_load(BEISPIEL.read_text(encoding="utf-8")))
     stufe1 = cfg.rollen["student"].eintraege_bis(1)
-    assert "library" not in stufe1
+    assert "workshop" not in stufe1
     assert "knowledge" not in stufe1
     # Werkzeuge stehen seit 0.40 in der Assistentenliste — sie sind Assistenten.
     assert "assistants" in stufe1 and "tools" not in stufe1
 
     stufe2 = cfg.rollen["student"].eintraege_bis(2)
-    assert {"library", "knowledge"} <= set(stufe2)
+    assert {"workshop", "knowledge"} <= set(stufe2)
 
 
 def test_lehrkraefte_bekommen_planung_erst_auf_stufe_3():
@@ -114,7 +114,7 @@ def test_die_meldung_nennt_den_wahrscheinlichen_tippfehler():
     """
     from app.ui.levels import _meldung_zu_ignorierten
 
-    assert "'library'" in _meldung_zu_ignorierten("teacher", ("libary",))
+    assert "'workshop'" in _meldung_zu_ignorierten("teacher", ("worksop",))
     # Ein Schlüssel aus einer anderen Fassung — kein Vorschlag, keine falsche Fährte.
     #
     # ⚠️ **Der Beispielschlüssel ist mit Absicht erfunden.** Hier stand `welcome`, bis
@@ -136,17 +136,17 @@ def test_ein_schluessel_aus_einer_anderen_fassung_blockiert_nichts():
     daten = _rolle(stufen=[
         {"stufe": 1, "name": "A", "beschreibung": "…",
          "eintraege": ["aus_der_zukunft", "chat"]},
-        {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["library"]},
+        {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["workshop"]},
     ])
     r = RollenStufen.model_validate(daten)
-    assert r.eintraege_bis(2) == ["chat", "library"]
+    assert r.eintraege_bis(2) == ["chat", "workshop"]
     assert r.ignoriert == ("aus_der_zukunft",)
 
 
 def test_luecke_in_der_nummerierung_wird_abgewiesen():
     daten = _rolle(stufen=[
         {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat"]},
-        {"stufe": 3, "name": "C", "beschreibung": "…", "eintraege": ["library"]},
+        {"stufe": 3, "name": "C", "beschreibung": "…", "eintraege": ["workshop"]},
     ])
     with pytest.raises(ValidationError, match="lückenlos"):
         RollenStufen.model_validate(daten)
@@ -172,7 +172,7 @@ def test_startstufe_muss_es_geben():
 def test_stufen_sind_kumulativ():
     r = RollenStufen.model_validate(_rolle())
     assert r.eintraege_bis(1) == ["chat"]
-    assert r.eintraege_bis(2) == ["chat", "library"]
+    assert r.eintraege_bis(2) == ["chat", "workshop"]
 
 
 def test_admin_zaehlt_als_lehrkraft():
@@ -380,7 +380,7 @@ class TestNachgereichteEintraege:
         """Die Schule darf mehr zeigen als die Vorlage — das ist ihr Zuschnitt, kein
         Rückstand."""
         assert self._fehlend(
-            tmp_path, eigene=["welcome", "chat", "library"], beispiel=["welcome", "chat"]
+            tmp_path, eigene=["welcome", "chat", "workshop"], beispiel=["welcome", "chat"]
         ) == {}
 
     def test_ohne_beispieldatei_kein_abgleich(self, tmp_path):
@@ -448,8 +448,8 @@ def test_entfallener_schluessel_bekommt_eigene_meldung():
     assert "seit 0.40 entfallen" in meldung and "streichen" in meldung
     assert "meinten Sie" not in meldung and "erscheinen nicht" not in meldung
 
-    gemischt = _meldung_zu_ignorierten("student", ("tools", "libary"))
-    assert "seit 0.40 entfallen" in gemischt and "'library'" in gemischt
+    gemischt = _meldung_zu_ignorierten("student", ("tools", "worksop"))
+    assert "seit 0.40 entfallen" in gemischt and "'workshop'" in gemischt
 
 
 def test_entfallener_schluessel_wird_uebergangen():
@@ -459,3 +459,53 @@ def test_entfallener_schluessel_wird_uebergangen():
     r = RollenStufen.model_validate(daten)
     assert r.eintraege_bis(1) == ["chat"]
     assert r.ignoriert == ("tools",)
+
+
+# ── Umbenannte Schlüssel (0.40, F5) ───────────────────────────────────────────
+
+def test_alter_schluessel_library_wirkt_als_workshop():
+    """Die Schuldatei überlebt das Update — `library` darf den Menüpunkt nicht verlieren."""
+    from app.ui.levels import _meldung_zu_umbenannten
+
+    r = RollenStufen.model_validate(_rolle(stufen=[
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat"]},
+        {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["library", "knowledge"]},
+    ]))
+    assert r.eintraege_bis(2) == ["chat", "workshop", "knowledge"]
+    assert r.umbenannt == ("library",) and r.ignoriert == ()
+    meldung = _meldung_zu_umbenannten("teacher", r.umbenannt)
+    assert "'library' heißt seit 0.40 'workshop'" in meldung and "umbenennen" in meldung
+
+
+def test_alter_und_neuer_name_zugleich():
+    """Steht `workshop` schon da, fällt `library` weg — kein „Eintrag in zwei Stufen“."""
+    r = RollenStufen.model_validate(_rolle(stufen=[
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat", "workshop"]},
+        {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["library"]},
+    ]))
+    assert r.eintraege_bis(2) == ["chat", "workshop"]
+    assert r.umbenannt == ("library",)
+
+
+def test_ohne_alte_namen_keine_meldung():
+    r = RollenStufen.model_validate(_rolle())
+    assert r.umbenannt == ()
+
+
+def test_beim_laden_gemeldet(tmp_path, caplog):
+    import logging
+
+    datei = tmp_path / "ui_levels.yaml"
+    datei.write_text(yaml.safe_dump({"rollen": {"student": _rolle(stufen=[
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat", "library", "tools"]},
+    ])}}), encoding="utf-8")
+    load_ui_levels.cache_clear()
+    try:
+        with caplog.at_level(logging.WARNING, logger="app.ui.levels"):
+            cfg = load_ui_levels(datei)
+    finally:
+        load_ui_levels.cache_clear()
+    assert cfg.rollen["student"].eintraege_bis(1) == ["chat", "workshop"]
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "'library' heißt seit 0.40 'workshop'" in text
+    assert "'tools' ist seit 0.40 entfallen" in text

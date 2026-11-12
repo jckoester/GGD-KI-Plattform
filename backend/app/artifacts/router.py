@@ -175,7 +175,7 @@ async def save_image_to_library(
     except store.QuotaExceeded:
         raise HTTPException(
             status_code=409,
-            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+            detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
         )
     except promote.PromotionError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -199,7 +199,7 @@ async def save_diagram_to_library(
     except store.QuotaExceeded:
         raise HTTPException(
             status_code=409,
-            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+            detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
         )
     except promote.PromotionError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -209,10 +209,10 @@ async def save_diagram_to_library(
 @router.get("", response_model=LibraryResponse)
 async def list_library(
     group_id: int | None = Query(
-        default=None, description="nur Artefakte aus Chats dieser Unterrichtsgruppe"
+        default=None, description="nur Produkte aus Chats dieser Unterrichtsgruppe"
     ),
     subject_id: int | None = Query(
-        default=None, description="nur Artefakte aus Chats dieses Fachs"
+        default=None, description="nur Produkte aus Chats dieses Fachs"
     ),
     limit: int | None = Query(default=None, ge=1, le=200),
     current_user: JwtPayload = Depends(get_current_user),
@@ -289,7 +289,7 @@ async def create_document(
     except store.QuotaExceeded:
         raise HTTPException(
             status_code=409,
-            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+            detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
         )
     return _saved(artifact, created)
 
@@ -303,7 +303,7 @@ async def get_document(
     """Lädt ein Dokument zum Bearbeiten (Quelle = Markdown)."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     if record.kind != "document":
@@ -324,7 +324,7 @@ async def update_document(
     """Überschreibt ein Dokument (nur die Eigentümer:in, nur `kind='document'`)."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     if record.kind != "document":
@@ -337,7 +337,7 @@ async def update_document(
     except store.QuotaExceeded:
         raise HTTPException(
             status_code=409,
-            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+            detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
         )
     return _saved(artifact, False)
 
@@ -357,7 +357,7 @@ async def export_document(
     """
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     if record.kind != "document":
@@ -403,7 +403,7 @@ async def export_document(
         except store.QuotaExceeded:
             raise HTTPException(
                 status_code=409,
-                detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+                detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
             )
         return JSONResponse(jsonable_encoder(_saved(artifact, True)))
 
@@ -459,7 +459,7 @@ async def _eigenes_artefakt(
 ) -> Artifact:
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     return record
@@ -554,12 +554,12 @@ async def get_artifact_file(
     """Liefert die Artefakt-Bytes — nur an die Eigentümer:in (Pseudonym-Autorisierung)."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     data = store.read_artifact_bytes(record)
     if data is None:
-        raise HTTPException(status_code=404, detail="Artefakt-Datei nicht gefunden")
+        raise HTTPException(status_code=404, detail="Datei des Produkts nicht gefunden")
     headers = _SVG_HARDENING if record.mime_type == "image/svg+xml" else None
     return Response(content=data, media_type=record.mime_type, headers=headers)
 
@@ -573,7 +573,7 @@ async def delete_artifact_endpoint(
     """Löscht ein Artefakt (Row + Datei) — nur die Eigentümer:in."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     await store.delete_artifact(db, record)
@@ -605,11 +605,11 @@ async def ggb_from_artifact(
     """`.ggb`-Export eines gespeicherten Plot-Artefakts (aus dessen `source`)."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     if record.kind != "plot" or not record.source:
-        raise HTTPException(status_code=422, detail="Kein GeoGebra-Export für dieses Artefakt")
+        raise HTTPException(status_code=422, detail="Kein GeoGebra-Export für dieses Produkt")
     try:
         data = geogebra.ggb_bytes_from_source(record.source)
     except RenderError as exc:

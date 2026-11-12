@@ -161,7 +161,7 @@
         failedImages = new Set(failedImages).add(id);
     }
 
-    // „In Bibliothek speichern" (Phase 18): Status je Bild — idle | saving | saved | exists | full | error.
+    // „In der Werkstatt speichern" (Phase 18; bis 0.40 „In Bibliothek speichern"): Status je Bild — idle | saving | saved | exists | full | error.
     let imageSaveState = $state({});
     async function saveImage(imageId) {
         if (imageSaveState[imageId] === 'saving') return;
@@ -171,23 +171,28 @@
             imageSaveState = { ...imageSaveState, [imageId]: r.created ? 'saved' : 'exists' };
         } catch (e) {
             imageSaveState = { ...imageSaveState, [imageId]: e?.status === 409 ? 'full' : 'error' };
+            // Nur der Fehler verschwindet wieder; „gespeichert“ bleibt stehen — samt Link in die
+            // Werkstatt (0.40, F11): Auf Stufe 1 steht sie nicht in der Seitenleiste.
+            setTimeout(() => {
+                imageSaveState = { ...imageSaveState, [imageId]: 'idle' };
+            }, 2500);
         }
-        setTimeout(() => {
-            imageSaveState = { ...imageSaveState, [imageId]: 'idle' };
-        }, 2500);
     }
+
+    /** Link „In der Werkstatt ✓“ unter einem gespeicherten Bild oder Diagramm (0.40, F11). */
+    const WERKSTATT_LINK_KLASSE = 'mt-1 inline-block text-xs text-light-bl dark:text-dark-bl hover:underline';
     function imageSaveTitle(state) {
         return {
             saving: 'Wird gespeichert…',
-            saved: 'In Bibliothek gespeichert',
-            exists: 'Bereits in der Bibliothek',
-            full: 'Bibliothek voll',
+            saved: 'In der Werkstatt gespeichert',
+            exists: 'Bereits in der Werkstatt',
+            full: 'Werkstatt voll',
             error: 'Speichern fehlgeschlagen',
-        }[state] ?? 'In Bibliothek speichern';
+        }[state] ?? 'In der Werkstatt speichern';
     }
 
     // Server-/Client-gerenderte Diagramme (circuit/plot/mermaid) bekommen einen
-    // „In Bibliothek speichern"-Knopf, sobald sie erfolgreich zu SVG gerendert wurden.
+    // „In der Werkstatt speichern"-Knopf, sobald sie erfolgreich zu SVG gerendert wurden.
     // Die Rohquelle liegt in `data-source` (von serverRender.js/diagrams.js gestasht).
     const DIAGRAM_KIND = {
         'circuit-block': 'circuit', 'plot-block': 'plot', 'smiles-block': 'smiles', 'mermaid-block': 'mermaid',
@@ -227,10 +232,10 @@
 
                 const saveBtn = document.createElement('button');
                 saveBtn.type = 'button';
-                saveBtn.setAttribute('aria-label', 'In Bibliothek speichern');
-                saveBtn.title = 'In Bibliothek speichern';
+                saveBtn.setAttribute('aria-label', 'In der Werkstatt speichern');
+                saveBtn.title = 'In der Werkstatt speichern';
                 saveBtn.className = btnClass;
-                saveBtn.textContent = 'In Bibliothek';
+                saveBtn.textContent = 'In Werkstatt';
                 saveBtn.addEventListener('click', async () => {
                     if (saveBtn.disabled) return;
                     saveBtn.disabled = true;
@@ -238,10 +243,19 @@
                     try {
                         const r = await saveDiagramToLibrary(kind, src, { messageId: message.id ?? null });
                         saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
+                        // Bleibender Link unter dem Diagramm — die Leiste erscheint nur beim Überfahren.
+                        if (!block.querySelector(':scope > a[data-werkstatt-link]')) {
+                            const link = document.createElement('a');
+                            link.href = '/workshop';
+                            link.dataset.werkstattLink = '';
+                            link.className = WERKSTATT_LINK_KLASSE;
+                            link.textContent = 'In der Werkstatt ✓';
+                            block.appendChild(link);
+                        }
                     } catch (e) {
                         saveBtn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
                     }
-                    setTimeout(() => { saveBtn.textContent = 'In Bibliothek'; saveBtn.disabled = false; }, 2200);
+                    setTimeout(() => { saveBtn.textContent = 'In Werkstatt'; saveBtn.disabled = false; }, 2200);
                 });
                 bar.appendChild(saveBtn);
 
@@ -342,11 +356,11 @@
             const doc = await createDocument(deriveDocTitle(message.content), message.content ?? '', {
                 messageId: message.id ?? null,
             });
-            await goto(`/library/${doc.id}/edit`);
+            await goto(`/workshop/${doc.id}/edit`);
         } catch (e) {
             openingWorkshop = false;
             workshopError = e?.status === 409
-                ? 'Bibliothek voll — bitte zuerst aufräumen.'
+                ? 'Werkstatt voll — bitte zuerst aufräumen.'
                 : 'Konnte nicht als Dokument angelegt werden.';
         }
     }
@@ -379,7 +393,7 @@
             bausteinDialogOffen = true;
         } catch (e) {
             bausteinFehler = e?.status === 409
-                ? 'Bibliothek voll — bitte zuerst aufräumen.'
+                ? 'Werkstatt voll — bitte zuerst aufräumen.'
                 : 'Konnte nicht als Baustein gespeichert werden.';
         } finally {
             bausteinLaeuft = false;
@@ -542,6 +556,9 @@
                                         </button>
                                     {/if}
                                 </div>
+                                {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
+                                    <a href="/workshop" class="block {WERKSTATT_LINK_KLASSE}">In der Werkstatt ✓</a>
+                                {/if}
                                 {#if variiereStatus[img.image_id] && variiereStatus[img.image_id] !== 'laeuft'}
                                     <p class="mt-0.5 text-xs text-light-re dark:text-dark-re">
                                         {variiereStatus[img.image_id]}

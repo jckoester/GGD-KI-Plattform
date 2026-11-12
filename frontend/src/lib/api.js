@@ -2549,7 +2549,7 @@ export async function getLibrary({ groupId = null, subjectId = null, limit = nul
     if (limit != null) params.set('limit', String(limit))
     const query = params.toString()
     const res = await fetch(`${BASE}/artifacts${query ? `?${query}` : ''}`, { credentials: 'include' })
-    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bibliothek konnte nicht geladen werden')
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Werkstatt konnte nicht geladen werden')
     return res.json()
 }
 
