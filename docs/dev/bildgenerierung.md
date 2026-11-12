@@ -167,9 +167,12 @@ die serverseitige Moderation im Handler ist die tragende Schicht.
   LiteLLM-Team-Allowlist und **mergen** die jeweils andere Modell-Klasse beim Speichern
   (Chat-Matrix bewahrt Bild-Freigaben und umgekehrt). Frontend: zweiter Abschnitt auf
   `/settings/models` über die wiederverwendbare Komponente `ModelMatrixTable.svelte`.
-- **Werkzeug-Übersicht `/tools`** (dort heißt „Werkzeug" der *Assistent*, nicht die
-  Funktion): rein Frontend (`lib/tools.js`, `MEDIA_TOOL_GROUPS`,
-  `isToolAssistant()`) — filtert die bereits in `AssistantSummary` enthaltenen `tool_groups`.
+- **Werkzeuge** (dort heißt „Werkzeug" der *Assistent*, nicht die Funktion): seit 0.40 das
+  Feld `assistants.produces` (Liste in `app/assistants/produkte.py`, `GET /assistants/produktarten`),
+  Marke und Filter in der Assistentenliste (`lib/assistentenliste.js`, `ProduktMarken.svelte`).
+  Die Seite `/tools` und `lib/tools.js` gibt es nicht mehr; `/tools` leitet auf
+  `/assistants?erstellt=alle`. Beim Einschalten von `image_generation` schlägt der Editor
+  `image` vor; Migration 0102 hat den Bestand so vorbelegt.
 - **Prüfpunkt:** `_initial_status()` (`app/api/assistants.py`) zwingt schulweite,
   schülersichtbare Bild-Assistenten in `pending_review` (Helferin
   `_is_student_visible_image_assistant`), überschreibt den allgemeinen

@@ -9,7 +9,7 @@ typischerweise aus dem Produktivsystem nach promptLab oder auf eine Entwicklungs
 
 **Rollen:** Der **Export** ist eine Lehrkraft-Funktion in der Oberfläche. Der **Import** ist
 ein Admin-Vorgang auf der Kommandozeile des Backend-Containers; es gibt dafür bewusst keine
-Oberfläche — er schreibt tief in den Wissensgraph und gehört in dieselbe Hand wie der
+Oberfläche — er schreibt tief in die Bibliothek und gehört in dieselbe Hand wie der
 Bildungsplan-Import.
 
 ---
@@ -38,7 +38,7 @@ Beides muss **vor** dem Import stehen:
 | Voraussetzung | Prüfen mit |
 |---|---|
 | Das **Fach** existiert (gleicher `fach_code`) | `/settings` → Fächer, oder `scripts/seed_subjects.py` |
-| Der **Bildungsplan** des Fachs ist importiert | Wissensgraph → Bildungsplan des Fachs öffnen |
+| Der **Bildungsplan** des Fachs ist importiert | Bibliothek → Bildungsplan des Fachs öffnen |
 
 Fehlt das Fach, bricht der Import ab. Fehlt der Bildungsplan, bricht er ebenfalls ab — mit
 einer Meldung, die Fach und Edition nennt.

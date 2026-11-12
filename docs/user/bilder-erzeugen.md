@@ -5,21 +5,21 @@ zum Beispiel eine Illustration für ein Arbeitsblatt oder eine schematische Skiz
 
 ## Wo finde ich die Bild-Werkzeuge?
 
-In der Seitenleiste gibt es den Menüpunkt **Werkzeuge**. Dort sind alle Assistenten
-gebündelt, die Inhalte erzeugen (aktuell Bilder). Ein Klick auf ein Werkzeug startet
-einen Chat damit.
+In der **Assistentenliste** tragen Assistenten, die etwas herstellen, eine Marke — etwa
+**„erstellt Bilder“**. Über der Liste filterst du nach **Werkzeuge** oder gleich nach
+**Bilder**. Ein Klick auf ein Werkzeug startet einen Chat damit.
 
-> Erscheint dort nichts, ist für dich derzeit kein Bild-Werkzeug freigegeben. Ob und
+> Erscheint der Filter nicht, ist für dich derzeit kein Werkzeug freigegeben. Ob und
 > welche Bild-Werkzeuge verfügbar sind, entscheidet die Schule.
 
 ## Wie erzeuge ich ein Bild?
 
-1. In der Seitenleiste **Werkzeuge** öffnen und einen Bild-Assistenten wählen.
+1. In der Assistentenliste den Filter **Bilder** wählen und einen Bild-Assistenten öffnen.
 2. Im Chat **beschreiben**, was das Bild zeigen soll — je genauer, desto besser
    (Motiv, Stil, Bildausschnitt).
 3. Das fertige Bild erscheint in der Antwort. Über die Symbole oben rechts am Bild
    kannst du es **herunterladen** oder mit dem Lesezeichen-Symbol in deine
-   [Bibliothek](bibliothek.md) übernehmen — sonst verschwindet es mit dem Chat.
+   [Werkstatt](werkstatt.md) übernehmen — sonst verschwindet es mit dem Chat.
 
 ## Noch einmal versuchen
 

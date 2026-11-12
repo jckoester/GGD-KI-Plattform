@@ -1,6 +1,6 @@
-# Material-Werkstatt — Betrieb & Vorlagen
+# Werkstatt (Dokumente) — Betrieb & Vorlagen
 
-Die **Material-Werkstatt** (Phase 19) lässt Nutzer:innen Markdown-Dokumente (`artifacts.kind='document'`,
+Die **Werkstatt** (Phase 19, bis 0.40 „Material-Werkstatt“) lässt Nutzer:innen Markdown-Dokumente (`artifacts.kind='document'`,
 Teil der [Artefaktbibliothek](artefaktbibliothek.md)) bearbeiten und als **PDF / DOCX / ODT**
 exportieren.
 
@@ -37,7 +37,7 @@ Unter **Einstellungen → Export-Vorlagen** (`/settings/export`, nur Admin):
 - **Word/ODT-Referenzdokument** — je ein hochgeladenes `.docx`/`.odt`, dessen Formatvorlagen
   (Überschriften, Schriften, Ränder) Pandoc via `--reference-doc` übernimmt. Am einfachsten: ein
   bestehendes Dokument mit den gewünschten Formatvorlagen speichern und hochladen. **Seit 0.39
-  gilt es für alle Word-/ODT-Exporte**: Material-Werkstatt, Stundenentwurf und Curriculum.
+  gilt es für alle Word-/ODT-Exporte**: Werkstatt, Stundenentwurf und Curriculum.
   Tabellen nehmen die Tabellen-Formatvorlage „Table“; ihre **Linien setzt der Export aber selbst**
   (dünn, schwarz) — sie gelten auch mit Schulvorlage. Das Curriculum kommt im **Querformat**; gedreht
   wird die Seite der Vorlage, ihre Ränder bleiben.
@@ -89,4 +89,4 @@ einbeziehen; das CSS liegt in der Datenbank (`site_config`).
 ## Datenschutz
 
 Dokumente sind pseudonyme Artefakte (nur die Eigentümer:in sieht/exportiert sie) und unterliegen
-demselben Lifecycle wie die übrige Bibliothek (Aufbewahrung, Cleanup-Cron, Löschung mit dem Konto).
+demselben Lifecycle wie die übrige Werkstatt (Aufbewahrung, Cleanup-Cron, Löschung mit dem Konto).

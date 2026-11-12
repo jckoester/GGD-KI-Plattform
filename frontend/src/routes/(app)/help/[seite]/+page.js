@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 
-import { helpEintrag } from '$lib/help-nav.js';
+import { helpEintrag, UMBENANNTE_HILFE } from '$lib/help-nav.js';
 import { nutzer } from '$lib/zugang.js';
 
 /**
@@ -14,7 +14,10 @@ import { nutzer } from '$lib/zugang.js';
  * Unbekanntes Pfadstück → **404**, nicht stilles Nichts: Ein Tippfehler im Link soll
  * auffallen. Welche Pfade es gibt, sagt `helpNav`.
  */
-export async function load({ params }) {
+export async function load({ params, url }) {
+    const neu = UMBENANNTE_HILFE[params.seite];
+    if (neu) redirect(301, `/help/${neu}${url.search}`); // `url.hash` ist in `load` nicht lesbar
+
     const eintrag = helpEintrag(params.seite);
     if (!eintrag) error(404, 'Diese Hilfeseite gibt es nicht.');
 

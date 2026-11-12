@@ -78,5 +78,5 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
 - [Rückmeldungen sichten](feedback.md) — Triage des Feedback-Kanals: Issue-Referenz, bekannte Probleme, Zweckbindung der Kontaktangabe, Abgrenzung zur 4-Augen-Einsicht, Löschfristen; Auswertung der Antwortbewertung (`/statistics/ratings`)
 - [Server-Rendering-Sidecar](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Betrieb, Config, Cache-Cleanup
-- [Artefaktbibliothek](artefaktbibliothek.md) — Aufbewahrung/Quota, Ablage-Volume, Cleanup-Cron
-- [Material-Werkstatt](material-werkstatt.md) — Pandoc-Abhängigkeit, Export-Vorlagen (CSS/reference-doc)
+- [Werkstatt (Ablage)](artefaktbibliothek.md) — Aufbewahrung/Quota, Ablage-Volume, Cleanup-Cron
+- [Werkstatt (Dokumente)](material-werkstatt.md) — Pandoc-Abhängigkeit, Export-Vorlagen (CSS/reference-doc)

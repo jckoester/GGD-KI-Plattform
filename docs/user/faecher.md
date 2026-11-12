@@ -19,11 +19,11 @@ Unterrichtsgruppe, nur aus zwei Richtungen.
 | **Jetzt** *(Lehrkräfte)* | Laufende und nächste Unterrichtseinheit, die zuletzt gehaltene und die nächsten Stunden |
 | **Weiterarbeiten** | Deine letzten Chats in dieser Gruppe — und **„+ Neuer Chat"** für einen Chat, der zu dieser Gruppe gehört: Der Assistent kennt dann den aktuellen Unterricht (letzte und vorletzte Stunde mit ihren Inhalten, nächstes Thema, nächste Klassenarbeit) und die Fachbegriffe, die die Gruppe schon hatte |
 | **Assistenten** | Die Assistenten, die für diese Gruppe freigegeben sind |
-| **Zuletzt entstanden** | Deine Bausteine und Artefakte aus dieser Gruppe, gemischt und nach Datum |
+| **Zuletzt entstanden** | Deine Bausteine und Produkte aus dieser Gruppe, gemischt und nach Datum |
 | **Nachschlagen** | Fachbegriffe, Methoden- und Operatorenblätter, Suche |
 
-**„Zuletzt entstanden" zeigt nur, was dir gehört.** Ob ein Eintrag ein *Baustein* (im
-Wissensspeicher) oder ein *Artefakt* (in der Bibliothek) ist, steht rechts daneben —
+**„Zuletzt entstanden" zeigt nur, was dir gehört.** Ob ein Eintrag ein *Baustein* (in der
+Bibliothek) oder ein *Produkt* (in der Werkstatt) ist, steht rechts daneben —
 die Liste trennt danach aber nicht, weil es für deine Arbeit dieselbe Sorte Ergebnis ist.
 
 ---
@@ -213,7 +213,7 @@ Gruppe, für die er nicht gedacht war.
 angelegt habe?**
 Der Bezug zur Gruppe entsteht über den Chat, in dem etwas entstanden ist. Ein Dokument,
 das du in der Werkstatt aus dem Nichts angelegt hast, hat keinen solchen Chat — es
-steht in der [Bibliothek](bibliothek.md), nur nicht in diesem Auszug.
+steht in der [Werkstatt](werkstatt.md), nur nicht in diesem Auszug.
 
 **Wo sind meine Chats ohne Fach?**
 Im [Verlauf](chat.md). Die Fachübersicht zeigt nur, was einem Fach zugeordnet ist; die

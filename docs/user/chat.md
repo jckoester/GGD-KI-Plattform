@@ -52,13 +52,13 @@ Du kannst Dateien direkt in ein Gespräch einbinden — zum Beispiel ein PDF, ei
 
 ## Kontextbausteine hinzufügen
 
-Über den **Suche-Button** (Lupensymbol) neben dem Textfeld kannst du passende Wissensbausteine aus dem Kontextspeicher in den Chat einbinden — zum Beispiel Bildungsplan-Kompetenzen oder Unterrichtsmaterial. Die KI berücksichtigt diese Bausteine beim Antworten.
+Über den **Suche-Button** (Lupensymbol) neben dem Textfeld kannst du passende Wissensbausteine aus der Bibliothek in den Chat einbinden — zum Beispiel Bildungsplan-Kompetenzen oder Unterrichtsmaterial. Die KI berücksichtigt diese Bausteine beim Antworten.
 
 Tippe deine Frage oder einen beschreibenden Text ein und klick den Button. Die Plattform sucht semantisch passende Bausteine und zeigt sie zur Auswahl an. Bestätigte Bausteine erscheinen als Chips oberhalb des Textfelds und können dort wieder entfernt werden.
 
 Alternativ tippst du **`@`** ins Textfeld, um direkt nach einem Baustein zu suchen.
 
-Mehr dazu: [Kontextspeicher](kontext.md)
+Mehr dazu: [Bibliothek](bibliothek.md)
 
 ## Kontext unter der Antwort
 
@@ -115,7 +115,7 @@ schreiben — sie kümmert sich um die richtige Notation. Versteht die Darstellu
 darstellbar"**; ein Klick zeigt den Quelltext.
 
 **Weiterverwenden.** Fährst du über eine abgesetzte Formel, erscheint **„Kopieren"**: In der
-Zwischenablage landet die Schreibweise `$$…$$`, die sich in Chat, Werkstatt oder Wissensgraph
+Zwischenablage landet die Schreibweise `$$…$$`, die sich in Chat, Werkstatt oder Bibliothek
 wieder einfügen lässt. Wer Text mit Formeln markiert und kopiert, bekommt die Formeln ebenfalls
 so.
 

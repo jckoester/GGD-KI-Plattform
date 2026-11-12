@@ -2,7 +2,7 @@
 
 Wer Ergebnisse aus dieser Plattform in einer GFS, im Seminarkurs oder in einer Facharbeit
 verwendet, muss das **kenntlich machen** — genau wie bei jeder anderen Quelle. Dazu gehören
-üblicherweise das Werkzeug, das **Modell**, das geantwortet hat, das **Datum** und die
+üblicherweise die Plattform, das **Modell**, das geantwortet hat, das **Datum** und die
 **eigene Eingabe**.
 
 Alle diese Angaben hält die Plattform bereit. Du musst sie nicht abschreiben.
@@ -51,13 +51,13 @@ Bild: FLUX.2-klein-4B
 >
 > Diesen Prompt als eigene Formulierung auszugeben wäre eine Falschangabe.
 
-## In der Bibliothek
+## In der Werkstatt
 
 Unter jedem Eintrag steht, womit er erzeugt wurde („Erzeugt mit `FLUX.1-schnell`"), und es
 gibt einen Knopf **„Zitieren"** mit demselben Textbaustein.
 
-Das ist der Ort, an dem du nachsiehst, wenn du ein Bild aus der Bibliothek in ein Dokument
-übernimmst: Die Angabe bleibt am Artefakt, auch wenn der Chat längst gelöscht ist.
+Das ist der Ort, an dem du nachsiehst, wenn du ein Bild aus der Werkstatt in ein Dokument
+übernimmst: Die Angabe bleibt am Produkt, auch wenn der Chat längst gelöscht ist.
 
 ## In exportierten Dokumenten
 
@@ -86,6 +86,5 @@ speicherst.
 ## Weiter
 
 - [Den Chat nutzen](chat.md)
-- [Bibliothek](bibliothek.md)
-- [Material-Werkstatt](werkstatt.md)
+- [Werkstatt](werkstatt.md)
 - [Datenschutz](datenschutz.md)

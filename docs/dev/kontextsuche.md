@@ -103,6 +103,7 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 | `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 28 von 42 Typen |
 | `app/context/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
 | `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
+| `planung_content_types` in `taxonomy.yaml` → `Suchprofil.ohne_typen` | Seit 0.40: Die **Suchseite der Bibliothek** (`exclude_planning: true` an `POST /context/search`) findet keine Jahrespläne, Unterrichtseinheiten und -stunden — in keinem Abschnitt, auch nicht in der Zählung der Aufzählung. Der Chat (Suchknopf, `@`, `context_search`, Vorab) setzt den Schalter nie; ein Wächter (`test_planung_bibliothek.py`) hält fest, dass `ohne_typen` nur der Suchendpunkt setzt |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
 
 ### Was ein Treffer dem Modell über sich sagt
@@ -543,7 +544,7 @@ Dropdown offen gilt, fängt der Chat die Eingabetaste ab.
 ## „Meine Bausteine" — was „eigen" heißt, und wer was darf
 
 `/knowledge/mine` (Abfrageschicht: `app/context/meine_bausteine.py`) ist die einzige
-Wissensgraph-Fläche, die **allen Rollen** offensteht. Zwei Entscheidungen dahinter sind
+Fläche der Bibliothek, die **allen Rollen** offensteht. Zwei Entscheidungen dahinter sind
 nicht offensichtlich.
 
 ### Der Bestand: Pseudonym **und** Typ

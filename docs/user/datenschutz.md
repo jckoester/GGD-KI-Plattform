@@ -101,7 +101,7 @@ und wird nur in diesen geregelten Verfahren — und außerhalb der Software — 
 | Gesamter Account | 3 Monate nach dem letzten Login |
 | Eigene Bausteine, die nur du siehst | mit dem Account |
 | Eigene Bausteine, die du geteilt hast | bleiben — ohne deinen Namen |
-| Deine Bibliothek (Bilder, Diagramme, Dokumente) | mit dem Account |
+| Deine Werkstatt (Bilder, Diagramme, Dokumente) | mit dem Account |
 | Gruppenmitgliedschaften, Lernstand, eigene Einstellungen | mit dem Account |
 | Rückmeldungen (Feedback) | 180 Tage nach dem Abschluss; offene bleiben stehen |
 

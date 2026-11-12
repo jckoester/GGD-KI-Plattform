@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.40.0] – 2026-11-12
+
+Neue Namen und Orte: Werkstatt, Bibliothek, Werkzeuge in der Assistentenliste. Eine Migration (0102).
+
 ### Neu
 
 - Assistenten-Editor: Angabe „Stellt her“ (Bilder, Diagramme, Dokumente, Stundenentwürfe, Jahresplanung). Beim
@@ -27,16 +31,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Neuigkeit zu Werkstatt und Bibliothek, dazu ein Hinweis in Werkstatt, Suche und „Meine Bausteine“ (bis 31.01.2027,
   wegklickbar).
 - Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.
+- Hilfe: „Werkstatt“ fasst die bisherigen Seiten „Bibliothek“ und „Material-Werkstatt“ zusammen; „Bibliothek“ ist die
+  bisherige Seite „Kontextspeicher“. `/help/kontext` leitet um.
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0102). Assistenten mit Bildgenerierung, Stundenplanung oder Unterrichtsplanung bekommen die
-  passende Angabe automatisch.
-- Seed erst mit `--dry-run`, dann ohne: Er trägt „Stellt her“ bei vorhandenen Assistenten nach, wenn die Angabe leer
-  ist („Schaltpläne zeichnen“ → Diagramme).
+- `alembic upgrade head` (0102) — wie im regulären Update. Assistenten mit Bildgenerierung, Stunden- oder
+  Jahresplanung bekommen die passende Angabe „Stellt her“ automatisch — auch eigene der Schule; im Editor nachsehen.
+- Backend **und** Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden.
+- Danach (der Seed läuft im neuen Image): `docker compose exec backend python scripts/seed_assistants.py --dry-run`,
+  dann ohne `--dry-run`. Er trägt „Stellt her“ bei vorhandenen Assistenten nach, wenn die Angabe leer ist
+  („Schaltpläne zeichnen“ → Diagramme).
 - Eigene Assistenten, die Diagramme oder Dokumente herstellen: im Editor „Stellt her“ setzen.
 - `config/ui_levels.yaml`: `tools` streichen und `library` in `workshop` umbenennen; Stufentexte nach
   `ui_levels.example.yaml` anpassen. Ohne Anpassung bleibt die Navigation vollständig, der Start meldet beide Schlüssel.
+- Aufräumen wie im regulären Update-Ablauf: `docker image prune -f && docker builder prune -f`.
 
 ## [0.39.2] – 2026-11-11
 

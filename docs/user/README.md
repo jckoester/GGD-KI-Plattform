@@ -19,7 +19,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - Dateien (PDF, Bilder, Textdateien) in ein Gespräch einbinden
 - Zwischen verschiedenen KI-Modellen wählen
 - Vorgefertigte Assistenten für bestimmte Aufgaben nutzen (z. B. Texte korrigieren, Ideen entwickeln)
-- Wissensbausteine aus dem Kontextspeicher in ein Gespräch einbinden (Bildungsplan, Unterrichtsmaterial)
+- Wissensbausteine aus der Bibliothek in ein Gespräch einbinden (Bildungsplan, Unterrichtsmaterial)
 - *(Lehrkräfte)* Den Unterricht planen — vom Jahresplan bis zum Stundenentwurf
 - Frühere Gespräche im Verlauf wiederfinden
 
@@ -31,15 +31,14 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [Den Chat nutzen](chat.md) — Nachrichten, Dateien, Modelle, Verlauf
 - [Fächer und Unterrichtsgruppen](faecher.md) — die Übersichtsseite, „Jetzt", Archiv früherer Schuljahre
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
-- [Bilder erzeugen](bilder-erzeugen.md) — Bild-Werkzeuge finden, nutzen, Grenzen & Kosten
+- [Bilder erzeugen](bilder-erzeugen.md) — Bild-Assistenten finden, nutzen, Grenzen & Kosten
 - [Diagramme & Graphen](diagramme.md) — Diagramme, Schaltpläne, Funktionsgraphen, Strukturformeln im Chat
-- [Bibliothek](bibliothek.md) — Bilder & Diagramme dauerhaft speichern, herunterladen, GeoGebra-Export
-- [Material-Werkstatt](werkstatt.md) — Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
+- [Werkstatt](werkstatt.md) — Bilder, Diagramme und Dokumente aufbewahren, Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
 - [KI-Ergebnisse zitieren](zitieren.md) — Modell, Datum und Eingabe für GFS, Seminarkurs, Facharbeit
 - [Schulcurriculum](curriculum.md) — *(Lehrkräfte)* Kapitel & Lernsequenzen, Kompetenzen verknüpfen, Fassungswechsel, Export
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
-- [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
+- [Bibliothek](bibliothek.md) — Bausteine suchen und gezielt in den Chat einbinden
 - [Fachbegriffe pflegen](fachbegriffe-pflegen.md) — *(Lehrkräfte)* Dateiformat, Einspielen mit Vorschau, Export
 - [Bessere Antworten](bessere-antworten.md) — *(Lehrkräfte)* wie die Assistenten genauer auf deinen Unterricht antworten
 - [Als Schüler:in ansehen](vorschau.md) — *(Lehrkräfte)* die Plattform aus Schülersicht ausprobieren, auch den eigenen Assistenten

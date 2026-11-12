@@ -63,7 +63,7 @@ oder ausgefüllt wird, nicht. Eine Textspalte am linken Rand eines breiten Schir
 unangenehm zu lesen, deshalb zentriert die schmale Variante (`max-w-4xl mx-auto`).
 
 **Ausnahmen — Seiten mit eigener Flex-Struktur.** Chat, Graph, Suche, Curriculum-Ansicht
-und -Editor, Planer, Material-Werkstatt und der Assistenten-Editor verwalten ihren
+und -Editor, Planer, Werkstatt und der Assistenten-Editor verwalten ihren
 Scrollbereich selbst; sie haben feste Kopf- oder Fußleisten, die nicht mitscrollen
 dürfen. Dort gilt `PageBody` **nicht** — wohl aber dieselbe Inhaltsbreite: `max-w-4xl
 mx-auto w-full` für Lesbares, volle Breite für Tabellen und Zeichenflächen.
@@ -166,7 +166,7 @@ Die zugehörigen SSE-Events und ihr Format sind in
 ## Rich-Rendering im Markdown (KaTeX, Mermaid/Pele)
 
 Ein **zentraler** Renderer `frontend/src/lib/markdown.js` (`renderMarkdown`) speist Chat
-(`MessageBubble`), Wissensgraph (`/knowledge/[id]`), Curriculum-Tabelle und Hilfeseiten —
+(`MessageBubble`), Bibliothek (`/knowledge/[id]`), Curriculum-Tabelle und Hilfeseiten —
 eine Erweiterung dort wirkt überall. Pipeline: `marked` → `DOMPurify.sanitize`
 (+ highlight.js für Codeblöcke).
 

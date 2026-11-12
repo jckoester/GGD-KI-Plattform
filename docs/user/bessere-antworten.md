@@ -113,7 +113,7 @@ Daraus folgt:
 
 ⚠️ **Speichern heißt veröffentlichen.** Ein gespeichertes Blatt steht sofort in den Antworten
 der Assistenten. Halte unfertige Blätter privat, bis sie fertig sind (siehe
-[Kontextspeicher → Speichern heißt veröffentlichen](kontext.md#speichern-heißt-veröffentlichen)).
+[Bibliothek → Speichern heißt veröffentlichen](bibliothek.md#speichern-heißt-veröffentlichen)).
 
 ## 6. Einen spezielleren Assistenten anlegen
 

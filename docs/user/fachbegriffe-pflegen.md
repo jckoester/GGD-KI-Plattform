@@ -295,5 +295,5 @@ liest. Ein einzelner Eintrag geht über „Als Markdown" in seiner Detailansicht
 
 ## Verwandte Seiten
 
-- [Kontextspeicher](kontext.md) — wie Bausteine im Chat wirken
+- [Bibliothek](bibliothek.md) — wie Bausteine im Chat wirken
 - [Fächer und Gruppen](faecher.md)

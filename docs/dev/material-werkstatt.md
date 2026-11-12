@@ -1,8 +1,8 @@
-# Material-Werkstatt (Phase 19)
+# Werkstatt: Dokumente (Phase 19; bis 0.40 „Material-Werkstatt“)
 
 Nutzereditierbare Markdown-Dokumente + Export nach PDF/DOCX/ODT. Baut auf der
 [Artefaktbibliothek](artefaktbibliothek.md) auf. Code in `backend/app/export/` +
-`frontend/src/routes/(app)/library/[id]/edit`.
+`frontend/src/routes/(app)/workshop/[id]/edit` (bis 0.40 `/library/[id]/edit`, das umleitet).
 
 ## Dokument-Artefakt
 
@@ -99,7 +99,7 @@ Pandoc-Ausgabe prüfen, vergleichen Attribute einzeln: Pandoc 3.11 (Prod, CI) sc
 
 `lib/api.js` (`createDocument`/`getDocument`/`updateDocument`, `getDocumentExportBlob`/
 `saveDocumentExport`, Admin-Vorlagen-Funktionen) · `lib/workshop.js` `deriveDocTitle` ·
-Editor-Route `(app)/library/[id]/edit` (Textarea ⇄ Vorschau via `renderMarkdown` +
+Editor-Route `(app)/workshop/[id]/edit` (Textarea ⇄ Vorschau via `renderMarkdown` +
 `renderDiagrams` + `renderServerBlocks`, Export-Leiste) · Admin-Seite `(admin)/settings/export`.
 Einstieg aus dem Chat: `MessageBubble` „Als Dokument bearbeiten" — der Knopf nennt die
 Tätigkeit, die Ansicht heißt weiter Werkstatt (Entscheidung zu 0.12).

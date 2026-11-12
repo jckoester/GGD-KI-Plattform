@@ -109,9 +109,12 @@ im Chat tatsächlich Bilder entstehen:
    *Fähigkeiten* die Checkbox **„Bildgenerierung"** aktivieren
    (siehe [Fähigkeiten](#fähigkeiten-tool_groups)).
 
-**Nutzerseitige Auffindbarkeit:** Assistenten mit Bildgenerierung erscheinen zusätzlich
-unter dem Seitenleisten-Menüpunkt **„Werkzeuge"** (`/tools`), der alle
-artefakterzeugenden Assistenten bündelt.
+**Nutzerseitige Auffindbarkeit:** Assistenten mit der Angabe **„Stellt her“** (Bilder,
+Diagramme, Dokumente, Stundenentwürfe, Jahresplanung) sind **Werkzeuge**: Sie tragen in der
+Assistentenliste eine Marke („erstellt Bilder“) und lassen sich dort filtern
+(`/assistants?erstellt=alle`). Beim Einschalten der Bildgenerierung schlägt der Editor die
+Angabe „Bilder“ vor. Den früheren Menüpunkt „Werkzeuge“ (`/tools`) gibt es seit 0.40 nicht
+mehr; die Adresse leitet auf die Assistentenliste um.
 
 **Jugendschutz-Prüfpunkt:** Ein **schulweiter**, für Schüler:innen sichtbarer
 Bild-Assistent geht **immer** in die Admin-Freigabe (`pending_review`) — auch wenn der
@@ -420,8 +423,9 @@ Eine **Fähigkeit** ist das, was ein Assistent im Chat kann. Gesteuert wird sie 
 Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten* — mit einer Ausnahme:
 `student_planning` hat dort keinen Schalter (siehe unten).
 
-> **Nicht verwechseln:** Ein **Werkzeug** ist ein *Assistent*, der etwas herstellt — die
-> Sammlung dieser Assistenten steht für Nutzer:innen unter `/tools`. Eine **Funktion**
+> **Nicht verwechseln:** Ein **Werkzeug** ist ein *Assistent*, der etwas herstellt — er
+> trägt die Angabe **„Stellt her“** (Feld `produces`, seit 0.40) und erscheint in der
+> Assistentenliste mit Marke und Filter. Eine **Funktion**
 > ist die technische Schnittstelle, die das Chat-Modell aufruft (`generate_image`).
 > Diese drei Begriffe hießen früher alle „Werkzeug".
 
@@ -536,7 +540,7 @@ Zwei weitere Felder engen das ein:
   Assistenten nicht — unabhängig von der Freigabe. Ist die Stufe einer Person unbekannt,
   gilt keine Grenze. Für Lehrkräfte und für die Erstellerin gilt die Stufe nie.
 - **Sichtbarkeit:** „Versteckt“ nimmt den Assistenten aus allen Listen (Chat-Auswahl,
-  Assistenten-Übersicht, Werkzeuge, Fachseite). Über einen Link oder einen Einstieg auf
+  Assistenten-Übersicht samt Filter „Werkzeuge“, Fachseite). Über einen Link oder einen Einstieg auf
   der Startseite bleibt er für alle Freigegebenen nutzbar. Der frühere Wert `private`
   wird beim Speichern und beim YAML-Import zu `hidden`.
 

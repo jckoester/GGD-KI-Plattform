@@ -115,6 +115,9 @@ ohne Ort.
 
 - **K1/K2:** in `bp_curriculum_content_types`, sonst steht der Typ in der freien Liste
   (Schritt 14).
+- **Planung** (Jahresplan, Einheit, Stunde): in `planung_content_types` — dann fehlt der Typ
+  in „Alle Bausteine“, der Suche der Bibliothek, ihrer Facette, dem Graphen und „Neuer
+  Baustein“; der Chat findet ihn weiter (seit 0.40).
 - **K3:** der Kandidat für eine Sammlung (Schritt 9). Wer pflegt, entscheidet der
   `write_scope`, nicht die Klasse — nicht alles Kuratierte ist Sache der Fachschaft.
 - **K4/K6:** Übernahme aus der Bibliothek regeln (Schritt 10); K6 ist immer
@@ -446,7 +449,7 @@ neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 
 ### 19. Dokumentation
 
-Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
+Nutzer-Doku (`docs/user/bibliothek.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen. Außerhalb des Repositorys: die Zuordnungstabelle in
 ADR-019 um eine Zeile (Klasse, Entstehung, Pflege, Ort, `ui_status`).
 

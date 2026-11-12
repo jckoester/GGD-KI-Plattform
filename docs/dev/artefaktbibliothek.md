@@ -32,7 +32,7 @@ Quota-Verbrauch. Der partielle Unique-Index ist der DB-Backstop gegen Doppelklic
 
 ## Promotion aus dem Chat (`promote.py`)
 
-„In Bibliothek speichern" hebt einen flüchtigen Chat-Inhalt in die Bibliothek:
+„In der Werkstatt speichern" (bis 0.40 „In Bibliothek speichern") hebt einen flüchtigen Chat-Inhalt in die Werkstatt:
 
 - **Bild** — Bytes aus `generated_images` kopieren; der Bild-Prompt (`GeneratedImage.prompt`,
   seit 0038) wandert als `source` mit. `origin_ref = image:<image_id>`.
@@ -70,7 +70,7 @@ bewusst schmal (Funktionen/Punkte/Wertebereich) — kein Anspruch auf volle GeoG
 - `components/MessageBubble.svelte`: Speichern-Knopf an Bildern + `libraryButtons`-Action an
   gerenderten Diagrammen (inkl. GeoGebra-Knopf bei `plot`). `serverRender.js`/`diagrams.js`
   stashen die Rohquelle in `data-source`, bevor sie den Block durch SVG ersetzen.
-- Route `(app)/library/+page.svelte`: Grid, Belegungsbalken, Download/PNG/Code/ggb/Löschen.
+- Route `(app)/workshop/+page.svelte` (bis 0.40 `/library`, das jetzt umleitet): Grid, Belegungsbalken, Download/PNG/Code/ggb/Löschen.
   Vorschau via `<img src="/api/artifacts/{id}">` (kein `innerHTML` → SVG-XSS-neutral).
 
 ## Herkunft (Modell-Transparenz, Alembic 0049/0050)

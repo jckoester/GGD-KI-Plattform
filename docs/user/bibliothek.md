@@ -1,60 +1,230 @@
-# Bibliothek — Bilder & Diagramme dauerhaft speichern
+# Bibliothek
 
-Chats werden nach drei Monaten ohne neue Nachricht automatisch gelöscht — die darin
-erzeugten Bilder und Diagramme verschwinden dann mit. Damit dir ein gelungenes Ergebnis
-erhalten bleibt, kannst du es in deine **persönliche Bibliothek** übernehmen. Dort bleibt es
-unabhängig vom Chat, bis du es löschst oder die Aufbewahrungsfrist abläuft.
+> Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente
+> liegen jetzt in der **[Werkstatt](werkstatt.md)** — so hieß bisher, was in der Seitenleiste
+> „Bibliothek“ stand.
 
-## Etwas in die Bibliothek speichern
+Die Bibliothek ist eine Sammlung von Wissensbausteinen, die du einer Chat-Unterhaltung gezielt hinzufügen kannst. Die KI liest diese Bausteine beim Antworten mit und kann so präzisere, inhaltlich passendere Antworten geben.
 
-Fahre im Chat mit der Maus über ein **erzeugtes Bild** oder ein gerendertes **Diagramm**
-(Schaltplan, Funktionsgraph, Flussdiagramm). Es erscheint ein Knopf:
+> **Was die Suche zusagt — und was nicht.** Sie antwortet in getrennten Abschnitten, und
+> der Unterschied ist wichtig:
+>
+> - **Bausteine mit diesem Namen** und **Alle passenden Bausteine** sind
+>   vollständig — mit Zahl. Steht dort „24 gefunden", gibt es 24; steht dort „8 von 24
+>   angezeigt", weißt du, dass mehr da ist. Wird ein Name nicht gefunden, heißt das
+>   verlässlich: Es gibt keinen Baustein dieses Namens.
+> - **Nächstliegende Bausteine** sind eine Empfehlung nach Ähnlichkeit und **nie
+>   vollständig**. Dass dort etwas fehlt, heißt nicht, dass es das nicht gibt.
+>
+> Was daraus folgt: Suchst du nach etwas Bestimmtem, nimm den Namen — über die
+> Suchseite oder den `@`-Shortcode. Für „was gibt es zu diesem Thema?" ist die
+> Ähnlichkeitssuche gedacht, und die bleibt eine Heuristik: Sie schlägt vor, sie zählt
+> nicht.
+>
+> Der Bestand besteht bislang fast nur aus Bildungsplan-Daten. Sobald Lehrkräfte in
+> größerem Umfang eigene Bausteine anlegen — Begriffsdefinitionen, Methoden, Anleitungen
+> —, ist die thematische Suche neu zu bewerten.
 
-- Bei Bildern das **Lesezeichen-Symbol** oben rechts.
-- Bei Diagrammen der Knopf **„In Bibliothek"**.
+## Was sind Bausteine?
 
-Ein Klick speichert das Element. Speicherst du dasselbe Element zweimal, entsteht **kein
-Duplikat** — es bleibt bei einem Eintrag.
+Ein Baustein ist ein konkretes Informationsstück — zum Beispiel:
 
-## Die Bibliothek öffnen
+- eine Kompetenz aus dem Bildungsplan (z. B. „Schülerinnen und Schüler können Brüche auf der Zahlengeraden darstellen")
+- ein **Fachbegriff** mit Definition, Beispielen und den häufigen Irrtümern dazu
+- ein **Stoffsteckbrief** in Chemie: Formel, Eigenschaften, Nachweis und
+  Gefahrenhinweise zu einem Stoff — Reinstoff und Lösung getrennt
+  (Chlorwasserstoff / Salzsäure)
+- ein schultypisches Konzept, das an deiner Schule besonders behandelt wird
+- ein Thema oder eine Funktion aus dem Unterrichtsmaterial
 
-Über den Eintrag **„Bibliothek"** in der Seitenleiste. Du siehst dort alle gespeicherten
-Elemente mit Vorschau, dazu oben einen Balken, wie viel Speicherplatz du schon belegst.
+Ein Baustein kann **Abbildungen** enthalten — sie stehen an der Stelle im Text, an der
+sie erklärt werden, mit einer Beschreibung darunter. Diese Beschreibung ist kein
+Beiwerk: Sie ist das, was du hörst, wenn du einen Screenreader benutzt, und das, was
+ein Assistent über das Bild weiß. Er sieht die Zeichnung nicht.
 
-Zu jedem Eintrag gibt es:
+Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
 
-- **Herunterladen** — die Originaldatei (Bild als PNG, Diagramm als SVG).
-- **PNG** — bei Diagrammen zusätzlich als Pixelbild (praktisch zum Einfügen in Dokumente).
-- **Code** — bei Diagrammen der zugrunde liegende Quelltext: zum **Kopieren** oder als Datei
-  (`.tex` für Schaltpläne, `.yaml` für Funktionsgraphen, `.mmd` für Flussdiagramme). Bei
-  Bildern ist das die Bildbeschreibung, mit der das Bild erzeugt wurde.
-- **GeoGebra** — bei Funktionsgraphen eine `.ggb`-Datei, die du in GeoGebra öffnen und dort
-  weiterbearbeiten kannst (Funktionen, Punkte, Wertebereich werden übernommen).
-- **Als Baustein** — bei Dokumenten und Flussdiagrammen: übernimmt den Inhalt in den
-  [Kontextspeicher](kontext.md#aus-einem-chat-ergebnis-einen-baustein-machen), damit er
-  über die Suche wiederauffindbar ist und im Unterricht als Material verwendet werden
-  kann. Ist das geschehen, trägt die Karte das Kennzeichen
-  **„als Baustein übernommen →"** mit einem Link dorthin.
-- **Löschen** — entfernt den Eintrag (mit Rückfrage).
+## Wozu ist das nützlich?
 
-## Gut zu wissen
+Ohne Kontext kennt die KI nur das, was du in der Eingabe schreibst. Mit Bausteinen kannst du ihr gezielt Hintergrundwissen mitgeben — ohne alles selbst eintippen zu müssen.
 
-- Die Bibliothek ist **privat** — nur du siehst deine Elemente.
-- Es gibt ein **Speicherlimit**. Ist es erreicht, musst du erst ältere Elemente löschen,
-  bevor du Neues speichern kannst. Wie groß dein Limit ist und wie lange Elemente aufbewahrt
-  werden, legt die Schule fest (für Lehrkräfte in der Regel länger und mehr Platz als für
-  Schüler:innen).
-- Läuft die **Aufbewahrungsfrist** eines Elements ab, wird es automatisch entfernt — das
-  Ablaufdatum steht an jeder Karte. Möchtest du etwas dauerhaft behalten, lade es rechtzeitig
-  herunter.
-- **Mit deinem Konto verschwindet auch deine Bibliothek.** Wird ein Konto nach drei Monaten
-  ohne Anmeldung gelöscht, gehen die gespeicherten Elemente mit — auch solche, deren eigene
-  Frist noch läuft. Sie waren ohnehin nur für dich sichtbar. Was erhalten bleiben soll,
-  gehört als [Baustein](kontext.md#aus-einem-chat-ergebnis-einen-baustein-machen) mit einer
-  geteilten Sichtbarkeit in den Wissensgraphen.
+**Beispiele:**
 
-Auch **Text-Dokumente** (Arbeitsblätter) liegen in der Bibliothek — sie bearbeitest du im Editor
-der [Material-Werkstatt](werkstatt.md) und exportierst sie als PDF/Word/ODT.
+- Du fragst nach einer Erklärung für Klasse 5 und fügst die zugehörige Bildungsplan-Kompetenz als Kontext hinzu → die KI orientiert sich am tatsächlichen Kompetenzrahmen.
+- Du entwickelst eine Aufgabe zu einem Arduino-Baustein und fügst dessen technische Beschreibung als Kontext ein → die KI kennt genaue Bezeichnungen und Parameter.
 
-→ Wie du Bilder und Diagramme überhaupt erzeugst, steht unter
-[Bilder erzeugen](bilder-erzeugen.md) und [Diagramme & Graphen](diagramme.md).
+## Kontext im Chat hinzufügen
+
+### Über den Suche-Button
+
+Neben dem Textfeld im Chat gibt es einen **Suche-Button** (Lupensymbol). Er ist klickbar, sobald du etwas in das Textfeld eingetippt hast.
+
+1. Tippe deine Frage oder einen beschreibenden Text ins Textfeld.
+2. Klick den Suche-Button — die Plattform sucht automatisch nach passenden Bausteinen.
+3. Eine Auswahlliste erscheint über dem Eingabefeld, nach Abschnitten geordnet: **Bausteine mit diesem Namen**, **Ähnlich benannte Bausteine** und **Nächstliegende Bausteine**. Vorausgewählt sind höchstens fünf je Abschnitt, ähnlich benannte keine — du kannst einzeln zu- und abwählen oder oben rechts **„Alle"** klicken.
+4. Klick **„Hinzufügen"** — die gewählten Bausteine werden als Chips über dem Textfeld angeheftet.
+
+Warum nicht alles vorausgewählt ist: Ein Name kann vielen Bausteinen gehören — „nennen" etwa steht als Operator in jedem Fach und in mehreren Bildungsplan-Fassungen. Jeder angeheftete Baustein geht als Text an das Sprachmodell; vorausgewählt ist deshalb nur, was oben steht. Wurde die Liste gekürzt, führt ein Verweis am Abschnittsende zur Suchseite (Menüpunkt **Bibliothek**), die alle Treffer zeigt.
+
+> 📷 *Screenshot folgt: Angeheftete Bausteine als Chips über dem Eingabefeld.*
+<!-- Ersetzen durch: ![Kontext-Chips](/help-images/kontext/kontext-chips.png) -->
+
+Die Suche verwendet semantische Ähnlichkeit: Du musst nicht exakte Schlagwörter treffen — auch ein vollständig formulierter Prompt liefert passende Treffer.
+
+**Namen werden direkt nachgeschlagen.** Suchst du nach einem Begriff, den es als Baustein gibt — einem Operator wie „nennen", einer Leitidee, einem Fachbegriff —, steht er oben, auch wenn andere Bausteine thematisch näher liegen. Die Frageform ist dabei egal: „nennen", „Operator nennen" und „Was bedeutet der Operator nennen?" führen zum selben Ergebnis. Wo derselbe Name in mehreren Fächern vorkommt, erscheinen die Fächer nacheinander.
+
+**Auch weitere Namen führen zum Ziel.** Ein Baustein kann mehrere Bezeichnungen tragen — „Ich-Du-Wir" und „Think-Pair-Share" meinen dieselbe Methode. Suchst du nach einer davon, findest du den Baustein, und der Treffer zeigt die anderen Namen mit, damit erkennbar bleibt, warum er dasteht. Weitere Bezeichnungen trägst du beim Bearbeiten unter **„Andere Bezeichnungen"** ein; sie gelten bei der Suche wie der Titel selbst.
+
+**Das Fach des Chats zählt mit.** Führst du den Chat in einem Fach oder einer Unterrichtsgruppe, stehen dessen Bausteine weiter oben. Ausgeblendet wird dabei nichts: Wer im Physik-Chat nach dem Satz des Pythagoras fragt, bekommt weiterhin die Mathematik-Kompetenz — sie ist dort schließlich die richtige Antwort. In einem Chat ohne Fach entscheidet allein die Ähnlichkeit.
+
+### Über den @-Shortcode
+
+Tippe **`@`** in das Textfeld, um einen Baustein über seinen Namen zu finden. Wähle einen Treffer aus der Liste — der Baustein wird sofort angeheftet.
+
+**Mehrwortige Titel darfst du ausschreiben.** Tippe ruhig `@Satz des Pythagoras` — die Liste engt sich mit jedem Wort weiter ein. Es genügt aber auch der Anfang (`@Satz`) oder ein Wort aus der Mitte (`@Pythagoras`). Ganz oben steht, was **genau** so heißt, dahinter, was so anfängt, dann Ähnliches. Bausteine aus dem Fach des Chats stehen weiter vorn.
+
+Die Liste schließt sich mit **Esc**, sobald du einen Treffer wählst — und wenn nichts mehr passt. Ein `@` mitten im Satz stört also nicht.
+
+### Kontext wieder entfernen
+
+Angeheftete Bausteine werden als beschriftete Chips oberhalb des Textfelds angezeigt. Ein Klick auf das **×** rechts am Chip entfernt ihn wieder aus dem Kontext.
+
+## Angezeigte Trefferzahl einstellen
+
+Das Vorschlagsfenster zeigt standardmäßig bis zu 8 Treffer. Wenn du häufig mit komplexen Themen arbeitest und mehr Auswahlmöglichkeiten wünschst, kannst du den Wert auf deiner [Profilseite](profil.md) erhöhen.
+
+Die Einstellung betrifft **nur deine eigene Suche** über den Suche-Button. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Diese Suche läuft im Hintergrund: Der Assistent liest die gefundenen Bausteine, ohne dass dir dazu eine Auswahlliste angeboten wird. Das Vorschlagsfenster erscheint also nur, wenn du selbst gesucht hast.
+
+**Eine gekürzte Liste sagt es dir.** Reicht der Platz nicht, steht am Abschnittsende, wie viel fehlt — „5 von 24 angezeigt" — und ein Verweis führt zur Suchseite mit allen Treffern. Du musst also nicht raten, ob eine Liste vollständig ist.
+
+Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden Bausteine**; die **Nächstliegenden** sind eine Auswahl nach Ähnlichkeit und tragen deshalb keine Gesamtzahl (siehe oben).
+
+## Meine Bausteine
+
+Unter **Bibliothek → Meine Bausteine** steht alles, was unter deinem Konto
+gespeichert ist — über alle Fächer und Entstehungswege hinweg. Die Seite ist für vier
+Dinge da:
+
+- **Nachsehen, was da ist.** Der einzige Ort, der deinen Gesamtbestand zeigt, egal ob
+  ein Baustein aus einer Sammlung, einem Upload, dem Unterrichtsplaner oder einem Chat
+  stammt.
+- **Aufräumen.** Umbenennen, archivieren, löschen — alles direkt in der Zeile.
+- **Den Lebenszyklus im Blick behalten.** Ablaufdaten, automatisch archivierte
+  Bausteine und Verweise auf Archiviertes laufen nur hier zusammen. Der übliche
+  Anlass ist der Schuljahreswechsel.
+- **Herkunft nachvollziehen.** Woher kam der Baustein, und gibt es im Chat eine neuere
+  Fassung?
+
+**Wonach die Seite sortiert:** nach Fach, innerhalb nach zuletzt geändert. Bausteine
+ohne Fach stehen am Ende. Über der Liste filterst du nach Bausteinart.
+
+**Der Zähler in der Seitenleiste** zeigt, wie viele Bausteine Aufmerksamkeit brauchen —
+etwas läuft demnächst ab, ist abgelaufen, verweist auf Archiviertes, oder es fehlt noch
+der Inhalt. Oben auf der Seite steht dann derselbe Hinweis mit einem Knopf **„Nur diese
+anzeigen"**.
+
+**Für Lehrkräfte** zeigt jede Zeile zusätzlich, in welcher Einheit oder Stunde der
+Baustein steckt. Ein Klick darauf filtert die Liste. Trägt ein Baustein hier nichts,
+nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
+
+> **Die Seite bearbeitet nichts.** Sie verwaltet: umbenennen, archivieren, löschen.
+> Zum Ändern des Inhalts führt sie dich dorthin, wo er hingehört — ein Stundenentwurf
+> in den Unterrichtsplaner, ein Sammlungseintrag in seinen Editor. Wer gezielt etwas
+> zum Bearbeiten sucht, ist über Fachseite, Sammlung oder Planer schneller: Die
+> filtern bereits vor.
+
+**Für Schüler:innen** ist es die einzige Stelle neben der Suche, an der sie die
+Bibliothek sehen. Dort stehen nur ihre eigenen Bausteine — niemand sonst kann sie
+lesen.
+
+## Aus einem Chat-Ergebnis einen Baustein machen
+
+Was im Chat entsteht, ist zunächst flüchtig: Nach drei Monaten ohne neue Nachricht wird
+das Gespräch gelöscht. Ein gelungenes Arbeitsblatt, eine Mindmap, eine Zusammenfassung —
+das soll bleiben und wiederauffindbar sein. Dafür gibt es **„Als Baustein speichern"**.
+
+Zwei Wege führen zum selben Formular:
+
+- **Im Chat**, unter der Antwort neben „Als Dokument bearbeiten".
+- **In der [Werkstatt](werkstatt.md)**, an jedem Dokument und jedem Flussdiagramm.
+
+Im Formular legst du fest:
+
+| Feld | Bedeutung |
+|---|---|
+| **Bausteinart** | Was ist das — ein Arbeitsblatt, ein Lerntext, eine Gliederung? Danach wird später gefiltert und gesucht. |
+| **Titel** | Vorbelegt aus der ersten Überschrift; ändere ihn zu dem, wonach du suchen würdest. |
+| **Sichtbarkeit** | Wer lesen und wer ändern darf. |
+| **Ablauf und Schuljahr** | Aufklappbar. Ohne Angabe gilt bei den meisten Arten das Ende des laufenden Schuljahres. |
+
+**Für Schüler:innen ist die Sichtbarkeit nicht wählbar:** Deren Bausteine sind immer
+privat — niemand sonst kann sie sehen, auch keine Lehrkraft. Statt eines Auswahlfelds
+steht dort ein Satz, der das sagt.
+
+**Das Ergebnis steht danach in [Meine Bausteine](#meine-bausteine)** und ist über die
+Suche auffindbar. In der Werkstatt trägt der Eintrag ein Kennzeichen
+**„als Baustein übernommen →"**, das dorthin führt.
+
+### Wenn du etwas überarbeitest
+
+Speicherst du dasselbe Dokument ein zweites Mal, entsteht **kein zweiter Baustein**,
+sondern eine **neue Fassung**: Der Knopf heißt dann „Baustein aktualisieren", die
+bisherige Fassung wandert ins Archiv und bleibt von der neuen aus erreichbar. Das ist
+wichtig für alle, die auf den Baustein verweisen — eine Unterrichtsstunde, die die alte
+Fassung als Material führt, bekommt dort die neue vorgeschlagen, statt ins Leere zu
+zeigen.
+
+Hat sich nichts geändert, sagt die Plattform das und legt nichts an.
+
+> **Das Produkt bleibt liegen.** Der Baustein ist eine Kopie mit eigenem Leben — Titel,
+> Sichtbarkeit, Verknüpfungen. Das Dokument bearbeitest du weiterhin in der
+> [Werkstatt](werkstatt.md); dorthin gehen Änderungen am Text. Erst ein erneutes
+> „Baustein aktualisieren" holt sie in die Bibliothek.
+
+### Speichern heißt veröffentlichen
+
+**Es gibt keinen Entwurfszustand.** Was du in einem Sammlungs-Editor speicherst, ist
+sofort da: in der Sammlung, in der Suche und im Kontext, den ein Assistent zu passenden
+Fragen mitliest. Ein Zwischenspeichern „nur für mich" gibt es nicht.
+
+Wenn du an etwas arbeitest, das noch nicht fertig ist, hast du zwei Möglichkeiten:
+
+- **Außerhalb schreiben** und erst den fertigen Text einsetzen.
+- **Die Sichtbarkeit eng stellen** (`privat` oder auf deine Unterrichtsgruppe), solange
+  der Baustein reift, und sie danach weiten.
+
+Dasselbe gilt für importierte Bausteine: **Der Import ist die Freigabe.** Wer eine Datei
+einspielt, verantwortet ihren Inhalt — es gibt kein Häkchen, das einen Eintrag danach
+noch „freigibt".
+
+> Ein Zwischenspeichern kann später dazukommen. Es wäre dann eine eigene Fassung neben
+> der gültigen, keine Markierung am veröffentlichten Baustein — sonst stünde ein
+> unfertiger Text schon in den Antworten, während das Häkchen noch fehlt.
+
+## Archivieren statt löschen
+
+Bausteine, die du selbst angelegt hast, kannst du unter **Meine Bausteine**
+**archivieren** oder **löschen**. Der Unterschied ist größer, als die beiden Wörter
+vermuten lassen:
+
+- **Archiviert** heißt: aus Suche und Assistenten heraus, aber nicht weg. Der Baustein
+  bleibt in deinem Archiv, alle Verknüpfungen bleiben, und du kannst ihn jederzeit
+  zurückholen.
+- **Gelöscht** heißt: endgültig fort, samt seiner Verknüpfungen.
+
+Deshalb greift eine Regel: **Verweisen aktive Bausteine anderer auf deinen, lässt er sich
+nicht löschen.** Die Plattform zeigt dir dann, wer darauf aufbaut, und bietet
+Archivieren an. Deine eigenen Verweise halten dich nicht auf.
+
+Bei fremden Bausteinen — schulweiten Vorlagen, dem Bildungsplan, Material der Fachschaft —
+erscheinen die beiden Knöpfe gar nicht erst: Sie pflegt, wem sie gehören.
+
+**Abgelaufene Bausteine.** Trägt ein Baustein ein Ablaufdatum, wandert er danach von
+selbst ins Archiv; im Archiv steht dann „abgelaufen am …". **Reaktivieren** holt ihn
+zurück und setzt zugleich ein neues Ablaufdatum — sonst wäre er noch in derselben Nacht
+wieder verschwunden. Nach drei Schuljahren im Archiv werden eigene Bausteine endgültig
+gelöscht; Bildungsplan und importierte Inhalte nie.
+
+## Kontext und Datenschutz
+
+Bausteine, die einer Unterhaltung hinzugefügt werden, werden zusammen mit deinen Nachrichten an die KI übermittelt. Es gelten dieselben Datenschutzregeln wie für Chat-Nachrichten — lies dazu die [Datenschutzerklärung](datenschutz.md).

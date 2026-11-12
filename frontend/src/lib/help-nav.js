@@ -29,11 +29,10 @@ export const helpNav = [
     { label: 'Assistenten',         slug: 'assistenten',         file: 'assistenten' },
     { label: 'Bilder erzeugen',     slug: 'bilder-erzeugen',     file: 'bilder-erzeugen' },
     { label: 'Diagramme & Graphen', slug: 'diagramme',           file: 'diagramme' },
-    { label: 'Bibliothek',          slug: 'bibliothek',          file: 'bibliothek' },
-    { label: 'Material-Werkstatt',  slug: 'werkstatt',           file: 'werkstatt' },
+    { label: 'Werkstatt',           slug: 'werkstatt',           file: 'werkstatt' },
     { label: 'KI-Ergebnisse zitieren', slug: 'zitieren',         file: 'zitieren' },
     { label: 'Fächer und Gruppen',  slug: 'faecher',             file: 'faecher' },
-    { label: 'Kontextspeicher',     slug: 'kontext',             file: 'kontext' },
+    { label: 'Bibliothek',          slug: 'bibliothek',          file: 'bibliothek' },
     { label: 'Fachbegriffe pflegen', slug: 'fachbegriffe-pflegen', file: 'fachbegriffe-pflegen', fuer: 'teacher' },
     { label: 'Bessere Antworten',   slug: 'bessere-antworten',   file: 'bessere-antworten', fuer: 'teacher' },
     { label: 'Als Schüler:in ansehen', slug: 'vorschau',         file: 'vorschau', fuer: 'teacher' },
@@ -45,6 +44,13 @@ export const helpNav = [
     { label: 'Datenschutz',         slug: 'datenschutz',         file: 'datenschutz' },
     { label: 'Inhaltsrichtlinien',  slug: 'guardrails',          file: 'guardrails', fuer: 'admin', geschuetzt: true },
 ].map((e) => ({ ...e, path: e.slug ? `/help/${e.slug}` : '/help' }))
+
+/**
+ * Seiten, die es unter anderem Namen gab: alt → neu. Lesezeichen und Links aus älteren
+ * Neuigkeiten kommen so an. 0.40: Die Hilfe zum Wissensbereich hieß „Kontextspeicher“
+ * (`/help/kontext`) und heißt jetzt „Bibliothek“.
+ */
+export const UMBENANNTE_HILFE = { kontext: 'bibliothek' }
 
 /** Der Eintrag zu einem Pfadstück — `''` ist die Übersicht. */
 export function helpEintrag(slug) {

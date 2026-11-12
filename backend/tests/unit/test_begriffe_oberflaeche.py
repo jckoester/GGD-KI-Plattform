@@ -1,8 +1,9 @@
 """Wächter: Meldungen an Nutzer:innen benutzen die Wörter der Oberfläche (0.40, Päckchen AM).
 
 Geprüft werden die Texte in `HTTPException(…)` unter `app/` — das `detail` erscheint in der
-Oberfläche. „Knoten“ heißt dort „Baustein“ (Schritt 7a). Log-Meldungen und Texte für das
-Modell sind nicht gemeint (Plan F7). Schritt 8 ergänzt „Wissensgraph“ und „Artefakt“.
+Oberfläche. „Knoten“ heißt dort „Baustein“ (Schritt 7a); „Wissensgraph“ und „Kontextspeicher“
+heißen „Bibliothek“, „Artefakt“ heißt „Produkt“, die Ablage der Produkte „Werkstatt“ (Schritt 8).
+Log-Meldungen und Texte für das Modell sind nicht gemeint (Plan F7).
 """
 import ast
 import re
@@ -33,4 +34,10 @@ def test_die_suche_greift():
 def test_kein_knoten_in_meldungen():
     funde = [f"{ort}: {text!r}" for ort, text in _meldungen()
              if re.search(r"knoten", text, re.IGNORECASE)]
+    assert funde == []
+
+
+def test_keine_alten_namen_in_meldungen():
+    alt = re.compile(r"Wissensgraph|Kontextspeicher|Artefakt|Bibliothek ist voll|in der Bibliothek", re.IGNORECASE)
+    funde = [f"{ort}: {text!r}" for ort, text in _meldungen() if alt.search(text)]
     assert funde == []

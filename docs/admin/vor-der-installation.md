@@ -31,7 +31,7 @@ Vektorbreite und Bildformat direkt beim Anbieter ab.
 Drei Anforderungen sind nicht verhandelbar, und alle drei scheitern **still** — nichts
 stürzt ab, es passiert nur nicht das Gewünschte:
 
-1. **Function-Calling.** Ohne das fallen Wissensgraph, Unterrichtsplanung und
+1. **Function-Calling.** Ohne das fallen die Suche in der Bibliothek, Unterrichtsplanung und
    Bildgenerierung ersatzlos aus. Das Modell antwortet freundlich, ruft aber nie eine
    Funktion auf. Zu erkennen nur daran, dass Antworten auffällig allgemein bleiben.
 2. **Ein Preis in der LiteLLM-Config.** Fehlt er, meldet der SpendLog 0 — Budgets,

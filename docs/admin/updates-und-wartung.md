@@ -625,10 +625,10 @@ aus wie eine gültige Einstellung:
 rm config/taxonomy.yaml
 ```
 
-**Ein Assistent sagt, im Wissensgraph sei nichts zu einem Thema — obwohl Bausteine
+**Ein Assistent sagt, in der Bibliothek sei nichts zu einem Thema — obwohl Bausteine
 vorhanden sind**
 Seit 09/2026 antwortet die Suche in getrennten Abschnitten mit Zählung (siehe
-[Kontextspeicher](../user/kontext.md)): Namensträger und Aufzählung sind vollständig, die
+[Bibliothek](../user/bibliothek.md)): Namensträger und Aufzählung sind vollständig, die
 thematische Auswahl ist es ausdrücklich nie. Bleibt ein Baustein trotzdem ungenannt,
 lohnen zwei Fragen: Hat das Modell **thematisch** gesucht, wo eine Aufzählung nötig
 gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 14 der 42 Typen sind

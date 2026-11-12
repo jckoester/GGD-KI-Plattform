@@ -42,7 +42,7 @@ Der Betrieb bricht **nicht** ab, es degradiert nur:
   in-process im Backend und funktionieren weiter).
 - **Im Export (PDF, Word, ODT):** Formeln (PDF), Schaltpläne und Diagramme erscheinen als
   Quelltext statt gerendert.
-- **„In Bibliothek speichern“** scheitert für Schaltpläne und Diagramme mit einer Fehlermeldung.
+- **„In der Werkstatt speichern“** scheitert für Schaltpläne und Diagramme mit einer Fehlermeldung.
   Diagramme im Chat zeichnet der Browser selbst; sie sind nicht betroffen.
 
 Prüfen, ob er läuft: `docker compose ps render-sidecar` bzw. Logs `docker compose logs render-sidecar`.

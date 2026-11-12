@@ -55,7 +55,7 @@ docker compose logs backend | grep "Nicht schreibbar"
 Die beiden Seiten zeigen dann eine Warnung und sperren „Speichern"; der Ferienkalender lässt
 sich weiter kopieren und von Hand eintragen. Der übrige Betrieb läuft unverändert — ein
 schreibgeschütztes `config/` ist zulässig, wenn Sie die Dateien ohnehin von Hand pflegen.
-Dieselbe Startprüfung gilt für die Ablagen unter `data/` (erzeugte Bilder, Bibliothek,
+Dieselbe Startprüfung gilt für die Ablagen unter `data/` (erzeugte Bilder, Werkstatt,
 Export-Vorlagen).
 
 > **`subjects.yaml` braucht zusätzlich einen Seed-Lauf.** Der Neustart macht die Datei nur
@@ -110,7 +110,7 @@ ausgeliefert. Im laufenden Betrieb gibt es sie auf dem Host also gar nicht.
 > [Updates & Wartung](updates-und-wartung.md).
 
 Ihr eigener Bedarf ist auf der **Datenebene** vorgesehen und braucht die Datei nicht:
-eigene Themengebiete als Wurzeln des Wissensgraphen, eigene Bausteine in jeder Art,
+eigene Themengebiete als Wurzeln der Bibliothek, eigene Bausteine in jeder Art,
 eigene Schlagworte. Fehlt Ihnen wirklich eine Bausteinart, ist das ein Anliegen ans
 Projekt — dann bekommen alle Schulen sie.
 
@@ -737,12 +737,12 @@ rollen:
       - stufe: 1
         name: Chatten
         beschreibung: Chat, freigegebene Assistenten, deine Fächer und dein Verlauf.
-        eintraege: [chat, assistants, tools, subjects, history]
+        eintraege: [chat, assistants, subjects, history]
       - stufe: 2
         name: Sammeln und nachschlagen
-        beschreibung: Dazu Bibliothek und Wissensbereich.
+        beschreibung: Dazu Werkstatt und Bibliothek.
         aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
-        eintraege: [library, knowledge]
+        eintraege: [workshop, knowledge]
 ```
 
 - `startstufe` — womit **neue** Konten beginnen. Bestandskonten wurden bei der Migration
@@ -751,8 +751,12 @@ rollen:
   optional und sollte ehrlich sein („braucht einmalig ein eingerichtetes Wochenraster") —
   wer freischaltet und vor einer leeren Seite steht, schaltet nicht wieder frei.
 - `eintraege` — die Navigationsschlüssel. Gültig sind: `welcome`, `chat`, `assistants`,
-  `assistants_my`, `tools`, `library`, `knowledge`, `curricula`, `education_plans`,
+  `assistants_my`, `workshop`, `knowledge`, `curricula`, `education_plans`,
   `subjects`, `planner`, `history`.
+
+**Seit 0.40 umbenannt oder entfallen:** `library` heißt `workshop` (Werkstatt) — der alte
+Name wirkt weiter, der Start bittet um Umbenennung. `tools` ist entfallen (Werkzeuge stehen
+in der Assistentenliste); der Start meldet ihn, die Navigation bleibt vollständig.
 
 **Regeln, die der Start erzwingt** (das Backend bricht sonst mit einer Meldung ab):
 Stufen laufen von 1 an ohne Lücke, und jeder Eintrag steht in genau einer Stufe.
@@ -829,7 +833,7 @@ Modellwähler ausblendet. Welche Modelle sich wofür eignen, steht in
 
 | | Folge, wenn es fehlt |
 |---|---|
-| `supports_function_calling: true` | Wissensgraph, Unterrichtsplanung und Bildgenerierung fallen ersatzlos aus. Das Modell antwortet freundlich und ruft nie eine Funktion auf. |
+| `supports_function_calling: true` | Suche in der Bibliothek, Unterrichtsplanung und Bildgenerierung fallen ersatzlos aus. Das Modell antwortet freundlich und ruft nie eine Funktion auf. |
 | `input_cost_per_token` / `output_cost_per_token` | Der SpendLog meldet 0. EUR-Budgets, die 429-Sperre und die Kostenstatistik laufen ins Leere. Betrifft **jedes** Modell mit eigener `api_base` — LiteLLM kennt dafür keine Preise. |
 | `IMAGE_PRICES` in der `.env` | Für **Bilder** ignoriert LiteLLM den Preis aus dieser Datei und liest nur seine eingebaute Tabelle. Ohne die Variable kostet jedes Bild 0,00 $. |
 

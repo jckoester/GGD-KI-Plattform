@@ -42,7 +42,7 @@ Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüle
 ## Umfang der Oberfläche
 
 Die Plattform kann viel — und zeigt deshalb anfangs bewusst wenig. Sie beginnt mit
-Chat, Assistenten, Werkzeugen und Verlauf; alles Weitere blendest du selbst ein, wenn du
+Chat, Assistenten und Verlauf; alles Weitere blendest du selbst ein, wenn du
 es brauchst.
 
 Im Profil steht dafür der Abschnitt **Umfang der Oberfläche**. Jede Stufe enthält die
@@ -126,7 +126,7 @@ du am iPad mit Tastaturhülle, wähle **„Enter sendet"**, wenn Enter abschicke
 
 ## Kontext-Suche
 
-Wenn du den Suche-Button im Chat nutzt, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen kannst du diesen Wert erhöhen:
+Wenn du den Suche-Button im Chat nutzt, werden standardmäßig bis zu **8 Treffer** aus der Bibliothek angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen kannst du diesen Wert erhöhen:
 
 - Öffne die Profilseite und wähle unter **„Kontext-Suche"** die gewünschte Zahl angezeigter Treffer.
 

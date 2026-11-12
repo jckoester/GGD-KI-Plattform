@@ -143,7 +143,7 @@ dazukommt. Jetzt prüft ein Test sie gegen die `docker-compose.yml`
 | `auto_confirm_reviews` | täglich 03:45 Uhr | — | Nachbereitungen, die niemand bestätigt hat, automatisch abschließen |
 | `cleanup_rendered_svg` | täglich 04:00 Uhr | ✅ | Zwischengespeicherte Server-Renderings räumen |
 | `cleanup_generated_images` | täglich 04:30 Uhr | ✅ | Erzeugte Bilder nach Ablauf der Frist löschen |
-| `cleanup_artifacts` | täglich 04:45 Uhr | ✅ | Abgelaufene Artefakte der Bibliothek löschen |
+| `cleanup_artifacts` | täglich 04:45 Uhr | ✅ | Abgelaufene Produkte der Werkstatt löschen |
 | `node_lifecycle` | täglich 05:00 Uhr | ✅ | Abgelaufene Bausteine archivieren, lange archivierte löschen |
 | `weekly_budget_accrual` | montags 05:00 Uhr | — | Wochenguthaben zuteilen (idempotent; ein ausgefallener Lauf holt nach) |
 | `sync_timetable` | Mo–Fr 05:30 Uhr | — | Stundenplan abgleichen: Entfall, Vertretung, Verlegung |
@@ -203,7 +203,7 @@ Personenbezug und bleibt.
 | `jwt_revocations` | gelöscht |
 | `budget_accruals` | gelöscht — die Zuteilungshistorie des Wochenmodells |
 | `budget_grants` | gelöscht — von Hand aufgebuchte Zuschläge samt ihrem Protokoll (wer, wann, warum) |
-| `artifacts` | gelöscht, Datenbankzeilen **und** Dateien — die Bibliothek ist strikt privat |
+| `artifacts` | gelöscht, Datenbankzeilen **und** Dateien — die Werkstatt ist strikt privat |
 | `node_engagement` | gelöscht — persönlicher Lernzustand; der Zustand je Gruppe bleibt |
 | `group_memberships` | gelöscht, alle Herkünfte |
 | `teacher_group_exclusions` | gelöscht — die persönlichen Fach-Ausblendungen |
@@ -336,10 +336,10 @@ gehört der Schule, der Personenbezug nicht.
 > keine Eigentümerin mehr — nur noch Admins können ihn ändern. Der `write_scope` wird
 > bewusst **nicht** angehoben, weil das eine stille Rechteausweitung wäre.
 
-#### Die Bibliothek geht mit dem Konto
+#### Die Werkstatt geht mit dem Konto
 
 Artefakte haben eine **eigene** Frist (`expires_at`, bei Lehrkräften bis zu zwei Jahre).
-Trotzdem gewinnt die Kontolöschung: Die Bibliothek ist strikt privat — die Liste filtert
+Trotzdem gewinnt die Kontolöschung: Die Werkstatt ist strikt privat — die Liste filtert
 auf die Eigentümerin, der Abruf einer fremden Datei wird abgewiesen. Damit gilt dieselbe
 Regel wie für einen privaten Baustein. Bis 09/2026 überlebten Artefakte das Konto samt
 Pseudonym bis zum Fristende.
@@ -432,7 +432,7 @@ ausgenommen der Aufräum-Lauf und die Kontolöschung).
 | Anmeldung (`auth`) | gescheiterte Anmeldungen (mit Grund, **ohne** Benutzernamen), abgelehnte Bestätigungen der Anmeldung (Step-up), Sperren der Drossel (höchstens ein Eintrag je Person, Bereich und Viertelstunde), abgewiesene Rückmeldungen gesperrter Personen, Beginn und Ende des Vorschaumodus (Klasse, Gruppe) | 180 Tage |
 | Verwaltung (`admin`) | Assistenten freigegeben, abgelehnt, aktiviert, deaktiviert, gelöscht; Modell-Freischaltung; Wochenbeträge und Zuschläge; Guardrail-Prompt; Site-Texte; Ferienkalender; beendete Sitzungen; Statuswechsel von Rückmeldungen | 2 Jahre |
 | Moderation (`moderation`) | Krisen-Flag angelegt (Kategorie und Schwere), Krisen-Flag erledigt | 1 Jahr |
-| System (`system`) | Ergebnisse der Löschläufe für Konten, Chats und Audit-Log sowie des Lebenszyklus im Kontextspeicher (Anzahlen) | 90 Tage |
+| System (`system`) | Ergebnisse der Löschläufe für Konten, Chats und Audit-Log sowie des Lebenszyklus der Bibliothek (Anzahlen) | 90 Tage |
 
 Den Aufräum-Lauf `cleanup_audit_log` zeigt die Tabelle der [automatischen Läufe](#automatische-läufe-cron-jobs).
 

@@ -110,3 +110,16 @@ describe('alte Adressen (0.40)', () => {
         expect(umleitung(ladeTools, {})).toEqual({ status: 301, location: '/assistants?erstellt=alle' });
     });
 });
+
+describe('Hilfe: alte Seite „Kontextspeicher“ (0.40)', () => {
+    it('/help/kontext → /help/bibliothek', async () => {
+        const { load } = await import('../routes/(app)/help/[seite]/+page.js');
+        let umleitung = null;
+        try {
+            await load({ params: { seite: 'kontext' }, url: new URL('http://x/help/kontext') });
+        } catch (e) {
+            umleitung = { status: e.status, location: e.location };
+        }
+        expect(umleitung).toEqual({ status: 301, location: '/help/bibliothek' });
+    });
+});

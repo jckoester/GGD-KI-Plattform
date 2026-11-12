@@ -85,7 +85,7 @@ der Weg, fächerverbindende Bezüge sichtbar zu machen.
 ### Material
 
 Im Feld **Material** steht Freitext, Links — und mit `@` Verweise auf Bausteine aus dem
-[Kontextspeicher](kontext.md): Arbeitsblätter, Aufgaben, Präsentationen, Methodenblätter
+[Bibliothek](bibliothek.md): Arbeitsblätter, Aufgaben, Präsentationen, Methodenblätter
 und fachliche Konzepte.
 
 Bildungsplan-Kompetenzen erscheinen hier bewusst **nicht** — dafür gibt es die IK- und

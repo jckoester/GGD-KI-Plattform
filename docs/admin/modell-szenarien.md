@@ -382,8 +382,8 @@ Deployment benennt — genauer als der Alias, wenn dieser auf mehrere Deployment
 > `x-litellm-model-id` ist ein Hash. Erst der Abgleich mit `/model/info` macht daraus einen
 > Namen.
 
-Gespeichert wird die Angabe an der Nachricht, am erzeugten Bild und — beim Übernehmen in
-die Bibliothek — am Artefakt. Letzteres ist kein Luxus: Ein Artefakt überlebt die
+Gespeichert wird die Angabe an der Nachricht, am erzeugten Bild und — beim Speichern in
+der Werkstatt — am Artefakt. Letzteres ist kein Luxus: Ein Artefakt überlebt die
 Konversation bewusst, die Bildzeile stirbt mit ihr; ohne die Kopie wäre die Herkunft nach
 spätestens 93 Tagen weg.
 

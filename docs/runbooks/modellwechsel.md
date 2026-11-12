@@ -34,9 +34,9 @@ Zwischen dem Schema-Schritt und dem Ende des Re-Embeddings liefert die **semanti
 keine Treffer**. `app/context/retrieval.py` und `app/chat/router.py` filtern auf
 `embedding IS NOT NULL` — es gibt also keine Fehlermeldungen, nur leere Ergebnisse:
 
-- Der Wissensgraph-Kontext im Chat bleibt leer (Assistenten antworten weiter, nur ohne
+- Der Kontext aus der Bibliothek bleibt im Chat leer (Assistenten antworten weiter, nur ohne
   Kontextknoten).
-- Die semantische Suche im Wissensgraph findet nichts.
+- Die semantische Suche in der Bibliothek findet nichts.
 - Volltext-/Titelsuche, Curricula, Unterrichtsplanung, Bildungsplan-Navigation sind **nicht**
   betroffen.
 
@@ -178,7 +178,7 @@ ORDER BY 2 DESC;
 
 Zusätzlich fachlich stichprobenartig prüfen:
 
-- Semantische Suche im Wissensgraph mit zwei bis drei bekannten Anfragen — liefert sie
+- Semantische Suche in der Bibliothek mit zwei bis drei bekannten Anfragen — liefert sie
   plausible Treffer?
 - Ein Chat mit einem Assistenten, der Kontextknoten nutzt: erscheinen Kontextvorschläge?
 - Spaltenbreite: `\d context_nodes` zeigt `vector(N)` mit dem konfigurierten N.

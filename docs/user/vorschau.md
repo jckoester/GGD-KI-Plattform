@@ -41,7 +41,7 @@ Daten echter Schüler:innen kommen darin nicht vor.
 
 - **Chatten, Bilder erzeugen, Feedback geben** — ja. Eine Rückmeldung aus der Vorschau ist für
   die Administration als solche markiert.
-- **Ändern** — nein. Einstellungen, Bibliothek, Gruppen, Zugangstoken bleiben, wie sie sind;
+- **Ändern** — nein. Einstellungen, Werkstatt, Gruppen, Zugangstoken bleiben, wie sie sind;
   die Plattform antwortet mit „In der Vorschau lässt sich nichts ändern.“
 - **Krisenhinweis:** Schreibst du eine Nachricht, die nach einer Notlage klingt, erscheint der
   Hinweis mit den Hilfsangeboten wie bei einer Schüler:in. Es entsteht aber **keine Meldung**

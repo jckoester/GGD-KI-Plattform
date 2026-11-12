@@ -89,7 +89,7 @@ Nach der Anmeldung siehst du die Hauptansicht der Plattform:
 ### Warum die Seitenleiste so kurz ist
 
 Du siehst anfangs nur wenige Einträge. Das ist Absicht: Die Plattform hat deutlich mehr
-zu bieten — Bibliothek, Unterrichtsplanung, Wissensbausteine —, aber alles auf einmal
+zu bieten — Werkstatt, Unterrichtsplanung, Bibliothek —, aber alles auf einmal
 wäre eine Wand. Du blendest ein, was du brauchst, wenn du es brauchst.
 
 Am Ende der Seitenleiste steht dafür **„Es gibt mehr"**, ausführlicher im

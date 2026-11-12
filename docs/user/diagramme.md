@@ -21,8 +21,8 @@ dargestellt wird. Fährst du mit der Maus über die Grafik, erscheinen oben rech
   [Werkstatt](werkstatt.md) weiterzuverwenden.
 - **„SVG"** — die Grafik als Datei. Sie ist **immer hell**, auch wenn du den Dunkelmodus
   nutzt, damit sie auf weißem Papier lesbar bleibt.
-- **„In Bibliothek"** — legt die Grafik dauerhaft ab; sonst verschwindet sie mit dem Chat
-  (→ [Bibliothek](bibliothek.md)).
+- **„In Werkstatt"** — legt die Grafik dauerhaft ab; sonst verschwindet sie mit dem Chat
+  (→ [Werkstatt](werkstatt.md)).
 - **„GeoGebra"** — nur bei Funktionsgraphen: eine `.ggb`-Datei zum Weiterbearbeiten.
 
 ## Schaltpläne
