@@ -25,9 +25,8 @@ rollen:
       - stufe: 1
         name: Chatten
         beschreibung: >-
-          Chat, die für dich freigegebenen Assistenten und Werkzeuge, deine Fächer und
-          dein Verlauf.
-        eintraege: [welcome, chat, assistants, tools, subjects, history]
+          Chat, die für dich freigegebenen Assistenten, deine Fächer und dein Verlauf.
+        eintraege: [welcome, chat, assistants, subjects, history]
 
       - stufe: 2
         name: Sammeln und nachschlagen
@@ -43,9 +42,8 @@ rollen:
       - stufe: 1
         name: Chatten
         beschreibung: >-
-          Freier Chat, die schulweit freigegebenen Assistenten und Werkzeuge, Verlauf
-          und Profil.
-        eintraege: [welcome, chat, assistants, tools, history]
+          Freier Chat, die schulweit freigegebenen Assistenten, Verlauf und Profil.
+        eintraege: [welcome, chat, assistants, history]
 
       - stufe: 2
         name: Eigene Assistenten und Material

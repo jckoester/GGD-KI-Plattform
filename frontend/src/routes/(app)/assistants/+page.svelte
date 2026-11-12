@@ -1,5 +1,10 @@
 <script>
-    import { abschnitteUebersicht, stufenText, zurAnzeige } from "$lib/assistentenliste.js";
+    import {
+        ALLE_WERKZEUGE, abschnitteUebersicht, erstelltFilter, filterArten, nachErstellt, stufenText, zurAnzeige,
+    } from "$lib/assistentenliste.js";
+    import { ladeProduktarten } from "$lib/produktarten.js";
+    import ProduktMarken from "$lib/components/ProduktMarken.svelte";
+    import { page } from "$app/stores";
     import { BADGE } from "$lib/badges.js";
     import FachBadge from "$lib/components/FachBadge.svelte";
     import { assistentKosten } from "$lib/modellangaben.js";
@@ -17,8 +22,18 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let assistants = $state([])
+    let arten = $state([]) // „stellt her“ (0.40)
+    // Filter „Werkzeuge“ in der Adresse (`?erstellt=alle|image|…`) — Links und Zurück tragen ihn.
+    const filter = $derived(erstelltFilter($page.url.searchParams.get("erstellt"), arten))
+    const angeboteneArten = $derived(filterArten(assistants, arten))
+    const gefiltert = $derived(nachErstellt(assistants, filter))
     // F37 c (0.26): spezifische, allgemeine, weitere — Überschriften nur ab zwei Abschnitten.
-    const abschnitte = $derived(abschnitteUebersicht(assistants))
+    const abschnitte = $derived(abschnitteUebersicht(gefiltert))
+
+    const FILTER_KLASSE = "px-3 py-1 rounded-full text-sm border transition-colors"
+    const filterKlasse = (aktiv) => aktiv
+        ? `${FILTER_KLASSE} border-light-ui-3 dark:border-dark-ui-3 bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx font-medium`
+        : `${FILTER_KLASSE} border-light-ui-2 dark:border-dark-ui-2 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`
     let loading = $state(true)
     let error = $state(null)
 
@@ -42,8 +57,9 @@
 
     onMount(async () => {
         try {
-            const data = await getAssistants()
+            const [data, geladeneArten] = await Promise.all([getAssistants(), ladeProduktarten()])
             assistants = zurAnzeige(data.items)
+            arten = geladeneArten
         } catch (err) {
             error = err.message ?? 'Fehler beim Laden der Assistenten'
         } finally {
@@ -59,6 +75,18 @@
             <h1 class="text-2xl font-semibold">Assistenten</h1>
         </div>
 
+        {#if !loading && angeboteneArten.length}
+            <nav aria-label="Filter nach Werkzeug" class="flex flex-wrap gap-2 mb-6">
+                <a href="/assistants" class={filterKlasse(!filter)} aria-current={!filter ? "page" : undefined}>Alle</a>
+                <a href="/assistants?erstellt={ALLE_WERKZEUGE}" class={filterKlasse(filter === ALLE_WERKZEUGE)}
+                   aria-current={filter === ALLE_WERKZEUGE ? "page" : undefined}>Werkzeuge</a>
+                {#each angeboteneArten as art (art.id)}
+                    <a href="/assistants?erstellt={art.id}" class={filterKlasse(filter === art.id)}
+                       aria-current={filter === art.id ? "page" : undefined}>{art.filter}</a>
+                {/each}
+            </nav>
+        {/if}
+
         {#if loading}
             <div class="flex items-center justify-center py-12">
                 <div class="flex flex-col items-center gap-2 text-light-tx-2 dark:text-dark-tx-2">
@@ -71,6 +99,11 @@
         {:else if assistants.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
                 <p class="text-lg">Derzeit sind keine Assistenten für dich verfügbar.</p>
+            </div>
+        {:else if gefiltert.length === 0}
+            <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
+                <p class="text-lg">Kein Assistent für dich stellt das her.</p>
+                <a href="/assistants" class="text-sm text-light-bl dark:text-dark-bl hover:underline">Alle Assistenten zeigen</a>
             </div>
         {:else}
           {#each abschnitte as abschnitt (abschnitt.titel)}
@@ -111,6 +144,7 @@
                                         {#if stufenText(assistant)}
                                             <span class={BADGE}>{stufenText(assistant)}</span>
                                         {/if}
+                                        <ProduktMarken {assistant} />
                                         {#if kostenText(assistant)}
                                             <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
                                                   title="Geschätzte Kosten je Nachricht, samt Prompt und Dokumenten">{kostenText(assistant)}</span>

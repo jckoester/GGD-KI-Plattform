@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { abschnitteUebersicht, allgemeineImFach, gesperrtHinweis, ordneFuerFach, schlagwoerterAnzeige, stufenBereiche, stufenText, zurAnzeige } from './assistentenliste.js'
+import { ALLE_WERKZEUGE, abschnitteUebersicht, allgemeineImFach, erstelltFilter, filterArten, markenVon, nachErstellt, gesperrtHinweis, ordneFuerFach, schlagwoerterAnzeige, stufenBereiche, stufenText, zurAnzeige } from './assistentenliste.js'
 
 const SRC = join(import.meta.dirname, '..')
 const lies = (p) => readFileSync(join(SRC, p), 'utf8')
@@ -25,7 +25,6 @@ describe('zurAnzeige', () => {
 describe('Anzeige filtert, Einstieg und Direktlink nicht (Quelltext-Wächter)', () => {
     it.each([
         'routes/(app)/assistants/+page.svelte',
-        'routes/(app)/tools/+page.svelte',
         'routes/(app)/subjects/[slug]/+page.svelte',
         'lib/components/GruppenUebersicht.svelte',
         'lib/stores/assistants.js',
@@ -171,4 +170,47 @@ describe('stufenText', () => {
     expect(stufenText({ max_grade: 7 })).toBe('bis Kl. 7')
     expect(stufenText({})).toBe('')
   })
+})
+
+
+describe('Werkzeuge: Marke und Filter (0.40)', () => {
+    const ARTEN = [
+        { id: 'image', marke: 'erstellt Bilder', filter: 'Bilder' },
+        { id: 'diagram', marke: 'erstellt Diagramme', filter: 'Diagramme' },
+        { id: 'year_plan', marke: 'plant das Schuljahr', filter: 'Jahresplanung' },
+    ]
+    const LISTE = [
+        { id: 1, produces: ['year_plan', 'image'] },
+        { id: 2, produces: [] },
+        { id: 3 },
+        { id: 4, produces: ['image'] },
+    ]
+
+    it('Marken in Listenreihenfolge, Unbekanntes fällt weg', () => {
+        expect(markenVon(LISTE[0], ARTEN)).toEqual(['erstellt Bilder', 'plant das Schuljahr'])
+        expect(markenVon({ produces: ['zeitreise'] }, ARTEN)).toEqual([])
+        expect(markenVon(LISTE[2], ARTEN)).toEqual([])
+    })
+
+    it('Filter nur für Arten, die vorkommen', () => {
+        expect(filterArten(LISTE, ARTEN).map((a) => a.id)).toEqual(['image', 'year_plan'])
+        expect(filterArten([{ id: 2 }], ARTEN)).toEqual([])
+    })
+
+    it('Adresse: alle, eine Art, sonst kein Filter', () => {
+        expect(erstelltFilter(ALLE_WERKZEUGE, ARTEN)).toBe('alle')
+        expect(erstelltFilter('diagram', ARTEN)).toBe('diagram')
+        expect(erstelltFilter('zeitreise', ARTEN)).toBeNull()
+        expect(erstelltFilter(null, ARTEN)).toBeNull()
+    })
+
+    it('filtert nach Werkzeug und nach Art', () => {
+        expect(nachErstellt(LISTE, null).map((a) => a.id)).toEqual([1, 2, 3, 4])
+        expect(nachErstellt(LISTE, 'alle').map((a) => a.id)).toEqual([1, 4])
+        expect(nachErstellt(LISTE, 'year_plan').map((a) => a.id)).toEqual([1])
+    })
+
+    it('/tools leitet auf die Werkzeuge in der Assistentenliste (Quelltext-Wächter)', () => {
+        expect(lies('routes/(app)/tools/+page.js')).toContain("redirect(301, '/assistants?erstellt=alle')")
+    })
 })

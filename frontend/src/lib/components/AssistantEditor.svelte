@@ -2206,9 +2206,8 @@
                                 Fähigkeiten
                             </span>
                             <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                Was dieser Assistent im Chat kann. Ein Assistent mit einer
-                                medienerzeugenden Fähigkeit erscheint zusätzlich unter
-                                <strong>Werkzeuge</strong> in der Seitenleiste.
+                                Was dieser Assistent im Chat kann. Was er herstellt, steht
+                                oben unter „Stellt her“.
                             </p>
                             <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
                                 <input

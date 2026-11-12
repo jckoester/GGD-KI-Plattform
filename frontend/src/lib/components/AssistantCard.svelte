@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation'
   import { Bot } from 'lucide-svelte'
   import SubjectIcon from './SubjectIcon.svelte'
+  import ProduktMarken from './ProduktMarken.svelte'
   import { neuerChatPfad } from '$lib/chatziel.js'
   import { stufenText } from '$lib/assistentenliste.js'
   import { BADGE } from '$lib/badges.js'
@@ -53,6 +54,9 @@
       {scopeLabel()}
     </span>
   </div>
+  {#if (assistant.produces ?? []).length}
+    <div class="flex flex-wrap gap-1"><ProduktMarken {assistant} /></div>
+  {/if}
   {#if assistant.description}
     <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 line-clamp-2 leading-relaxed">
       {assistant.description}

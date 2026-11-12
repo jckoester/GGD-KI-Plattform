@@ -49,7 +49,6 @@ BEKANNTE_EINTRAEGE = frozenset({
     "chat",              # Neuer Chat
     "assistants",        # Assistenten (Übersicht)
     "assistants_my",     # Meine Assistenten (Lehrkraft)
-    "tools",             # Werkzeuge
     "library",           # Bibliothek
     "knowledge",         # Wissensbereich (Suche, Meine Bausteine, Graph)
     "curricula",         # Curricula
@@ -58,6 +57,15 @@ BEKANNTE_EINTRAEGE = frozenset({
     "planner",           # Unterrichtsplanung (Jahresübersicht, Stundenentwurf)
     "history",           # Letzte Chats / Verlauf
 })
+
+#: Schlüssel, die es **gab** — Fassung, seit der sie entfallen sind. Die Schuldatei
+#: (`config/ui_levels.yaml`) überlebt jedes Update; ein solcher Schlüssel ist dort kein
+#: Tippfehler, sondern Altbestand. Er bekommt deshalb eine eigene Meldung („bitte streichen“)
+#: statt eines Tippfehler-Vorschlags. Seit 0.40 ist ein Werkzeug ein Assistent mit Angabe
+#: „stellt her“ und steht in der Assistentenliste — die Seite `/tools` gibt es nicht mehr.
+ENTFALLEN: dict[str, str] = {
+    "tools": "0.40",
+}
 
 
 class Stufe(BaseModel):
@@ -210,8 +218,18 @@ def _meldung_zu_ignorierten(rolle: str, unbekannt: tuple[str, ...]) -> str:
     nach einem Rollback oder einem Zweigwechsel. Beides sieht in der Datei gleich aus;
     erst der Abstand trennt sie.
     """
+    entfallen = [e for e in unbekannt if e in ENTFALLEN]
+    if entfallen and len(entfallen) == len(unbekannt):
+        return (
+            f"Rolle {rolle!r}: " + ", ".join(
+                f"{e!r} ist seit {ENTFALLEN[e]} entfallen" for e in entfallen
+            ) + " — bitte aus config/ui_levels.yaml streichen. Die Navigation ist vollständig."
+        )
     teile = []
     for e in unbekannt:
+        if e in ENTFALLEN:
+            teile.append(f"{e!r} (seit {ENTFALLEN[e]} entfallen, bitte streichen)")
+            continue
         nah = get_close_matches(e, BEKANNTE_EINTRAEGE, n=1, cutoff=0.7)
         teile.append(f"{e!r} (meinten Sie {nah[0]!r}?)" if nah else repr(e))
     return (

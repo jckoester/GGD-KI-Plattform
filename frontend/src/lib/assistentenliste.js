@@ -139,3 +139,60 @@ export function stufenText(a) {
   if (von != null && bis != null) return von === bis ? `Kl. ${von}` : `Kl. ${von}–${bis}`;
   return von != null ? `ab Kl. ${von}` : `bis Kl. ${bis}`;
 }
+
+// ── Werkzeuge: Angabe „stellt her“ (0.40, Päckchen AM) ──────────────────────
+//
+// Ein Werkzeug ist ein Assistent mit Angabe `produces`. Die Arten (Kennung, Marke,
+// Filterbeschriftung) kommen vom Backend (`$lib/produktarten.js`); hier stehen nur die
+// reinen Handgriffe für Marke, Filter und Adresse (`?erstellt=`).
+
+/** Wert von `?erstellt=` für „alle Werkzeuge“. */
+export const ALLE_WERKZEUGE = "alle";
+
+/**
+ * Die Marken eines Assistenten, in Listenreihenfolge. Unbekannte Kennungen fallen weg.
+ *
+ * @param {{produces?: string[]}} assistent
+ * @param {Array<{id: string, marke: string}>} arten
+ */
+export function markenVon(assistent, arten) {
+  const gesetzt = new Set(assistent?.produces ?? []);
+  return (arten ?? []).filter((a) => gesetzt.has(a.id)).map((a) => a.marke);
+}
+
+/**
+ * Die Arten, die in der Liste tatsächlich vorkommen — nur sie bekommen einen Filter.
+ *
+ * @param {Array<{produces?: string[]}>} liste
+ * @param {Array<{id: string}>} arten
+ */
+export function filterArten(liste, arten) {
+  const vorhanden = new Set((liste ?? []).flatMap((a) => a?.produces ?? []));
+  return (arten ?? []).filter((a) => vorhanden.has(a.id));
+}
+
+/**
+ * Der gültige Filter aus der Adresse: `null` (alle Assistenten), `"alle"` (alle Werkzeuge)
+ * oder eine Kennung. Unbekanntes zählt als `null` — ein alter Link zeigt dann alles statt nichts.
+ *
+ * @param {string|null|undefined} wert  `?erstellt=`
+ * @param {Array<{id: string}>} arten
+ */
+export function erstelltFilter(wert, arten) {
+  if (wert === ALLE_WERKZEUGE) return ALLE_WERKZEUGE;
+  return (arten ?? []).some((a) => a.id === wert) ? wert : null;
+}
+
+/**
+ * Liste nach Filter.
+ *
+ * @param {Array<{produces?: string[]}>} liste
+ * @param {string|null} filter  aus `erstelltFilter`
+ */
+export function nachErstellt(liste, filter) {
+  if (!filter) return liste ?? [];
+  return (liste ?? []).filter((a) => {
+    const p = a?.produces ?? [];
+    return filter === ALLE_WERKZEUGE ? p.length > 0 : p.includes(filter);
+  });
+}

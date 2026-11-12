@@ -9,6 +9,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Assistenten-Editor: Angabe „Stellt her“ (Bilder, Diagramme, Dokumente, Stundenentwürfe, Jahresplanung). Beim
   Einschalten einer Fähigkeit wird die passende Angabe vorgeschlagen. Export, Import und Seed führen sie mit.
+- Assistentenliste: Marke an Werkzeugen („erstellt Bilder“, „plant Stunden“ …) und Filter *Alle · Werkzeuge · je
+  Art*; der Filter steht in der Adresse. Marken auch unter „Meine Assistenten“ und auf Fach- und Gruppenseiten.
+
+### Geändert
+
+- Der Menüpunkt „Werkzeuge“ entfällt; `/tools` leitet auf die Werkzeuge in der Assistentenliste um.
 
 ### Nach dem Update
 
@@ -17,6 +23,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Seed erst mit `--dry-run`, dann ohne: Er trägt „Stellt her“ bei vorhandenen Assistenten nach, wenn die Angabe leer
   ist („Schaltpläne zeichnen“ → Diagramme).
 - Eigene Assistenten, die Diagramme oder Dokumente herstellen: im Editor „Stellt her“ setzen.
+- `config/ui_levels.yaml`: `tools` aus den Stufen streichen; der Start meldet den Schlüssel sonst als entfallen.
 
 ## [0.39.2] – 2026-11-11
 

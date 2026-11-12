@@ -61,8 +61,8 @@ def test_schuelerinnen_sehen_bibliothek_und_wissen_erst_auf_stufe_2():
     stufe1 = cfg.rollen["student"].eintraege_bis(1)
     assert "library" not in stufe1
     assert "knowledge" not in stufe1
-    # Werkzeuge bleiben unten — sie benutzen sich wie Assistenten (Entscheidung 19.09.).
-    assert "tools" in stufe1
+    # Werkzeuge stehen seit 0.40 in der Assistentenliste — sie sind Assistenten.
+    assert "assistants" in stufe1 and "tools" not in stufe1
 
     stufe2 = cfg.rollen["student"].eintraege_bis(2)
     assert {"library", "knowledge"} <= set(stufe2)
@@ -438,3 +438,24 @@ class TestNachgereichteEintraege:
         text = caplog.text
         assert "'welcome'" in text and "teacher" in text
         assert "Navigation" in text
+
+
+def test_entfallener_schluessel_bekommt_eigene_meldung():
+    """0.40: `tools` steht noch in der Schuldatei — Altbestand, kein Tippfehler."""
+    from app.ui.levels import _meldung_zu_ignorierten
+
+    meldung = _meldung_zu_ignorierten("student", ("tools",))
+    assert "seit 0.40 entfallen" in meldung and "streichen" in meldung
+    assert "meinten Sie" not in meldung and "erscheinen nicht" not in meldung
+
+    gemischt = _meldung_zu_ignorierten("student", ("tools", "libary"))
+    assert "seit 0.40 entfallen" in gemischt and "'library'" in gemischt
+
+
+def test_entfallener_schluessel_wird_uebergangen():
+    daten = _rolle(stufen=[
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["chat", "tools"]},
+    ])
+    r = RollenStufen.model_validate(daten)
+    assert r.eintraege_bis(1) == ["chat"]
+    assert r.ignoriert == ("tools",)

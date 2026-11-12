@@ -1,4 +1,5 @@
 <script>
+  import ProduktMarken from "$lib/components/ProduktMarken.svelte"
   import { anteilKurz } from "$lib/eigene_bewertung.js";
   import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
@@ -378,6 +379,9 @@
                 >
                   {item.name}
                 </a>
+                {#if (item.produces ?? []).length}
+                  <div class="flex flex-wrap gap-1 mt-1"><ProduktMarken assistant={item} /></div>
+                {/if}
                 {#if item.description}
                   <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 line-clamp-1 mt-0.5">
                     {item.description}
