@@ -9,7 +9,8 @@ ihm **fehlt**, trägt der Seed aus dem Eintrag nach — was gesetzt ist, übersc
   Operatoren (Päckchen AF);
 - seit 0.32.1 auch **Beschreibung, Symbol, Schlagwörter, Fach, Klassenstufen** (nur wenn beide
   Grenzen leer sind), **Vorschlag** (`suggest` auf der Vorgabe `never`, `suggestion_text`) und
-  **Dokumente** (nur wenn er keine hat).
+  **Dokumente** (nur wenn er keine hat);
+- seit 0.40 **„stellt her“** (`produces`, nur wenn leer).
 
 ⚠️ **Anlass 0.32.1** (Prod, 04.11.2026): Die Assistenten waren aus einer älteren Fassung von
 `assistants.example.yaml` entstanden, ohne Fach, Klassenstufen und Vorschlag. Spätere Läufe
@@ -27,7 +28,7 @@ Felder je Eintrag (alle außer `name` und Prompt optional):
 `min_grade`, `max_grade`, `disabled_augmentations`, `documents` (Dateien wie
 `system_prompt_file`; als Dokument des Assistenten angehängt), `suggest`, `suggestion_text`,
 `trigger_examples`, `trigger_counterexamples`, `fallbacks` (Namen anderer Assistenten),
-`operator_faecher` (Fach-Slugs), `bausteine` (Schlüssel aus `app/assistants/bausteine/`; nur beim Anlegen).
+`operator_faecher` (Fach-Slugs), `produces` (0.40; bei vorhandenen nachgetragen, wenn leer), `bausteine` (Schlüssel aus `app/assistants/bausteine/`; nur beim Anlegen).
 
 Nach dem Anlegen werden die Beispiele eingebettet; scheitert das, holt es der nächtliche
 `embedding_backfill.py` nach.
@@ -52,7 +53,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.assistants import ausloeser
+from app.assistants import ausloeser, produkte
 from app.assistants.bausteine import SCHLUESSEL as BAUSTEIN_SCHLUESSEL
 from app.config import settings
 from app.db.models import Assistant, AssistantDocument, AssistantTriggerExample, Subject
@@ -147,6 +148,16 @@ async def _setze_beispiele(db, assistant_id: int, listen: dict[str, list[str]]) 
     return neu
 
 
+def _produces(entry: dict) -> list[str]:
+    """Angabe „stellt her“ des Eintrags (0.40); Unbekanntes wird gemeldet und übergangen."""
+    werte = [str(w) for w in entry.get("produces") or []]
+    falsch = produkte.unbekannte(werte)
+    if falsch:
+        logger.warning("  „stellt her“ für %s übergangen (unbekannt): %s",
+                       entry.get("name"), ", ".join(falsch))
+    return produkte.geordnet(werte)
+
+
 async def _leere_felder_fuellen(db: AsyncSession, existing: Assistant, entry: dict) -> list[str]:
     """Leere Felder eines vorhandenen Assistenten aus dem Eintrag setzen (0.32.1).
 
@@ -181,6 +192,11 @@ async def _leere_felder_fuellen(db: AsyncSession, existing: Assistant, entry: di
         existing.min_grade = entry.get("min_grade")
         existing.max_grade = entry.get("max_grade")
         gesetzt.append("Klassenstufen")
+    # 0.40: Ein neues Feld ist leer, weil es noch nie gesetzt wurde — Nachtragen ist eindeutig.
+    produces = _produces(entry)
+    if produces and not existing.produces:
+        existing.produces = produces
+        gesetzt.append("stellt her " + ", ".join(produces))
     if entry.get("suggest") and existing.suggest == "never":
         existing.suggest = entry["suggest"]
         gesetzt.append("Vorschlag")
@@ -313,6 +329,7 @@ async def seed(config_path: Path, dry_run: bool = False, session_factory=None) -
                     max_grade=entry.get("max_grade"),
                     disabled_augmentations=entry.get("disabled_augmentations") or [],
                     image_kinds=[],
+                    produces=_produces(entry),
                     operator_faecher=operator_faecher,
                     bausteine=_bausteine(entry),
                     suggest=entry.get("suggest") or "never",

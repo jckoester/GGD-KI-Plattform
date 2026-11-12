@@ -405,6 +405,12 @@ class Assistant(Base):
         JSONB, nullable=False, server_default=text("'[]'")
     )
 
+    # 0.40 (Alembic 0102): Was der Assistent herstellt — Kennungen aus
+    # `app/assistants/produkte.py`. Nicht leer = Werkzeug (Marke und Filter in der Liste).
+    produces: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+
     # Päckchen AF (Alembic 0091): Fächer (Slugs), aus denen die Plattform die Definition eines
     # Operators holt, den die Schülernachricht nennt („Erläutere …"), und als Abschnitt
     # „Operator dieser Aufgabe" in den Systemtext setzt. **Leer = aus** — der Abschnitt gehört

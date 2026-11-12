@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Assistenten-Editor: Angabe „Stellt her“ (Bilder, Diagramme, Dokumente, Stundenentwürfe, Jahresplanung). Beim
+  Einschalten einer Fähigkeit wird die passende Angabe vorgeschlagen. Export, Import und Seed führen sie mit.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0102). Assistenten mit Bildgenerierung, Stundenplanung oder Unterrichtsplanung bekommen die
+  passende Angabe automatisch.
+- Seed erst mit `--dry-run`, dann ohne: Er trägt „Stellt her“ bei vorhandenen Assistenten nach, wenn die Angabe leer
+  ist („Schaltpläne zeichnen“ → Diagramme).
+- Eigene Assistenten, die Diagramme oder Dokumente herstellen: im Editor „Stellt her“ setzen.
+
 ## [0.39.2] – 2026-11-11
 
 ### Behoben

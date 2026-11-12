@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, or_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.assistants import ausloeser
+from app.assistants import ausloeser, produkte
 from app.assistants.bausteine import SCHLUESSEL as BAUSTEIN_SCHLUESSEL
 
 from app.auth.dependencies import get_current_user, require_any_role
@@ -71,6 +71,8 @@ class AssistantSummary(BaseModel):
     max_grade: Optional[int]
     created_by: Optional[str]
     tool_groups: list[str] = []
+    #: Was der Assistent herstellt (0.40) — Kennungen aus `app/assistants/produkte.py`.
+    produces: list[str] = []
     #: `specific` | `fallback` | `never` — die Fach- und Gruppenseiten zeigen die Rückfälle,
     #: deren `tags` das Fach nennen, als „Allgemeine Assistenten“ (0.26, F37 b).
     suggest: Optional[str] = None
@@ -153,6 +155,8 @@ class AssistantCreate(BaseModel):
     disabled_augmentations: list[str] = []
     # Leer = alle konfigurierten Bildarten (siehe config/image_models.yaml).
     image_kinds: list[str] = []
+    # 0.40: was er herstellt (`app/assistants/produkte.py`); leer = kein Werkzeug.
+    produces: list[str] = []
     # Päckchen AF: Fach-Slugs für den Abschnitt „Operator dieser Aufgabe“; leer = aus.
     operator_faecher: list[str] = []
     # 0.26: Bausteine hinter dem Prompt (`app/assistants/bausteine/`); leer = keiner.
@@ -190,6 +194,7 @@ class AssistantUpdate(BaseModel):
     tool_groups: Optional[list[str]] = None
     disabled_augmentations: Optional[list[str]] = None
     image_kinds: Optional[list[str]] = None
+    produces: Optional[list[str]] = None
     operator_faecher: Optional[list[str]] = None
     bausteine: Optional[list[str]] = None
     suggest: Optional[str] = None
@@ -237,6 +242,7 @@ class AssistantResponse(BaseModel):
     tool_groups: list[str] = []
     disabled_augmentations: list[str] = []
     image_kinds: list[str] = []
+    produces: list[str] = []
     operator_faecher: list[str] = []
     bausteine: list[str] = []
     documents: list[AssistantDocumentOut] = []
@@ -355,6 +361,7 @@ def _assistant_to_yaml(
             # die Bildart-Auswahl — der Assistent sah identisch aus und konnte weniger.
             "tool_groups": list(assistant.tool_groups or []) or None,
             "image_kinds": list(assistant.image_kinds or []) or None,
+            "produces": list(assistant.produces or []) or None,
             "operator_faecher": list(assistant.operator_faecher or []) or None,
             "bausteine": list(assistant.bausteine or []) or None,
         },
@@ -487,6 +494,9 @@ def _yaml_to_assistant_fields(
         "image_kinds": _uebernimm_bekannte(
             config.get("image_kinds") or [], bekannte_bildarten(), "Bildarten", gesammelt
         ),
+        "produces": produkte.geordnet(_uebernimm_bekannte(
+            config.get("produces") or [], set(produkte.KENNUNGEN), "Angaben „stellt her“", gesammelt
+        )),
         "name": meta["name"].strip(),
         "description": meta.get("description"),
         "subject_id": subject_id,
@@ -510,6 +520,21 @@ def _yaml_to_assistant_fields(
             if meta.get(k) is not None
         } or None,
     }
+
+
+def _gepruefte_produktarten(werte: list[str]) -> list[str]:
+    """Angabe „stellt her“ aus Editor oder API — Unbekanntes wird abgewiesen, nicht geschluckt.
+
+    Anders als beim Import (`_uebernimm_bekannte`): Der Editor bietet nur bekannte Kennungen
+    an; eine unbekannte ist ein Fehler des Aufrufers, kein Assistent aus einer anderen Schule.
+    """
+    falsch = produkte.unbekannte(werte)
+    if falsch:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unbekannte Angabe „stellt her“: {', '.join(falsch)}",
+        )
+    return produkte.geordnet(werte)
 
 
 # ── Validation ──────────────────────────────────────────────────────────────
@@ -897,6 +922,25 @@ async def list_assistants(
     ])
 
 
+class ProduktartOut(BaseModel):
+    id: str
+    marke: str
+    filter: str
+    faehigkeit: Optional[str] = None
+
+
+@router.get("/produktarten", response_model=list[ProduktartOut])
+async def list_produktarten(
+    current_user: JwtPayload = Depends(get_current_user),
+) -> list[ProduktartOut]:
+    """Was ein Assistent herstellen kann — Kennung, Marke, Filterbeschriftung (0.40).
+
+    Eine Quelle für Editor, Marken und Filter (`app/assistants/produkte.py`). Vor
+    `/{assistant_id}` registriert, sonst hielte FastAPI „produktarten“ für eine ID.
+    """
+    return [ProduktartOut(**vars(p)) for p in produkte.PRODUKTARTEN]
+
+
 # ── Eigene Assistenten ───────────────────────────────────────────────────────
 # Muss VOR /{assistant_id} registriert werden, sonst matched FastAPI "mine" als int-ID.
 
@@ -1020,6 +1064,8 @@ async def eigenen_stundenassistenten_anlegen(
         audience="teacher",
         scope="private",
         tool_groups=["lesson_planning"],
+        # Die Marke folgt der Vorlage (0.40): Hat die Schule sie dort abgewählt, gilt das auch hier.
+        produces=list(vorlage.produces or []),
         creator_role="admin" if "admin" in current_user.roles else "teacher",
         created_by=current_user.sub,
         updated_by_pseudonym=current_user.sub,
@@ -1116,6 +1162,7 @@ async def create_assistant(
         tool_groups=request.tool_groups,
         disabled_augmentations=request.disabled_augmentations,
         image_kinds=request.image_kinds,
+        produces=_gepruefte_produktarten(request.produces),
         operator_faecher=operator_faecher,
         bausteine=_gepruefte_bausteine(request.bausteine if ist_admin else []),
         suggest=request.suggest,
@@ -1178,6 +1225,8 @@ async def update_assistant(
         )
     if "bausteine" in update_data:
         update_data["bausteine"] = _gepruefte_bausteine(update_data["bausteine"] or [])
+    if "produces" in update_data:
+        update_data["produces"] = _gepruefte_produktarten(update_data["produces"] or [])
     if "suggestion_text" in update_data:
         update_data["suggestion_text"] = (update_data["suggestion_text"] or "").strip() or None
     # `null` hieße hier „Spalte leeren“, und `suggest` ist NOT NULL.

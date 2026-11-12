@@ -65,6 +65,7 @@
         getImageKinds,
     } from "$lib/api.js";
     import { SCOPE_ANCHOR_CONTENT_TYPES } from "$lib/taxonomy.js";
+    import { ladeProduktarten, mitVorschlag, umgeschaltet } from "$lib/produktarten.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import {
         EMPFOHLEN_MAX,
@@ -113,6 +114,15 @@
         bausteine.filter((b) => form.bausteine.includes(b.key)).map((b) => `„${b.label}“`),
     );
     let imageKinds = $state([]); // konfigurierte Bildarten (Modell + Formate)
+    let produktarten = $state([]); // „stellt her“ (0.40) — [{ id, marke, filter, faehigkeit }]
+
+    /** Fähigkeit an- oder ausschalten; beim Einschalten die passende Art „stellt her“ vorschlagen. */
+    function faehigkeitSetzen(gruppe, an) {
+        form.tool_groups = an
+            ? [...form.tool_groups.filter((g) => g !== gruppe), gruppe]
+            : form.tool_groups.filter((g) => g !== gruppe);
+        if (an) form.produces = mitVorschlag(form.produces, gruppe, produktarten);
+    }
     // Rückfall-Assistenten für das Feld „Darunter anbieten“ (C2, nur Admins).
     let rueckfallAssistenten = $state([]);
     const VORSCHLAGSTEXT_MAX = 300; // wie SUGGESTION_TEXT_MAX im Backend
@@ -496,6 +506,7 @@
             tool_groups: [],
             disabled_augmentations: [],
             image_kinds: [],
+            produces: [],
             operator_faecher: [],
             bausteine: [],
             suggest: "never",
@@ -572,6 +583,7 @@
             tool_groups: a.tool_groups ?? [],
             disabled_augmentations: a.disabled_augmentations ?? [],
             image_kinds: a.image_kinds ?? [],
+            produces: a.produces ?? [],
             operator_faecher: a.operator_faecher ?? [],
             bausteine: a.bausteine ?? [],
             suggest: a.suggest || "never",
@@ -626,6 +638,8 @@
             suggestion_text: form.suggestion_text.trim() || null,
             trigger_examples: zeilenZuListe(form.trigger_examples),
             trigger_counterexamples: zeilenZuListe(form.trigger_counterexamples),
+            // „Stellt her“ (0.40) — eine Beschriftung, keine Fähigkeit; auch Lehrkräfte setzen sie.
+            produces: form.produces,
         };
         if (isAdmin) {
             p.sort_order = parseInt(form.sort_order) || 0;
@@ -685,6 +699,9 @@
                     rueckfallAssistenten = []; // Feld zeigt dann nur die gespeicherten IDs
                 }
             }
+
+            // 3b′. Arten für „stellt her“ — leer bei einem Fehler, dann entfällt der Abschnitt.
+            produktarten = await ladeProduktarten();
 
             // 3c. Bildarten (nur relevant bei aktiver Bildgenerierung)
             try {
@@ -2134,6 +2151,36 @@
                         {availabilitySummary}
                     </p>
 
+                    <!-- Alle: „stellt her“ (0.40) -->
+                    {#if produktarten.length}
+                        <fieldset class="space-y-2">
+                            <legend class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                                Stellt her
+                            </legend>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Was dieser Assistent herstellt. Mit einer Angabe gilt er als
+                                <strong>Werkzeug</strong>: In der Assistentenliste trägt er eine
+                                Marke und lässt sich danach filtern. Nichts gewählt = er begleitet,
+                                statt etwas abzuliefern.
+                            </p>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                {#each produktarten as art (art.id)}
+                                    <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.produces.includes(art.id)}
+                                            onchange={(e) => (form.produces = umgeschaltet(
+                                                form.produces, art.id, e.currentTarget.checked, produktarten,
+                                            ))}
+                                            class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                        />
+                                        {art.filter}
+                                    </label>
+                                {/each}
+                            </div>
+                        </fieldset>
+                    {/if}
+
                     <!-- Admin-only: Sortier-Reihenfolge + Fähigkeiten -->
                     {#if isAdmin}
                         <div class="space-y-2">
@@ -2167,13 +2214,7 @@
                                 <input
                                     type="checkbox"
                                     checked={form.tool_groups.includes('planning')}
-                                    onchange={(e) => {
-                                        if (e.currentTarget.checked) {
-                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'planning'), 'planning']
-                                        } else {
-                                            form.tool_groups = form.tool_groups.filter(g => g !== 'planning')
-                                        }
-                                    }}
+                                    onchange={(e) => faehigkeitSetzen('planning', e.currentTarget.checked)}
                                     class="rounded border-light-ui-3 dark:border-dark-ui-3"
                                 />
                                 Unterrichtsplanung
@@ -2185,13 +2226,7 @@
                                 <input
                                     type="checkbox"
                                     checked={form.tool_groups.includes('lesson_planning')}
-                                    onchange={(e) => {
-                                        if (e.currentTarget.checked) {
-                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'lesson_planning'), 'lesson_planning']
-                                        } else {
-                                            form.tool_groups = form.tool_groups.filter(g => g !== 'lesson_planning')
-                                        }
-                                    }}
+                                    onchange={(e) => faehigkeitSetzen('lesson_planning', e.currentTarget.checked)}
                                     class="rounded border-light-ui-3 dark:border-dark-ui-3"
                                 />
                                 Stundenplanung
@@ -2203,13 +2238,7 @@
                                 <input
                                     type="checkbox"
                                     checked={form.tool_groups.includes('image_generation')}
-                                    onchange={(e) => {
-                                        if (e.currentTarget.checked) {
-                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'image_generation'), 'image_generation']
-                                        } else {
-                                            form.tool_groups = form.tool_groups.filter(g => g !== 'image_generation')
-                                        }
-                                    }}
+                                    onchange={(e) => faehigkeitSetzen('image_generation', e.currentTarget.checked)}
                                     class="rounded border-light-ui-3 dark:border-dark-ui-3"
                                 />
                                 Bildgenerierung

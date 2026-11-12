@@ -1125,6 +1125,14 @@ export async function getImageKinds() {
   return res.json();
 }
 
+/** Was ein Assistent herstellen kann (0.40): `[{ id, marke, filter, faehigkeit }]`. */
+export async function getProduktarten() {
+  const res = await fetch(`${BASE}/assistants/produktarten`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
 export async function createAssistant(data) {
   const res = await fetch(`${BASE}/assistants`, {
     method: "POST",

@@ -19,6 +19,9 @@ assistants:
     # Function-Calling beherrschen.
     tool_groups:
       - planning
+    # Was er herstellt (0.40): Marke und Filter „Werkzeuge“ in der Assistentenliste.
+    # Kennungen: image, diagram, document, lesson_plan, year_plan (app/assistants/produkte.py).
+    produces: [year_plan]
     system_prompt_file: config/prompts/jahresplan_assistent.md
     tags:
       - planung
@@ -38,6 +41,7 @@ assistants:
     # Werkzeug selbst. Die Jahresplanung (`planning`) gehört bewusst nicht dazu.
     tool_groups:
       - lesson_planning
+    produces: [lesson_plan]
     system_prompt_file: config/prompts/stundenentwurf_assistent.md
     tags:
       - planung
@@ -171,6 +175,8 @@ assistants:
     max_grade: 13
     model: chat-komplex
     disabled_augmentations: [metacognitive_nudges]
+    # Diagramme ohne eigene Fähigkeit — die Angabe kommt nicht aus der Migration.
+    produces: [diagram]
     system_prompt_file: config/prompts/schaltplaene_assistent.md
     bausteine: [schaltplaene]
     tags: [physik, technik, schaltplan]

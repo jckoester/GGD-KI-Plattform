@@ -260,3 +260,44 @@ async def test_vollstaendiger_assistent_wird_uebersprungen(sitzungen, tmp_path):
     stand = await SEED.seed(datei, session_factory=sitzungen)
     assert (stand["nachgetragen"], stand["uebersprungen"]) == (0, 2)
 
+
+
+async def test_stellt_her_beim_anlegen_und_als_nachtrag(sitzungen, tmp_path):
+    """0.40: `produces` wird angelegt und bei einem Vorhandenen nachgetragen, wenn leer (S3)."""
+    async with sitzungen() as db:
+        db.add(Assistant(name=f"{PRAEFIX}Schaltplan", system_prompt="P", model="",
+                         audience="all", scope="all", suggest="never", fallbacks=[]))
+        await db.commit()
+
+    eintraege = f"""
+  - name: {PRAEFIX}Schaltplan
+    system_prompt: P
+    produces: [diagram]
+  - name: {PRAEFIX}Neu
+    system_prompt: P
+    produces: [year_plan, zeitreise, image]
+"""
+    await SEED.seed(_yaml(tmp_path, eintraege), session_factory=sitzungen)
+
+    vorhanden, _, _ = await _lade(sitzungen, f"{PRAEFIX}Schaltplan")
+    neu, _, _ = await _lade(sitzungen, f"{PRAEFIX}Neu")
+    assert vorhanden.produces == ["diagram"]
+    # Unbekanntes wird übergangen, der Rest in Listenreihenfolge.
+    assert neu.produces == ["image", "year_plan"]
+
+
+async def test_gesetztes_stellt_her_bleibt(sitzungen, tmp_path):
+    """Auch eine abgewählte Angabe ist eine Entscheidung — nur ein gesetzter Wert ist erkennbar."""
+    async with sitzungen() as db:
+        db.add(Assistant(name=f"{PRAEFIX}Schaltplan", system_prompt="P", model="", audience="all",
+                         scope="all", suggest="never", fallbacks=[], produces=["document"]))
+        await db.commit()
+
+    await SEED.seed(_yaml(tmp_path, f"""
+  - name: {PRAEFIX}Schaltplan
+    system_prompt: P
+    produces: [diagram]
+"""), session_factory=sitzungen)
+
+    a, _, _ = await _lade(sitzungen, f"{PRAEFIX}Schaltplan")
+    assert a.produces == ["document"]

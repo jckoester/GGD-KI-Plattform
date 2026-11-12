@@ -186,6 +186,7 @@ class TestAssistantResponse:
             # Wie tool_groups: Der server_default greift erst beim INSERT, ein frisch
             # konstruiertes ORM-Objekt hätte hier None.
             image_kinds=[],
+            produces=[],
             operator_faecher=[],
             bausteine=[],
             # Ebenso die Vorschlagsfelder (0090).
@@ -823,6 +824,7 @@ class TestFaehigkeitenImRoundTrip:
             import_metadata=None,
             tool_groups=["image_generation", "planning"],
             image_kinds=["standard"],
+            produces=["image", "year_plan"],
             operator_faecher=[],
             bausteine=[],
             suggest="never",
@@ -837,16 +839,18 @@ class TestFaehigkeitenImRoundTrip:
 
         assert data["config"]["tool_groups"] == ["image_generation", "planning"]
         assert data["config"]["image_kinds"] == ["standard"]
+        assert data["config"]["produces"] == ["image", "year_plan"]
 
     def test_export_laesst_leere_felder_weg(self):
         """Ein Assistent ohne Fähigkeiten soll keine leeren Listen im YAML tragen."""
         yaml_text = _assistant_to_yaml(
-            self._assistent(tool_groups=[], image_kinds=[]), subject_slug=None
+            self._assistent(tool_groups=[], image_kinds=[], produces=[]), subject_slug=None
         )
         data = yaml.safe_load(yaml_text)
 
         assert "tool_groups" not in data["config"]
         assert "image_kinds" not in data["config"]
+        assert "produces" not in data["config"]
 
     def test_round_trip_erhaelt_die_faehigkeiten(self):
         """Export → Import: derselbe Funktionsumfang, nicht nur dasselbe Aussehen."""
@@ -857,6 +861,7 @@ class TestFaehigkeitenImRoundTrip:
 
         assert felder["tool_groups"] == original.tool_groups
         assert felder["image_kinds"] == original.image_kinds
+        assert felder["produces"] == original.produces
 
     def test_export_ist_schema_konform(self):
         """Was der Export schreibt, muss der Import auch annehmen dürfen."""
@@ -963,6 +968,17 @@ class TestUnbekannteWerteBeimImport:
         assert felder["tool_groups"] == ["image_generation"]
         assert len(hinweise) == 1 and "zeitreise" in hinweise[0]
 
+    def test_unbekannte_angabe_stellt_her_wird_uebergangen_und_genannt(self):
+        hinweise = []
+        felder = _yaml_to_assistant_fields(
+            self._yaml(produces=["year_plan", "zeitreise", "image"]),
+            subject_id=None,
+            hinweise=hinweise,
+        )
+
+        assert felder["produces"] == ["image", "year_plan"]
+        assert len(hinweise) == 1 and "zeitreise" in hinweise[0]
+
     def test_bekannte_werte_erzeugen_keinen_hinweis(self):
         hinweise = []
         _yaml_to_assistant_fields(
@@ -974,6 +990,7 @@ class TestUnbekannteWerteBeimImport:
         """Ein Altbestand-YAML ohne die Felder muss unverändert importierbar bleiben."""
         felder = _yaml_to_assistant_fields(self._yaml(), subject_id=None)
         assert felder["tool_groups"] == [] and felder["image_kinds"] == []
+        assert felder["produces"] == []
 
     def test_faehigkeiten_haengen_nicht_an_der_importreihenfolge(self):
         """`TOOL_REGISTRY` füllt sich erst beim Import der registrierenden Module.
