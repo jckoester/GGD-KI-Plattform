@@ -51,3 +51,16 @@ export async function alleSchliessen(liste, merken = neuigkeitGelesen) {
     }
     return []
 }
+
+
+/**
+ * Der Hinweis zur Umbenennung von Werkstatt und Bibliothek (0.40, F9). Der Übergangshinweis
+ * in beiden Bereichen hängt an ihm: Er erscheint, solange die Neuigkeit sichtbar ist, und wer
+ * ihn schließt, schließt die Neuigkeit mit. `test_neuigkeiten.py` prüft, dass es die `id` gibt.
+ */
+export const WERKSTATT_NEUIGKEIT = '0.40-werkstatt-bibliothek'
+
+/** Steht die Neuigkeit `id` in der Liste des Servers (also: sichtbar und nicht geschlossen)? */
+export function istOffen(liste, id) {
+    return (liste ?? []).some((n) => n.id === id)
+}

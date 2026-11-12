@@ -125,3 +125,19 @@ def test_neueste_zuerst():
     alt, neu = _n(id="alt", datum=date(2026, 9, 20)), _n(id="neu", datum=date(2026, 10, 1))
     assert [n.id for n in sichtbar([alt, neu], rollen=["teacher"], gelesen=set(), konto_seit=None,
                                    stufe=None, stufen=STUFEN, heute=HEUTE)] == ["neu", "alt"]
+
+
+def test_uebergangshinweis_0_40_haengt_an_einer_neuigkeit():
+    """0.40, F9: Werkstatt und Bibliothek zeigen ihren Hinweis, solange es diese Neuigkeit gibt.
+
+    Die `id` steht im Frontend (`WERKSTATT_NEUIGKEIT`); fehlte sie hier, erschiene der Hinweis nie.
+    Mit `eintrag: workshop` bekommt ihn nur, wer die Werkstatt sieht.
+    """
+    import re
+
+    js = (Path(__file__).resolve().parents[3] / "frontend/src/lib/neuigkeiten.js").read_text(encoding="utf-8")
+    kennung = re.search(r"WERKSTATT_NEUIGKEIT = '([^']+)'", js).group(1)
+    eintrag = next(n for n in lade(DATEI) if n.id == kennung)
+    assert eintrag.eintrag == "workshop"
+    assert eintrag.bis == date(2027, 1, 31)
+    assert {"student", "teacher"} <= set(eintrag.rollen)

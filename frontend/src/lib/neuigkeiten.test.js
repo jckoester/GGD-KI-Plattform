@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { alleSchliessen, aufteilen, OFFEN, schliessen } from "./neuigkeiten.js"
+import { alleSchliessen, aufteilen, istOffen, OFFEN, schliessen, WERKSTATT_NEUIGKEIT } from "./neuigkeiten.js"
 
 const LISTE = [{ id: "a", titel: "A" }, { id: "b", titel: "B" }]
 
@@ -47,5 +47,14 @@ describe("Hinweise verdichten", () => {
         })
         expect(await alleSchliessen(fuenf.slice(0, 3), merken)).toEqual([])
         expect(reihenfolge).toEqual(["a", "b", "c"])
+    })
+})
+
+
+describe("Übergangshinweis an einer Neuigkeit (0.40)", () => {
+    it("offen, solange der Server die Neuigkeit liefert", () => {
+        expect(istOffen([{ id: WERKSTATT_NEUIGKEIT }], WERKSTATT_NEUIGKEIT)).toBe(true)
+        expect(istOffen([{ id: "andere" }], WERKSTATT_NEUIGKEIT)).toBe(false)
+        expect(istOffen(undefined, WERKSTATT_NEUIGKEIT)).toBe(false)
     })
 })

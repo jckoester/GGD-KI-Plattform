@@ -1,4 +1,6 @@
 <script>
+    import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
+    import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
     /**
      * Suchseite des Kontextspeichers (ADR-017, AP7).
      *
@@ -219,6 +221,12 @@
     <div class="flex-1 overflow-y-auto">
         <div class="px-6 py-6">
             <StufenHinweis eintrag="knowledge" />
+            <UebergangsHinweis
+                neuigkeitId={WERKSTATT_NEUIGKEIT}
+                message="Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente liegen jetzt in der Werkstatt."
+                href="/workshop"
+                linkLabel="Zur Werkstatt"
+            />
             <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-1">
                 Bausteine suchen
             </h1>

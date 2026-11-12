@@ -336,3 +336,22 @@
     werden dabei zu bearbeitbaren Formeln, Listen und Diagramme bleiben erhalten. Ohne
     Schulvorlage kommen Word-Dateien jetzt auf A4.
   link: /help/unterrichtsplanung#export
+
+- id: "0.40-werkstatt-bibliothek"
+  version: "0.40.0"
+  # ⚠️ Beim Release auf den Tag des Releases setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-12
+  # F9 (Plan 0.40): Der Übergangshinweis in Werkstatt und Bibliothek hängt an diesem Eintrag —
+  # er erscheint, solange der Hinweis sichtbar ist, und wer ihn dort schließt, schließt beide.
+  bis: 2027-01-31
+  rollen: [student, teacher]
+  # Wer die Werkstatt noch nicht sieht (Stufe 1), bekäme sonst eine Nachricht über zwei Orte,
+  # die es für ihn nicht gibt.
+  eintrag: workshop
+  titel: "Werkstatt und Bibliothek"
+  text: >-
+    Was du aus dem Chat speicherst, also Bilder, Diagramme und Dokumente, liegt jetzt in der
+    Werkstatt; bisher hieß sie „Bibliothek“. Die Bibliothek ist jetzt der frühere Wissensgraph
+    mit Suche und Bausteinen. Werkzeuge, die etwas herstellen, findest du in der
+    Assistentenliste unter „Werkzeuge“.
+  link: /help/werkstatt

@@ -1,4 +1,6 @@
 <script>
+    import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
+    import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
   /**
    * „Meine Bausteine" — der eigene Bestand, nach Fach gruppiert (AP7 Schritt 2).
    *
@@ -226,6 +228,12 @@
 <svelte:head><title>Meine Bausteine</title></svelte:head>
 
 <PageBody>
+  <UebergangsHinweis
+    neuigkeitId={WERKSTATT_NEUIGKEIT}
+    message="Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente liegen jetzt in der Werkstatt."
+    href="/workshop"
+    linkLabel="Zur Werkstatt"
+  />
   <h1 class="text-2xl font-semibold text-light-tx dark:text-dark-tx">Meine Bausteine</h1>
 
   <!-- Kopfzeile je Rolle. Für Schüler:innen in einfacher Sprache und mit der

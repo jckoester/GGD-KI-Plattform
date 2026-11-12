@@ -1,4 +1,6 @@
 <script>
+    import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
+    import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
     import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { goto } from '$app/navigation';
@@ -206,6 +208,10 @@
 <PageBody breit>
   <StufenHinweis eintrag="workshop" />
     <div class="max-w-5xl mx-auto">
+        <UebergangsHinweis
+            neuigkeitId={WERKSTATT_NEUIGKEIT}
+            message="Hier liegen jetzt deine gespeicherten Bilder, Diagramme und Dokumente — bisher hieß dieser Bereich „Bibliothek“."
+        />
         <div class="flex items-center justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
                 <Library class="w-6 h-6" />
