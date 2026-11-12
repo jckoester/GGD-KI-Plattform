@@ -176,3 +176,11 @@ describe("Planung in der Bibliothek (0.40)", () => {
         expect(graphOhnePlanung(knoten, kanten, "s").knoten.map((x) => x.id)).toEqual(["s", "b"])
     })
 })
+
+describe("Kategorienamen (0.40)", () => {
+    it("Material und Handreichungen statt Artefakt und Dokument", async () => {
+        const { CATEGORY_LABELS } = await import("$lib/taxonomy.js")
+        expect(CATEGORY_LABELS.artifact).toBe("Material")
+        expect(CATEGORY_LABELS.document).toBe("Handreichungen")
+    })
+})

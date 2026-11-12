@@ -112,7 +112,7 @@
 categories:
 
   document:
-    label_de: "Dokument"
+    label_de: "Handreichungen"   # bis 0.40 „Dokument“
     color: "bl"
     icon: FileType
     content_types:
@@ -389,7 +389,7 @@ categories:
         embedding: true
 
   artifact:
-    label_de: "Artefakt"
+    label_de: "Material"         # bis 0.40 „Artefakt“ (Notiz Werkzeug/Werkstatt 10.2)
     color: "or"
     icon: Package
     content_types:

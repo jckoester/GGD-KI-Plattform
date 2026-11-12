@@ -22,6 +22,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Jahrespläne, Unterrichtseinheiten und -stunden erscheinen nicht mehr in „Alle Bausteine“, in der Suche der Bibliothek
   (Treffer und Bausteinart), im Graphen und bei „Neuer Baustein“. „Meine Bausteine“ zeigt sie weiter; der Chat findet
   sie weiter.
+- Kategorien in der Bibliothek: „Material“ statt „Artefakt“, „Handreichungen“ statt „Dokument“.
 - Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.
 
 ### Nach dem Update

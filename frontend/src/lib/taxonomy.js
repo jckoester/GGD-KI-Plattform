@@ -464,9 +464,9 @@ export const FELD_SCHEMATA = {
 }
 
 export const CATEGORY_LABELS = {
-  "document": "Dokument",
+  "document": "Handreichungen",
   "knowledge": "Wissen",
-  "artifact": "Artefakt",
+  "artifact": "Material",
   "concept": "Konzept"
 }
 
