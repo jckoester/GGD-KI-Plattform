@@ -71,6 +71,12 @@ BP_CURRICULUM_CONTENT_TYPES: Final[tuple[str, ...]] = tuple(
     _data.get("bp_curriculum_content_types") or ()
 )
 
+# Unterrichtsplanung (0.40): nicht in den Listen und der Suche der Bibliothek. Der Chat sucht
+# sie weiter — den Ausschluss wünscht nur die Suchseite (Profil der Suche, `context/router.py`).
+PLANUNG_CONTENT_TYPES: Final[tuple[str, ...]] = tuple(
+    _data.get("planung_content_types") or ()
+)
+
 # Voreinstellung für valid_until-Offset in Tagen ab heute (None = permanent).
 VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # document

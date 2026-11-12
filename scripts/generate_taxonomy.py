@@ -40,6 +40,7 @@ def main():
     ]
 
     bp_curriculum_types = data.get("bp_curriculum_content_types", [])
+    planung_types = data.get("planung_content_types", [])
 
     ruhende_types = [
         ct["key"]
@@ -102,6 +103,10 @@ def main():
         "// Importierte Bildungsplan-/Curriculum-Knotentypen — aus der freien /knowledge-Liste",
         "// serverseitig ausgeschlossen (exclude_content_type). Quelle: taxonomy.yaml (C2).",
         f"export const BP_CURRICULUM_CONTENT_TYPES = {_js(bp_curriculum_types)}",
+        "",
+        "// Unterrichtsplanung — nicht in Listen, Suche, Facetten und Graph der Bibliothek (0.40).",
+        "// Der Chat findet sie weiter. Quelle: taxonomy.yaml.",
+        f"export const PLANUNG_CONTENT_TYPES = {_js(planung_types)}",
         "",
         "// Typen mit `ui_status: ruhend` — erscheinen in keiner Auswahl, keinem Filter und",
         "// keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;",

@@ -258,6 +258,14 @@ def pruefe_taxonomie() -> list[str]:
             "Quelle: app/context/taxonomy.yaml"
         )
 
+    unbekannt_planung = sorted(set(taxonomy.PLANUNG_CONTENT_TYPES) - typen)
+    if unbekannt_planung:
+        befunde.append(
+            f"planung_content_types nennt unbekannte Typen: {unbekannt_planung} — "
+            "sie werden aus der Bibliothek ausgeschlossen, ohne zu existieren. "
+            "Quelle: app/context/taxonomy.yaml"
+        )
+
     # Die durchsetzende Ankerliste (`retrieval.py`) und die YAML sind seit 02.09.2026
     # dasselbe Objekt. Die Prüfung hält das fest: Wer die Liste dort wieder als Literal
     # hinschreibt, bekommt es beim Start gesagt und nicht erst durch ein falsches Badge.

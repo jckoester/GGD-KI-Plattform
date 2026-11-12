@@ -2,6 +2,7 @@
     import { untrack } from 'svelte'
   import { goto } from '$app/navigation'
   import { getNeighborhood } from '$lib/api.js'
+  import { graphOhnePlanung } from '$lib/knotentypen.js'
   import { CATEGORY_LABELS } from '$lib/taxonomy.js'
   import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 
@@ -90,7 +91,9 @@
       await new Promise(resolve => setTimeout(resolve, 50))
       
       const { width, height } = svgEl.getBoundingClientRect()
-      const { nodes, links } = runSimulation(data.nodes, data.edges, width, height)
+      // Unterrichtsplanung gehört nicht in den Graphen der Bibliothek (0.40).
+      const { knoten, kanten } = graphOhnePlanung(data.nodes, data.edges, nodeId)
+      const { nodes, links } = runSimulation(knoten, kanten, width, height)
       simNodes = nodes
       simEdges = links
     } catch (e) {

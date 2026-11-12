@@ -12,7 +12,7 @@
  * nicht einlösen kann. Vorhandene Knoten bleiben les-, such- und traversierbar, und die
  * Schnittstelle nimmt sie weiter an.
  */
-import { CONTENT_TYPE_LABELS, RUHENDE_CONTENT_TYPES } from "$lib/taxonomy.js"
+import { CONTENT_TYPE_LABELS, PLANUNG_CONTENT_TYPES, RUHENDE_CONTENT_TYPES } from "$lib/taxonomy.js"
 
 /**
  * Filtert ruhende Typen aus einer Liste.
@@ -63,4 +63,71 @@ export function auswaehlbareTypOptionen(typen, aktuellerTyp = null) {
   return auswaehlbareTypen(typen, aktuellerTyp)
     .map((key) => ({ key, label: CONTENT_TYPE_LABELS[key] ?? key }))
     .sort((a, b) => a.label.localeCompare(b.label, "de"))
+}
+
+
+// ── Unterrichtsplanung in der Bibliothek (0.40, Päckchen AM) ─────────────────
+//
+// Jahresplan, Unterrichtseinheit und -stunde gehören zur Planung, nicht in die Bibliothek:
+// nicht in „Alle Bausteine“, Suche, Facette, Graph und „Neuer Baustein“. „Meine Bausteine“,
+// die Detailseite und das Archiv zeigen sie weiter, der Chat findet sie weiter.
+
+const PLANUNG = new Set(PLANUNG_CONTENT_TYPES)
+
+/** Ist das ein Typ der Unterrichtsplanung? */
+export function istPlanung(typ) {
+  return PLANUNG.has(typ)
+}
+
+/**
+ * Typenliste ohne Planung — außer dem aktuellen Typ (wie bei ruhenden Typen: eine
+ * bestehende Auswahl darf nicht stillschweigend leer werden).
+ *
+ * @param {string[]} typen
+ * @param {string|null|undefined} aktuellerTyp
+ */
+export function ohnePlanung(typen, aktuellerTyp = null) {
+  return (typen ?? []).filter((t) => !PLANUNG.has(t) || t === aktuellerTyp)
+}
+
+/** Such-Facette der Bibliothek: auswählbare Typen ohne Planung. */
+export function bibliothekTypLabels(aktuellerTyp = null) {
+  return auswaehlbareTypLabels(aktuellerTyp).filter(
+    ([key]) => !PLANUNG.has(key) || key === aktuellerTyp,
+  )
+}
+
+/**
+ * Graph der Bibliothek ohne Planungsknoten. Der Startknoten bleibt, auch wenn er selbst eine
+ * Stunde ist — wer von einer Stunde aus in den Graphen geht, will deren Umgebung sehen.
+ * Was danach vom Startknoten aus nicht mehr erreichbar ist, fällt mit weg: Sonst hingen
+ * Knoten, die nur über eine Stunde verbunden waren, als Inseln im Bild.
+ *
+ * @param {Array<{id: string, content_type?: string}>} knoten
+ * @param {Array<{from_node_id: string, to_node_id: string}>} kanten
+ * @param {string} startId
+ */
+export function graphOhnePlanung(knoten, kanten, startId) {
+  const bleibt = new Set(
+    (knoten ?? []).filter((k) => k.id === startId || !PLANUNG.has(k.content_type)).map((k) => k.id),
+  )
+  const verbunden = (kanten ?? []).filter((e) => bleibt.has(e.from_node_id) && bleibt.has(e.to_node_id))
+  const nachbarn = new Map()
+  for (const e of verbunden) {
+    if (!nachbarn.has(e.from_node_id)) nachbarn.set(e.from_node_id, [])
+    if (!nachbarn.has(e.to_node_id)) nachbarn.set(e.to_node_id, [])
+    nachbarn.get(e.from_node_id).push(e.to_node_id)
+    nachbarn.get(e.to_node_id).push(e.from_node_id)
+  }
+  const erreicht = new Set(bleibt.has(startId) ? [startId] : [])
+  const offen = [...erreicht]
+  while (offen.length) {
+    for (const n of nachbarn.get(offen.pop()) ?? []) {
+      if (!erreicht.has(n)) { erreicht.add(n); offen.push(n) }
+    }
+  }
+  return {
+    knoten: (knoten ?? []).filter((k) => erreicht.has(k.id)),
+    kanten: verbunden.filter((e) => erreicht.has(e.from_node_id) && erreicht.has(e.to_node_id)),
+  }
 }

@@ -86,6 +86,14 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
   "lernsequenz"
 ]
 
+// Unterrichtsplanung — nicht in Listen, Suche, Facetten und Graph der Bibliothek (0.40).
+// Der Chat findet sie weiter. Quelle: taxonomy.yaml.
+export const PLANUNG_CONTENT_TYPES = [
+  "jahresplan",
+  "unterrichtseinheit",
+  "unterrichtsstunde"
+]
+
 // Typen mit `ui_status: ruhend` — erscheinen in keiner Auswahl, keinem Filter und
 // keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.

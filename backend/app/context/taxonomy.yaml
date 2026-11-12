@@ -779,6 +779,16 @@ categories:
         # Bedingung** („ab 0,1 mol/L"). Die Bedingung gehört an die Kante, nicht an den
         # Knoten; das Seed-Skript schreibt sie dorthin (AP5).
 
+# Unterrichtsplanung (0.40, Päckchen AM). Sie gehört nicht in die Bibliothek: ausgeschlossen aus
+# „Alle Bausteine“, der Suche der Oberfläche (Treffer und Facette), dem Graphen und „Neuer Baustein“.
+# **Nicht** ausgeschlossen: „Meine Bausteine“ (bis 0.42), Detailseite, Archiv, Planung — und alles,
+# was der Chat liest (Vorab-Suche, `context_search`, `finde_stunde`).
+# → generiert `PLANUNG_CONTENT_TYPES` in frontend/src/lib/taxonomy.js.
+planung_content_types:
+  - jahresplan
+  - unterrichtseinheit
+  - unterrichtsstunde
+
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und
 # verstopfen die UX) — werden serverseitig über exclude_content_type ausgeblendet (C2).

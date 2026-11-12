@@ -31,7 +31,7 @@
     // Dieselben Abschnittstitel wie im Vorschlagsfenster des Chats: Derselbe Umschlag
     // darf an zwei Stellen nicht verschieden heißen.
     import { ABSCHNITT_TITEL } from "$lib/umschlag.js";
-    import { auswaehlbareTypLabels } from "$lib/knotentypen.js";
+    import { bibliothekTypLabels } from "$lib/knotentypen.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { activeConversationId, pageTitle } from "$lib/stores/pageTitle.js";
     import { subjects } from "$lib/stores/subjects.js";
@@ -145,6 +145,8 @@
                 content_type: typ ? [typ] : null,
                 subject_id: fachId ? Number(fachId) : null,
                 grade: stufe ? Number(stufe) : null,
+                // Unterrichtsplanung nicht in der Suche der Bibliothek (0.40); der Chat findet sie weiter.
+                exclude_planning: true,
             });
             merken(cacheSchluessel(), umschlag);
             gesucht = q;
@@ -264,7 +266,7 @@
                                bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
                     >
                         <option value="">Alle Bausteinarten</option>
-                        {#each auswaehlbareTypLabels(typ) as [wert, label]}
+                        {#each bibliothekTypLabels(typ) as [wert, label]}
                             <option value={wert}>{label}</option>
                         {/each}
                     </select>

@@ -1,6 +1,6 @@
 <script>
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
-    import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
+    import { BP_CURRICULUM_CONTENT_TYPES, PLANUNG_CONTENT_TYPES } from "$lib/taxonomy.js";
     import PageBody from '$lib/components/PageBody.svelte'
     import { FolderHeart } from "lucide-svelte";
 </script>
@@ -36,6 +36,6 @@
     <KnowledgeNodeList
         showSubjectFilter={true}
         showNewButton={true}
-        excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
+        excludeContentTypes={[...BP_CURRICULUM_CONTENT_TYPES, ...PLANUNG_CONTENT_TYPES]}
     />
 </PageBody>

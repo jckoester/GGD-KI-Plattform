@@ -19,6 +19,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Dokumente heißen „Produkte“. Neue Adresse `/workshop`; `/library` leitet um.
 - „Wissensgraph“ heißt jetzt „Bibliothek“ (Menü, Seiten, Hinweise); ebenso, wo die Oberfläche „Wissensspeicher“ oder
   „Kontextspeicher“ sagte. Die Adressen unter `/knowledge` bleiben.
+- Jahrespläne, Unterrichtseinheiten und -stunden erscheinen nicht mehr in „Alle Bausteine“, in der Suche der Bibliothek
+  (Treffer und Bausteinart), im Graphen und bei „Neuer Baustein“. „Meine Bausteine“ zeigt sie weiter; der Chat findet
+  sie weiter.
 - Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.
 
 ### Nach dem Update

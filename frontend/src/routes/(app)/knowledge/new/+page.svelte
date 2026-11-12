@@ -7,7 +7,7 @@
     SCHULJAHRESENDE_CONTENT_TYPES,
     SCOPE_DEFAULTS,
   } from '$lib/taxonomy.js'
-  import { auswaehlbareTypOptionen } from '$lib/knotentypen.js'
+  import { auswaehlbareTypOptionen, ohnePlanung } from '$lib/knotentypen.js'
   import {
     alsTagMonat,
     ladeSchuljahr,
@@ -76,7 +76,8 @@
 
   // ── Content-Type-Optionen je Category ──────────────────────────────────
   const contentTypeOptions = $derived(
-    auswaehlbareTypOptionen(category ? (CONTENT_TYPES[category] ?? []) : [])
+    // Planung entsteht im Planer, nicht hier (0.40).
+    auswaehlbareTypOptionen(ohnePlanung(category ? (CONTENT_TYPES[category] ?? []) : []))
   )
 
   // ── Scope-Defaults bei Category-/Typ-Wechsel setzen ────────────────────

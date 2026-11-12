@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest"
+import { bibliothekTypLabels, graphOhnePlanung, istPlanung, ohnePlanung } from "./knotentypen.js"
+import { PLANUNG_CONTENT_TYPES } from "$lib/taxonomy.js"
 import {
   auswaehlbareTypen,
   auswaehlbareTypLabels,
@@ -129,4 +131,48 @@ describe("Taxonomie-Zusicherungen", () => {
       expect(RUHENDE_CONTENT_TYPES.has(typ)).toBe(false)
     }
   })
+})
+
+// ── Unterrichtsplanung in der Bibliothek (0.40) ───────────────────────────────
+
+describe("Planung in der Bibliothek (0.40)", () => {
+    it("die drei Planungstypen", () => {
+        expect([...PLANUNG_CONTENT_TYPES].sort()).toEqual(["jahresplan", "unterrichtseinheit", "unterrichtsstunde"])
+        expect(istPlanung("unterrichtsstunde")).toBe(true)
+        expect(istPlanung("fachbegriff")).toBe(false)
+    })
+
+    it("ohnePlanung lässt den aktuellen Typ stehen", () => {
+        expect(ohnePlanung(["jahresplan", "fachbegriff"])).toEqual(["fachbegriff"])
+        expect(ohnePlanung(["jahresplan", "fachbegriff"], "jahresplan")).toEqual(["jahresplan", "fachbegriff"])
+    })
+
+    it("die Such-Facette bietet keine Planung an", () => {
+        const schluessel = bibliothekTypLabels().map(([k]) => k)
+        expect(schluessel.some((k) => istPlanung(k))).toBe(false)
+        expect(schluessel.length).toBeGreaterThan(5)
+    })
+
+    it("der Graph verliert Stunden und was nur über sie hing", () => {
+        const knoten = [
+            { id: "k", content_type: "kapitel" },
+            { id: "s", content_type: "unterrichtsstunde" },
+            { id: "b", content_type: "fachbegriff" },     // nur über die Stunde verbunden
+            { id: "c", content_type: "fachbegriff" },     // direkt am Kapitel
+        ]
+        const kanten = [
+            { from_node_id: "s", to_node_id: "k" },
+            { from_node_id: "s", to_node_id: "b" },
+            { from_node_id: "k", to_node_id: "c" },
+        ]
+        const { knoten: k, kanten: e } = graphOhnePlanung(knoten, kanten, "k")
+        expect(k.map((x) => x.id)).toEqual(["k", "c"])
+        expect(e).toEqual([{ from_node_id: "k", to_node_id: "c" }])
+    })
+
+    it("vom Startknoten Stunde aus bleibt die Stunde mit ihrer Umgebung", () => {
+        const knoten = [{ id: "s", content_type: "unterrichtsstunde" }, { id: "b", content_type: "fachbegriff" }]
+        const kanten = [{ from_node_id: "s", to_node_id: "b" }]
+        expect(graphOhnePlanung(knoten, kanten, "s").knoten.map((x) => x.id)).toEqual(["s", "b"])
+    })
 })

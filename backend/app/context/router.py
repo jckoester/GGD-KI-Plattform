@@ -1497,6 +1497,7 @@ async def search_context_nodes(
     from app.chat.router import subject_of_conversation
     from app.context.filters import Knotenfilter
     from app.context.search import Suchprofil, aufzaehlung, suche
+    from app.context.taxonomy import PLANUNG_CONTENT_TYPES
 
     # Ohne eigene Angabe die Anzeigezahl aus dem Nutzerprofil (Vorschlagsfenster).
     limit = request.limit or await anzeige_limit(db, user.sub)
@@ -1521,6 +1522,7 @@ async def search_context_nodes(
         thematisch=limit,
         aufzaehlung=limit,
         grade=request.grade,
+        ohne_typen=PLANUNG_CONTENT_TYPES if request.exclude_planning else (),
     )
     ergebnis = await suche(
         request.query, profil, db, nur_identifikation=request.identification_only

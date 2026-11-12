@@ -279,6 +279,9 @@ class ContextSearchRequest(BaseModel):
     content_type: list[str] | None = None
     subject_id: int | None = None
     grade: int | None = Field(default=None, ge=1, le=13)
+    # Suchseite der Bibliothek (0.40): Unterrichtsplanung nicht finden. Der Chat schickt es
+    # nicht — `@`-Suche und Suchknopf finden Stunden weiter.
+    exclude_planning: bool = False
 
     # Nur die Namensträger, ohne thematische Auswahl. Für das `@`-Dropdown: Dort wird ein
     # **bekannter Titel** nachgeschlagen, und die thematische Auswahl kostete bei jedem

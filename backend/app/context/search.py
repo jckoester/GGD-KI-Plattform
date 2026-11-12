@@ -100,6 +100,10 @@ class Suchprofil:
     # `planning.eingefuehrt`, 0.20). Nur die Vorab-Suche liest sie: Ein Treffer im Graubereich
     # wird für sie sicher (Päckchen AC, F2 a).
     eingefuehrt: frozenset[str] = frozenset()
+    # Typen, die gar nicht erst gefunden werden (0.40): Die Suchseite der Bibliothek blendet die
+    # Unterrichtsplanung aus. Wirkt in `_grundabfrage`, also in jedem Abschnitt und in der
+    # Zählung der Aufzählung. Der Chat setzt es nie.
+    ohne_typen: tuple[str, ...] = ()
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────
@@ -366,6 +370,8 @@ def _grundabfrage(profil: Suchprofil):
     )
     if profil.anchor_ids:
         stmt = stmt.where(ContextNode.id.in_(teilgraph(profil.anchor_ids)))
+    if profil.ohne_typen:
+        stmt = stmt.where(ContextNode.content_type.notin_(profil.ohne_typen))
     return stmt
 
 
