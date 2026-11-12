@@ -834,7 +834,7 @@
         </p>
     {:else}
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Knoten nicht gefunden.
+            Baustein nicht gefunden.
         </p>
     {/if}
 </PageBody>

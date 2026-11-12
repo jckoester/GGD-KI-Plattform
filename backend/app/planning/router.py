@@ -1010,7 +1010,7 @@ async def create_lesson(
     if ue_node is None or ue_node.status != "active":
         raise HTTPException(status_code=404, detail="Unterrichtseinheit nicht gefunden")
     if ue_node.content_type != "unterrichtseinheit":
-        raise HTTPException(status_code=422, detail="Knoten ist keine Unterrichtseinheit")
+        raise HTTPException(status_code=422, detail="Das ist keine Unterrichtseinheit")
 
     group_id = ue_node.write_scope_group_id
     if group_id is None:

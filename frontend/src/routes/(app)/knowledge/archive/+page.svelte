@@ -195,7 +195,7 @@
     <ErrorBanner message={error} />
   {:else if filteredNodes.length === 0}
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 py-8 text-center">
-      Keine archivierten Knoten{schuljahr ? ` aus ${schuljahr}` : ''}.
+      Keine archivierten Bausteine{schuljahr ? ` aus ${schuljahr}` : ''}.
     </p>
   {:else}
     <div class="overflow-x-auto">

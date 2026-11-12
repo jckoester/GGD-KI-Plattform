@@ -154,7 +154,7 @@
       oninput={onInput}
       onkeydown={onKeydown}
       onblur={() => setTimeout(closeDropdown, 200)}
-      placeholder="+ Material (@ für Knoten)"
+      placeholder="+ Material (@ für Bausteine)"
       class="w-full bg-transparent text-xs text-light-tx dark:text-dark-tx
              border-b border-light-ui-3 dark:border-dark-ui-3
              focus:border-primary dark:focus:border-primary-dark outline-none
@@ -170,7 +170,7 @@
         {#if loading}
           <div class="px-3 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2">Suche…</div>
         {:else if items.length === 0}
-          <div class="px-3 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2">Kein Knoten gefunden</div>
+          <div class="px-3 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2">Kein Baustein gefunden</div>
         {:else}
           {#each items as node, i}
             <button

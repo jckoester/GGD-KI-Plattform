@@ -208,7 +208,7 @@
 </script>
 
 <PageBody>
-  <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx mb-6">Neuen Knoten anlegen</h1>
+  <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx mb-6">Neuen Baustein anlegen</h1>
 
   <form onsubmit={e => { e.preventDefault(); save() }} class="space-y-6">
     <!-- Titel -->
@@ -287,7 +287,7 @@
           class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                  bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
                  focus:outline-none focus:border-primary dark:focus:border-primary-dark"
-          placeholder="Beschreibe den Knoten (Markdown möglich)..."
+          placeholder="Beschreibe den Baustein (Markdown möglich)..."
         ></textarea>
       </div>
     {/if}

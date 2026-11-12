@@ -431,7 +431,7 @@
              bg-primary dark:bg-primary-dark text-white font-medium
              hover:opacity-90 transition-opacity whitespace-nowrap"
         >
-            + Neuer Knoten
+            + Neuer Baustein
         </a>
     {/if}
 </div>
@@ -484,12 +484,12 @@
     <ErrorBanner message={error} />
 {:else if nodes.length === 0}
     <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
-        Keine Knoten gefunden.
+        Keine Bausteine gefunden.
         {#if showNewButton}
             <a
                 href="/knowledge/new"
                 class="ml-1 text-primary dark:text-dark-bl underline"
-                >Ersten Knoten anlegen</a
+                >Ersten Baustein anlegen</a
             >
         {/if}
     </div>
@@ -739,7 +739,7 @@
     <div
         class="flex items-center justify-between gap-3 mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2"
     >
-        <span>{sortedNodes.length}{hasMore ? "+" : ""} Knoten</span>
+        <span>{sortedNodes.length}{hasMore ? "+" : ""} Bausteine</span>
         {#if hasMore}
             <button
                 onclick={loadMore}

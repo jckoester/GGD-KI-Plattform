@@ -23,6 +23,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (Treffer und Bausteinart), im Graphen und bei „Neuer Baustein“. „Meine Bausteine“ zeigt sie weiter; der Chat findet
   sie weiter.
 - Kategorien in der Bibliothek: „Material“ statt „Artefakt“, „Handreichungen“ statt „Dokument“.
+- In der Bibliothek heißt es durchgehend „Baustein“, nicht mehr „Knoten“ (Knöpfe, Seitentitel, Meldungen, Hilfe).
 - Neuigkeit zu Werkstatt und Bibliothek, dazu ein Hinweis in Werkstatt, Suche und „Meine Bausteine“ (bis 31.01.2027,
   wegklickbar).
 - Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.

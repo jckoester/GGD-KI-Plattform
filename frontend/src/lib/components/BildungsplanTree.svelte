@@ -340,7 +340,7 @@
                                     </button>
                                     <a
                                         href={nodeHref(pkGruppe.id)}
-                                        title="Knotenansicht öffnen"
+                                        title="Baustein öffnen"
                                         class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
                                                hover:text-primary dark:hover:text-dark-bl transition-colors"
                                     >
@@ -461,7 +461,7 @@
                 </button>
                 <a
                     href={nodeHref(ld.id)}
-                    title="Knotenansicht öffnen"
+                    title="Baustein öffnen"
                     class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
                            hover:text-primary dark:hover:text-dark-bl transition-colors"
                 >

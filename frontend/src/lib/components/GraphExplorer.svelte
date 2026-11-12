@@ -155,7 +155,7 @@
 
     <!-- Knoten-Zähler -->
     <span class="ml-auto text-xs text-light-tx-2 dark:text-dark-tx-2">
-      {simNodes.length} Knoten · {simEdges.length} Kanten
+      {simNodes.length} Bausteine · {simEdges.length} Verknüpfungen
     </span>
   </div>
 

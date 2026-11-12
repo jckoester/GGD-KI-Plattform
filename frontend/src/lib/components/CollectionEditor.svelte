@@ -363,7 +363,7 @@
             <WarningBanner
                 message="Sichtbarkeit: {defRead} lesen, {defWrite} bearbeiten — die
                          Vorgabe dieser Bausteinart. Ändern lässt sie sich nach dem
-                         Speichern in der Knoten-Bearbeitung."
+                         Speichern beim Bearbeiten des Bausteins."
             />
         {/if}
 

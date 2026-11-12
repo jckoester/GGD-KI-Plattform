@@ -85,7 +85,7 @@ Versuchsprotokoll, eine Gedichtanalyse, eine Erörterung. Findet der Assistent d
 es seinem allgemeinen Schema vor. Dann fragt er nach der „Vermutung“, wenn deine Fachschaft
 „Vermutung“ schreibt und nicht „Hypothese“.
 
-**Anlegen:** unter **Fächer → dein Fach → „weiterer Kontext“ → „+ Neuer Knoten“**, Bausteinart
+**Anlegen:** unter **Fächer → dein Fach → „weiterer Kontext“ → „+ Neuer Baustein“**, Bausteinart
 „Methodenblatt“. Die ganze Sammlung steht in der Seitenleiste unter **Sammlungen →
 Methodenblätter**. Voreingestellt darf die ganze Schule lesen und die Fachschaft ändern.
 

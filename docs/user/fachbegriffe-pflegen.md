@@ -25,7 +25,7 @@ Beides findest du unter **Fächer → dein Fach → „weiterer Kontext"**:
 |---|---|
 | **Aus Dateien** | Dateien wählen, Vorschau ansehen, einspielen |
 | **Als Zip** | den ganzen Bestand des Fachs als Dateien sichern |
-| **+ Neuer Knoten** | einen einzelnen Eintrag im Editor anlegen |
+| **+ Neuer Baustein** | einen einzelnen Eintrag im Editor anlegen |
 
 Einen einzelnen Eintrag holst du in seiner Detailansicht über **Als Markdown** heraus.
 

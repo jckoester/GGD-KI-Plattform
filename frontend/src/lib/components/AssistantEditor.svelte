@@ -1942,7 +1942,7 @@
 
                         {#if retrievalAnchors.length > 0}
                             <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                Der Assistent sucht in allen Knoten, die diesen Wissensgebieten zugeordnet sind.
+                                Der Assistent sucht in allen Bausteinen, die diesen Wissensgebieten zugeordnet sind.
                             </p>
                         {/if}
                     </div>

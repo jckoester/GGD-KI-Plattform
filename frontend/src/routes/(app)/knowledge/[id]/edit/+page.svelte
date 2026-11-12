@@ -417,7 +417,7 @@
         <div class="mb-4">
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-                    Knoten bearbeiten
+                    Baustein bearbeiten
                 </h1>
                 {#if node}
                     <span
@@ -454,7 +454,7 @@
         <!-- Banner: Nur-Lesen-Hinweis -->
         {#if node && !canEdit}
             <InfoBanner
-                message="Du kannst diesen Knoten nur lesen. Zum Bearbeiten ist eine Schreibberechtigung erforderlich."
+                message="Du kannst diesen Baustein nur lesen. Zum Bearbeiten ist eine Schreibberechtigung erforderlich."
             />
         {/if}
 
@@ -465,7 +465,7 @@
                   bg-light-ye/10 dark:bg-dark-ye/10 text-sm text-light-tx dark:text-dark-tx"
             >
                 <p class="font-medium mb-1">
-                    ⚠️ Dieser Knoten verweist auf archivierte Inhalte:
+                    ⚠️ Dieser Baustein verweist auf archivierte Inhalte:
                 </p>
                 <ul class="space-y-1 ml-2">
                     {#each archivedRefs as ref (ref.id)}
@@ -488,7 +488,7 @@
                                         href="/knowledge/{ref.suggested_successor_id}"
                                         class="underline hover:text-primary dark:hover:text-primary-dark"
                                     >
-                                        Knoten anzeigen
+                                        Baustein anzeigen
                                     </a>
                                 </span>
                             {/if}
@@ -605,7 +605,7 @@
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
                    focus:outline-none focus:border-primary dark:focus:border-primary-dark
                    disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="Beschreibe den Knoten (Markdown möglich)..."
+                        placeholder="Beschreibe den Baustein (Markdown möglich)..."
                     ></textarea>
                 </div>
             {/if}
@@ -1231,8 +1231,8 @@
                     bg-light-ye/10 dark:bg-dark-ye/10 text-sm"
                 >
                     <p class="text-light-tx dark:text-dark-tx mb-3">
-                        Dieser Knoten wird für Assistenten und Schüler
-                        unsichtbar. Kanten und Konfigurationen bleiben erhalten.
+                        Dieser Baustein wird für Assistenten und Schüler
+                        unsichtbar. Verknüpfungen und Einstellungen bleiben erhalten.
                         Fortfahren?
                     </p>
                     <div class="flex gap-2">

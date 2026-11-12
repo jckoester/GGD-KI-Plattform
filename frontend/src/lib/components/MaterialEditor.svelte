@@ -133,7 +133,7 @@
             onkeydown={handleKeydown}
             onblur={() => { setTimeout(() => { dropdownOpen = false }, 200) }}
             rows="3"
-            placeholder="Material: @ für Knoten, URLs werden verlinkt, freier Text möglich"
+            placeholder="Material: @ für Bausteine, URLs werden verlinkt, freier Text möglich"
             class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2 resize-none
                    focus:outline-none focus:border-primary dark:focus:border-primary-dark"

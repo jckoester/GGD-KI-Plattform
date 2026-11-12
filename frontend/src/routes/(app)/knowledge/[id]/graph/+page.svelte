@@ -20,7 +20,7 @@
       class="text-sm text-light-tx-2 dark:text-dark-tx-2
              hover:text-light-tx dark:hover:text-dark-tx transition-colors"
     >
-      ← Zurück zum Knoten
+      ← Zurück zum Baustein
     </a>
   </div>
   <div class="flex-1 min-h-0">

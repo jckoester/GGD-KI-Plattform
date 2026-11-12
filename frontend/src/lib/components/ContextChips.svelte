@@ -61,7 +61,7 @@
                                hover:text-light-tx dark:hover:text-dark-tx
                                ml-0.5"
                         title="Aus Kontext entfernen"
-                        aria-label="Knoten {node.title} aus Kontext entfernen"
+                        aria-label="Baustein {node.title} aus Kontext entfernen"
                     >
                         <X class="w-3 h-3" />
                     </button>

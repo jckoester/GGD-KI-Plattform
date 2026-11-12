@@ -472,7 +472,7 @@ async def get_neighborhood(
     # Startknoten laden und prüfen
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_read_permission(node, user, db)
 
     # Recursive CTE für bidirektionale Traversierung
@@ -537,7 +537,7 @@ async def get_archived_references(
     # Startknoten laden
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_read_permission(node, user, db)
 
     sql = text("""
@@ -601,7 +601,7 @@ async def copy_node(
     # Quellknoten laden
     source = await db.get(ContextNode, node_id)
     if source is None or source.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     # Nur lesbare Quellknoten dürfen kopiert werden (sonst Exfiltration per UUID, Audit #1).
     await _check_read_permission(source, user, db)
 
@@ -737,7 +737,7 @@ async def get_node(
 ):
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_read_permission(node, user, db)
     await _schreibrechte_setzen([node], user, db)
     await _aliase_setzen([node], db)
@@ -897,7 +897,7 @@ async def update_node(
 ):
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
 
     update_data = payload.model_dump(exclude_unset=True, by_alias=False)
@@ -1045,7 +1045,7 @@ async def update_node_title(
     Re-Import (C1). Admin-only — die BP-Curriculum-Daten sind schulweit/global."""
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     vektor_vorher = await eingabe_mit_aliasen(db, node)
     node.title = payload.title
     node.title_locked = True
@@ -1086,7 +1086,7 @@ async def reaktiviere_node(
     """
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
 
     if node.status != "archived":
@@ -1125,7 +1125,7 @@ async def verwalte_node(
     """
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
 
     vektor_vorher = await eingabe_mit_aliasen(db, node)
@@ -1179,7 +1179,7 @@ async def delete_node(
     """
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
 
     # ── F7: Archivieren vor Löschen (ADR-019) ────────────────────────────────
@@ -1299,7 +1299,7 @@ async def add_context_anchor(
     # Knoten laden und validieren
     node = await db.get(ContextNode, body.node_id)
     if node is None or node.status != "active":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden oder inaktiv")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden oder inaktiv")
 
     # Fuer retrieval_scope: nur strukturell sinnvolle Typen zulassen
     if body.role == "retrieval_scope" and node.content_type not in VALID_SCOPE_ANCHOR_TYPES:
@@ -1422,7 +1422,7 @@ async def add_chat_context_node(
     # Knoten existiert und ist aktiv?
     node = await db.get(ContextNode, payload.node_id)
     if node is None or node.status != "active":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden oder inaktiv")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden oder inaktiv")
 
     # Sichtbarkeit prüfen (kein privater/fremd-gruppen Knoten, Audit #1)
     await _check_read_permission(node, user, db)
@@ -1858,9 +1858,9 @@ async def create_edge(
     to_node = await db.get(ContextNode, payload.to_node_id)
 
     if not from_node or from_node.status != "active":
-        raise HTTPException(status_code=404, detail=f"Startknoten {payload.from_node_id} nicht gefunden")
+        raise HTTPException(status_code=404, detail=f"Ausgangsbaustein {payload.from_node_id} nicht gefunden")
     if not to_node or to_node.status != "active":
-        raise HTTPException(status_code=404, detail=f"Zielknoten {payload.to_node_id} nicht gefunden")
+        raise HTTPException(status_code=404, detail=f"Zielbaustein {payload.to_node_id} nicht gefunden")
 
     await _check_write_permission(from_node, user, db)
     await _check_read_permission(to_node, user, db)
@@ -1903,7 +1903,7 @@ async def delete_edge(
 
     from_node = await db.get(ContextNode, edge.from_node_id)
     if not from_node or from_node.status != "active":
-        raise HTTPException(status_code=404, detail="Startknoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Ausgangsbaustein nicht gefunden")
 
     await _check_write_permission(from_node, user, db)
 
@@ -1922,7 +1922,7 @@ async def get_node_edges(
     # Prüfe ob Knoten existiert und sichtbar ist
     node = await db.get(ContextNode, node_id)
     if not node or node.status != "active":
-        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+        raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     
     # Sichtbarkeitsprüfung (privat/fremd-gruppen ausgeschlossen, Audit #1)
     await _check_read_permission(node, user, db)

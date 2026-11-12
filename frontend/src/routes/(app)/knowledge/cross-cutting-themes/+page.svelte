@@ -148,7 +148,7 @@
                                 </button>
                                 <a
                                     href={nodeHref(lp.id)}
-                                    title="Knotenansicht öffnen"
+                                    title="Baustein öffnen"
                                     class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
                                            hover:text-primary dark:hover:text-dark-bl transition-colors"
                                 >

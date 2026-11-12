@@ -1528,7 +1528,7 @@ export async function searchContextNodesLegacy(query, contentTypes = []) {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.detail ?? "Fehler bei der Knotensuche");
+    throw new ApiError(res.status, data.detail ?? "Fehler bei der Suche nach Bausteinen");
   }
   return res.json(); // ContextNodeResult[]
 }
@@ -1654,7 +1654,7 @@ export async function getContextNodes(params = {}) {
   const res = await fetch(`${BASE}/context/nodes?${p}`, { credentials: 'include' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Knoten')
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Bausteine')
   }
   return res.json()
 }
@@ -1732,7 +1732,7 @@ export async function getContextNode(nodeId) {
   const res = await fetch(`${BASE}/context/nodes/${nodeId}`, { credentials: 'include' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.detail ?? 'Knoten nicht gefunden')
+    throw new ApiError(res.status, data.detail ?? 'Baustein nicht gefunden')
   }
   return res.json()
 }

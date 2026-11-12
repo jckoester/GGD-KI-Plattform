@@ -178,8 +178,8 @@ Eine *offene* Phase zählt dagegen mit.
   Methode — wie sie abläuft und worauf es ankommt. Über **„+ … anlegen"**
   legst du einen eigenen, zunächst privaten Eintrag an, den du später deiner
   Fachschaft freigeben kannst.
-- **Material**: Freitext **oder** verknüpfter Material-Knoten. Im Feld tippst du
-  einen Namen ein; mit **`@`** suchst du einen vorhandenen Knoten und verlinkst ihn.
+- **Material**: Freitext **oder** verknüpfter Baustein. Im Feld tippst du
+  einen Namen ein; mit **`@`** suchst du einen vorhandenen Baustein und verlinkst ihn.
   **Methodenblätter** (etwa ein Merkblatt zur Gedichtanalyse) verlinkst du hier, beim
   Material der Phase, in der die Klasse damit arbeitet — nicht unter *Methode*: Die Methode
   beschreibt, wie die Phase abläuft (Sozialform, Arrangement), das Methodenblatt das fachliche
