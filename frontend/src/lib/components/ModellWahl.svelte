@@ -119,7 +119,7 @@
                     </p>
                     <p>
                         Sind die <strong>Fähigkeiten</strong> nicht nutzbar, wirken die Schalter
-                        weiter unten nicht: Der Assistent kann dann weder im Wissensspeicher suchen
+                        weiter unten nicht: Der Assistent kann dann weder in der Bibliothek suchen
                         noch Unterricht planen.
                     </p>
                 </div>

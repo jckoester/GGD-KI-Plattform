@@ -1475,7 +1475,7 @@
                             Standardmodell und folgt einem späteren Wechsel automatisch. Ein
                             fest gewähltes Modell bindet ihn daran — er funktioniert dann
                             nicht mehr, sobald es aus der Modell-Konfiguration entfällt.
-                            Für die Fähigkeiten (Wissensgraph, Unterrichtsplanung, Bilder)
+                            Für die Fähigkeiten (Suche in der Bibliothek, Unterrichtsplanung, Bilder)
                             ist ein Modell mit ⚙ nötig.
                         </p>
                     </div>
@@ -1776,8 +1776,8 @@
                         </div>
 
                         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                          Gehen bei jeder Nachricht vollständig mit — anders als Bausteine aus dem
-                          Wissensspeicher, die nur bei passender Frage dazukommen. Das kostet bei
+                          Gehen bei jeder Nachricht vollständig mit — anders als Bausteine aus der
+                          Bibliothek, die nur bei passender Frage dazukommen. Das kostet bei
                           jeder Nachricht mit. Im Chat sehen alle, auch Schüler:innen, die
                           Dateinamen: Wähle sie so, dass sie sagen, was drinsteht
                           (etwa „PSE mit Schulwerten“).

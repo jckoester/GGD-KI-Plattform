@@ -260,7 +260,7 @@ describe("Vorschläge aus den Phasentexten (0.18, Schritt 6)", () => {
     it("die Vorschlagszeile zeigt den Hinweis zu früheren Stunden und klappt Namen ohne Eintrag ein", () => {
         const zeile = quelle("lib/components/planner/BegriffVorschlag.svelte")
         expect(zeile).toContain("vorschlag?.hinweis_frueher")
-        expect(zeile).toMatch(/<details[\s\S]*ohne Eintrag im Wissensspeicher/)
+        expect(zeile).toMatch(/<details[\s\S]*ohne Eintrag in der Bibliothek/)
         expect(zeile).not.toMatch(/bekannt/i)
     })
 })

@@ -17,6 +17,7 @@
         BookOpen,
         Pencil,
         Database,
+        Library,
         FolderHeart,
         Search,
         Hammer,
@@ -336,11 +337,11 @@
                 >
                     <button onclick={() => { toggle('knowledge'); goto('/knowledge/search') }}>
                         <span class="flex items-center gap-2">
-                            <Database class="w-4 h-4" />
-                            Wissensgraph
+                            <Library class="w-4 h-4" />
+                            Bibliothek
                         </span>
                     </button>
-                    <button onclick={() => toggle('knowledge')} aria-label="Wissensgraph auf- oder zuklappen">
+                    <button onclick={() => toggle('knowledge')} aria-label="Bibliothek auf- oder zuklappen">
                         {#if openSection === 'knowledge'}
                             <ChevronDown class="w-4 h-4" />
                         {:else}

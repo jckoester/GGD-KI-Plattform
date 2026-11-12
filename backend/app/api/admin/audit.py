@@ -60,7 +60,7 @@ BEZEICHNUNG: dict[str, str] = {
     "crisis_flag_resolved": "Krisen-Flag erledigt",
     "accounts_cleaned": "Konten gelöscht (Löschlauf)",
     "conversations_cleaned": "Chats gelöscht (Löschlauf)",
-    "node_lifecycle_run": "Lebenszyklus des Kontextspeichers",
+    "node_lifecycle_run": "Lebenszyklus der Bibliothek",
     "audit_log_cleaned": "Audit-Log aufgeräumt",
 }
 

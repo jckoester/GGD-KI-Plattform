@@ -100,7 +100,7 @@
   {#if offen.ohne.length}
     <details class="text-light-tx-2 dark:text-dark-tx-2">
       <summary class="cursor-pointer">
-        {offen.ohne.length} {offen.ohne.length === 1 ? 'Name' : 'Namen'} ohne Eintrag im Wissensspeicher
+        {offen.ohne.length} {offen.ohne.length === 1 ? 'Name' : 'Namen'} ohne Eintrag in der Bibliothek
       </summary>
       <p class="mt-1">{offen.ohne.map((o) => o.name).join(', ')} — die Fachschaft kann fehlende Begriffe anlegen.</p>
     </details>

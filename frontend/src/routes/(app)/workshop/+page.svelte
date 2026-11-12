@@ -390,7 +390,7 @@
                                     <button
                                         type="button"
                                         onclick={() => (uebernahmeItem = item)}
-                                        title="Als Baustein in den Wissensgraphen übernehmen"
+                                        title="Als Baustein in die Bibliothek übernehmen"
                                         class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                                text-light-tx-2 dark:text-dark-tx-2
                                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"

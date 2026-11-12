@@ -208,7 +208,7 @@
     }
 </script>
 
-<svelte:head><title>Suche · Wissensgraph</title></svelte:head>
+<svelte:head><title>Suche · Bibliothek</title></svelte:head>
 
 <!-- `<main>` im App-Layout ist `overflow-hidden`: Jede Seite bringt ihren eigenen
      Scrollbereich mit. Die Auswahlleiste steht **außerhalb** davon und bleibt damit
@@ -221,7 +221,7 @@
                 Bausteine suchen
             </h1>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-5">
-                Durchsucht den Kontextspeicher nach Namen und nach Thema.
+                Durchsucht die Bibliothek nach Namen und nach Thema.
             </p>
 
             <form onsubmit={(e) => { e.preventDefault(); suchen(); }} class="space-y-3">

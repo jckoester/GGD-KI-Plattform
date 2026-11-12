@@ -17,6 +17,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Menüpunkt „Werkzeuge“ entfällt; `/tools` leitet auf die Werkzeuge in der Assistentenliste um.
 - „Bibliothek“ heißt jetzt „Werkstatt“ (Menü, Seiten, Knöpfe im Chat, Meldungen); gespeicherte Bilder, Diagramme und
   Dokumente heißen „Produkte“. Neue Adresse `/workshop`; `/library` leitet um.
+- „Wissensgraph“ heißt jetzt „Bibliothek“ (Menü, Seiten, Hinweise); ebenso, wo die Oberfläche „Wissensspeicher“ oder
+  „Kontextspeicher“ sagte. Die Adressen unter `/knowledge` bleiben.
 - Nach dem Speichern eines Bildes oder Diagramms im Chat bleibt der Link „In der Werkstatt ✓“ stehen.
 
 ### Nach dem Update

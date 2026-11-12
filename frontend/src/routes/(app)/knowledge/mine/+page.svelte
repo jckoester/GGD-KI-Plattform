@@ -254,7 +254,7 @@
       <p class="mt-3 text-light-tx dark:text-dark-tx">Hier ist noch nichts.</p>
       <p class="mt-1 text-sm text-light-tx-2 dark:text-dark-tx-2">
         {#if istLehrkraft}
-          Bausteine entstehen beim Anlegen im Wissensgraph, in einer Sammlung
+          Bausteine entstehen beim Anlegen in der Bibliothek, in einer Sammlung
           oder aus dem Unterrichtsplaner.
         {:else}
           Wenn du im Chat etwas erarbeitest, kannst du es dort als Baustein

@@ -48,7 +48,7 @@
             <ScanSearch class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
             <div class="font-medium text-light-tx dark:text-dark-tx">Vorab-Suche</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Was der Wissensspeicher vorlegt und anbietet — und was nachgeschlagen wird
+                Was die Bibliothek vorlegt und anbietet — und was nachgeschlagen wird
             </div>
         </a>
         <a

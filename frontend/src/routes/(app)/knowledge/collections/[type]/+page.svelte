@@ -208,7 +208,7 @@
             class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx
                    dark:hover:text-dark-tx transition-colors mb-1 block"
         >
-            ← Wissensgraph
+            ← Bibliothek
         </a>
 
         <div class="flex items-start justify-between gap-4 mb-4">

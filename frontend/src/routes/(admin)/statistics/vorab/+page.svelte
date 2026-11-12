@@ -90,7 +90,7 @@
     </div>
 
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-        Zu jeder Nachricht legt die Plattform passende Einträge des Wissensspeichers als Inhalt
+        Zu jeder Nachricht legt die Plattform passende Bausteine der Bibliothek als Inhalt
         vor (<em>sicher</em>) und bietet weitere nur mit Titel an. <em>Nachgeschlagen</em> heißt:
         Der angebotene Eintrag stand im Suchergebnis derselben Antwort — nicht unbedingt, weil das
         Modell gezielt nach ihm gesucht hat. Titel, die oft angeboten und nie nachgeschlagen werden,
