@@ -127,7 +127,7 @@ def test_neueste_zuerst():
                                    stufe=None, stufen=STUFEN, heute=HEUTE)] == ["neu", "alt"]
 
 
-def test_uebergangshinweis_0_40_haengt_an_einer_neuigkeit():
+def test_uebergangshinweis_haengt_an_einer_neuigkeit():
     """0.40, F9: Werkstatt und Bibliothek zeigen ihren Hinweis, solange es diese Neuigkeit gibt.
 
     Die `id` steht im Frontend (`WERKSTATT_NEUIGKEIT`); fehlte sie hier, erschiene der Hinweis nie.

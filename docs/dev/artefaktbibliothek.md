@@ -15,6 +15,11 @@ als `generated_images` (konversationsgebunden, stirbt per FK-Cascade mit der Kon
 | `origin_ref` | Herkunfts-**Idempotenzschlüssel**; partieller Unique-Index `(owner, origin_ref)` |
 | `origin_conversation_id` | nur Herkunfts-Notiz (**kein** FK/CASCADE) |
 | `expires_at` | Aufbewahrung, beim Speichern eingefroren und bei jedem Benutzen erneuert (`store.frist_erneuern`, 0.41; nie verkürzt) |
+| `subject_id` | eigenes Fach des Produkts (0.41, Migration 0103; `SET NULL`) — siehe „Fachbezug“ |
+| `topic` | freies Thema (Text), keine Kante zur Planung (0.41) |
+| `derived_from` | Ursprungsprodukt, etwa das Dokument eines Exports (`CASCADE`, 0.41) |
+| `updated_at` | zuletzt bearbeitet — Vorgabe-Sortierung der Werkstatt (0.41) |
+| `assistant_name` | Name des Assistenten der Herkunfts-Konversation, als Text kopiert (0.41, F12) |
 
 Die Bytes liegen auf Disk unter `settings.artifact_storage_dir`; `store.storage_dir()` löst
 relative Pfade **repo-root-relativ** auf (cwd-unabhängig — der Cron läuft nicht aus `backend/`).
@@ -41,13 +46,28 @@ Quota-Verbrauch. Der partielle Unique-Index ist der DB-Backstop gegen Doppelklic
   Mermaid seit 0.36 (Pele im Sidecar); bis dahin kam das SVG aus dem Browser.
   `origin_ref = <kind>:<svg_hash(kind, source)>`.
 
+## Fachbezug (seit 0.41)
+
+Bis 0.40 hing das Fach eines Produkts an seiner Herkunfts-Konversation — und die wird nach spätestens
+93 Tagen gelöscht. Danach fiel das Produkt aus jedem Fach-Auszug (Gruppenseite, Filter). Seit 0.41 trägt
+das Produkt ein **eigenes Fach** (`subject_id`): Beim Speichern aus dem Chat wird es aus der Konversation
+**kopiert** (direkt oder über die Gruppe, `promote.herkunft`), „Neues Dokument“ und die Angaben setzen es
+von Hand. Eine Gruppe am Produkt gibt es bewusst nicht; die Gruppenseite zeigt die Produkte des **Fachs**
+(Plan F3). Den Rest der Ordnung trägt das freie **Thema** (`GET /artifacts/topics` schlägt eigene Themen
+vor, Lehrkräften dazu die Titel der Einheiten ihrer Gruppen).
+
 ## Endpunkte (`router.py`, Prefix `/artifacts`)
 
 | Route | Zweck |
 |-------|-------|
 | `POST /from-image` | Bild promoten (403 fremd · 409 Quota · 422 Fehler) |
 | `POST /from-diagram` | Diagramm promoten (circuit/plot/mermaid) |
-| `GET /` | eigene Bibliothek: `{ items[], used_bytes, quota_bytes }` |
+| `GET /` | eigene Werkstatt: `{ items[], used_bytes, quota_bytes, total, faecher, themen }`; Filter `q`, `art`, `subject_id`, `topic`, `bald_ablaufend`, `als_baustein`, `sort`, `limit`/`offset` (0.41); Exporte hängen am Dokument (`exporte`) |
+| `PATCH /{id}` | Titel, Fach, Thema ändern (0.41) |
+| `GET /topics` | Themen zum Vorschlagen (0.41) |
+| `GET /{id}/info` | Produktansicht: Angaben, Herkunft, Exporte, Baustein (0.41) |
+| `POST /{id}/kopie` | Dokument als Kopie speichern (0.41) |
+| `GET /anhaengbar`, `GET\|POST /chats/{conv}`, `DELETE /chats/{conv}/{id}` | Produkte im Chat (0.41, siehe [Werkstatt](material-werkstatt.md#produkte-im-chat-041-schritt-10)) |
 | `GET /{id}` | Bytes ausliefern (Eigentümer:in); SVG mit CSP `sandbox` + `nosniff` gehärtet |
 | `DELETE /{id}` | Artefakt löschen (Row + Datei) |
 | `POST /ggb` | Plot-Spec → `.ggb` (zustandslos, Chat-Download) |
@@ -70,8 +90,9 @@ bewusst schmal (Funktionen/Punkte/Wertebereich) — kein Anspruch auf volle GeoG
 - `components/MessageBubble.svelte`: Speichern-Knopf an Bildern + `libraryButtons`-Action an
   gerenderten Diagrammen (inkl. GeoGebra-Knopf bei `plot`). `serverRender.js`/`diagrams.js`
   stashen die Rohquelle in `data-source`, bevor sie den Block durch SVG ersetzen.
-- Route `(app)/workshop/+page.svelte` (bis 0.40 `/library`, das jetzt umleitet): Grid, Belegungsbalken, Download/PNG/Code/ggb/Löschen.
-  Vorschau via `<img src="/api/artifacts/{id}">` (kein `innerHTML` → SVG-XSS-neutral).
+- Route `(app)/workshop/+page.svelte` (bis 0.40 `/library`, das jetzt umleitet): Grid, Belegungsbalken, Suche/Filter/
+  Sortierung (0.41), Download/PNG/Code/ggb/Im Chat verwenden/Löschen. Vorschau via `<img src="/api/artifacts/{id}">`
+  (kein `innerHTML` → SVG-XSS-neutral); Titel und Vorschaubild führen in die Produktansicht `(app)/workshop/[id]`.
 
 ## Herkunft (Modell-Transparenz, Alembic 0049/0050)
 

@@ -337,21 +337,26 @@
     Schulvorlage kommen Word-Dateien jetzt auf A4.
   link: /help/unterrichtsplanung#export
 
-- id: "0.40-werkstatt-bibliothek"
-  version: "0.40.0"
-  # ⚠️ Beim Release auf den Tag des Releases setzen (docs/dev/neuigkeiten.md).
-  datum: 2026-11-12
-  # F9 (Plan 0.40): Der Übergangshinweis in Werkstatt und Bibliothek hängt an diesem Eintrag —
-  # er erscheint, solange der Hinweis sichtbar ist, und wer ihn dort schließt, schließt beide.
+- id: "0.41-werkstatt-reihe"
+  version: "0.41.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md). 0.40 und 0.41
+  # gehen gemeinsam auf Prod (Plan 0.41, F13 b): eine Neuigkeit für die Reihe statt je Release;
+  # sie nimmt die frühere `0.40-werkstatt-bibliothek` auf (nie ausgeliefert). Für Lehrkräfte kommt
+  # mit 0.42 eine zweite zur Planung dazu.
+  datum: 2026-11-13
+  # Der Übergangshinweis in Werkstatt, Suche und „Meine Bausteine“ hängt an diesem Eintrag
+  # (`WERKSTATT_NEUIGKEIT`) — er erscheint, solange der Hinweis sichtbar ist.
   bis: 2027-01-31
   rollen: [student, teacher]
-  # Wer die Werkstatt noch nicht sieht (Stufe 1), bekäme sonst eine Nachricht über zwei Orte,
-  # die es für ihn nicht gibt.
+  # Wer die Werkstatt noch nicht sieht (Stufe 1), bekäme sonst eine Nachricht über Orte, die es
+  # für ihn nicht gibt.
   eintrag: workshop
-  titel: "Werkstatt und Bibliothek"
+  titel: "Werkstatt und Bibliothek neu geordnet"
   text: >-
     Was du aus dem Chat speicherst, also Bilder, Diagramme und Dokumente, liegt jetzt in der
-    Werkstatt; bisher hieß sie „Bibliothek“. Die Bibliothek ist jetzt der frühere Wissensgraph
-    mit Suche und Bausteinen. Werkzeuge, die etwas herstellen, findest du in der
-    Assistentenliste unter „Werkzeuge“.
+    Werkstatt; bisher hieß sie „Bibliothek“. Dort suchst du, ordnest nach Fach und Thema und
+    öffnest jedes Produkt in einer eigenen Ansicht. Mit „@“ im Chat oder „Im Chat verwenden“
+    arbeitet die KI mit deinem Dokument weiter. Die Bibliothek ist jetzt der frühere
+    Wissensgraph mit Suche und Bausteinen; Werkzeuge, die etwas herstellen, findest du in der
+    Assistentenliste.
   link: /help/werkstatt

@@ -30,6 +30,38 @@ Produkte mit Vorschau, dazu oben einen Balken, wie viel Speicherplatz du schon b
 > Die Seitenleiste zeigt die Werkstatt erst ab der zweiten Darstellungsstufe (Profil). Speichern
 > kannst du auch vorher — der Link „In der Werkstatt ✓“ unter dem gespeicherten Element führt hin.
 
+## Ordnen und wiederfinden
+
+Jedes Produkt hat einen **Titel**, ein **Fach** und auf Wunsch ein **Thema**:
+
+- Den **Titel** setzt die Werkstatt beim Speichern selbst — bei einem Bild aus der
+  Bildbeschreibung, bei einem Diagramm aus seinem Titel oder deiner Frage im Chat.
+- Das **Fach** kommt aus dem Chat, in dem das Produkt entstanden ist, und bleibt, auch wenn der
+  Chat später gelöscht wird.
+- Das **Thema** ist ein freies Stichwort, etwa „Säuren und Basen“. Beim Tippen schlägt die
+  Werkstatt Themen vor, die du schon verwendet hast; Lehrkräften auch die Titel der Einheiten
+  ihrer Gruppen.
+
+Ändern kannst du alle drei mit dem Stift an der Karte oder mit **„Angaben“** in der Ansicht.
+
+Oben in der Werkstatt **suchst** du in Titel und Inhalt und **filterst** nach Art (Bild,
+Diagramm, Dokument, Datei), Fach und Thema, dazu nach **„läuft bald ab“** und **„als Baustein
+übernommen“**. Sortieren kannst du nach **Zuletzt bearbeitet**, **Zuletzt angelegt** oder
+**Titel**; mit **„nach Fach gruppiert“** stehen die Produkte je Fach beisammen. Sortierung und
+Gruppierung merkt sich die Werkstatt.
+
+## Die Ansicht eines Produkts
+
+Ein Klick auf Titel oder Vorschaubild öffnet das Produkt. Oben stehen Titel, Art, Fach, Thema,
+woher es stammt (Assistent, Modell und — solange es ihn gibt — ein Link zum Chat), wann es
+angelegt und zuletzt bearbeitet wurde und bis wann es aufbewahrt wird. Darunter je nach Art:
+
+- **Dokument** — der Editor (siehe unten) und die behaltenen Exporte. **„Als Kopie speichern“**
+  legt ein zweites Dokument mit demselben Inhalt an.
+- **Diagramm** — groß, mit Knöpfen zum **Vergrößern** und Verschieben, dazu der Quelltext zum
+  Kopieren.
+- **Bild** — das Bild und die Beschreibung, mit der es erzeugt wurde.
+
 Zu jedem Eintrag gibt es:
 
 - **Herunterladen** — die Originaldatei (Bild als PNG, Diagramm als SVG).
@@ -91,7 +123,9 @@ Diagramme, Schaltpläne und Funktionsgraphen funktionieren wie im Chat (```merma
 
 - **Herunterladen** — die Datei landet in deinen Downloads.
 - **„In der Werkstatt behalten"** ankreuzen — die exportierte Datei wird zusätzlich in der
-  Werkstatt abgelegt (praktisch für eine finale Fassung).
+  Werkstatt abgelegt (praktisch für eine finale Fassung). Sie hängt am Dokument: Die Karte zeigt
+  sie eingeklappt, die Ansicht listet sie unter **Exporte**. Löschst du das Dokument, gehen
+  seine Exporte mit — die Rückfrage sagt, wie viele.
 
 Wird beim Export gespeichert, exportiert die Werkstatt automatisch die aktuelle (gespeicherte)
 Fassung — deine ungespeicherten Änderungen werden also zuerst gesichert.
@@ -104,8 +138,9 @@ Fassung — deine ungespeicherten Änderungen werden also zuerst gesichert.
   Produkte aufbewahrt werden, legt die Schule fest (für Lehrkräfte in der Regel länger und
   mehr Platz als für Schüler:innen).
 - Läuft die **Aufbewahrungsfrist** eines Produkts ab, wird es automatisch entfernt — das
-  Ablaufdatum steht an jeder Karte. Möchtest du etwas dauerhaft behalten, lade es rechtzeitig
-  herunter.
+  Ablaufdatum steht an jeder Karte. **Jedes Benutzen erneuert die Frist**: bearbeiten, Titel,
+  Fach oder Thema ändern, exportieren, als Baustein übernehmen. Was du nicht mehr anfasst,
+  verschwindet irgendwann; möchtest du es dauerhaft behalten, lade es herunter.
 - **Mit deinem Konto verschwindet auch deine Werkstatt.** Wird ein Konto nach drei Monaten
   ohne Anmeldung gelöscht, gehen die gespeicherten Produkte mit — auch solche, deren eigene
   Frist noch läuft. Sie waren ohnehin nur für dich sichtbar. Was erhalten bleiben soll,

@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.41.0] – 2026-11-13
+
+Ordnung in der Werkstatt: Fach und Thema am Produkt, Suche und Filter, eine Ansicht je Produkt, Produkte im Chat;
+Schüler:innen speichern nur noch in der Werkstatt. Zwei Migrationen (0103, 0104).
+
 ### Neu
 
 - Produkte in der Werkstatt tragen ein eigenes Fach; beim Speichern aus dem Chat wird es übernommen und bleibt, auch
@@ -50,6 +55,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `alembic upgrade head` (0103, 0104).
 - `python scripts/schueler_bausteine_ueberfuehren.py --dry-run` (im Backend-Container), Protokoll ansehen, dann ohne
   `--dry-run`.
+- Die Neuigkeiten zu 0.40 und 0.41 sind eine gemeinsame (`0.41-werkstatt-reihe`); ihr `datum` beim Ausrollen auf den
+  Tag des Ausrollens setzen.
 
 ## [0.40.0] – 2026-11-12
 

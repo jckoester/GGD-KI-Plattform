@@ -62,7 +62,7 @@ Eine Neuigkeit kann zusätzlich **dort** erscheinen, wo sich etwas geändert hat
 `<UebergangsHinweis neuigkeitId=… message=… />` (`lib/components/UebergangsHinweis.svelte`)
 zeigt einen eigenen Text, solange `GET /neuigkeiten` die Neuigkeit liefert — also mit denselben
 Regeln für Rolle, Stufe, Konto-Alter und `bis`. Wer ihn schließt, schließt die Neuigkeit; auf der
-Startseite ist sie dann ebenfalls weg. Erstes Beispiel: `0.40-werkstatt-bibliothek` in Werkstatt,
+Startseite ist sie dann ebenfalls weg. Erstes Beispiel: `0.41-werkstatt-reihe` (bis zur Zusammenlegung `0.40-werkstatt-bibliothek`) in Werkstatt,
 Suche und „Meine Bausteine“ (`WERKSTATT_NEUIGKEIT` in `lib/neuigkeiten.js`; ein Test hält die `id`
 mit `neuigkeiten.yaml` zusammen). So braucht ein Übergangshinweis keinen eigenen Ablauf und keinen
 Code, der nach dem Stichtag entfernt werden muss — der Hinweis endet mit der Neuigkeit.
