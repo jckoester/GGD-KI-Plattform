@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
 
+import sqlalchemy as sa
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -250,6 +251,59 @@ async def update_document(
     record.updated_at = ts
     await db.commit()
     return record
+
+
+#: Wie lang ein Thema sein darf — ein Stichwort, kein Text.
+THEMA_MAX = 100
+
+_UNVERAENDERT = object()
+
+
+async def update_angaben(
+    db: AsyncSession,
+    record: Artifact,
+    *,
+    title=_UNVERAENDERT,
+    subject_id=_UNVERAENDERT,
+    topic=_UNVERAENDERT,
+    now: Optional[datetime] = None,
+) -> Artifact:
+    """Titel, Fach, Thema eines Produkts ändern — für alle Arten (0.41, Schritt 3).
+
+    Nur, was übergeben wird, ändert sich; ``None`` bei Fach oder Thema heißt „entfernen“.
+    Ein leerer Titel ist nicht erlaubt (``ValueError``), ein leeres Thema heißt „keins“.
+    Prüfen, ob das Produkt der Person gehört und das Fach existiert, ist Sache des Aufrufers.
+    Die Frist bleibt hier unberührt; sie zu erneuern ist Schritt 6.
+    """
+    if title is not _UNVERAENDERT:
+        neu = (title or "").strip()[:200]
+        if not neu:
+            raise ValueError("Der Titel darf nicht leer sein.")
+        record.title = neu
+    if subject_id is not _UNVERAENDERT:
+        record.subject_id = subject_id
+    if topic is not _UNVERAENDERT:
+        record.topic = (topic or "").strip()[:THEMA_MAX] or None
+    record.updated_at = _now(now)
+    await db.commit()
+    return record
+
+
+async def eigene_themen(
+    db: AsyncSession, owner_pseudonym: str, *, subject_id: int | None = None, limit: int = 50
+) -> list[str]:
+    """Die eigenen Themen, zuletzt benutzte zuerst — wahlweise nur in einem Fach."""
+    zuletzt = sa.func.max(Artifact.updated_at)
+    stmt = (
+        select(Artifact.topic)
+        .where(Artifact.owner_pseudonym == owner_pseudonym, Artifact.topic.is_not(None))
+        .group_by(Artifact.topic)
+        .order_by(zuletzt.desc(), Artifact.topic)
+        .limit(limit)
+    )
+    if subject_id is not None:
+        stmt = stmt.where(Artifact.subject_id == subject_id)
+    return list((await db.execute(stmt)).scalars())
 
 
 async def list_artifacts(

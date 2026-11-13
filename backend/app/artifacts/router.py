@@ -151,6 +151,32 @@ class DocumentResponse(BaseModel):
     expires_at: datetime
 
 
+class AngabenUpdate(BaseModel):
+    """Titel, Fach, Thema ändern (0.41). Nur gesendete Felder zählen; `null` bei Fach oder
+    Thema entfernt es."""
+
+    title: str | None = None
+    subject_id: int | None = None
+    topic: str | None = None
+
+
+class AngabenAntwort(BaseModel):
+    id: UUID
+    title: str
+    subject_id: int | None
+    topic: str | None
+    updated_at: datetime
+    expires_at: datetime
+
+
+class ThemenAntwort(BaseModel):
+    """Vorschläge fürs Thema: eigene frühere Themen; für Lehrkräfte dazu die Titel der
+    Einheiten ihrer Gruppen (als Text, keine Kante zur Planung — Plan F8)."""
+
+    eigene: list[str]
+    einheiten: list[str]
+
+
 def _saved(artifact: Artifact, created: bool) -> SavedArtifact:
     return SavedArtifact(
         id=artifact.id,
@@ -209,6 +235,49 @@ async def save_diagram_to_library(
     except promote.PromotionError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return _saved(artifact, created)
+
+
+@router.get("/topics", response_model=ThemenAntwort)
+async def themen_vorschlaege(
+    subject_id: int | None = Query(default=None, description="nur Themen dieses Fachs"),
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ThemenAntwort:
+    """Themen zum Vorschlagen. Vor `/{artifact_id}` registriert — sonst hielte FastAPI
+    „topics“ für eine ID.
+
+    Schüler:innen bekommen nur die eigenen (F8): Die Titel der Einheiten sind Planung der
+    Lehrkraft. Eigene Gruppen nur über `vorschau.mitglied()` — in der Vorschau ist die
+    Lehrkraft dort Schüler:in und bekommt deshalb keine Einheiten.
+    """
+    eigene = await store.eigene_themen(db, current_user.sub, subject_id=subject_id)
+    einheiten: list[str] = []
+    if uebernahme.ist_lehrkraft(current_user.roles):
+        import sqlalchemy as sa
+        from app.auth import vorschau
+        from app.db.models import ContextNode, Group, GroupMembership
+
+        gruppen = (
+            sa.select(GroupMembership.group_id)
+            .join(Group, Group.id == GroupMembership.group_id)
+            .where(vorschau.mitglied(current_user.sub, "teacher"))
+        )
+        if subject_id is not None:
+            gruppen = gruppen.where(Group.subject_id == subject_id)
+        einheiten = list((await db.execute(
+            sa.select(ContextNode.title)
+            .where(
+                ContextNode.content_type == "unterrichtseinheit",
+                ContextNode.status == "active",
+                ContextNode.write_scope.in_(("group", "group_teachers")),
+                ContextNode.write_scope_group_id.in_(gruppen),
+            )
+            .distinct()
+            .order_by(ContextNode.title)
+        )).scalars())
+        bekannt = set(eigene)
+        einheiten = [t for t in einheiten if t and t not in bekannt]
+    return ThemenAntwort(eigene=eigene, einheiten=einheiten)
 
 
 @router.get("", response_model=LibraryResponse)
@@ -324,6 +393,37 @@ async def get_document(
     return DocumentResponse(
         id=record.id, title=record.title, kind=record.kind, source=record.source or "",
         byte_size=record.byte_size, created_at=record.created_at, expires_at=record.expires_at,
+    )
+
+
+@router.patch("/{artifact_id}", response_model=AngabenAntwort)
+async def update_angaben(
+    artifact_id: UUID,
+    req: AngabenUpdate,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AngabenAntwort:
+    """Titel, Fach, Thema eines Produkts ändern — jede Art, nur die Eigentümer:in (0.41)."""
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    gesendet = req.model_fields_set
+    if "subject_id" in gesendet and req.subject_id is not None:
+        from app.db.models import Subject
+
+        if await db.get(Subject, req.subject_id) is None:
+            raise HTTPException(status_code=422, detail="Unbekanntes Fach")
+    try:
+        record = await store.update_angaben(
+            db, record, **{feld: getattr(req, feld) for feld in gesendet}
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return AngabenAntwort(
+        id=record.id, title=record.title, subject_id=record.subject_id, topic=record.topic,
+        updated_at=record.updated_at, expires_at=record.expires_at,
     )
 
 
