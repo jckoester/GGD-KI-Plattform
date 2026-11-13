@@ -23,6 +23,18 @@ describe("Schüler-Wechsel", () => {
             .toContain("alsBaustein={darfUebernehmen ? alsBausteinSpeichern : null}")
     })
 
+    it("in der Vorschau bietet die Leiste im Chat nichts an, was speichert", () => {
+        // Der Server sperrt das Speichern in der Vorschau (`app/auth/vorschau.py`).
+        const bubble = lesen("components", "MessageBubble.svelte")
+        expect(bubble).toContain("let inVorschau = $derived(!!$user?.vorschau)")
+        expect(bubble).toContain("speichern={inVorschau ? null : () => saveImageToLibrary(img.image_id)}")
+        expect(bubble).toContain("speichern: inVorschau ? null : () => saveDiagramToLibrary(")
+        expect(bubble).toContain("speichern={inVorschau ? null : textSpeichern}")
+        expect(bubble).toContain("bearbeiten={inVorschau ? null : openInWorkshop}")
+        // Kein weiterer Speichern-Weg an der Vorschau vorbei.
+        expect(bubble.match(/speichern[=:] ?\{?\(?\)? ?=?>? ?(saveImageToLibrary|saveDiagramToLibrary|textSpeichern)/g) ?? []).toEqual([])
+    })
+
     it("„Meine Bausteine“ in der Seitenleiste nur für Lehrkräfte", () => {
         const sidebar = lesen("components", "Sidebar.svelte")
         const eintrag = sidebar.indexOf("goto('/knowledge/mine')")

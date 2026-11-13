@@ -42,7 +42,8 @@ Daten echter Schüler:innen kommen darin nicht vor.
 - **Chatten, Bilder erzeugen, Feedback geben** — ja. Eine Rückmeldung aus der Vorschau ist für
   die Administration als solche markiert.
 - **Ändern** — nein. Einstellungen, Werkstatt, Gruppen, Zugangstoken bleiben, wie sie sind;
-  die Plattform antwortet mit „In der Vorschau lässt sich nichts ändern.“
+  die Plattform antwortet mit „In der Vorschau lässt sich nichts ändern.“ Im Chat fehlen deshalb
+  „Speichern“ und „Als Dokument bearbeiten“; Herunterladen, Code kopieren und GeoGebra gehen.
 - **Krisenhinweis:** Schreibst du eine Nachricht, die nach einer Notlage klingt, erscheint der
   Hinweis mit den Hilfsangeboten wie bei einer Schüler:in. Es entsteht aber **keine Meldung**
   für die Krisen-Einsicht.

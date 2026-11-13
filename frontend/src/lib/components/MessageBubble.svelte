@@ -107,6 +107,11 @@
         !!($user?.roles?.includes('teacher') || $user?.roles?.includes('admin')),
     );
 
+    // In der Vorschau bleibt die Werkstatt unverändert (der Server sperrt das Speichern,
+    // `app/auth/vorschau.py`). Die Leiste bietet dann nur, was nichts speichert:
+    // Herunterladen, Code kopieren, GeoGebra, neu erzeugen.
+    let inVorschau = $derived(!!$user?.vorschau);
+
     // ── Herkunft (Modell-Transparenz) ────────────────────────────────────────
     // Standardmäßig verborgen, per Klick einblendbar: Zum Arbeiten braucht die Angabe
     // niemand, für eine Quellenangabe in GFS oder Facharbeit ist sie nötig — und dann
@@ -225,7 +230,7 @@
                     target: bar,
                     props: {
                         variante: 'overlay',
-                        speichern: () => saveDiagramToLibrary(kind, quelle(), { messageId: message.id ?? null }),
+                        speichern: inVorschau ? null : () => saveDiagramToLibrary(kind, quelle(), { messageId: message.id ?? null }),
                         herunterladen: () => diagrammSvgHerunterladen(block, kind),
                         extras,
                         // Bleibender Link unter dem Diagramm — die Leiste erscheint nur beim Überfahren.
@@ -471,7 +476,7 @@
                                             transition-opacity">
                                     <ProduktLeiste
                                         variante="overlay"
-                                        speichern={() => saveImageToLibrary(img.image_id)}
+                                        speichern={inVorschau ? null : () => saveImageToLibrary(img.image_id)}
                                         herunterladen={{ href: `/api/images/${img.image_id}`, dateiname: `bild-${img.image_id}.png` }}
                                         extras={img.bildart ? [{
                                             id: 'neu', label: 'Neu erzeugen',
@@ -506,8 +511,8 @@
                 <div class="mt-3">
                     <ProduktLeiste
                         variante="zeile"
-                        speichern={textSpeichern}
-                        bearbeiten={openInWorkshop}
+                        speichern={inVorschau ? null : textSpeichern}
+                        bearbeiten={inVorschau ? null : openInWorkshop}
                         herunterladen={textHerunterladen}
                         alsBaustein={darfUebernehmen ? alsBausteinSpeichern : null}
                         hinweis={textHinweis}

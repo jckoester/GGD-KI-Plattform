@@ -94,6 +94,10 @@ def _scope(name):
     ("GET", "app.preferences.router.read_preferences", False),
     ("POST", "app.chat.router.chat", False),
     ("POST", "app.feedback.router.create_feedback", False),
+    # Werkstatt bleibt in der Vorschau unverändert; die GeoGebra-Datei aus dem Chat rechnet nur.
+    ("POST", "app.artifacts.router.create_document", True),
+    ("POST", "app.artifacts.router.save_image_to_library", True),
+    ("POST", "app.artifacts.router.ggb_from_source", False),
     ("GET", "app.auth.router.step_up_challenge", True),
 ])
 def test_regel(methode, name, gesperrt):

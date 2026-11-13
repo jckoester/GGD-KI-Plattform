@@ -144,6 +144,7 @@ ERLAUBT: dict[str, str] = {
     "app.context.router.search_context_nodes": "rechnet nur",
     "app.api.pii.pii_scan": "rechnet nur",
     "app.render.router.render_block": "rechnet nur (Cache)",
+    "app.artifacts.router.ggb_from_source": "rechnet nur (GeoGebra-Datei aus dem Chat, speichert nichts)",
     "app.auth.router.logout": "Abmelden beendet auch die Vorschau",
     "app.auth.vorschau_router.vorschau_betreten": "weist selbst ab (409, keine Verschachtelung)",
 }
