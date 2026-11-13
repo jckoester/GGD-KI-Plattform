@@ -496,25 +496,33 @@
         {/if}
         {#if istLehrkraft && $zeigtEintrag('planner')}
     <!-- Planung (0.42, Päckchen AO): je aktuelle Gruppe der Planer, darunter das Archiv.
-         Keine Liste aller Planungsknoten (Jan, F2). Der Kopf klappt nur auf — eine
-         Übersichtsseite „Planung“ gibt es nicht. -->
+         Keine Liste aller Planungsknoten (Jan, F2). Seit 0.42.2 öffnet der Kopf die
+         Übersicht `/planning` (Kacheln je Gruppe, Archiv abgesetzt). -->
               <div class="mt-2">
-                <button
-                    onclick={() => toggle('planning')}
-                    aria-expanded={openSection === 'planning'}
+                <!-- Wie „Meine Fächer“: Der Name öffnet die Übersicht (0.42.2) und klappt auf,
+                     der Pfeil klappt nur auf oder zu. -->
+                <div
                     class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                            {imPlaner ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                 >
-                    <span class="flex items-center gap-2">
-                        <CalendarRange class="w-4 h-4" />
-                        Planung
-                    </span>
-                    {#if openSection === 'planning'}
-                        <ChevronDown class="w-4 h-4" />
-                    {:else}
-                        <ChevronRight class="w-4 h-4" />
-                    {/if}
-                </button>
+                    <button onclick={() => { openSection = 'planning'; goto('/planning') }}>
+                        <span class="flex items-center gap-2">
+                            <CalendarRange class="w-4 h-4" />
+                            Planung
+                        </span>
+                    </button>
+                    <button
+                        onclick={() => toggle('planning')}
+                        aria-expanded={openSection === 'planning'}
+                        aria-label={openSection === 'planning' ? 'Planung zuklappen' : 'Planung aufklappen'}
+                    >
+                        {#if openSection === 'planning'}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </button>
+                </div>
                 {#if openSection === 'planning'}
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         {#each planungsgruppen as g (g.id)}

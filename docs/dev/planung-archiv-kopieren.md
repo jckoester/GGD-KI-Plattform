@@ -1,7 +1,9 @@
 # Planung: Archiv, Rechte und Kopieren (0.42)
 
 Seit 0.42 hat die Unterrichtsplanung einen eigenen Menüpunkt „Planung“: je aktuelle Gruppe ein
-Link in ihren Planer, darunter das Archiv früherer Schuljahre. Diese Seite beschreibt, wer was
+Link in ihren Planer, darunter das Archiv früherer Schuljahre. Seit 0.42.2 öffnet der Menükopf die
+Übersicht `/planning` mit denselben Gruppen als Kacheln (Beschriftung `menueBeschriftung`, Quelle
+`GET /planning/groups`) und dem Archiv abgesetzt darunter. Diese Seite beschreibt, wer was
 sieht und ändern darf und was eine Kopie mitnimmt. Die Regeln stehen ausführlich in den
 Moduldocstrings; hier steht, wo sie liegen und warum sie so sind.
 

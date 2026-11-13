@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.42.2] – 2026-11-13
+
+### Neu
+
+- Übersicht „Planung“: je Unterrichtsgruppe des Schuljahres eine Kachel in ihren Planer, abgesetzt darunter das
+  Archiv. Ein Klick auf „Planung“ in der Seitenleiste öffnet sie.
+
+### Nach dem Update
+
+- Neu bauen und starten (Frontend). Keine Migration, keine Konfiguration.
+
 ## [0.42.1] – 2026-11-13
 
 ### Behoben

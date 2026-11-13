@@ -3,9 +3,11 @@
 Die Unterrichtsplanung hilft Lehrkräften, ein Schuljahr von der groben
 Jahresübersicht bis zur einzelnen Stunde zu planen — manuell oder dialoggestützt
 mit einem Assistenten. Du erreichst sie über den Menüpunkt **Planung** in der
-Seitenleiste: Dort steht jede deiner Unterrichtsgruppen dieses Schuljahres mit ihrem
-Fachsymbol, darunter das [Archiv](#archiv-und-kopieren) früherer Schuljahre. Der Weg
-über **Fächer → Gruppe → Planung** geht weiterhin.
+Seitenleiste: Ein Klick darauf öffnet die Übersicht mit einer Kachel je
+Unterrichtsgruppe dieses Schuljahres und, abgesetzt darunter, dem
+[Archiv](#archiv-und-kopieren) früherer Schuljahre. Aufgeklappt zeigt der Menüpunkt
+dieselben Gruppen mit ihrem Fachsymbol. Der Weg über **Fächer → Gruppe → Planung**
+geht weiterhin.
 
 > **Hinweis:** Die Unterrichtsplanung ist eine Funktion für **Lehrkräfte**.
 > Schüler:innen sehen sie nicht — sie bekommen nur das aktuelle Thema im Chat

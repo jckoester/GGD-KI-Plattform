@@ -112,6 +112,14 @@ describe('Verdrahtung', () => {
         expect(sidebar).toContain("goto('/planning/archive')")
     })
 
+    it('Übersicht /planning (0.42.2): Kacheln je Gruppe wie im Menü, Archiv abgesetzt; der Kopf führt hin', () => {
+        const seite = quelle('routes/(app)/planning/+page.svelte')
+        expect(seite).toContain('mitBeschriftung(menueGruppen(')
+        expect(seite).toContain('plannerPfad(g)')
+        expect(seite).toContain('archivPfad()')
+        expect(quelle('lib/components/Sidebar.svelte')).toContain("goto('/planning')")
+    })
+
     it('Stundenentwurf im Lesezustand führt zurück ins Archiv, nicht in den Planer', () => {
         const seite = quelle('routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte')
         expect(seite).toContain('archivPfad(groupId)')
