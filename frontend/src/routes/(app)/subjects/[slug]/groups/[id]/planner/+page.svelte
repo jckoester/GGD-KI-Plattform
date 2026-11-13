@@ -44,6 +44,7 @@
   } from '$lib/planung_archiv.js'
   import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
   import EinheitenAnsicht from '$lib/components/planner/EinheitenAnsicht.svelte'
+  import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -63,6 +64,13 @@
   let darstellung = $state('kacheln')   // Liste oder Kacheln — gemerkt wie im Archiv
   let inhalt = $state(null)
   let inhaltFehler = $state(null)
+  // Stunde ohne Termin einplanen (Schritt 3): {stunde, einheitId} oder null.
+  let einplanStunde = $state(null)
+
+  function eingeplant() {
+    ladeInhalt()
+    loadOverview()
+  }
 
   function wechsleAnsicht(neu) {
     if (neu === ansicht) return
@@ -728,6 +736,7 @@
             art: 'stunde', quelle: { id: st.id, titel: st.titel, einheitTitel: e?.id ? e.titel : '' },
           })}
           termine
+          onEinplanen={(st, e) => (einplanStunde = { stunde: { id: st.id, titel: st.titel }, einheitId: e?.id ?? null })}
           leerText="Diese Gruppe hat noch keine Einheiten. Du legst sie in der Jahresübersicht an."
         />
       {/if}
@@ -804,6 +813,15 @@
   fachId={group?.subject_id ?? null}
   onClose={() => (kopieren = null)}
   onKopiert={einheitKopiert}
+/>
+
+<EinplanenDialog
+  open={einplanStunde != null}
+  {groupId}
+  stunde={einplanStunde?.stunde ?? null}
+  einheitId={einplanStunde?.einheitId ?? null}
+  onClose={() => (einplanStunde = null)}
+  onEingeplant={eingeplant}
 />
 
 <UnitDialog

@@ -174,3 +174,90 @@ async def test_fremde_gruppe_und_vorschau(test_client, auth_headers, jwt_service
         exp=jetzt + 3600,
     )
     assert (await _inhalt(test_client, {"Cookie": f"session={token}"})).status_code == 403
+
+
+# ── Einplanen (Schritt 3): der Weg des Dialogs über `PATCH /planning/slots/{id}` ─────
+
+
+def _leerer_termin(conn, gruppe, tag, *, einheit=None, thema=None):
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO lesson_slots (group_id, date, halbjahr, ue_node_id, thema) "
+                    "VALUES (%s, %s, 1, %s, %s) RETURNING id, updated_at", (gruppe, tag, einheit, thema))
+        sid, stand = cur.fetchone()
+    conn.commit()
+    return str(sid), stand.isoformat()
+
+
+def _einheit_der_stunde(conn, stunde):
+    return [str(z[0]) for z in _lies(conn, "SELECT to_node_id FROM context_edges WHERE from_node_id = %s "
+                                           "AND relation = 'part_of'", stunde)]
+
+
+def _lies(conn, sql, *args):
+    with conn.cursor() as cur:
+        cur.execute(sql, args)
+        return cur.fetchall()
+
+
+async def test_einplanen_auf_leeren_termin(test_client, auth_headers, conn):
+    """Wie der Dialog: Einheit und Titel als Thema mitgeben — die Stunde bleibt in ihrer Einheit."""
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Kopierte Stunde")
+    slot, stand = _leerer_termin(conn, EIGENE, date(2026, 9, 21))
+
+    resp = await test_client.patch(f"/planning/slots/{slot}", headers=auth_headers, json={
+        "stunde_node_id": stunde, "ue_node_id": einheit, "thema": "Kopierte Stunde",
+        "expected_updated_at": stand,
+    })
+
+    assert resp.status_code == 200, resp.text
+    assert _einheit_der_stunde(conn, stunde) == [einheit]
+    daten = (await _inhalt(test_client, auth_headers)).json()
+    assert _stunden(daten)["Kopierte Stunde"]["slot_id"] == slot
+
+
+async def test_einplanen_ohne_einheit_am_termin_loeste_die_stunde(test_client, auth_headers, conn):
+    """Warum der Dialog die Einheit mitschickt: Ohne sie ordnet der Server die Stunde dem
+    Termin zu — und der hat keine Einheit."""
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Lose danach")
+    slot, _ = _leerer_termin(conn, EIGENE, date(2026, 9, 22))
+
+    resp = await test_client.patch(f"/planning/slots/{slot}", headers=auth_headers,
+                                   json={"stunde_node_id": stunde})
+
+    assert resp.status_code == 200
+    assert _einheit_der_stunde(conn, stunde) == []
+
+
+async def test_einplanen_auf_termin_der_einheit_behaelt_thema(test_client, auth_headers, conn):
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Zweite")
+    slot, stand = _leerer_termin(conn, EIGENE, date(2026, 9, 23), einheit=einheit, thema="Getriebe")
+
+    resp = await test_client.patch(f"/planning/slots/{slot}", headers=auth_headers,
+                                   json={"stunde_node_id": stunde, "expected_updated_at": stand})
+
+    assert resp.status_code == 200
+    assert resp.json()["thema"] == "Getriebe"
+    assert _einheit_der_stunde(conn, stunde) == [einheit]
+
+
+async def test_einplanen_veralteter_stand_und_doppelt(test_client, auth_headers, conn):
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Umkämpft")
+    slot, stand = _leerer_termin(conn, EIGENE, date(2026, 9, 24))
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lesson_slots SET thema = 'inzwischen belegt', updated_at = now() WHERE id = %s", (slot,))
+    conn.commit()
+
+    veraltet = await test_client.patch(f"/planning/slots/{slot}", headers=auth_headers,
+                                       json={"stunde_node_id": stunde, "expected_updated_at": stand})
+    assert veraltet.status_code == 409
+    assert veraltet.json()["detail"]["grund"] == "veraltet"
+
+    zweiter, _ = _leerer_termin(conn, EIGENE, date(2026, 9, 25))
+    _termin(conn, EIGENE, date(2026, 9, 28), stunde)
+    doppelt = await test_client.patch(f"/planning/slots/{zweiter}", headers=auth_headers,
+                                      json={"stunde_node_id": stunde, "ue_node_id": einheit})
+    assert doppelt.status_code == 409

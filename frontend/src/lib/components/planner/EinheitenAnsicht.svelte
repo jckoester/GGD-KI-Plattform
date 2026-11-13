@@ -8,7 +8,8 @@
      * `getGruppenInhalt`).
      *
      * `termine`: Stunden ohne Termin kennzeichnen und je Einheit zählen — im Planer, wo man sie
-     * noch einplanen will; im Archiv nicht.
+     * noch einplanen will; im Archiv nicht. `onEinplanen(stunde, einheit)`: Knopf „Einplanen“ an
+     * jeder Stunde ohne Termin (0.42.3, Schritt 3) — nur, wenn gesetzt.
      */
     import { anzahl, datumKurz, einheitenMitOhne, gewaehlteEinheit, ohneTermin, stundenPfad } from '$lib/planung_archiv.js'
     import { ueColorIndex } from '$lib/planner.js'
@@ -22,6 +23,7 @@
         onKopiereEinheit,
         onKopiereStunde,
         termine = false,
+        onEinplanen = null,
         leerText = 'In dieser Gruppe liegt keine Planung.',
         fehltText = 'Diese Einheit gibt es nicht.',
     } = $props()
@@ -48,6 +50,8 @@
     const kopierKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded border border-light-ui-3 dark:border-dark-ui-3 ' +
         'text-light-tx-2 dark:text-dark-tx-2 bg-light-bg dark:bg-dark-bg hover:text-light-bl dark:hover:text-dark-bl transition-colors'
     const liste = 'divide-y divide-light-ui-2 dark:divide-dark-ui-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3'
+    const einplanKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded bg-primary dark:bg-primary-dark text-white ' +
+        'hover:opacity-90 transition-opacity'
     const ohneMarke = 'inline-block px-1.5 py-0.5 text-xs rounded border border-dashed border-light-ui-3 ' +
         'dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2'
 </script>
@@ -80,6 +84,10 @@
                         </span>
                         {@render terminAngabe(s)}
                     </a>
+                    {#if onEinplanen && !s.slot_id}
+                        <button type="button" class="{einplanKnopf} mr-2" onclick={() => onEinplanen(s, einheit)}
+                                aria-label="Stunde „{s.titel}“ einplanen">Einplanen</button>
+                    {/if}
                     <button type="button" class={kopierKnopf} onclick={() => onKopiereStunde(s, einheit)}
                             aria-label="Stunde „{s.titel}“ kopieren">Kopieren</button>
                 </li>
@@ -97,8 +105,14 @@
                         {/if}
                         <p class="mt-2">{@render terminAngabe(s)}</p>
                     </a>
-                    <button type="button" class="{kopierKnopf} absolute top-2 right-2" onclick={() => onKopiereStunde(s, einheit)}
-                            aria-label="Stunde „{s.titel}“ kopieren">Kopieren</button>
+                    <div class="absolute top-2 right-2 flex flex-col items-end gap-1">
+                        <button type="button" class={kopierKnopf} onclick={() => onKopiereStunde(s, einheit)}
+                                aria-label="Stunde „{s.titel}“ kopieren">Kopieren</button>
+                        {#if onEinplanen && !s.slot_id}
+                            <button type="button" class={einplanKnopf} onclick={() => onEinplanen(s, einheit)}
+                                    aria-label="Stunde „{s.titel}“ einplanen">Einplanen</button>
+                        {/if}
+                    </div>
                 </div>
             {/each}
         </div>

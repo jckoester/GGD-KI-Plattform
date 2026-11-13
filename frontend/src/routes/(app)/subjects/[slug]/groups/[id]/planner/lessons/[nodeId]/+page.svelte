@@ -32,6 +32,7 @@
   import PhaseTable from '$lib/components/planner/PhaseTable.svelte'
   import AssistentenKnopf from '$lib/components/AssistentenKnopf.svelte'
   import KopierenDialog from '$lib/components/planner/KopierenDialog.svelte'
+  import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
 
   const { data } = $props()
   const nodeId = $derived(data.nodeId)
@@ -289,6 +290,18 @@
   // ── Kopieren und Notiz aus der Vorlage (0.42) ──────────────────────────────────
 
   let kopierenOffen = $state(false)
+  // Einplanen (0.42.3): eine Stunde ohne Termin, etwa eine Kopie, auf einen freien Termin legen.
+  let einplanenOffen = $state(false)
+
+  // Nur Termin und Navigation auffrischen — der Editor bleibt, wie er ist (ungespeicherte Eingaben).
+  async function eingeplant() {
+    try {
+      const frisch = await getLesson(nodeId)
+      lesson = { ...lesson, slot: frisch.slot, nav: frisch.nav }
+    } catch {
+      // Eingeplant ist es trotzdem; die Anzeige holt es beim nächsten Laden nach.
+    }
+  }
   let notizFehler = $state(null)
 
   // Die Nachbereitungsnotiz der Vorlage (S1): nur ein Hinweis, keine Nachbereitung dieser Stunde.
@@ -460,6 +473,13 @@
                 ↩︎ {nurLesen ? 'Archiv' : 'Übersicht'}
               </a>
             </div>
+
+            {#if !lesson.slot && !nurLesen}
+              <button type="button" onclick={() => (einplanenOffen = true)} class={navBtn}
+                      title="Diese Stunde hat noch keinen Termin — auf einen freien legen">
+                📅 Einplanen
+              </button>
+            {/if}
 
             <!-- Kopieren — auch im Lesezustand: Aus dem Archiv kopieren ist der Hauptfall (F11). -->
             <button type="button" onclick={() => (kopierenOffen = true)} class={navBtn}
@@ -784,5 +804,13 @@
     quelle={{ id: nodeId, titel: lesson.titel, einheitTitel: lesson.ue?.titel ?? '' }}
     fachId={lesson.subject_id}
     onClose={() => (kopierenOffen = false)}
+  />
+  <EinplanenDialog
+    open={einplanenOffen}
+    {groupId}
+    stunde={{ id: nodeId, titel: lesson.titel }}
+    einheitId={lesson.ue?.id ?? null}
+    onClose={() => (einplanenOffen = false)}
+    onEingeplant={eingeplant}
   />
 {/if}
