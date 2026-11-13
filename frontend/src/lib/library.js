@@ -84,3 +84,106 @@ export function slugify(title) {
         .slice(0, 60);
     return s || 'produkt';
 }
+
+// ── Ordnung der Werkstatt (0.41, Schritt 4) ─────────────────────────────────
+
+/**
+ * Die Arten im Filter. Bild, Diagramm, Dokument kommen mit ihrer Beschriftung aus der
+ * gemeinsamen Liste „stellt her“ (`$lib/produktarten.js`) — dieselben Kennungen wie im
+ * Backend (`app/assistants/produkte.py`, `WERKSTATT_ARTEN`); dazu „Dateien“ für GeoGebra und
+ * Exporte, die es nur hier gibt.
+ *
+ * @param {Array<{id: string, filter: string}>} produktarten
+ */
+export function werkstattArten(produktarten) {
+    const aus_liste = ['image', 'diagram', 'document']
+        .map((id) => (produktarten ?? []).find((p) => p.id === id))
+        .filter(Boolean)
+        .map((p) => ({ id: p.id, label: p.filter }));
+    return [...aus_liste, { id: 'file', label: 'Dateien' }];
+}
+
+export const SORTIERUNGEN = [
+    { id: 'updated', label: 'Zuletzt bearbeitet' },
+    { id: 'created', label: 'Zuletzt angelegt' },
+    { id: 'title', label: 'Titel' },
+];
+
+/** Schlüssel in den Einstellungen der Person (F10): Sortierung und Gruppierung. */
+export const ANSICHT_SCHLUESSEL = 'werkstatt_ansicht';
+
+/** Gemerkte Ansicht — Unbekanntes fällt auf die Vorgabe „zuletzt bearbeitet, ungruppiert“. */
+export function ansichtAusEinstellungen(einstellungen) {
+    const roh = einstellungen?.[ANSICHT_SCHLUESSEL] ?? {};
+    return {
+        sort: SORTIERUNGEN.some((s) => s.id === roh.sort) ? roh.sort : 'updated',
+        gruppiert: roh.gruppiert === true,
+    };
+}
+
+const ARTEN_IDS = new Set(['image', 'diagram', 'document', 'file']);
+
+function ganzzahl(roh) {
+    const zahl = roh == null ? NaN : Number(roh);
+    return Number.isInteger(zahl) ? zahl : null;
+}
+
+/**
+ * Filter aus der Adresszeile — Links (etwa „Produkte in Mathematik“ von der Fachseite) und
+ * Zurück tragen ihn. Unbekanntes zählt als „kein Filter“.
+ *
+ * @param {URLSearchParams} params
+ */
+export function filterAusAdresse(params) {
+    const art = params.get('art');
+    return {
+        q: (params.get('q') ?? '').trim(),
+        art: ARTEN_IDS.has(art) ? art : null,
+        subjectId: ganzzahl(params.get('subject_id')),
+        topic: params.get('topic') || null,
+        baldAblaufend: params.get('bald') === '1',
+        alsBaustein: params.get('baustein') === '1',
+    };
+}
+
+/** Die Adresse zu einem Filter (nur gesetzte Teile), mit führendem `?` oder leer. */
+export function adresseAusFilter(f) {
+    const p = new URLSearchParams();
+    if (f.q) p.set('q', f.q);
+    if (f.art) p.set('art', f.art);
+    if (f.subjectId != null) p.set('subject_id', String(f.subjectId));
+    if (f.topic) p.set('topic', f.topic);
+    if (f.baldAblaufend) p.set('bald', '1');
+    if (f.alsBaustein) p.set('baustein', '1');
+    const s = p.toString();
+    return s ? `?${s}` : '';
+}
+
+/** Ist irgendein Filter gesetzt? */
+export function filterGesetzt(f) {
+    return Boolean(f.q || f.art || f.subjectId != null || f.topic || f.baldAblaufend || f.alsBaustein);
+}
+
+/**
+ * Produkte nach Fach gruppiert, Fächer alphabetisch, „Ohne Fach“ zuletzt. Innerhalb einer
+ * Gruppe bleibt die Reihenfolge der Liste (also die gewählte Sortierung).
+ *
+ * @param {Array<{subject_id?: number|null}>} items
+ * @param {Record<number, {name: string}>} faecher
+ */
+export function nachFachGruppiert(items, faecher) {
+    const gruppen = new Map();
+    for (const item of items ?? []) {
+        const id = item.subject_id ?? null;
+        if (!gruppen.has(id)) gruppen.set(id, []);
+        gruppen.get(id).push(item);
+    }
+    const name = (id) => (id == null ? 'Ohne Fach' : (faecher?.[id]?.name ?? 'Unbekanntes Fach'));
+    return [...gruppen.entries()]
+        .map(([id, liste]) => ({ subjectId: id, name: name(id), items: liste }))
+        .sort((a, b) => {
+            if (a.subjectId == null) return 1;
+            if (b.subjectId == null) return -1;
+            return a.name.localeCompare(b.name, 'de');
+        });
+}

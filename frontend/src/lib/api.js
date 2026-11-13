@@ -2542,14 +2542,46 @@ export async function saveDiagramToLibrary(kind, source, { title = null, message
 // Die eigene Bibliothek. `groupId`/`subjectId` verengen auf den Unterrichtsbezug —
 // hergeleitet über den Chat, in dem das Artefakt entstand. `usedBytes`/`quotaBytes`
 // in der Antwort beziehen sich immer auf die **ganze** Bibliothek, nie auf den Auszug.
-export async function getLibrary({ groupId = null, subjectId = null, limit = null } = {}) {
+export async function getLibrary({
+    groupId = null, subjectId = null, limit = null, offset = 0,
+    q = '', art = null, topic = null, baldAblaufend = false, alsBaustein = false, sort = null,
+} = {}) {
     const params = new URLSearchParams()
     if (groupId != null) params.set('group_id', String(groupId))
     if (subjectId != null) params.set('subject_id', String(subjectId))
     if (limit != null) params.set('limit', String(limit))
+    if (offset) params.set('offset', String(offset))
+    // Seit 0.41: Suche, Art, Thema, Merkmale, Sortierung (Werkstatt).
+    if (q) params.set('q', q)
+    if (art) params.set('art', art)
+    if (topic) params.set('topic', topic)
+    if (baldAblaufend) params.set('bald_ablaufend', 'true')
+    if (alsBaustein) params.set('als_baustein', 'true')
+    if (sort) params.set('sort', sort)
     const query = params.toString()
     const res = await fetch(`${BASE}/artifacts${query ? `?${query}` : ''}`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Werkstatt konnte nicht geladen werden')
+    return res.json()
+}
+
+// Titel, Fach, Thema eines Produkts ändern (0.41). Nur gesendete Felder ändern sich;
+// `null` bei Fach oder Thema entfernt es.
+export async function updateArtefaktAngaben(artifactId, angaben) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(angaben),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Angaben konnten nicht gespeichert werden')
+    return res.json()
+}
+
+// Themen zum Vorschlagen: { eigene, einheiten } (Einheiten nur für Lehrkräfte).
+export async function getThemenVorschlaege(subjectId = null) {
+    const query = subjectId != null ? `?subject_id=${subjectId}` : ''
+    const res = await fetch(`${BASE}/artifacts/topics${query}`, { credentials: 'include' })
+    if (!res.ok) return { eigene: [], einheiten: [] }
     return res.json()
 }
 

@@ -10,66 +10,138 @@
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
         Share2,
     } from 'lucide-svelte';
-    import { getLibrary, deleteArtifact, createDocument } from '$lib/api.js';
+    import { getLibrary, deleteArtifact, createDocument, getPreferences, patchPreferences } from '$lib/api.js';
+    import { subjects } from '$lib/stores/subjects.js';
+    import { ladeProduktarten } from '$lib/produktarten.js';
+    import ProduktAngaben from '$lib/components/ProduktAngaben.svelte';
+    import { Pencil, Search, X } from 'lucide-svelte';
     import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
     import { triggerDownload } from '$lib/download.js';
     import {
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
         isImageLike, isSvg, slugify,
+        werkstattArten, SORTIERUNGEN, ANSICHT_SCHLUESSEL, ansichtAusEinstellungen,
+        filterAusAdresse, adresseAusFilter, filterGesetzt, nachFachGruppiert,
     } from '$lib/library.js';
     import { zitiername, zitatText, zeitpunkt } from '$lib/provenance.js';
     import { branding } from '$lib/branding.js';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
+    import { BADGE } from '$lib/badges.js';
 
     let items = $state([]);
+    let total = $state(0);
     let usedBytes = $state(0);
     let quotaBytes = $state(0);
     let loading = $state(true);
+    let mehrLaedt = $state(false);
     let error = $state(null);
+    // Auswahl der Filter aus dem ganzen eigenen Bestand (nicht aus dem gefilterten).
+    let faecherIds = $state([]);
+    let themen = $state([]);
+    let arten = $state(werkstattArten([]));
 
     let confirmDeleteId = $state(null);
     let copiedId = $state(null);
     let busyId = $state(null);
-    // Das Artefakt, das gerade in den Wissensgraphen übernommen wird (AP8).
+    let bearbeiteId = $state(null);
+    // Das Produkt, das gerade als Baustein in die Bibliothek übernommen wird (AP8).
     let uebernahmeItem = $state(null);
 
     let usage = $derived(usagePercent(usedBytes, quotaBytes));
 
-    // ── Fachfilter ────────────────────────────────────────────────────────────
-    // Einstieg von der Fach-/Gruppenseite: „alle Artefakte in Mathematik". Der
-    // Bezug kommt aus dem Chat, in dem das Artefakt entstand — ein Artefakt ohne
-    // Herkunfts-Chat erscheint deshalb nur in der vollen Liste. Das steht als
-    // Hinweis am gefilterten Zustand, sonst wirkt die Lücke wie ein Fehler.
-    const filterSubjectId = $derived.by(() => {
-        const roh = $page.url.searchParams.get('subject_id');
-        const zahl = roh == null ? NaN : Number(roh);
-        return Number.isInteger(zahl) ? zahl : null;
-    });
-    const filterFach = $derived(
-        filterSubjectId == null ? null : ($subjectMap[filterSubjectId] ?? null),
-    );
+    /** So viele Produkte je Abruf; „Mehr laden“ holt die nächsten. */
+    const SEITE = 60;
 
-    async function load() {
-        loading = true;
+    // ── Filter (Adresszeile) und Ansicht (Einstellungen, F10) ───────────────
+    // Der Filter steht in der Adresse: Links wie „Produkte in Mathematik“ von der Fachseite
+    // und der Zurück-Knopf tragen ihn. Sortierung und Gruppierung sind eine Gewohnheit der
+    // Person und werden in ihren Einstellungen gemerkt.
+    const filter = $derived(filterAusAdresse($page.url.searchParams));
+    let ansicht = $state({ sort: 'updated', gruppiert: false });
+    let ansichtGeladen = $state(false);
+
+    const faecherAlle = $derived(
+        [...($subjects ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+    );
+    const faecherImBestand = $derived(
+        faecherIds.map((id) => ({ id, name: $subjectMap[id]?.name ?? 'Unbekanntes Fach' }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+    );
+    const gruppen = $derived(nachFachGruppiert(items, $subjectMap));
+
+    function setzeFilter(teil) {
+        goto(`/workshop${adresseAusFilter({ ...filter, ...teil })}`, { keepFocus: true, noScroll: true });
+    }
+
+    // Suche: tippen, kurz warten, dann in die Adresse — ohne für jeden Buchstaben einen
+    // Eintrag im Verlauf.
+    // svelte-ignore state_referenced_locally
+    let suchtext = $state(filter.q);
+    let suchTimer;
+    function suchen() {
+        clearTimeout(suchTimer);
+        suchTimer = setTimeout(() => {
+            goto(`/workshop${adresseAusFilter({ ...filter, q: suchtext.trim() })}`,
+                 { keepFocus: true, noScroll: true, replaceState: true });
+        }, 300);
+    }
+
+    async function ansichtSetzen(teil) {
+        ansicht = { ...ansicht, ...teil };
+        try {
+            await patchPreferences({ [ANSICHT_SCHLUESSEL]: ansicht });
+        } catch {
+            // Nicht gemerkt, aber angewandt — beim nächsten Besuch gilt wieder die alte.
+        }
+    }
+
+    async function load({ anhaengen = false } = {}) {
+        if (anhaengen) mehrLaedt = true; else loading = true;
         error = null;
         try {
-            const data = await getLibrary({ subjectId: filterSubjectId });
-            items = data.items ?? [];
+            const data = await getLibrary({
+                ...filter, sort: ansicht.sort, limit: SEITE, offset: anhaengen ? items.length : 0,
+            });
+            items = anhaengen ? [...items, ...(data.items ?? [])] : (data.items ?? []);
+            total = data.total ?? items.length;
             usedBytes = data.used_bytes ?? 0;
             quotaBytes = data.quota_bytes ?? 0;
+            faecherIds = data.faecher ?? [];
+            themen = data.themen ?? [];
         } catch (err) {
             error = err.message ?? 'Werkstatt konnte nicht geladen werden.';
         } finally {
             loading = false;
+            mehrLaedt = false;
         }
     }
 
-    // Kein `onMount`: Der Filter steht in der Adresszeile, und ein Wechsel
-    // zwischen „alle" und einem Fach ist eine Navigation ohne Neuaufbau der Seite.
     $effect(() => {
-        filterSubjectId;
-        load();
+        getPreferences().then((p) => {
+            ansicht = ansichtAusEinstellungen(p);
+            ansichtGeladen = true;
+        });
+        ladeProduktarten().then((p) => (arten = werkstattArten(p)));
     });
+
+    // Neu laden, wenn sich Filter oder Sortierung ändern — erst, wenn die gemerkte Ansicht
+    // da ist, sonst käme die erste Liste in der falschen Reihenfolge.
+    $effect(() => {
+        filter;
+        ansicht.sort;
+        if (ansichtGeladen) load();
+    });
+
+    const CHIP = 'px-2.5 py-1 rounded-full border transition-colors';
+    const chip = (aktiv) => aktiv
+        ? `${CHIP} border-light-ui-3 dark:border-dark-ui-3 bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx font-medium`
+        : `${CHIP} border-light-ui-2 dark:border-dark-ui-2 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`;
+
+    function angabenGespeichert(neu) {
+        items = items.map((i) => (i.id === neu.id ? { ...i, ...neu } : i));
+        bearbeiteId = null;
+        load();   // Filter, Fächer und Themen können sich verschoben haben
+    }
 
     let creatingDoc = $state(false);
     async function newDocument() {
@@ -195,6 +267,7 @@
         try {
             await deleteArtifact(item.id);
             items = items.filter((i) => i.id !== item.id);
+            total = Math.max(0, total - 1);
             usedBytes = Math.max(0, usedBytes - item.byte_size);
             confirmDeleteId = null;
         } catch (err) {
@@ -204,6 +277,250 @@
         }
     }
 </script>
+
+{#snippet karte(item)}
+        <div class="flex flex-col bg-light-bg-2 dark:bg-dark-bg-2
+                    border border-light-ui-3 dark:border-dark-ui-3 rounded-lg overflow-hidden">
+            <!-- Vorschau -->
+            <div class="flex items-center justify-center bg-white h-40 overflow-hidden">
+                {#if isImageLike(item.mime_type)}
+                    <img
+                        src="/api/artifacts/{item.id}"
+                        alt={item.title}
+                        loading="lazy"
+                        class="max-h-40 max-w-full object-contain"
+                    />
+                {:else}
+                    <FileText class="w-10 h-10 text-light-tx-3" />
+                {/if}
+            </div>
+
+            <div class="flex flex-col flex-1 p-3">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                    <span class="text-xs px-1.5 py-0.5 rounded-full
+                                 bg-light-ui-3 dark:bg-dark-ui-3
+                                 text-light-tx-2 dark:text-dark-tx-2">
+                        {kindLabel(item.kind)}
+                    </span>
+                    <span class="text-xs text-light-tx-3 dark:text-dark-tx-3">
+                        {formatBytes(item.byte_size)}
+                    </span>
+                </div>
+                {#if bearbeiteId === item.id}
+                    <ProduktAngaben
+                        {item}
+                        faecher={faecherAlle}
+                        onGespeichert={angabenGespeichert}
+                        onAbbrechen={() => (bearbeiteId = null)}
+                    />
+                {:else}
+                    <div class="flex items-start gap-1">
+                        <p class="flex-1 font-medium text-light-tx dark:text-dark-tx truncate" title={item.title}>
+                            {item.title}
+                        </p>
+                        <button
+                            type="button"
+                            onclick={() => (bearbeiteId = item.id)}
+                            aria-label="Titel, Fach und Thema bearbeiten"
+                            title="Titel, Fach und Thema bearbeiten"
+                            class="shrink-0 p-1 rounded text-light-tx-3 dark:text-dark-tx-3
+                                   hover:text-light-tx dark:hover:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                        >
+                            <Pencil class="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                    {#if item.subject_id != null || item.topic}
+                        <p class="flex flex-wrap gap-1 mt-1">
+                            {#if item.subject_id != null}
+                                <span class={BADGE}>{$subjectMap[item.subject_id]?.name ?? 'Fach'}</span>
+                            {/if}
+                            {#if item.topic}
+                                <span class={BADGE}>{item.topic}</span>
+                            {/if}
+                        </p>
+                    {/if}
+                {/if}
+                <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-0.5">
+                    Bearbeitet {fmtDate(item.updated_at ?? item.created_at)} · gültig bis {fmtDate(item.expires_at)}
+                </p>
+                <!-- Die Verknüpfung in die Gegenrichtung (AP8): Von hier
+                     aus sieht man, dass aus dem Artefakt schon ein Baustein
+                     geworden ist — und kommt hin. Ohne das wäre die
+                     Übernahme eine Einbahnstraße, und beim zweiten Mal
+                     wüsste niemand, ob es sie schon gab. -->
+                {#if item.baustein_id}
+                    <a
+                        href="/knowledge/{item.baustein_id}"
+                        title="Zum Baustein „{item.baustein_titel}“"
+                        class="mt-1 inline-flex items-center gap-1 self-start max-w-full
+                               text-xs px-1.5 py-0.5 rounded-full
+                               border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-bl dark:text-dark-bl
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                    >
+                        <Share2 class="w-3 h-3 shrink-0" />
+                        <span class="truncate">als Baustein übernommen →</span>
+                    </a>
+                {/if}
+                <!-- Hier dauerhaft sichtbar, anders als im Chat: Die Bibliothek
+                     ist der Ort, an dem man nachsieht, was man zitieren muss. -->
+                {#if zitiername(item.provider_model)}
+                    <p class="text-xs text-light-tx-3 dark:text-dark-tx-3">
+                        Erzeugt mit <span class="font-mono">{zitiername(item.provider_model)}</span>
+                    </p>
+                {/if}
+
+                <!-- Aktionen -->
+                <div class="flex flex-wrap items-center gap-1 mt-3 pt-2
+                            border-t border-light-ui-3 dark:border-dark-ui-3">
+                    {#if zitiername(item.provider_model)}
+                        <button
+                            type="button"
+                            onclick={() => copyZitat(item)}
+                            title="Plattform, Modell und Datum als Textbaustein"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            {#if zitatKopiertId === item.id}
+                                <Check class="w-3.5 h-3.5" /> Kopiert
+                            {:else}
+                                <Quote class="w-3.5 h-3.5" /> Zitieren
+                            {/if}
+                        </button>
+                    {/if}
+                    {#if item.kind === 'document'}
+                        <a
+                            href="/workshop/{item.id}/edit"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
+                        </a>
+                    {/if}
+                    <!-- Ob das geht, sagt der Server (`uebernehmbar`) — sonst
+                         zeigte der Knopf irgendwann etwas anderes an, als der
+                         Endpunkt erlaubt. -->
+                    {#if item.uebernehmbar}
+                        <button
+                            type="button"
+                            onclick={() => (uebernahmeItem = item)}
+                            title="Als Baustein in die Bibliothek übernehmen"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <Share2 class="w-3.5 h-3.5" /> Als Baustein
+                        </button>
+                    {/if}
+                    <button
+                        type="button"
+                        onclick={() => downloadOriginal(item)}
+                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                               text-light-tx-2 dark:text-dark-tx-2
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                    >
+                        <Download class="w-3.5 h-3.5" /> Herunterladen
+                    </button>
+
+                    {#if isSvg(item.mime_type)}
+                        <button
+                            type="button"
+                            onclick={() => downloadPng(item)}
+                            disabled={busyId === item.id}
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   disabled:opacity-50"
+                        >
+                            <FileDown class="w-3.5 h-3.5" /> PNG
+                        </button>
+                    {/if}
+
+                    {#if item.kind === 'plot'}
+                        <a
+                            href="/api/artifacts/{item.id}/ggb"
+                            download="{slugify(item.title)}.ggb"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <FileDown class="w-3.5 h-3.5" /> GeoGebra
+                        </a>
+                    {/if}
+
+                    {#if item.source}
+                        <button
+                            type="button"
+                            onclick={() => copyCode(item)}
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            {#if copiedId === item.id}
+                                <Check class="w-3.5 h-3.5" /> Kopiert
+                            {:else}
+                                <Copy class="w-3.5 h-3.5" /> Code
+                            {/if}
+                        </button>
+                        <button
+                            type="button"
+                            onclick={() => downloadCode(item)}
+                            aria-label="Code herunterladen"
+                            title="Code herunterladen"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <FileDown class="w-3.5 h-3.5" /> .{codeExt(item.kind)}
+                        </button>
+                    {/if}
+
+                    <div class="ml-auto">
+                        {#if confirmDeleteId === item.id}
+                            <span class="inline-flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onclick={() => confirmDelete(item)}
+                                    disabled={busyId === item.id}
+                                    class="text-xs px-2 py-1 rounded
+                                           text-light-re dark:text-dark-re
+                                           hover:bg-light-re-bg dark:hover:bg-dark-re-bg/20
+                                           disabled:opacity-50"
+                                >
+                                    Löschen?
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => (confirmDeleteId = null)}
+                                    class="text-xs px-2 py-1 rounded
+                                           text-light-tx-2 dark:text-dark-tx-2
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                                >
+                                    Abbrechen
+                                </button>
+                            </span>
+                        {:else}
+                            <button
+                                type="button"
+                                onclick={() => (confirmDeleteId = item.id)}
+                                aria-label="Löschen"
+                                title="Löschen"
+                                class="inline-flex items-center p-1 rounded
+                                       text-light-tx-3 dark:text-dark-tx-3
+                                       hover:text-light-re dark:hover:text-dark-re
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            >
+                                <Trash2 class="w-3.5 h-3.5" />
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+        </div>
+{/snippet}
 
 <PageBody breit>
   <StufenHinweis eintrag="workshop" />
@@ -228,30 +545,13 @@
                 <FilePlus class="w-4 h-4" /> Neues Dokument
             </button>
         </div>
-        {#if filterSubjectId != null}
-            <div class="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                    Nur Produkte aus Chats
-                    {#if filterFach}
-                        im Fach <span class="font-medium text-light-tx dark:text-dark-tx">{filterFach.name}</span>.
-                    {:else}
-                        eines Fachs.
-                    {/if}
-                    Was ohne Chat entstanden ist, steht nur in der vollen Liste.
-                </p>
-                <a href="/workshop" class="text-sm text-light-bl dark:text-dark-bl hover:underline">
-                    alle anzeigen
-                </a>
-            </div>
-        {:else}
-            <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-                Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
-                erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
-            </p>
-        {/if}
+        <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
+            Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
+            erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
+        </p>
 
         {#if !loading && quotaBytes > 0}
-            <div class="mb-6">
+            <div class="mb-4">
                 <div class="flex justify-between text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1">
                     <span>Belegt</span>
                     <span>{formatBytes(usedBytes)} von {formatBytes(quotaBytes)}</span>
@@ -264,6 +564,95 @@
                 </div>
             </div>
         {/if}
+
+        <!-- Suche, Filter, Ansicht (0.41) -->
+        <div class="mb-4 flex flex-col gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="relative flex-1 min-w-48">
+                    <span class="sr-only">In der Werkstatt suchen</span>
+                    <Search class="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-light-tx-3 dark:text-dark-tx-3" />
+                    <input
+                        type="search"
+                        bind:value={suchtext}
+                        oninput={suchen}
+                        placeholder="Titel oder Inhalt suchen"
+                        class="w-full pl-8 pr-2 py-1.5 text-sm rounded-lg
+                               border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                    />
+                </label>
+                <label class="text-sm text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1">
+                    Sortieren
+                    <select
+                        value={ansicht.sort}
+                        onchange={(e) => ansichtSetzen({ sort: e.currentTarget.value })}
+                        class="px-2 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                    >
+                        {#each SORTIERUNGEN as s (s.id)}
+                            <option value={s.id}>{s.label}</option>
+                        {/each}
+                    </select>
+                </label>
+                <label class="text-sm text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={ansicht.gruppiert}
+                        onchange={(e) => ansichtSetzen({ gruppiert: e.currentTarget.checked })}
+                        class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                    />
+                    nach Fach gruppiert
+                </label>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <button type="button" onclick={() => setzeFilter({ art: null })} class={chip(!filter.art)}
+                        aria-pressed={!filter.art}>Alle</button>
+                {#each arten as a (a.id)}
+                    <button type="button" onclick={() => setzeFilter({ art: a.id })} class={chip(filter.art === a.id)}
+                            aria-pressed={filter.art === a.id}>{a.label}</button>
+                {/each}
+                {#if faecherImBestand.length}
+                    <select
+                        value={filter.subjectId == null ? '' : String(filter.subjectId)}
+                        onchange={(e) => setzeFilter({ subjectId: e.currentTarget.value === '' ? null : Number(e.currentTarget.value) })}
+                        aria-label="Fach"
+                        class="px-2 py-1 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                    >
+                        <option value="">Alle Fächer</option>
+                        {#each faecherImBestand as f (f.id)}
+                            <option value={String(f.id)}>{f.name}</option>
+                        {/each}
+                    </select>
+                {/if}
+                {#if themen.length}
+                    <select
+                        value={filter.topic ?? ''}
+                        onchange={(e) => setzeFilter({ topic: e.currentTarget.value || null })}
+                        aria-label="Thema"
+                        class="px-2 py-1 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                    >
+                        <option value="">Alle Themen</option>
+                        {#each themen as t (t)}
+                            <option value={t}>{t}</option>
+                        {/each}
+                    </select>
+                {/if}
+                <button type="button" onclick={() => setzeFilter({ baldAblaufend: !filter.baldAblaufend })}
+                        class={chip(filter.baldAblaufend)} aria-pressed={filter.baldAblaufend}>läuft bald ab</button>
+                <button type="button" onclick={() => setzeFilter({ alsBaustein: !filter.alsBaustein })}
+                        class={chip(filter.alsBaustein)} aria-pressed={filter.alsBaustein}>als Baustein übernommen</button>
+            </div>
+            {#if filterGesetzt(filter) && !loading}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-2">
+                    {total} {total === 1 ? 'Produkt' : 'Produkte'} gefunden
+                    <a href="/workshop" class="inline-flex items-center gap-0.5 text-light-bl dark:text-dark-bl hover:underline">
+                        <X class="w-3 h-3" /> Filter zurücksetzen
+                    </a>
+                </p>
+            {/if}
+        </div>
 
         {#if error}
             <div class="mb-4"><ErrorBanner message={error} /></div>
@@ -278,12 +667,10 @@
             </div>
         {:else if items.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
-                {#if filterSubjectId != null}
-                    <!-- Nicht „deine Bibliothek ist leer" sagen, wenn nur der Auszug
-                         leer ist — das wäre eine falsche Auskunft über den Bestand. -->
-                    <p class="text-lg">
-                        Hier ist noch nichts{filterFach ? ` aus ${filterFach.name}` : ''}.
-                    </p>
+                {#if filterGesetzt(filter)}
+                    <!-- Nicht „deine Werkstatt ist leer“ sagen, wenn nur der Filter nichts
+                         findet — das wäre eine falsche Auskunft über den Bestand. -->
+                    <p class="text-lg">Dazu ist nichts in deiner Werkstatt.</p>
                     <p class="text-sm mt-1">
                         <a href="/workshop" class="text-light-bl dark:text-dark-bl hover:underline">
                             Alle Produkte anzeigen
@@ -297,219 +684,37 @@
                     </p>
                 {/if}
             </div>
+        {:else if ansicht.gruppiert}
+            {#each gruppen as g (g.subjectId ?? 'ohne')}
+                <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-3 mt-6 first:mt-0">
+                    {g.name}
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {#each g.items as item (item.id)}
+                        {@render karte(item)}
+                    {/each}
+                </div>
+            {/each}
         {:else}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {#each items as item (item.id)}
-                    <div class="flex flex-col bg-light-bg-2 dark:bg-dark-bg-2
-                                border border-light-ui-3 dark:border-dark-ui-3 rounded-lg overflow-hidden">
-                        <!-- Vorschau -->
-                        <div class="flex items-center justify-center bg-white h-40 overflow-hidden">
-                            {#if isImageLike(item.mime_type)}
-                                <img
-                                    src="/api/artifacts/{item.id}"
-                                    alt={item.title}
-                                    loading="lazy"
-                                    class="max-h-40 max-w-full object-contain"
-                                />
-                            {:else}
-                                <FileText class="w-10 h-10 text-light-tx-3" />
-                            {/if}
-                        </div>
-
-                        <div class="flex flex-col flex-1 p-3">
-                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                <span class="text-xs px-1.5 py-0.5 rounded-full
-                                             bg-light-ui-3 dark:bg-dark-ui-3
-                                             text-light-tx-2 dark:text-dark-tx-2">
-                                    {kindLabel(item.kind)}
-                                </span>
-                                <span class="text-xs text-light-tx-3 dark:text-dark-tx-3">
-                                    {formatBytes(item.byte_size)}
-                                </span>
-                            </div>
-                            <p class="font-medium text-light-tx dark:text-dark-tx truncate" title={item.title}>
-                                {item.title}
-                            </p>
-                            <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-0.5">
-                                Gespeichert {fmtDate(item.created_at)} · gültig bis {fmtDate(item.expires_at)}
-                            </p>
-                            <!-- Die Verknüpfung in die Gegenrichtung (AP8): Von hier
-                                 aus sieht man, dass aus dem Artefakt schon ein Baustein
-                                 geworden ist — und kommt hin. Ohne das wäre die
-                                 Übernahme eine Einbahnstraße, und beim zweiten Mal
-                                 wüsste niemand, ob es sie schon gab. -->
-                            {#if item.baustein_id}
-                                <a
-                                    href="/knowledge/{item.baustein_id}"
-                                    title="Zum Baustein „{item.baustein_titel}“"
-                                    class="mt-1 inline-flex items-center gap-1 self-start max-w-full
-                                           text-xs px-1.5 py-0.5 rounded-full
-                                           border border-light-ui-3 dark:border-dark-ui-3
-                                           text-light-bl dark:text-dark-bl
-                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                >
-                                    <Share2 class="w-3 h-3 shrink-0" />
-                                    <span class="truncate">als Baustein übernommen →</span>
-                                </a>
-                            {/if}
-                            <!-- Hier dauerhaft sichtbar, anders als im Chat: Die Bibliothek
-                                 ist der Ort, an dem man nachsieht, was man zitieren muss. -->
-                            {#if zitiername(item.provider_model)}
-                                <p class="text-xs text-light-tx-3 dark:text-dark-tx-3">
-                                    Erzeugt mit <span class="font-mono">{zitiername(item.provider_model)}</span>
-                                </p>
-                            {/if}
-
-                            <!-- Aktionen -->
-                            <div class="flex flex-wrap items-center gap-1 mt-3 pt-2
-                                        border-t border-light-ui-3 dark:border-dark-ui-3">
-                                {#if zitiername(item.provider_model)}
-                                    <button
-                                        type="button"
-                                        onclick={() => copyZitat(item)}
-                                        title="Plattform, Modell und Datum als Textbaustein"
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        {#if zitatKopiertId === item.id}
-                                            <Check class="w-3.5 h-3.5" /> Kopiert
-                                        {:else}
-                                            <Quote class="w-3.5 h-3.5" /> Zitieren
-                                        {/if}
-                                    </button>
-                                {/if}
-                                {#if item.kind === 'document'}
-                                    <a
-                                        href="/workshop/{item.id}/edit"
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
-                                    </a>
-                                {/if}
-                                <!-- Ob das geht, sagt der Server (`uebernehmbar`) — sonst
-                                     zeigte der Knopf irgendwann etwas anderes an, als der
-                                     Endpunkt erlaubt. -->
-                                {#if item.uebernehmbar}
-                                    <button
-                                        type="button"
-                                        onclick={() => (uebernahmeItem = item)}
-                                        title="Als Baustein in die Bibliothek übernehmen"
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        <Share2 class="w-3.5 h-3.5" /> Als Baustein
-                                    </button>
-                                {/if}
-                                <button
-                                    type="button"
-                                    onclick={() => downloadOriginal(item)}
-                                    class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                           text-light-tx-2 dark:text-dark-tx-2
-                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                >
-                                    <Download class="w-3.5 h-3.5" /> Herunterladen
-                                </button>
-
-                                {#if isSvg(item.mime_type)}
-                                    <button
-                                        type="button"
-                                        onclick={() => downloadPng(item)}
-                                        disabled={busyId === item.id}
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                               disabled:opacity-50"
-                                    >
-                                        <FileDown class="w-3.5 h-3.5" /> PNG
-                                    </button>
-                                {/if}
-
-                                {#if item.kind === 'plot'}
-                                    <a
-                                        href="/api/artifacts/{item.id}/ggb"
-                                        download="{slugify(item.title)}.ggb"
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        <FileDown class="w-3.5 h-3.5" /> GeoGebra
-                                    </a>
-                                {/if}
-
-                                {#if item.source}
-                                    <button
-                                        type="button"
-                                        onclick={() => copyCode(item)}
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        {#if copiedId === item.id}
-                                            <Check class="w-3.5 h-3.5" /> Kopiert
-                                        {:else}
-                                            <Copy class="w-3.5 h-3.5" /> Code
-                                        {/if}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onclick={() => downloadCode(item)}
-                                        aria-label="Code herunterladen"
-                                        title="Code herunterladen"
-                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                    >
-                                        <FileDown class="w-3.5 h-3.5" /> .{codeExt(item.kind)}
-                                    </button>
-                                {/if}
-
-                                <div class="ml-auto">
-                                    {#if confirmDeleteId === item.id}
-                                        <span class="inline-flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                onclick={() => confirmDelete(item)}
-                                                disabled={busyId === item.id}
-                                                class="text-xs px-2 py-1 rounded
-                                                       text-light-re dark:text-dark-re
-                                                       hover:bg-light-re-bg dark:hover:bg-dark-re-bg/20
-                                                       disabled:opacity-50"
-                                            >
-                                                Löschen?
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onclick={() => (confirmDeleteId = null)}
-                                                class="text-xs px-2 py-1 rounded
-                                                       text-light-tx-2 dark:text-dark-tx-2
-                                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
-                                            >
-                                                Abbrechen
-                                            </button>
-                                        </span>
-                                    {:else}
-                                        <button
-                                            type="button"
-                                            onclick={() => (confirmDeleteId = item.id)}
-                                            aria-label="Löschen"
-                                            title="Löschen"
-                                            class="inline-flex items-center p-1 rounded
-                                                   text-light-tx-3 dark:text-dark-tx-3
-                                                   hover:text-light-re dark:hover:text-dark-re
-                                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                        >
-                                            <Trash2 class="w-3.5 h-3.5" />
-                                        </button>
-                                    {/if}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    {@render karte(item)}
                 {/each}
+            </div>
+        {/if}
+
+        {#if !loading && items.length < total}
+            <div class="flex justify-center mt-6">
+                <button
+                    type="button"
+                    onclick={() => load({ anhaengen: true })}
+                    disabled={mehrLaedt}
+                    class="text-sm px-4 py-1.5 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                           disabled:opacity-50"
+                >
+                    {mehrLaedt ? 'Lädt…' : `Mehr laden (${items.length} von ${total})`}
+                </button>
             </div>
         {/if}
     </div>

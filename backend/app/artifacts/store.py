@@ -5,7 +5,7 @@ Speichern prüft die Per-User-Quota und friert `expires_at` aus der role-/jahrga
 Aufbewahrung ein (kein Rollen-Lookup im Cleanup nötig). Muster analog `app/chat/image_store.py`.
 """
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -306,15 +306,75 @@ async def eigene_themen(
     return list((await db.execute(stmt)).scalars())
 
 
+#: „Läuft bald ab“: Frist in höchstens so vielen Tagen.
+BALD_TAGE = 30
+
+#: Sortierungen der Werkstatt-Liste.
+SORTIERUNGEN = ("updated", "created", "title")
+
+
+@dataclass(frozen=True)
+class Filter:
+    """Was die Werkstatt-Liste eingrenzt (0.41, Schritt 4). Alles UND-verknüpft."""
+
+    group_id: int | None = None
+    subject_id: int | None = None
+    q: str | None = None
+    kinds: tuple[str, ...] = ()
+    topic: str | None = None
+    bald_ablaufend: bool = False
+    als_baustein: bool = False
+
+
+def _bedingungen(owner_pseudonym: str, f: Filter, now: datetime) -> list:
+    # Lokale Importe: `Group`/`ContextNode` werden nur hier gebraucht.
+    from app.db.models import ContextNode, Group
+
+    wo = [Artifact.owner_pseudonym == owner_pseudonym]
+    if f.group_id is not None:
+        fach_der_gruppe = select(Group.subject_id).where(Group.id == f.group_id).scalar_subquery()
+        wo.append(Artifact.subject_id == fach_der_gruppe)
+    if f.subject_id is not None:
+        wo.append(Artifact.subject_id == f.subject_id)
+    if f.q:
+        muster = "%" + f.q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        wo.append(sa.or_(Artifact.title.ilike(muster, escape="\\"),
+                         Artifact.source.ilike(muster, escape="\\")))
+    if f.kinds:
+        wo.append(Artifact.kind.in_(f.kinds))
+    if f.topic is not None:
+        wo.append(Artifact.topic == f.topic)
+    if f.bald_ablaufend:
+        wo.append(Artifact.expires_at <= now + timedelta(days=BALD_TAGE))
+    if f.als_baustein:
+        wo.append(sa.exists().where(
+            ContextNode.owner_pseudonym == owner_pseudonym,
+            ContextNode.status == "active",
+            ContextNode.metadata_["source_artifact_id"].astext == sa.cast(Artifact.id, sa.Text),
+        ))
+    return wo
+
+
+_REIHENFOLGE = {
+    "updated": (Artifact.updated_at.desc(), Artifact.id),
+    "created": (Artifact.created_at.desc(), Artifact.id),
+    "title": (sa.func.lower(Artifact.title), Artifact.id),
+}
+
+
 async def list_artifacts(
     db: AsyncSession,
     owner_pseudonym: str,
     *,
     group_id: int | None = None,
     subject_id: int | None = None,
+    filter_: Filter | None = None,
+    sort: str = "created",
     limit: int | None = None,
+    offset: int = 0,
+    now: Optional[datetime] = None,
 ) -> list[Artifact]:
-    """Die eigene Werkstatt, neueste zuerst — wahlweise auf ein Fach verengt.
+    """Die eigene Werkstatt — wahlweise eingegrenzt und sortiert.
 
     **Woher der Fachbezug kommt (seit 0.41).** Das Produkt trägt ein eigenes Fach
     (`subject_id`, Alembic 0103): beim Speichern aus dem Chat kopiert, danach änderbar. Bis
@@ -330,24 +390,54 @@ async def list_artifacts(
     Ohne Fach (etwa ein leer angelegtes Dokument) erscheint ein Produkt in keinem Auszug,
     nur in der vollen Werkstatt. Der Eigentümerfilter steht immer davor: Fremde Produkte
     sind auch dann unerreichbar, wenn ihr Fach passt.
+
+    ``group_id``/``subject_id`` direkt sind die Kurzform der Fach- und Gruppenseiten;
+    ``filter_`` ist der volle Filter der Werkstatt (beides zusammen: UND).
     """
-    # Lokaler Import: `Group` wird nur hier gebraucht.
-    from app.db.models import Group
-
-    stmt = select(Artifact).where(Artifact.owner_pseudonym == owner_pseudonym)
-
+    f = filter_ or Filter()
     if group_id is not None:
-        fach_der_gruppe = select(Group.subject_id).where(Group.id == group_id).scalar_subquery()
-        stmt = stmt.where(Artifact.subject_id == fach_der_gruppe)
+        f = replace(f, group_id=group_id)
     if subject_id is not None:
-        stmt = stmt.where(Artifact.subject_id == subject_id)
-
-    stmt = stmt.order_by(Artifact.created_at.desc())
+        f = replace(f, subject_id=subject_id)
+    stmt = (
+        select(Artifact)
+        .where(*_bedingungen(owner_pseudonym, f, _now(now)))
+        .order_by(*_REIHENFOLGE.get(sort, _REIHENFOLGE["created"]))
+        .offset(offset)
+    )
     if limit is not None:
         stmt = stmt.limit(limit)
+    return list((await db.execute(stmt)).scalars().all())
 
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+
+async def count_artifacts(
+    db: AsyncSession, owner_pseudonym: str, filter_: Filter | None = None,
+    now: Optional[datetime] = None,
+) -> int:
+    """Wie viele Produkte der Filter trifft — für „12 von 40“ und „Mehr laden“."""
+    stmt = select(func.count()).select_from(Artifact).where(
+        *_bedingungen(owner_pseudonym, filter_ or Filter(), _now(now))
+    )
+    return (await db.execute(stmt)).scalar_one()
+
+
+async def facetten(db: AsyncSession, owner_pseudonym: str) -> tuple[list[int], list[str]]:
+    """Fächer und Themen, die in der eigenen Werkstatt vorkommen — die Auswahl der Filter.
+
+    Über den **ganzen** Bestand, nicht über den gefilterten: Sonst verschwände ein Fach aus
+    der Auswahl, sobald man ein anderes gewählt hat.
+    """
+    faecher = (await db.execute(
+        select(Artifact.subject_id).where(
+            Artifact.owner_pseudonym == owner_pseudonym, Artifact.subject_id.is_not(None)
+        ).distinct()
+    )).scalars().all()
+    themen = (await db.execute(
+        select(Artifact.topic).where(
+            Artifact.owner_pseudonym == owner_pseudonym, Artifact.topic.is_not(None)
+        ).distinct().order_by(Artifact.topic)
+    )).scalars().all()
+    return sorted(faecher), list(themen)
 
 
 def read_artifact_bytes(record: Artifact) -> Optional[bytes]:

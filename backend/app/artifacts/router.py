@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import re
 
 from app.artifacts import geogebra, promote, store, uebernahme
+from app.assistants import produkte
 from app.artifacts.limits import get_artifact_limits
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
@@ -104,6 +105,11 @@ class LibraryResponse(BaseModel):
     items: list[ArtifactItem]
     used_bytes: int
     quota_bytes: int
+    # 0.41: Treffer des Filters insgesamt (für „Mehr laden“) und die Auswahl der Filter —
+    # Fächer und Themen über den ganzen Bestand, nicht über den gefilterten.
+    total: int = 0
+    faecher: list[int] = []
+    themen: list[str] = []
 
 
 class FromImageRequest(BaseModel):
@@ -289,10 +295,21 @@ async def list_library(
         default=None, description="nur Produkte dieses Fachs"
     ),
     limit: int | None = Query(default=None, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    q: str | None = Query(default=None, max_length=200, description="Suche in Titel und Inhalt"),
+    art: str | None = Query(default=None, description="image | diagram | document | file"),
+    topic: str | None = Query(default=None, max_length=100),
+    bald_ablaufend: bool = Query(default=False, description=f"Frist in höchstens {store.BALD_TAGE} Tagen"),
+    als_baustein: bool = Query(default=False, description="als Baustein übernommen"),
+    sort: str = Query(default="created", pattern="^(updated|created|title)$"),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LibraryResponse:
-    """Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige.
+    """Die eigene Werkstatt + Belegung/Quota für die Anzeige.
+
+    Seit 0.41 mit Suche, Filtern, Sortierung und Blättern. Die Vorgabe-Sortierung bleibt
+    „zuletzt angelegt“ — so liest die Gruppenseite „zuletzt entstanden“; die Werkstatt
+    schickt ihre eigene Wahl mit.
 
     `group_id`/`subject_id` verengen auf ein Fach (die Gruppe über ihr Fach), siehe
     :func:`app.artifacts.store.list_artifacts`.
@@ -302,9 +319,18 @@ async def list_library(
     Belegungsanzeige beantwortete eine Frage, die niemand stellt („wie viel Platz
     belegen meine Mathe-Artefakte?"), und verwirrte bei der, die zählt.
     """
-    records = await store.list_artifacts(
-        db, current_user.sub, group_id=group_id, subject_id=subject_id, limit=limit
+    if art is not None and art not in produkte.WERKSTATT_ARTEN:
+        raise HTTPException(status_code=422, detail="Unbekannte Art")
+    filter_ = store.Filter(
+        group_id=group_id, subject_id=subject_id, q=(q or "").strip() or None,
+        kinds=tuple(produkte.kinds_der_art(art)) if art else (),
+        topic=topic, bald_ablaufend=bald_ablaufend, als_baustein=als_baustein,
     )
+    records = await store.list_artifacts(
+        db, current_user.sub, filter_=filter_, sort=sort, limit=limit, offset=offset
+    )
+    total = await store.count_artifacts(db, current_user.sub, filter_)
+    faecher, themen = await store.facetten(db, current_user.sub)
     used = await store.used_bytes(db, current_user.sub)
     _, quota_bytes = get_artifact_limits(current_user.roles, current_user.grade)
     # Eine Abfrage für alle Karten, nicht eine je Karte.
@@ -327,7 +353,8 @@ async def list_library(
         )
 
     return LibraryResponse(
-        items=[_item(r) for r in records], used_bytes=used, quota_bytes=quota_bytes
+        items=[_item(r) for r in records], used_bytes=used, quota_bytes=quota_bytes,
+        total=total, faecher=faecher, themen=themen,
     )
 
 

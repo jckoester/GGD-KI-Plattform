@@ -11,6 +11,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   wenn der Chat gelöscht ist. Ebenso der Name des Assistenten.
 - Gespeicherte Bilder und Diagramme bekommen einen sprechenden Titel: aus dem Bild-Prompt, aus dem Titel des Diagramms
   oder aus der Frage im Chat; sonst Art und Datum.
+- Werkstatt: Suche in Titel und Inhalt, Filter nach Art, Fach, Thema, „läuft bald ab“ und „als Baustein übernommen“,
+  Sortierung (zuletzt bearbeitet, zuletzt angelegt, Titel) und Gruppierung nach Fach; Sortierung und Gruppierung
+  werden gemerkt. Titel, Fach und Thema lassen sich an jeder Karte ändern, mit Vorschlägen fürs Thema.
 
 ### Behoben
 

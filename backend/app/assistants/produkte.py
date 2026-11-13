@@ -48,3 +48,32 @@ def geordnet(werte: list[str]) -> list[str]:
     """Bekannte Kennungen ohne Doppelte, in der Reihenfolge von ``PRODUKTARTEN``."""
     gesetzt = set(werte)
     return [p.id for p in PRODUKTARTEN if p.id in gesetzt]
+
+
+# ── Arten in der Werkstatt (0.41, Gegenprüfung 4) ───────────────────────────
+#
+# Der Filter der Werkstatt nutzt dieselben Kennungen wie „stellt her“ — ein Bild ist ein
+# Bild, ob ein Assistent es herstellt oder ob es gespeichert wurde. Dazu „file“ für alles,
+# was nur als Datei vorliegt (GeoGebra, Exporte). Planungsarten gibt es als Produkt nicht.
+
+#: `artifacts.kind` → Art der Werkstatt.
+ART_DES_PRODUKTS: dict[str, str] = {
+    "image": "image",
+    "circuit": "diagram",
+    "plot": "diagram",
+    "smiles": "diagram",
+    "mermaid": "diagram",
+    "document": "document",
+    "ggb": "file",
+    "export_pdf": "file",
+    "export_docx": "file",
+    "export_odt": "file",
+}
+
+#: Reihenfolge im Filter.
+WERKSTATT_ARTEN: tuple[str, ...] = ("image", "diagram", "document", "file")
+
+
+def kinds_der_art(art: str) -> list[str]:
+    """Alle `artifacts.kind` einer Werkstatt-Art; unbekannte Art → leere Liste."""
+    return [k for k, a in ART_DES_PRODUKTS.items() if a == art]

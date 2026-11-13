@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     kindLabel, mimeExt, codeExt, formatBytes, usagePercent, isSvg, isImageLike, slugify,
+    werkstattArten, ansichtAusEinstellungen, filterAusAdresse, adresseAusFilter, filterGesetzt,
+    nachFachGruppiert,
 } from './library.js';
 
 describe('kindLabel', () => {
@@ -121,5 +123,59 @@ describe('Hilfe: alte Seite „Kontextspeicher“ (0.40)', () => {
             umleitung = { status: e.status, location: e.location };
         }
         expect(umleitung).toEqual({ status: 301, location: '/help/bibliothek' });
+    });
+});
+
+
+describe('Ordnung der Werkstatt (0.41)', () => {
+    it('Arten aus der gemeinsamen Liste, dazu Dateien', () => {
+        const produktarten = [
+            { id: 'image', filter: 'Bilder' }, { id: 'diagram', filter: 'Diagramme' },
+            { id: 'document', filter: 'Dokumente' }, { id: 'lesson_plan', filter: 'Stundenentwürfe' },
+        ];
+        expect(werkstattArten(produktarten)).toEqual([
+            { id: 'image', label: 'Bilder' }, { id: 'diagram', label: 'Diagramme' },
+            { id: 'document', label: 'Dokumente' }, { id: 'file', label: 'Dateien' },
+        ]);
+        // Ohne geladene Liste bleibt wenigstens „Dateien“.
+        expect(werkstattArten([])).toEqual([{ id: 'file', label: 'Dateien' }]);
+    });
+
+    it('gemerkte Ansicht, Unbekanntes fällt auf die Vorgabe', () => {
+        expect(ansichtAusEinstellungen({})).toEqual({ sort: 'updated', gruppiert: false });
+        expect(ansichtAusEinstellungen({ werkstatt_ansicht: { sort: 'title', gruppiert: true } }))
+            .toEqual({ sort: 'title', gruppiert: true });
+        expect(ansichtAusEinstellungen({ werkstatt_ansicht: { sort: 'zufall', gruppiert: 'ja' } }))
+            .toEqual({ sort: 'updated', gruppiert: false });
+    });
+
+    it('Filter hin und zurück durch die Adresse', () => {
+        const f = { q: 'Säure', art: 'diagram', subjectId: 3, topic: 'Redox', baldAblaufend: true, alsBaustein: false };
+        const adresse = adresseAusFilter(f);
+        expect(filterAusAdresse(new URLSearchParams(adresse.slice(1)))).toEqual(f);
+        expect(adresseAusFilter({ q: '', art: null, subjectId: null, topic: null, baldAblaufend: false, alsBaustein: false }))
+            .toBe('');
+    });
+
+    it('Unbekanntes in der Adresse ist kein Filter', () => {
+        const f = filterAusAdresse(new URLSearchParams('art=zeitreise&subject_id=abc&bald=ja'));
+        expect(f.art).toBeNull();
+        expect(f.subjectId).toBeNull();
+        expect(f.baldAblaufend).toBe(false);
+        expect(filterGesetzt(f)).toBe(false);
+    });
+
+    it('der alte Link von der Fachseite (?subject_id=) wirkt weiter', () => {
+        expect(filterAusAdresse(new URLSearchParams('subject_id=7')).subjectId).toBe(7);
+    });
+
+    it('nach Fach gruppiert: alphabetisch, ohne Fach zuletzt, Reihenfolge innen bleibt', () => {
+        const items = [
+            { id: 1, subject_id: 2 }, { id: 2, subject_id: null }, { id: 3, subject_id: 1 }, { id: 4, subject_id: 2 },
+        ];
+        const faecher = { 1: { name: 'Chemie' }, 2: { name: 'Biologie' } };
+        expect(nachFachGruppiert(items, faecher).map((g) => [g.name, g.items.map((i) => i.id)])).toEqual([
+            ['Biologie', [1, 4]], ['Chemie', [3]], ['Ohne Fach', [2]],
+        ]);
     });
 });

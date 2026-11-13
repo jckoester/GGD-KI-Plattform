@@ -341,6 +341,8 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     monkeypatch.setattr(
         "app.artifacts.router.get_artifact_limits", lambda roles, grade: (365, 52428800)
     )
+    monkeypatch.setattr(store_mod, "count_artifacts", AsyncMock(return_value=1))
+    monkeypatch.setattr(store_mod, "facetten", AsyncMock(return_value=([], [])))
     # Die Übernahme-Zuordnung (AP8) fragt die DB; hier steht nur ein MagicMock.
     monkeypatch.setattr(
         "app.artifacts.uebernahme.bausteine_zu_artefakten", AsyncMock(return_value={})
