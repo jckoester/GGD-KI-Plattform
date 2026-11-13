@@ -108,14 +108,17 @@ gespeichert ist — über alle Fächer und Entstehungswege hinweg. Die Seite ist
 Dinge da:
 
 - **Nachsehen, was da ist.** Der einzige Ort, der deinen Gesamtbestand zeigt, egal ob
-  ein Baustein aus einer Sammlung, einem Upload, dem Unterrichtsplaner oder einem Chat
-  stammt.
+  ein Baustein aus einer Sammlung, einem Upload oder einem Chat stammt.
 - **Aufräumen.** Umbenennen, archivieren, löschen — alles direkt in der Zeile.
 - **Den Lebenszyklus im Blick behalten.** Ablaufdaten, automatisch archivierte
   Bausteine und Verweise auf Archiviertes laufen nur hier zusammen. Der übliche
   Anlass ist der Schuljahreswechsel.
 - **Herkunft nachvollziehen.** Woher kam der Baustein, und gibt es im Chat eine neuere
   Fassung?
+
+Jahrespläne, Einheiten und Stunden stehen hier nicht: Sie haben ihren eigenen Ort unter
+**Planung** in der Seitenleiste, mit Planer und Archiv (siehe
+[Unterrichtsplanung](unterrichtsplanung.md#archiv-und-kopieren)).
 
 **Wonach die Seite sortiert:** nach Fach, innerhalb nach zuletzt geändert. Bausteine
 ohne Fach stehen am Ende. Über der Liste filterst du nach Bausteinart.
@@ -130,10 +133,9 @@ Baustein steckt. Ein Klick darauf filtert die Liste. Trägt ein Baustein hier ni
 nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
 
 > **Die Seite bearbeitet nichts.** Sie verwaltet: umbenennen, archivieren, löschen.
-> Zum Ändern des Inhalts führt sie dich dorthin, wo er hingehört — ein Stundenentwurf
-> in den Unterrichtsplaner, ein Sammlungseintrag in seinen Editor. Wer gezielt etwas
-> zum Bearbeiten sucht, ist über Fachseite, Sammlung oder Planer schneller: Die
-> filtern bereits vor.
+> Zum Ändern des Inhalts führt sie dich dorthin, wo er hingehört — etwa ein
+> Sammlungseintrag in seinen Editor. Wer gezielt etwas zum Bearbeiten sucht, ist über
+> Fachseite oder Sammlung schneller: Die filtern bereits vor.
 
 **Schüler:innen** sehen diesen Eintrag nicht: Ihre Arbeiten liegen in der
 [Werkstatt](werkstatt.md).

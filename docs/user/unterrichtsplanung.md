@@ -2,8 +2,10 @@
 
 Die Unterrichtsplanung hilft Lehrkräften, ein Schuljahr von der groben
 Jahresübersicht bis zur einzelnen Stunde zu planen — manuell oder dialoggestützt
-mit einem Assistenten. Du erreichst sie über eine deiner Unterrichtsgruppen
-(**Fächer → Gruppe → Planung**).
+mit einem Assistenten. Du erreichst sie über den Menüpunkt **Planung** in der
+Seitenleiste: Dort steht jede deiner Unterrichtsgruppen dieses Schuljahres mit ihrem
+Fachsymbol, darunter das [Archiv](#archiv-und-kopieren) früherer Schuljahre. Der Weg
+über **Fächer → Gruppe → Planung** geht weiterhin.
 
 > **Hinweis:** Die Unterrichtsplanung ist eine Funktion für **Lehrkräfte**.
 > Schüler:innen sehen sie nicht — sie bekommen nur das aktuelle Thema im Chat
@@ -153,6 +155,11 @@ Fachbegriffe“**.
 
 > 📷 *Screenshot folgt: Stundenentwurf mit Phasentabelle, Zeitbudget-Balken und der Leiste „Kompetenzen und Fachbegriffe“.*
 <!-- Ersetzen durch: ![Stundenentwurf](/help-images/unterrichtsplanung/stundenentwurf.png) -->
+
+Ist die Stunde eine [Kopie](#stunden-und-einheiten-kopieren) und hatte ihre Vorlage eine
+Kurzreflexion aus der Nachbereitung, steht diese über dem Verlaufsplan als **Notiz aus der
+Vorlage**, mit dem Datum der Vorlagenstunde. Sie ist nur ein Hinweis für dich: Sie zählt nicht
+als Nachbereitung dieser Stunde, und mit **Entfernen** ist sie weg.
 
 ### Phasen
 
@@ -423,6 +430,65 @@ wieder eine Klassenarbeit, nicht bloß „Unterricht".
 
 ---
 
+## Archiv und Kopieren
+
+### Das Archiv
+
+Zum Schuljahresende wandern Einheiten und Stunden ins Archiv. Weg sind sie damit nicht: Unter
+**Planung → Archiv** findest du jede frühere Gruppe, in der du noch eingetragen bist oder eigene
+Planung hast — mit Fach, Schuljahr und der Zahl ihrer Einheiten und Stunden. Ein Klick öffnet die
+Einheiten der Gruppe, ein weiterer die Stunden einer Einheit in ihrer Reihenfolge, mit
+Stundenziel, Datum und ob sie nachbereitet sind. Stunden, die zu keiner Einheit gehörten, stehen
+unter **Stunden ohne Einheit**. Jede Ebene kannst du als Liste oder als Kacheln ansehen; die Wahl
+merkt sich die Plattform.
+
+Bist du in einer früheren Gruppe nicht mehr eingetragen, siehst du dort nur deine eigene Planung.
+
+Alles im Archiv lässt sich **lesen und exportieren, aber nicht mehr ändern**. Das gilt auch für
+Stunden einer Gruppe, die nicht mehr zum laufenden Schuljahr gehört. Willst du eine alte Stunde
+wieder verwenden, kopierst du sie.
+
+### Stunden und Einheiten kopieren
+
+Kopieren kannst du an drei Stellen:
+
+- im **Archiv** an jeder Einheit und jeder Stunde,
+- in der **Jahresübersicht** über das Kopiersymbol an einer Einheit (es erscheint, wenn du mit der
+  Maus darüberfährst),
+- im **Stundenentwurf** über **Kopieren** im Kopf — auch, wenn die Stunde im Archiv liegt.
+
+Ziel ist immer eine deiner Gruppen **dieses Schuljahres im selben Fach**. Eine Stunde braucht
+außerdem eine Einheit: eine bestehende der Gruppe oder eine neue, die du im Dialog benennst. Die
+Kopie kommt ans Ende der Einheit, **ohne Termin** — wann sie stattfindet, legst du wie gewohnt in
+der Jahresübersicht fest. Eine Einheit kommt mit allen Stunden in ihrer Reihenfolge und ebenfalls
+ohne Termine.
+
+Kopieren darfst du, was du lesen kannst — also auch die Stunde einer Kollegin aus einer Gruppe,
+die ihr gemeinsam unterrichtet. Die Kopie gehört dir.
+
+### Was beim Kopieren mitkommt
+
+**Mit kommen** Titel, Stundenziel und der Verlaufsplan: Phasen mit Dauer, Priorität,
+Beschreibung, Methode, Sozialform und Material, dazu Kompetenzen und Fachbegriffe. Bei einer
+Einheit auch Beschreibung, Farbe und ihr Curriculum-Kapitel.
+
+**Nicht mit kommt**, was zur gehaltenen Stunde gehört: Termin, Nachbereitung (erledigt, offen,
+gestrichen), Kürzungen und Übertrag, verworfene Begriffsvorschläge und der Bezug zu einem Chat.
+Die Kurzreflexion kommt als [Notiz aus der Vorlage](#stundenentwurf) mit.
+
+**Was nicht passt, wird genannt.** Nach dem Kopieren zeigt der Dialog, was ausgelassen oder
+angepasst wurde:
+
+- **Kompetenzen** folgen der Fassung des Bildungsplans, die für die Zielgruppe gilt. Gibt es
+  dieselbe Kompetenz dort mit gleicher Nummer und gleichem Wortlaut, wird sie umgestellt; sonst
+  bleibt sie weg.
+- **Material** und **Fachbegriffe** kommen nur mit, wenn die Zielgruppe sie sehen kann. Ein
+  Arbeitsblatt, das du nur für die alte Gruppe freigegeben hattest, fehlt in der Kopie — gib es
+  im Baustein auch für die neue frei und trag es wieder ein.
+- Ein **Curriculum-Kapitel** bleibt nur, wenn es zu einem Curriculum der Zielgruppe gehört.
+
+---
+
 ## Was Schüler:innen mitbekommen
 
 Damit Schüler-Assistenten sinnvoll helfen können, erhält ein Chat **mit
@@ -459,6 +525,14 @@ Reflexionen, der Pin-Status oder Phasen-Details. Mehr dazu unter
 ---
 
 ## Häufige Fragen
+
+**Was wird am Schuljahresende aus meiner Planung?**
+Sie wandert ins [Archiv](#archiv-und-kopieren). Dort kannst du sie lesen, exportieren und als
+Vorlage in eine Gruppe des neuen Schuljahres kopieren.
+
+**Warum stehen meine Stunden nicht mehr unter „Meine Bausteine“?**
+Planung hat seit 0.42 ihren eigenen Ort: den Menüpunkt **Planung** mit Planer und Archiv. Unter
+„Meine Bausteine“ siehst du an deinem Material weiterhin, in welcher Einheit oder Stunde es steckt.
 
 **Muss ich den Assistenten benutzen?**
 Nein. Der gesamte Ablauf — Jahresplan, Stundenentwurf, Nachbereiten, Verschieben —

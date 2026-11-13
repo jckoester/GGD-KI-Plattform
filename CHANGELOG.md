@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.42.0] – 2026-11-13
+
+Planung mit eigenem Ort: Menüpunkt „Planung“ mit dem Planer jeder Gruppe und einem Archiv früherer Schuljahre;
+Stunden und Einheiten als Vorlage kopieren. Keine Migration.
+
 ### Neu
 
 - Menüpunkt „Planung“ für Lehrkräfte: je Unterrichtsgruppe des Schuljahres ein Link in ihren Planer, dazu das

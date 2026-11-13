@@ -364,7 +364,7 @@
 - id: "0.42-planung"
   version: "0.42.0"
   # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md); geht mit 0.40/0.41
-  # gemeinsam auf Prod. Text und Link schleift Schritt 7 (Doku) noch.
+  # gemeinsam auf Prod. Zweite Neuigkeit der Reihe, nur für Lehrkräfte (die erste: `0.41-werkstatt-reihe`).
   datum: 2026-11-13
   # Der Übergangshinweis in „Meine Bausteine“ hängt an diesem Eintrag (`PLANUNG_NEUIGKEIT`).
   bis: 2027-01-31
@@ -376,4 +376,4 @@
     den Einheiten und Stunden früherer Schuljahre. Stunden und Einheiten kopierst du als Vorlage
     in eine Gruppe desselben Fachs. In „Meine Bausteine“ stehen Jahrespläne, Einheiten und
     Stunden nicht mehr.
-  link: /help/unterrichtsplanung
+  link: /help/unterrichtsplanung#archiv-und-kopieren

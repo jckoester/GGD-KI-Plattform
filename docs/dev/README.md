@@ -60,6 +60,7 @@ cd frontend && npm install && npm run dev
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
 - [Kontextsuche](kontextsuche.md) — Suchschicht, Stellschrauben fürs Feintuning, Prüfsatz
 - [Fachbegriffe einspielen](fachbegriffe-import.md) — Schnittstelle des Seed-Skripts, Idempotenz, Bericht
+- [Planung: Archiv, Rechte, Kopieren](planung-archiv-kopieren.md) — wer lesen und ändern darf, Archiv, was eine Kopie mitnimmt
 - [Begriffsvorschlag](begriffsvorschlag.md) — Begriffe aus den Phasentexten: Ablauf, Fallen, Konfiguration
 - [Neuen Knotentyp einführen](neuer-knotentyp.md) — Checkliste, Netzwerkgraph, die vier stummen Fallen
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
