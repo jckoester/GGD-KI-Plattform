@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Stundenentwürfe bleiben nach dem Schuljahresende lesbar und exportierbar; ändern lassen sich nur Stunden aktueller
+  Gruppen.
+
+### Behoben
+
+- Frühere Unterrichtsgruppen nennen wieder ihr Schuljahr, und eine Gruppe mit Jahresplan im laufenden Schuljahr gilt
+  als aktuell.
+
 ## [0.41.0] – 2026-11-13
 
 Ordnung in der Werkstatt: Fach und Thema am Produkt, Suche und Filter, eine Ansicht je Produkt, Produkte im Chat;

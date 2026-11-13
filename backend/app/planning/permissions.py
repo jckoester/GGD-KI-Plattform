@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import JwtPayload
 from app.db.models import Group, GroupMembership
 from app.auth.vorschau import eigenes_zaehlt, mitglied
+from app.groups.aktualitaet import gruppe_ist_aktuell
 
 
 async def require_group_teacher(
@@ -65,7 +66,8 @@ async def zugang_zur_stunde(
 
     Zwei Wege hinein, einer heraus:
 
-    * **Mitgliedschaft** in der Gruppe → lesen *und* ändern. Der Regelfall.
+    * **Mitgliedschaft** in der Gruppe → lesen; ändern nur, wenn der Knoten **aktiv** ist
+      und die Gruppe **aktuell** (`gruppe_ist_aktuell`). Der Regelfall ist beides.
     * **Eigentum** an der Stunde → nur lesen. Der Archiv-Fall: Mit dem
       Schuljahreswechsel fällt die Mitgliedschaft (Immediate Mirror in
       ``sync_groups``), der eigene Stundenentwurf bleibt.
@@ -77,15 +79,22 @@ async def zugang_zur_stunde(
     die einzige Stelle, die dieser Regel nicht folgte; damit war die Auskunft über
     denselben Gegenstand von der Tür abhängig, durch die man kam.
 
-    Geändert wird weiterhin **nur** mit Mitgliedschaft: `PATCH /lessons/{id}` und
-    die Nachbereitung bleiben unangetastet.
+    **Archiv (0.42, F11/S3):** Ein vom Lebenszyklus archivierter Knoten (Schuljahresende)
+    bleibt auf beiden Wegen lesbar, ändern lässt er sich nicht. Ebenso eine Stunde einer
+    Gruppe, die nicht mehr aktuell ist, auch für Mitglieder — das Archiv ist durchgehend
+    lesend. Gelöschtes prüft der Aufrufer (404).
+
+    Gilt für Einheiten genauso (Gruppe und Eigentum wie die Stunde).
 
     :returns: ``True``, wenn geändert werden darf.
     :raises HTTPException: 403, wenn keiner der beiden Wege trägt.
     """
     group_id = lesson.write_scope_group_id
     if group_id is not None and await ist_gruppenlehrkraft(group_id, user, db):
-        return True
+        if lesson.status != "active":
+            return False
+        gruppe = await db.get(Group, group_id)
+        return gruppe is not None and await gruppe_ist_aktuell(db, gruppe)
     if (lesson.owner_pseudonym is not None and lesson.owner_pseudonym == user.sub
             and eigenes_zaehlt(user.sub)):
         return False

@@ -8,11 +8,11 @@ als Fehler.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode, GroupSourceClass, LessonSlot
-from app.planning.calendar import SchoolYearConfig
+from app.planning.calendar import SchoolYearConfig, load_school_year
 
 
 def ist_aktuell(
@@ -94,11 +94,33 @@ async def gruppen_mit_beleg(
     )
     planung = select(ContextNode.write_scope_group_id).where(
         ContextNode.write_scope_group_id.in_(gruppen_ids),
-        ContextNode.schuljahr == cfg.schuljahr,
+        schuljahr_des_knotens() == cfg.schuljahr,
         ContextNode.status == "active",
     )
     zeilen = await db.execute(stunden.union(planung))
     return {zeile[0] for zeile in zeilen.all()}
+
+
+def schuljahr_des_knotens():
+    """Das Schuljahr eines Planungsknotens als SQL-Ausdruck.
+
+    ⚠️ **Die Spalte `context_nodes.schuljahr` füllt kein Anlegeweg.** Jahresplan und Einheit
+    tragen ihr Schuljahr in `metadata.schuljahr` (`app/planning/service.py`); die Stunde trägt
+    keins. Bis 0.42 lasen dieser Beleg und `letztes_schuljahr` nur die Spalte — der Beleg
+    „Planung im laufenden Jahr" griff deshalb nie, und eine frühere Gruppe nannte nie ihr
+    Schuljahr (Sichtung 0.42, Schritt 0). Die Spalte bleibt Vorrang, falls sie je gesetzt ist.
+    """
+    return func.coalesce(ContextNode.schuljahr, ContextNode.metadata_["schuljahr"].astext)
+
+
+async def gruppe_ist_aktuell(db: AsyncSession, gruppe) -> bool:
+    """`ist_aktuell` für **eine** Gruppe — mit den beiden Abfragen, die die Regel braucht."""
+    if gruppe.type != "teaching_group" or gruppe.sso_group_id:
+        return True
+    cfg = load_school_year()
+    beleg = await gruppen_mit_beleg(db, [gruppe.id], cfg)
+    quellklasse = await gruppen_mit_quellklasse(db, [gruppe.id])
+    return ist_aktuell(gruppe, beleg, cfg, quellklasse)
 
 
 async def gruppen_mit_quellklasse(db: AsyncSession, gruppen_ids: list[int]) -> set[int]:

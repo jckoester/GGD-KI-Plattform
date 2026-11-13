@@ -26,6 +26,7 @@ from app.groups.aktualitaet import (
     gruppen_mit_beleg,
     gruppen_mit_quellklasse,
     ist_aktuell,
+    schuljahr_des_knotens,
 )
 from app.db.session import get_db
 from app.groups.jahrgang import jahrgang_aus
@@ -118,11 +119,11 @@ async def letztes_schuljahr(
     zeilen = await db.execute(
         select(
             ContextNode.write_scope_group_id,
-            sa_func.max(ContextNode.schuljahr),
+            sa_func.max(schuljahr_des_knotens()),
         )
         .where(
             ContextNode.write_scope_group_id.in_(gruppen_ids),
-            ContextNode.schuljahr.is_not(None),
+            schuljahr_des_knotens().is_not(None),
             ContextNode.status == "active",
         )
         .group_by(ContextNode.write_scope_group_id)

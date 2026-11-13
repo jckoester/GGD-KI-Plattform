@@ -31,7 +31,7 @@ from app.context.embedding import (
 )
 from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
-from app.planning import teilen, zuordnung
+from app.planning import archiv, teilen, zuordnung
 from app.db.models import (
     ContextEdge,
     ContextNode,
@@ -1220,6 +1220,8 @@ async def _build_lesson_nav(
     db: AsyncSession,
     node_id: UUID,
     unit_id: UUID | None,
+    *,
+    mit_archivierten: bool = False,
 ) -> LessonNav:
     if unit_id is None:
         return LessonNav(prev_node_id=None, next_node_id=None, position=1, total=1)
@@ -1231,7 +1233,7 @@ async def _build_lesson_nav(
             ContextEdge.to_node_id == unit_id,
             ContextEdge.relation == "part_of",
             ContextNode.content_type == "unterrichtsstunde",
-            ContextNode.status == "active",
+            ContextNode.status.in_(LESBAR if mit_archivierten else ("active",)),
         )
     )
     all_lessons = {n.id: n for n in lessons_result.scalars().all()}
@@ -1276,6 +1278,23 @@ async def _build_lesson_nav(
     )
 
 
+# ── Lesen und Ändern einer Stunde (0.42) ─────────────────────────────────────
+
+#: Was die lesenden Planungsrouten zeigen: aktiv und vom Lebenszyklus archiviert (F11).
+#: Geändert wird nur Aktives (`zugang_zur_stunde`).
+LESBAR: tuple[str, ...] = ("active", "archived")
+
+
+async def _darf_stunde_aendern(lesson: ContextNode, user: JwtPayload, db: AsyncSession) -> None:
+    """Schranke der schreibenden Stundenrouten — dieselbe Regel wie `darf_bearbeiten`.
+
+    403 auch für Mitglieder einer nicht mehr aktuellen Gruppe (S3): Der Entwurf zeigt sich
+    dort im Lesezustand, und ein Speichern daran vorbei soll nicht gelingen.
+    """
+    if not await zugang_zur_stunde(lesson, user, db):
+        raise HTTPException(status_code=403, detail="Diese Stunde lässt sich nur noch lesen")
+
+
 # ── GET /planning/lessons/{node_id} ──────────────────────────────────────────
 
 
@@ -1286,13 +1305,16 @@ async def get_lesson(
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
     lesson = await db.get(ContextNode, node_id)
-    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+    # Auch archiviert lesbar (0.42, F11): Der Lebenszyklus archiviert Stunden zum
+    # Schuljahresende; das Archiv der Planung öffnet sie hier im Lesezustand.
+    if lesson is None or lesson.status not in LESBAR or lesson.content_type != "unterrichtsstunde":
         raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
 
     group_id = lesson.write_scope_group_id
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    # Mitgliedschaft **oder** Eigentum; Letzteres nur lesend (Archiv-Fall).
+    # Mitgliedschaft **oder** Eigentum; ändern nur Mitglieder einer aktuellen Gruppe an
+    # einer aktiven Stunde (`zugang_zur_stunde`).
     darf_bearbeiten = await zugang_zur_stunde(lesson, user, db)
 
     # Übergeordnete UE
@@ -1330,7 +1352,8 @@ async def get_lesson(
             verfuegbare_min=slot.periods * 45,
         )
 
-    nav = await _build_lesson_nav(db, node_id, unit_id)
+    nav = await _build_lesson_nav(
+        db, node_id, unit_id, mit_archivierten=lesson.status == "archived")
     meta = lesson.metadata_ or {}
 
     # Jahrgang der Gruppe (gleiche Quelle wie die Curriculum-Anzeige) — für die
@@ -1378,7 +1401,7 @@ async def begriffe_vorschlagen_endpunkt(
         raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
     if lesson.write_scope_group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    await require_group_teacher(lesson.write_scope_group_id, user, db)
+    await _darf_stunde_aendern(lesson, user, db)
 
     ergebnis = await begriffe_vorschlagen(db, node_id, user, erzwingen=erzwingen)
     lesson = await db.get(ContextNode, node_id, populate_existing=True)
@@ -1405,7 +1428,7 @@ async def patch_lesson(
     group_id = lesson.write_scope_group_id
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    await require_group_teacher(group_id, user, db)
+    await _darf_stunde_aendern(lesson, user, db)
 
     # Vor dem Snapshot: Ein abgelehnter Schreibversuch soll keinen Wiederherstellungspunkt
     # erzeugen — sonst füllt ein Client mit veraltetem Stand den Verlauf mit Einträgen,
@@ -1604,13 +1627,14 @@ async def export_lesson(
     from fastapi.responses import Response
 
     lesson = await db.get(ContextNode, node_id)
-    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+    if lesson is None or lesson.status not in LESBAR or lesson.content_type != "unterrichtsstunde":
         raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
 
     group_id = lesson.write_scope_group_id
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    await require_group_teacher(group_id, user, db)
+    # Lesen genügt (0.42): Wer die Stunde im Archiv sieht, darf sie auch exportieren.
+    await zugang_zur_stunde(lesson, user, db)
 
     from app.planning.lesson_export import build_lesson_export, export_markdown, export_office, export_pdf
 
@@ -1773,6 +1797,120 @@ async def list_planungsgruppen(
     ]
     items.sort(key=lambda gruppe: gruppe.name.casefold())
     return PlanungsgruppenRead(items=items)
+
+
+# ── GET /planning/archive (0.42) ──────────────────────────────────────────────
+
+
+class ArchivFachRead(BaseModel):
+    id: int
+    slug: str
+    name: str
+    icon: str | None
+    color: str | None
+
+
+class ArchivGruppeRead(BaseModel):
+    id: int
+    name: str
+    fach: ArchivFachRead | None
+    # `mitglied`: noch Lehrkraft, Gruppe nicht mehr aktuell — alles der Gruppe;
+    # `eigentum`: nur die eigenen Einheiten und Stunden.
+    zugang: str
+    schuljahr: str | None
+    einheiten: int
+    stunden: int
+
+
+class ArchivGruppenRead(BaseModel):
+    items: list[ArchivGruppeRead]
+
+
+class ArchivStundeRead(BaseModel):
+    id: UUID
+    titel: str
+    stundenziel: str | None
+    datum: date | None
+    nachbereitet: bool
+    archiviert: bool
+
+
+class ArchivEinheitRead(BaseModel):
+    id: UUID
+    titel: str
+    farbe: int
+    schuljahr: str | None
+    archiviert: bool
+    stunden: list[ArchivStundeRead]
+
+
+class ArchivInhaltRead(BaseModel):
+    gruppe: ArchivGruppeRead
+    einheiten: list[ArchivEinheitRead]
+    ohne_einheit: list[ArchivStundeRead]
+
+
+def _archiv_fach(fach) -> ArchivFachRead | None:
+    if fach is None:
+        return None
+    return ArchivFachRead(id=fach.id, slug=fach.slug, name=fach.name, icon=fach.icon, color=fach.color)
+
+
+@router.get("/archive", response_model=ArchivGruppenRead)
+async def list_archiv(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Gruppen im Archiv der Planung (`app/planning/archiv.py`) — immer lesend."""
+    gruppen = await archiv.archiv_gruppen(db, user)
+    return ArchivGruppenRead(items=[
+        ArchivGruppeRead(
+            id=a.gruppe.id, name=a.gruppe.anzeigename, fach=_archiv_fach(a.fach), zugang=a.zugang,
+            schuljahr=a.schuljahr, einheiten=a.einheiten, stunden=a.stunden,
+        )
+        for a in gruppen
+    ])
+
+
+@router.get("/archive/groups/{group_id}", response_model=ArchivInhaltRead)
+async def get_archiv_gruppe(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einheiten und Stunden einer Gruppe im Archiv, dazu „Stunden ohne Einheit“.
+
+    404 ohne Zugang — ob es die Gruppe gibt, verrät die Antwort nicht.
+    """
+    gruppe = await db.get(Group, group_id)
+    zugang = (
+        await archiv.archiv_zugang(db, group_id, user)
+        if gruppe is not None and gruppe.type == "teaching_group" else None
+    )
+    if zugang is None:
+        raise HTTPException(status_code=404, detail="Nicht im Archiv")
+    fach = await db.get(Subject, gruppe.subject_id) if gruppe.subject_id else None
+    inhalt = await archiv.archiv_inhalt(db, gruppe, fach, zugang, user)
+
+    def stunde(s):
+        return ArchivStundeRead(**s.__dict__)
+
+    return ArchivInhaltRead(
+        gruppe=ArchivGruppeRead(
+            id=gruppe.id, name=gruppe.anzeigename, fach=_archiv_fach(fach), zugang=zugang,
+            schuljahr=max((e.schuljahr for e in inhalt.einheiten if e.schuljahr), default=None),
+            einheiten=len(inhalt.einheiten),
+            stunden=sum(len(e.stunden) for e in inhalt.einheiten) + len(inhalt.ohne_einheit),
+        ),
+        einheiten=[
+            ArchivEinheitRead(
+                id=e.id, titel=e.titel, farbe=e.farbe, schuljahr=e.schuljahr,
+                archiviert=e.archiviert, stunden=[stunde(s) for s in e.stunden],
+            )
+            for e in inhalt.einheiten
+        ],
+        ohne_einheit=[stunde(s) for s in inhalt.ohne_einheit],
+    )
 
 
 # ── GET /planning/mein-tag ────────────────────────────────────────────────────
