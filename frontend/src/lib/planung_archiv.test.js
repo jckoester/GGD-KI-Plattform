@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import {
     ansichtAusEinstellungen, anzahl, archivPfad, datumKurz, einheitenMitOhne, gewaehlteEinheit, klassenKurz,
     menueBeschriftung, menueGruppen, mitBeschriftung, OHNE_EINHEIT, plannerPfad, stundenPfad,
-    EINHEITEN, JAHR, ohneTermin, planerAnsichtPfad, planungsAnsichtAusAdresse, planungsAnsichtAusEinstellungen,
+    EINHEITEN, JAHR, ohneTermin, stundenOhneTermin, planerAnsichtPfad, planungsAnsichtAusAdresse, planungsAnsichtAusEinstellungen,
 } from './planung_archiv.js'
 
 const SRC = join(__dirname, '..')
@@ -129,6 +129,11 @@ describe('Ansicht des Planers (0.42.3)', () => {
     it('Stunden ohne Termin zählen', () => {
         expect(ohneTermin([{ slot_id: 'a' }, { slot_id: null }, {}])).toBe(2)
         expect(ohneTermin(undefined)).toBe(0)
+        expect(stundenOhneTermin({
+            einheiten: [{ stunden: [{ slot_id: 'a' }, { slot_id: null }] }, { stunden: [{}] }],
+            ohne_einheit: [{ slot_id: null }],
+        })).toBe(3)
+        expect(stundenOhneTermin(null)).toBe(0)
     })
 })
 
@@ -138,6 +143,9 @@ describe('Verdrahtung', () => {
         expect(seite).toContain('planungsAnsichtAusAdresse($page.url.searchParams) ?? gemerkt')
         expect(seite).toContain('[PLANUNGS_ANSICHT_SCHLUESSEL]: neu')
         expect(seite).toContain('getGruppenInhalt(groupId)')
+        // Feste Zeile in der Jahresübersicht, solange Stunden ohne Termin da sind (Schritt 4).
+        expect(seite).toContain('stundenOhneTermin(inhalt)')
+        expect(seite).toMatch(/\{#if ansicht === JAHR && ohneTerminZahl\}/)
         expect(seite).toMatch(/<EinheitenAnsicht[\s\S]*?\btermine\b/)
         // Archiv und Planer teilen sich die Darstellung.
         expect(quelle('routes/(app)/planning/archive/[id]/+page.svelte')).toContain('<EinheitenAnsicht')

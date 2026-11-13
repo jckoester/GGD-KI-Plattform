@@ -40,7 +40,7 @@
   import { getGruppenInhalt, getPreferences, patchPreferences } from '$lib/api.js'
   import {
     EINHEITEN, JAHR, PLANUNGS_ANSICHT_SCHLUESSEL, planerAnsichtPfad, planungsAnsichtAusAdresse,
-    planungsAnsichtAusEinstellungen,
+    planungsAnsichtAusEinstellungen, stundenOhneTermin,
   } from '$lib/planung_archiv.js'
   import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
   import EinheitenAnsicht from '$lib/components/planner/EinheitenAnsicht.svelte'
@@ -64,12 +64,13 @@
   let darstellung = $state('kacheln')   // Liste oder Kacheln — gemerkt wie im Archiv
   let inhalt = $state(null)
   let inhaltFehler = $state(null)
+  // Auch in der Jahresübersicht geladen: für die Zeile „N Stunden ohne Termin“ (Schritt 4).
+  const ohneTerminZahl = $derived(stundenOhneTermin(inhalt))
   // Stunde ohne Termin einplanen (Schritt 3): {stunde, einheitId} oder null.
   let einplanStunde = $state(null)
 
   function eingeplant() {
-    ladeInhalt()
-    loadOverview()
+    loadOverview()   // lädt die Einheiten mit
   }
 
   function wechsleAnsicht(neu) {
@@ -150,6 +151,8 @@
       // Geparktes überlebt die Sitzung — es muss beim Öffnen sichtbar sein, nicht
       // erst nach dem nächsten Neuaufbau.
       ladeParkplatz()
+      // Ebenso Stunden ohne Termin (0.42.3) — sie stehen sonst nirgends in der Jahresübersicht.
+      ladeInhalt()
     } catch (e) {
       error = e.message
     } finally {
@@ -185,6 +188,7 @@
       }
       // Balance + Units im Overview aktualisieren wenn UE-Zuweisung geändert
       if ('ue_node_id' in updates || 'stunde_node_id' in updates) {
+        ladeInhalt()   // Zahl der Stunden ohne Termin
         const refreshed = await getPlanningOverview(groupId)
         overview = refreshed
         // Slots beibehalten die wir bereits optimistisch aktualisiert haben
@@ -387,8 +391,7 @@
 
   function einheitKopiert(_ergebnis, ziel) {
     if (ziel?.id !== groupId) return
-    loadOverview()
-    if (ansicht === EINHEITEN) ladeInhalt()
+    loadOverview()   // lädt die Einheiten mit
   }
 
   function openEditUnit(unit) {
@@ -653,6 +656,23 @@
         aria-label="Schließen"
         class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
       >✕</button>
+    </div>
+  </div>
+{/if}
+
+<!-- Stunden ohne Termin (0.42.3): fest, nicht wegklickbar — wie der Parkplatz. Ohne diese
+     Zeile wären Kopien in der Jahresübersicht unsichtbar. -->
+{#if ansicht === JAHR && ohneTerminZahl}
+  <div class="px-4 pt-2">
+    <div class="flex items-center gap-3 rounded-lg border border-dashed border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
+      <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">
+        {ohneTerminZahl === 1 ? '1 Stunde hat' : `${ohneTerminZahl} Stunden haben`} noch keinen Termin.
+      </span>
+      <a href={planerAnsichtPfad(gruppeFuerPfad, EINHEITEN)}
+         class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                text-light-tx dark:text-dark-tx hover:bg-light-bg dark:hover:bg-dark-bg transition-colors"
+      >In den Einheiten einplanen</a>
     </div>
   </div>
 {/if}

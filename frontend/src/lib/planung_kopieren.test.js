@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-    ergebnisPfad, kopierAnfrage, meldungenZusammenfassung, meldungText, NEUE_EINHEIT, zielGruppen,
+    einheitenPfad, ergebnisPfad, kopierAnfrage, meldungenZusammenfassung, meldungText, NEUE_EINHEIT, zielGruppen,
 } from './planung_kopieren.js'
 
 const SRC = join(__dirname, '..')
@@ -45,8 +45,17 @@ describe('Ergebnis', () => {
 
     it('Link zur Kopie bzw. zum Planer', () => {
         expect(ergebnisPfad('stunde', { id: 's9' }, gruppe)).toBe('/subjects/chemie/groups/10/planner/lessons/s9')
-        expect(ergebnisPfad('einheit', { id: 'u9' }, gruppe)).toBe('/subjects/chemie/groups/10/planner')
+        expect(ergebnisPfad('einheit', { id: 'u9' }, gruppe))
+            .toBe('/subjects/chemie/groups/10/planner?ansicht=einheiten&einheit=u9')
         expect(ergebnisPfad('stunde', null, gruppe)).toBeNull()
+    })
+
+    it('die Kopie hat keinen Termin: Weg in die Einheitenansicht (0.42.3)', () => {
+        expect(einheitenPfad('stunde', { id: 's9', einheit_id: 'u3' }, gruppe))
+            .toBe('/subjects/chemie/groups/10/planner?ansicht=einheiten&einheit=u3')
+        expect(einheitenPfad('einheit', { id: 'u9' }, gruppe))
+            .toBe('/subjects/chemie/groups/10/planner?ansicht=einheiten&einheit=u9')
+        expect(einheitenPfad('stunde', null, gruppe)).toBeNull()
     })
 
     it('Meldungen lesbar', () => {

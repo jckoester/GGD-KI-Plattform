@@ -164,3 +164,8 @@ export function planerAnsichtPfad(gruppe, ansicht, einheit = null) {
 export function ohneTermin(stunden) {
     return (stunden ?? []).filter((s) => !s.slot_id).length
 }
+
+/** Alle Stunden der Gruppe ohne Termin — in Einheiten und ohne Einheit (Hinweiszeile im Planer). */
+export function stundenOhneTermin(inhalt) {
+    return (inhalt?.einheiten ?? []).reduce((n, e) => n + ohneTermin(e.stunden), 0) + ohneTermin(inhalt?.ohne_einheit)
+}

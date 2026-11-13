@@ -18,7 +18,7 @@
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
   import { copyLesson, copyUnit, getPlanungsgruppen, listUnits } from '$lib/api.js'
   import {
-    ergebnisPfad, kopierAnfrage, meldungenZusammenfassung, meldungText, NEUE_EINHEIT, zielGruppen,
+    einheitenPfad, ergebnisPfad, kopierAnfrage, meldungenZusammenfassung, meldungText, NEUE_EINHEIT, zielGruppen,
   } from '$lib/planung_kopieren.js'
 
   const { open = false, art = 'stunde', quelle = null, fachId = null, onClose, onKopiert = null } = $props()
@@ -38,6 +38,7 @@
   const gruppe = $derived(gruppen.find((g) => g.id === gruppeId) ?? null)
   const anfrage = $derived(kopierAnfrage(art, { gruppeId, einheitWahl, neuerTitel }))
   const link = $derived(ergebnisPfad(art, ergebnis, gruppe))
+  const einheitenLink = $derived(istStunde ? einheitenPfad(art, ergebnis, gruppe) : null)
 
   // Beim Öffnen frisch: Zielgruppen laden, alte Auswahl und altes Ergebnis vergessen.
   $effect(() => {
@@ -107,8 +108,11 @@
 
     {#if ergebnis}
       <SuccessBanner message={istStunde
-        ? `Die Stunde liegt jetzt in ${gruppe?.beschriftung ?? 'der Gruppe'}.`
+        ? `Die Stunde liegt jetzt in ${gruppe?.beschriftung ?? 'der Gruppe'}, noch ohne Termin.`
         : `Die Einheit liegt mit ${ergebnis.stunden} ${ergebnis.stunden === 1 ? 'Stunde' : 'Stunden'} in ${gruppe?.beschriftung ?? 'der Gruppe'}, noch ohne Termine.`} />
+      <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+        Im Planer der Gruppe findest du sie unter „Einheiten“ und planst sie dort ein.
+      </p>
       {#if ergebnis.meldungen?.length}
         <div class="mt-3">
           <p class="text-sm font-medium text-light-tx dark:text-dark-tx">{meldungenZusammenfassung(ergebnis.meldungen)}</p>
@@ -124,10 +128,17 @@
                 class="px-3 py-1.5 text-sm rounded-md text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2">
           Schließen
         </button>
+        {#if einheitenLink}
+          <a href={einheitenLink} onclick={onClose}
+             class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx
+                    hover:bg-light-bg-2 dark:hover:bg-dark-bg-2">
+            Zur Einheit
+          </a>
+        {/if}
         {#if link}
           <a href={link} onclick={onClose} data-autofocus
              class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-white hover:opacity-90">
-            {istStunde ? 'Kopie öffnen' : 'Zum Planer'}
+            {istStunde ? 'Kopie öffnen' : 'Zur Einheit'}
           </a>
         {/if}
       </div>

@@ -5,7 +5,7 @@
  * Ziel sind nur eigene **aktuelle** Gruppen **desselben Fachs** (Plan F5); das Backend prüft es
  * ebenso. Eine Stunde braucht eine Zieleinheit — eine bestehende oder eine neue (F6).
  */
-import { menueGruppen, mitBeschriftung, plannerPfad, stundenPfad } from './planung_archiv.js'
+import { EINHEITEN, menueGruppen, mitBeschriftung, planerAnsichtPfad, stundenPfad } from './planung_archiv.js'
 
 /** Wert der Auswahl „neue Einheit“ im Einheiten-Feld. */
 export const NEUE_EINHEIT = '__neu__'
@@ -30,10 +30,19 @@ export function kopierAnfrage(art, { gruppeId, einheitWahl, neuerTitel }) {
     return einheitWahl ? { gruppe_id: gruppeId, einheit_id: einheitWahl } : null
 }
 
-/** Wohin der Link nach dem Kopieren führt: die neue Stunde bzw. der Planer der Zielgruppe. */
+/** Wohin der Hauptlink nach dem Kopieren führt: die neue Stunde bzw. die neue Einheit. */
 export function ergebnisPfad(art, ergebnis, gruppe) {
     if (!ergebnis || !gruppe?.fach?.slug) return null
-    return art === 'stunde' ? stundenPfad(gruppe, ergebnis.id) : plannerPfad(gruppe)
+    return art === 'stunde' ? stundenPfad(gruppe, ergebnis.id) : einheitenPfad(art, ergebnis, gruppe)
+}
+
+/**
+ * Die Einheit der Kopie in der Einheitenansicht des Planers (0.42.3) — dort steht sie „ohne
+ * Termin“ und lässt sich einplanen. Ohne Termin ist sie in der Jahresübersicht nicht zu sehen.
+ */
+export function einheitenPfad(art, ergebnis, gruppe) {
+    if (!ergebnis || !gruppe?.fach?.slug) return null
+    return planerAnsichtPfad(gruppe, EINHEITEN, art === 'stunde' ? ergebnis.einheit_id : ergebnis.id)
 }
 
 const ARTEN = { kompetenz: 'Kompetenz', begriff: 'Begriff', material: 'Material', kapitel: 'Kapitel' }
