@@ -150,7 +150,7 @@
         error = null;
         try {
             const doc = await createDocument('Neues Dokument', '');
-            await goto(`/workshop/${doc.id}/edit`);
+            await goto(`/workshop/${doc.id}`);
         } catch (err) {
             creatingDoc = false;
             error = err.message ?? 'Dokument konnte nicht angelegt werden.';
@@ -297,8 +297,10 @@
 {#snippet karte(item)}
         <div class="flex flex-col bg-light-bg-2 dark:bg-dark-bg-2
                     border border-light-ui-3 dark:border-dark-ui-3 rounded-lg overflow-hidden">
-            <!-- Vorschau -->
-            <div class="flex items-center justify-center bg-white h-40 overflow-hidden">
+            <!-- Vorschau: führt wie der Titel in die Ansicht (Dokument: der Editor). Für
+                 Tastatur und Vorleser genügt der Titel-Link, daher hier aus der Reihenfolge. -->
+            <a href="/workshop/{item.id}" tabindex="-1" aria-hidden="true"
+               class="flex items-center justify-center bg-white h-40 overflow-hidden hover:opacity-90 transition-opacity">
                 {#if isImageLike(item.mime_type)}
                     <img
                         src="/api/artifacts/{item.id}"
@@ -309,7 +311,7 @@
                 {:else}
                     <FileText class="w-10 h-10 text-light-tx-3" />
                 {/if}
-            </div>
+            </a>
 
             <div class="flex flex-col flex-1 p-3">
                 <div class="flex items-center gap-2 flex-wrap mb-1">
@@ -331,9 +333,11 @@
                     />
                 {:else}
                     <div class="flex items-start gap-1">
-                        <p class="flex-1 font-medium text-light-tx dark:text-dark-tx truncate" title={item.title}>
+                        <!-- Jedes Produkt hat seine Ansicht (0.41, Schritt 8). -->
+                        <a href="/workshop/{item.id}" title={item.title}
+                           class="flex-1 font-medium text-light-tx dark:text-dark-tx truncate hover:underline">
                             {item.title}
-                        </p>
+                        </a>
                         <button
                             type="button"
                             onclick={() => (bearbeiteId = item.id)}
@@ -445,7 +449,7 @@
                     {/if}
                     {#if item.kind === 'document'}
                         <a
-                            href="/workshop/{item.id}/edit"
+                            href="/workshop/{item.id}"
                             class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                    text-light-tx-2 dark:text-dark-tx-2
                                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"

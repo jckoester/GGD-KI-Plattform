@@ -176,3 +176,61 @@ async def test_angaben_aendern_erneuert_die_frist(test_client, auth_headers_teac
     with conn.cursor() as cur:
         cur.execute("SELECT expires_at > now() + interval '30 days' FROM artifacts WHERE id = %s", (pid,))
         assert cur.fetchone()[0] is True
+
+
+# ── Produktansicht (Schritt 8) ───────────────────────────────────────────────
+
+def _dokument(conn, titel, *, quelle="# Blatt", fach=None, thema=None, chat=None):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO artifacts (owner_pseudonym, kind, mime_type, byte_size, title, source, subject_id, topic,"
+            " origin_conversation_id, expires_at) VALUES (%s, 'document', 'text/markdown', 7, %s, %s, %s, %s, %s,"
+            " now() + interval '300 days') RETURNING id",
+            (TEACHER2_PSEUDO, titel, quelle, fach, thema, chat),
+        )
+        did = cur.fetchone()[0]
+    conn.commit()
+    return str(did)
+
+
+async def test_info_mit_ursprung_und_ohne_chat(test_client, auth_headers_teacher2, conn):
+    from uuid import uuid4 as neu
+    dok = _dokument(conn, "AN3 Blatt", fach=FACH, thema="Redox", chat=str(neu()))   # Chat gibt es nicht (mehr)
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO artifacts (owner_pseudonym, kind, mime_type, byte_size, title, derived_from, expires_at)"
+            " VALUES (%s, 'export_pdf', 'application/pdf', 5, 'AN3 Blatt', %s, now() + interval '300 days')"
+            " RETURNING id", (TEACHER2_PSEUDO, dok))
+        export = str(cur.fetchone()[0])
+    conn.commit()
+
+    info = (await test_client.get(f"/artifacts/{dok}/info", headers=auth_headers_teacher2)).json()
+    assert (info["subject_id"], info["topic"], info["chat_vorhanden"]) == (FACH, "Redox", False)
+    assert info["origin_conversation_id"] is None
+    assert [e["id"] for e in info["exporte"]] == [export]
+
+    ex = (await test_client.get(f"/artifacts/{export}/info", headers=auth_headers_teacher2)).json()
+    assert (ex["derived_from"], ex["derived_from_title"]) == (dok, "AN3 Blatt")
+
+
+async def test_info_fremd(test_client, auth_headers, conn):
+    dok = _dokument(conn, "AN3 fremd")
+    assert (await test_client.get(f"/artifacts/{dok}/info", headers=auth_headers)).status_code == 403
+
+
+async def test_als_kopie_speichern(test_client, auth_headers_teacher2, conn):
+    dok = _dokument(conn, "AN3 Original", quelle="# Inhalt", fach=FACH, thema="Säuren")
+
+    resp = await test_client.post(f"/artifacts/{dok}/kopie", headers=auth_headers_teacher2)
+
+    assert resp.status_code == 200, resp.text
+    kopie = resp.json()["id"]
+    assert kopie != dok
+    info = (await test_client.get(f"/artifacts/{kopie}/info", headers=auth_headers_teacher2)).json()
+    assert (info["title"], info["source"], info["subject_id"], info["topic"]) == \
+        ("AN3 Original (Kopie)", "# Inhalt", FACH, "Säuren")
+
+
+async def test_kopie_nur_fuer_dokumente(test_client, auth_headers_teacher2, conn):
+    bild = _produkt(conn, TEACHER2_PSEUDO, "AN3 Bild")
+    assert (await test_client.post(f"/artifacts/{bild}/kopie", headers=auth_headers_teacher2)).status_code == 422

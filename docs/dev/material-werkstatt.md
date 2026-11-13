@@ -2,7 +2,8 @@
 
 Nutzereditierbare Markdown-Dokumente + Export nach PDF/DOCX/ODT. Baut auf der
 [Artefaktbibliothek](artefaktbibliothek.md) auf. Code in `backend/app/export/` +
-`frontend/src/routes/(app)/workshop/[id]/edit` (bis 0.40 `/library/[id]/edit`, das umleitet).
+`frontend/src/lib/components/DokumentEditor.svelte`, eingebaut in die Produktansicht
+`routes/(app)/workshop/[id]` (seit 0.41; `/workshop/[id]/edit` und `/library/[id]/edit` leiten um).
 
 ## Dokument-Artefakt
 
@@ -99,7 +100,7 @@ Pandoc-Ausgabe prüfen, vergleichen Attribute einzeln: Pandoc 3.11 (Prod, CI) sc
 
 `lib/api.js` (`createDocument`/`getDocument`/`updateDocument`, `getDocumentExportBlob`/
 `saveDocumentExport`, Admin-Vorlagen-Funktionen) · `lib/workshop.js` `deriveDocTitle` ·
-Editor-Route `(app)/workshop/[id]/edit` (Textarea ⇄ Vorschau via `renderMarkdown` +
+Editor `DokumentEditor.svelte` in der Produktansicht `(app)/workshop/[id]` (Textarea ⇄ Vorschau via `renderMarkdown` +
 `renderDiagrams` + `renderServerBlocks`, Export-Leiste) · Admin-Seite `(admin)/settings/export`.
 Einstieg aus dem Chat: `MessageBubble` „Als Dokument bearbeiten" — der Knopf nennt die
 Tätigkeit, die Ansicht heißt weiter Werkstatt (Entscheidung zu 0.12).

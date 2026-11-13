@@ -26,6 +26,10 @@ wie an Bildern und Texten:
   Werkstatt weiterzuverwenden.
 - **„GeoGebra"** — nur bei Funktionsgraphen: eine `.ggb`-Datei zum Weiterbearbeiten.
 
+Ist eine Grafik zu breit für den Chat, wird sie verkleinert und bekommt unten rechts Knöpfe zum
+**Vergrößern** und Verkleinern; vergrößert verschiebst du sie mit der Maus. Dasselbe geht in der
+[Werkstatt](werkstatt.md) in der Ansicht des gespeicherten Diagramms.
+
 ## Schaltpläne
 
 Schaltpläne erscheinen mit den **Symbolen aus dem Unterricht** (DIN/IEC): der Widerstand als

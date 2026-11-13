@@ -1,7 +1,8 @@
 <script>
+    // Der Editor eines Dokuments (Phase 19) — seit 0.41 Teil der Produktansicht
+    // `/workshop/<id>`. Den Titel ändert der Rahmen der Ansicht (Angaben), nicht der Editor.
     import { onMount } from 'svelte';
-    import { page } from '$app/stores';
-    import { ArrowLeft, Save, Loader2, Download } from 'lucide-svelte';
+    import { Save, Loader2, Download } from 'lucide-svelte';
     import {
         getDocument, updateDocument, getDocumentExportBlob, saveDocumentExport,
     } from '$lib/api.js';
@@ -18,18 +19,16 @@
         { fmt: 'odt', label: 'ODT' },
     ];
 
-    let id = $derived($page.params.id);
+    let { id, titel, onGespeichert = () => {} } = $props();
 
-    let title = $state('');
     let markdown = $state('');
-    let savedTitle = $state('');
     let savedMarkdown = $state('');
 
     let loading = $state(true);
     let saving = $state(false);
     let error = $state(null);
 
-    let dirty = $derived(title !== savedTitle || markdown !== savedMarkdown);
+    let dirty = $derived(markdown !== savedMarkdown);
     // Vorschau nach den Regeln des Exports (0.39): nur <br>, <sub>, <sup> als rohes HTML.
     let preview = $derived(renderMarkdown(markdown, { wieImExport: true }));
 
@@ -38,9 +37,7 @@
         error = null;
         try {
             const doc = await getDocument(id);
-            title = doc.title ?? '';
             markdown = doc.source ?? '';
-            savedTitle = title;
             savedMarkdown = markdown;
         } catch (err) {
             error = err.message ?? 'Dokument konnte nicht geladen werden.';
@@ -56,9 +53,9 @@
         saving = true;
         error = null;
         try {
-            await updateDocument(id, title, markdown);
-            savedTitle = title;
+            await updateDocument(id, titel, markdown);
             savedMarkdown = markdown;
+            onGespeichert();
         } catch (err) {
             error = err.message ?? 'Speichern fehlgeschlagen.';
         } finally {
@@ -84,9 +81,10 @@
             if (keepInLibrary) {
                 await saveDocumentExport(id, fmt);
                 exportMsg = `${fmt.toUpperCase()} in der Werkstatt gespeichert.`;
+                onGespeichert();
             } else {
                 const blob = await getDocumentExportBlob(id, fmt);
-                triggerDownload(blob, `${slugify(title)}.${fmt}`);
+                triggerDownload(blob, `${slugify(titel)}.${fmt}`);
             }
         } catch (err) {
             error = err?.status === 503
@@ -99,45 +97,23 @@
 </script>
 
 <div class="flex flex-col h-full">
-    <!-- Kopfleiste -->
-    <div class="flex items-center gap-3 px-4 py-2 border-b border-light-ui-3 dark:border-dark-ui-3">
-        <a
-            href="/workshop"
-            aria-label="Zurück zur Werkstatt"
-            class="p-1.5 rounded-lg text-light-tx-2 dark:text-dark-tx-2
-                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors shrink-0"
-        >
-            <ArrowLeft class="w-4 h-4" />
-        </a>
-        <input
-            type="text"
-            bind:value={title}
-            placeholder="Titel"
-            aria-label="Titel"
-            class="flex-1 min-w-0 bg-transparent text-light-tx dark:text-dark-tx
-                   font-medium px-2 py-1 rounded
-                   border border-transparent hover:border-light-ui-3 dark:hover:border-dark-ui-3
-                   focus:border-primary dark:focus:border-primary-dark focus:outline-none"
-        />
-        <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
-            {#if saving}Speichert…{:else if dirty}Ungespeicherte Änderungen{:else}Gespeichert{/if}
-        </span>
+    <!-- Speichern und Export -->
+    <div class="flex items-center flex-wrap gap-2 px-4 py-1.5 text-xs
+                border-b border-light-ui-3 dark:border-dark-ui-3
+                text-light-tx-2 dark:text-dark-tx-2">
         <button
             type="button"
             onclick={save}
             disabled={saving || !dirty}
-            class="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg shrink-0
+            class="inline-flex items-center gap-1 text-sm px-3 py-1 rounded-lg shrink-0
                    bg-primary dark:bg-primary-dark text-white
                    hover:opacity-90 transition-opacity disabled:opacity-40"
         >
             <Save class="w-4 h-4" /> Speichern
         </button>
-    </div>
-
-    <!-- Export-Leiste -->
-    <div class="flex items-center flex-wrap gap-2 px-4 py-1.5 text-xs
-                border-b border-light-ui-3 dark:border-dark-ui-3
-                text-light-tx-2 dark:text-dark-tx-2">
+        <span class="shrink-0 mr-2">
+            {#if saving}Speichert…{:else if dirty}Ungespeicherte Änderungen{:else}Gespeichert{/if}
+        </span>
         <span class="flex items-center gap-1"><Download class="w-3.5 h-3.5" /> Export:</span>
         {#each EXPORT_FORMATS as f}
             <button

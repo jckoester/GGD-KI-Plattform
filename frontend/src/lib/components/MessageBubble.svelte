@@ -24,6 +24,7 @@
     import WarningBanner from './WarningBanner.svelte';
     import KontextListe from './KontextListe.svelte';
     import { kontextEintraege } from '$lib/kontext_anzeige.js';
+    import { zoomAnhaengen } from '$lib/zoom.js';
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
     let {
@@ -235,17 +236,29 @@
                 }));
 
                 block.appendChild(bar);
+
+                // Zoom nur, wenn das Diagramm verkleinert dargestellt wird (0.41, Schritt 8).
+                // Die Knöpfe unten rechts — oben rechts liegt die Produktleiste.
+                block.style.setProperty('--pele-zoom-top', 'auto');
+                block.style.setProperty('--pele-zoom-bottom', '8px');
+                zoomAnhaengen(block)
+                    .then((z) => { if (abgebaut) z.destroy(); else zooms.push(z); })
+                    .catch(() => {}); // ohne Zoom bleibt das Diagramm, wie es war
             });
         }
 
         const eingehaengt = [];
+        const zooms = [];
+        let abgebaut = false;
         attach();
         const observer = new MutationObserver(attach);
         observer.observe(node, { childList: true, subtree: true });
         return {
             destroy() {
+                abgebaut = true;
                 observer.disconnect();
                 eingehaengt.forEach((k) => unmount(k));
+                zooms.forEach((z) => z.destroy());
             },
         };
     }
@@ -318,7 +331,7 @@
 
     async function openInWorkshop() {
         const doc = await textAlsDokument();
-        await goto(`/workshop/${doc.id}/edit`);
+        await goto(`/workshop/${doc.id}`);
     }
 
     async function textHerunterladen() {

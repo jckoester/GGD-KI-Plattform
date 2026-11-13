@@ -24,6 +24,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Im Chat tragen Bilder, Diagramme und Texte dieselbe Leiste: Speichern · Als Dokument bearbeiten (Text) ·
   Herunterladen · Weiteres der Art · Als Baustein speichern. Texte lassen sich jetzt auch speichern, ohne den Chat zu
   verlassen, und als Markdown herunterladen.
+- Jedes Produkt hat eine eigene Ansicht in der Werkstatt: Titel, Art, Fach, Thema, Herkunft (Assistent, Modell, Chat)
+  und Frist; Dokumente mit dem Editor, Diagramme zum Vergrößern und mit Quelltext, Bilder mit ihrer Beschreibung.
+  Dokumente lassen sich als Kopie speichern. Die alte Editor-Adresse leitet um.
+- Diagramme im Chat lassen sich vergrößern, wenn sie nicht in die Breite passen.
+- Ein Klick auf das Vorschaubild einer Karte in der Werkstatt öffnet das Produkt.
 
 ### Behoben
 

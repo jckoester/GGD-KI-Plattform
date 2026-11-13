@@ -85,6 +85,7 @@ describe('slugify', () => {
 import { load as ladeAlteListe } from '../routes/(app)/library/+page.js';
 import { load as ladeAltenEditor } from '../routes/(app)/library/[id]/edit/+page.js';
 import { load as ladeTools } from '../routes/(app)/tools/+page.js';
+import { load as ladeAltenWerkstattEditor } from '../routes/(app)/workshop/[id]/edit/+page.js';
 
 function umleitung(fn, arg) {
     try {
@@ -103,9 +104,14 @@ describe('alte Adressen (0.40)', () => {
             .toEqual({ status: 301, location: '/workshop' });
     });
 
-    it('/library/<id>/edit → /workshop/<id>/edit', () => {
+    it('/library/<id>/edit → /workshop/<id> (Produktansicht, 0.41)', () => {
         expect(umleitung(ladeAltenEditor, { params: { id: '42' }, url: new URL('http://x/library/42/edit') }))
-            .toEqual({ status: 301, location: '/workshop/42/edit' });
+            .toEqual({ status: 301, location: '/workshop/42' });
+    });
+
+    it('/workshop/<id>/edit → Produktansicht /workshop/<id> (0.41)', () => {
+        expect(umleitung(ladeAltenWerkstattEditor, { params: { id: '42' }, url: new URL('http://x/workshop/42/edit') }))
+            .toEqual({ status: 301, location: '/workshop/42' });
     });
 
     it('/tools → Werkzeuge in der Assistentenliste', () => {

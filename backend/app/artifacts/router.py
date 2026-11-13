@@ -637,6 +637,88 @@ async def _eigenes_artefakt(
     return record
 
 
+# ── Produktansicht (0.41, Schritt 8) ──────────────────────────────────────────
+
+
+class ProduktInfo(ArtifactItem):
+    """Alles, was die Produktansicht `/workshop/<id>` braucht — ohne die Bytes."""
+
+    # Herkunft: Der Chat ist nur verlinkbar, solange es ihn gibt (93 Tage).
+    origin_conversation_id: UUID | None = None
+    chat_vorhanden: bool = False
+    # Ursprungsprodukt, etwa das Dokument eines Exports.
+    derived_from: UUID | None = None
+    derived_from_title: str | None = None
+
+
+@router.get("/{artifact_id}/info", response_model=ProduktInfo)
+async def produkt_info(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProduktInfo:
+    """Angaben eines Produkts für die Produktansicht — nur die Eigentümer:in."""
+    from app.db.models import Conversation
+
+    r = await _eigenes_artefakt(db, artifact_id, current_user)
+    baustein = await uebernahme.vorhandener_baustein(db, artifact_id=r.id, pseudonym=current_user.sub)
+    exporte = [
+        ExportItem(id=e.id, kind=e.kind, mime_type=e.mime_type, title=e.title,
+                   byte_size=e.byte_size, created_at=e.created_at)
+        for e in await store.exporte_zu(db, [r.id])
+    ] if r.kind == "document" else []
+    chat_vorhanden = False
+    if r.origin_conversation_id is not None:
+        conv = await db.get(Conversation, r.origin_conversation_id)
+        chat_vorhanden = conv is not None and conv.pseudonym == current_user.sub
+    ursprung = await store.get_artifact(db, r.derived_from) if r.derived_from else None
+    return ProduktInfo(
+        id=r.id, kind=r.kind, mime_type=r.mime_type, title=r.title, byte_size=r.byte_size,
+        source=r.source, created_at=r.created_at, expires_at=r.expires_at,
+        provider_model=r.provider_model, subject_id=r.subject_id, topic=r.topic,
+        updated_at=r.updated_at, assistant_name=r.assistant_name, exporte=exporte,
+        uebernehmbar=uebernahme.ist_uebernehmbar(r),
+        baustein_id=baustein.id if baustein else None,
+        baustein_titel=baustein.title if baustein else None,
+        origin_conversation_id=r.origin_conversation_id if chat_vorhanden else None,
+        chat_vorhanden=chat_vorhanden,
+        derived_from=r.derived_from,
+        derived_from_title=ursprung.title if ursprung else None,
+    )
+
+
+@router.post("/{artifact_id}/kopie", response_model=SavedArtifact)
+async def als_kopie_speichern(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SavedArtifact:
+    """„Als Kopie speichern“ — ein neues Dokument mit gleichem Inhalt und gleichen Angaben.
+
+    Nur Dokumente (die einzige Art, die sich bisher bearbeiten lässt). Die Kopie hat keine
+    Herkunft aus einer Nachricht (`origin_ref`): Sonst führte ein zweites „Als Dokument
+    bearbeiten“ im Chat in die Kopie statt ins Original. Exporte gehen nicht mit.
+    """
+    r = await _eigenes_artefakt(db, artifact_id, current_user)
+    if r.kind != "document":
+        raise HTTPException(status_code=422, detail="Nur Dokumente lassen sich als Kopie speichern")
+    try:
+        kopie = await store.create_document(
+            db, owner_pseudonym=current_user.sub, roles=current_user.roles, grade=current_user.grade,
+            title=f"{r.title} (Kopie)"[:200], markdown=r.source or "",
+            origin_conversation_id=r.origin_conversation_id, provider_model=r.provider_model,
+            subject_id=r.subject_id, assistant_name=r.assistant_name,
+        )
+        if r.topic:
+            kopie = await store.update_angaben(db, kopie, topic=r.topic)
+    except store.QuotaExceeded:
+        raise HTTPException(
+            status_code=409,
+            detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
+        )
+    return _saved(kopie, True)
+
+
 @router.get("/{artifact_id}/baustein", response_model=BausteinVorschlag)
 async def baustein_vorschlag(
     artifact_id: UUID,

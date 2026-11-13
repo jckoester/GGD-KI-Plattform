@@ -2577,6 +2577,20 @@ export async function updateArtefaktAngaben(artifactId, angaben) {
     return res.json()
 }
 
+// Produktansicht (0.41): Angaben eines Produkts ohne die Bytes — Herkunft, Exporte, Baustein.
+export async function getProduktInfo(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/info`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Produkt konnte nicht geladen werden')
+    return res.json()
+}
+
+// „Als Kopie speichern“ (nur Dokumente): neues Dokument mit gleichem Inhalt und gleichen Angaben.
+export async function produktKopieren(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/kopie`, { method: 'POST', credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Kopie konnte nicht angelegt werden')
+    return res.json()
+}
+
 // Themen zum Vorschlagen: { eigene, einheiten } (Einheiten nur für Lehrkräfte).
 export async function getThemenVorschlaege(subjectId = null) {
     const query = subjectId != null ? `?subject_id=${subjectId}` : ''
