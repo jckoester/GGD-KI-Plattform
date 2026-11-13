@@ -2179,6 +2179,27 @@ export async function getPlanungsgruppen() {
 }
 
 // Archiv der Planung (0.42): Gruppen, dann Einheiten und Stunden einer Gruppe — immer lesend.
+// Kopieren als Vorlage (0.42): Stunde in eine Einheit, Einheit samt Stunden — in eine aktuelle
+// Gruppe desselben Fachs. Antwort mit `meldungen` (was nicht oder umgestellt übernommen wurde).
+async function kopiere(pfad, body) {
+    const res = await fetch(`${BASE}${pfad}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Kopieren ist fehlgeschlagen')
+    return res.json()
+}
+
+export function copyLesson(nodeId, body) {
+    return kopiere(`/planning/lessons/${nodeId}/copy`, body)
+}
+
+export function copyUnit(nodeId, body) {
+    return kopiere(`/planning/units/${nodeId}/copy`, body)
+}
+
 export async function getPlanungsArchiv() {
     const res = await fetch(`${BASE}/planning/archive`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, 'Archiv konnte nicht geladen werden')

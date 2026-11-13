@@ -29,6 +29,7 @@
   import PlannerTable from '$lib/components/planner/PlannerTable.svelte'
   import UnitLegend from '$lib/components/planner/UnitLegend.svelte'
   import UnitDialog from '$lib/components/planner/UnitDialog.svelte'
+  import KopierenDialog from '$lib/components/planner/KopierenDialog.svelte'
   import AusfallDialog from '$lib/components/planner/AusfallDialog.svelte'
   import PatternEditor from '$lib/components/planner/PatternEditor.svelte'
   import ReflowAssistbar from '$lib/components/planner/ReflowAssistbar.svelte'
@@ -326,6 +327,13 @@
   async function onUnitCreated() {
     showUnitDialog = false
     await refreshVomServer()
+  }
+
+  // Einheit als Vorlage kopieren (0.42). In dieselbe Gruppe kopiert → Übersicht neu laden.
+  let kopierEinheit = $state(null)
+
+  function einheitKopiert(_ergebnis, ziel) {
+    if (ziel?.id === groupId) loadOverview()
   }
 
   function openEditUnit(unit) {
@@ -636,6 +644,7 @@
     balance={overview.balance}
     onCreateUnit={() => { editUnit = null; showUnitDialog = true }}
     onEditUnit={openEditUnit}
+    onCopyUnit={(unit) => (kopierEinheit = unit)}
     onSelectUnit={(unit) => plannerTable?.scrollToUnit(unit.id)}
   />
 
@@ -678,6 +687,15 @@
   onConfirm={ausfallBestaetigt}
   onClose={() => { ausfallDialog = null }}
   fokusZurueck={() => document.querySelector(`[data-slot="${ausfallZiel}"] [aria-label="Weitere Aktionen"]`)}
+/>
+
+<KopierenDialog
+  open={kopierEinheit != null}
+  art="einheit"
+  quelle={kopierEinheit ? { id: kopierEinheit.id, titel: kopierEinheit.title } : null}
+  fachId={group?.subject_id ?? null}
+  onClose={() => (kopierEinheit = null)}
+  onKopiert={einheitKopiert}
 />
 
 <UnitDialog

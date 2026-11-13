@@ -12,6 +12,7 @@
     } from '$lib/planung_archiv.js'
     import { ueColorIndex } from '$lib/planner.js'
     import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
+    import KopierenDialog from '$lib/components/planner/KopierenDialog.svelte'
     import FachBadge from '$lib/components/FachBadge.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
@@ -24,6 +25,16 @@
     let laedt = $state(true)
     let fehler = $state(null)
     let ansicht = $state('kacheln')
+    // Kopieren als Vorlage (0.42): {art, quelle} oder null.
+    let kopieren = $state(null)
+
+    function kopiereStunde(s) {
+        kopieren = { art: 'stunde', quelle: { id: s.id, titel: s.titel, einheitTitel: einheit?.id ? einheit.titel : '' } }
+    }
+
+    function kopiereEinheit(e) {
+        kopieren = { art: 'einheit', quelle: { id: e.id, titel: e.titel } }
+    }
 
     $effect(() => {
         const id = groupId
@@ -49,6 +60,8 @@
     const karte = 'block rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-4 bg-light-bg dark:bg-dark-bg ' +
         'hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors'
     const zeile = 'flex items-center gap-3 px-4 py-3 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors'
+    const kopierKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded border border-light-ui-3 dark:border-dark-ui-3 ' +
+        'text-light-tx-2 dark:text-dark-tx-2 bg-light-bg dark:bg-dark-bg hover:text-light-bl dark:hover:text-dark-bl transition-colors'
     const liste = 'divide-y divide-light-ui-2 dark:divide-dark-ui-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3'
 </script>
 
@@ -106,8 +119,8 @@
             {:else if ansicht === 'liste'}
                 <ol class={liste}>
                     {#each einheit.stunden as s, i (s.id)}
-                        <li>
-                            <a href={stundenPfad(inhalt.gruppe, s.id)} class={zeile}>
+                        <li class="flex items-center pr-3">
+                            <a href={stundenPfad(inhalt.gruppe, s.id)} class="{zeile} flex-1 min-w-0">
                                 <span class="w-6 text-xs text-light-tx-2 dark:text-dark-tx-2">{i + 1}</span>
                                 <span class="flex-1 min-w-0">
                                     <span class="block font-medium text-light-tx dark:text-dark-tx truncate">{s.titel}</span>
@@ -117,13 +130,16 @@
                                 </span>
                                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">{stundeUnterzeile(s)}</span>
                             </a>
+                            <button type="button" class={kopierKnopf} onclick={() => kopiereStunde(s)}
+                                    aria-label="Stunde „{s.titel}“ kopieren">Kopieren</button>
                         </li>
                     {/each}
                 </ol>
             {:else}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {#each einheit.stunden as s, i (s.id)}
-                        <a href={stundenPfad(inhalt.gruppe, s.id)} class={karte}>
+                        <div class="relative">
+                        <a href={stundenPfad(inhalt.gruppe, s.id)} class="{karte} h-full pr-24">
                             <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Stunde {i + 1}</span>
                             <p class="font-medium text-light-tx dark:text-dark-tx">{s.titel}</p>
                             {#if s.stundenziel}
@@ -133,6 +149,9 @@
                                 <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">{stundeUnterzeile(s)}</p>
                             {/if}
                         </a>
+                        <button type="button" class="{kopierKnopf} absolute top-2 right-2" onclick={() => kopiereStunde(s)}
+                                aria-label="Stunde „{s.titel}“ kopieren">Kopieren</button>
+                        </div>
                     {/each}
                 </div>
             {/if}
@@ -143,8 +162,8 @@
             {:else if ansicht === 'liste'}
                 <ul class={liste}>
                     {#each einheiten as e (e.schluessel)}
-                        <li>
-                            <a href={archivPfad(groupId, e.schluessel)} class={zeile}>
+                        <li class="flex items-center pr-3">
+                            <a href={archivPfad(groupId, e.schluessel)} class="{zeile} flex-1 min-w-0">
                                 <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {farbe(e)}"></span>
                                 <span class="flex-1 min-w-0 font-medium text-light-tx dark:text-dark-tx truncate
                                              {e.id ? '' : 'italic'}">{e.titel}</span>
@@ -152,22 +171,40 @@
                                     {anzahl(e.stunden.length, 'Stunde', 'Stunden')}
                                 </span>
                             </a>
+                            {#if e.id}
+                                <button type="button" class={kopierKnopf} onclick={() => kopiereEinheit(e)}
+                                        aria-label="Einheit „{e.titel}“ kopieren">Kopieren</button>
+                            {/if}
                         </li>
                     {/each}
                 </ul>
             {:else}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {#each einheiten as e (e.schluessel)}
-                        <a href={archivPfad(groupId, e.schluessel)} class={karte}
+                        <div class="relative">
+                        <a href={archivPfad(groupId, e.schluessel)} class="{karte} h-full pr-24"
                            style={e.farbe != null ? `border-left: 4px solid ${farbe(e)}` : ''}>
                             <p class="font-medium text-light-tx dark:text-dark-tx {e.id ? '' : 'italic'}">{e.titel}</p>
                             <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
                                 {anzahl(e.stunden.length, 'Stunde', 'Stunden')}
                             </p>
                         </a>
+                        {#if e.id}
+                            <button type="button" class="{kopierKnopf} absolute top-2 right-2" onclick={() => kopiereEinheit(e)}
+                                    aria-label="Einheit „{e.titel}“ kopieren">Kopieren</button>
+                        {/if}
+                        </div>
                     {/each}
                 </div>
             {/if}
         {/if}
     {/if}
 </div>
+
+<KopierenDialog
+    open={kopieren != null}
+    art={kopieren?.art ?? 'stunde'}
+    quelle={kopieren?.quelle ?? null}
+    fachId={inhalt?.gruppe?.fach?.id ?? null}
+    onClose={() => (kopieren = null)}
+/>

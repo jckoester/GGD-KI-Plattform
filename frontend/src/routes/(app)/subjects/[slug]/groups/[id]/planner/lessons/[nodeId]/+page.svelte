@@ -1,7 +1,7 @@
 <script>
   import { dauerZusatz } from '$lib/phasendauer.js'
   import { neuerChatPfad } from '$lib/chatziel.js'
-  import { archivPfad } from '$lib/planung_archiv.js'
+  import { archivPfad, datumKurz } from '$lib/planung_archiv.js'
   import { passendeAssistenten } from '$lib/assistentenwahl.js'
   import { mitVerworfen } from '$lib/begriffe_der_stunde.js'
   import { user } from '$lib/stores/user.js'
@@ -31,6 +31,7 @@
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import PhaseTable from '$lib/components/planner/PhaseTable.svelte'
   import AssistentenKnopf from '$lib/components/AssistentenKnopf.svelte'
+  import KopierenDialog from '$lib/components/planner/KopierenDialog.svelte'
 
   const { data } = $props()
   const nodeId = $derived(data.nodeId)
@@ -285,6 +286,22 @@
   // Planer, den man nicht (mehr) ändern darf — oder gar nicht öffnen kann.
   const uebersicht = $derived(nurLesen ? archivPfad(groupId) : plannerBase)
 
+  // ── Kopieren und Notiz aus der Vorlage (0.42) ──────────────────────────────────
+
+  let kopierenOffen = $state(false)
+  let notizFehler = $state(null)
+
+  // Die Nachbereitungsnotiz der Vorlage (S1): nur ein Hinweis, keine Nachbereitung dieser Stunde.
+  async function notizEntfernen() {
+    notizFehler = null
+    try {
+      await patchLesson(nodeId, { notiz_aus_vorlage_entfernen: true })
+      lesson = { ...lesson, notiz_aus_vorlage: null }
+    } catch (e) {
+      notizFehler = e.message
+    }
+  }
+
   // Einheitliche Button-Höhe für die Kopf-Aktionen; Export-Buttons sind kleiner (eigene Zeile).
   const navBtn =
     'h-8 inline-flex items-center gap-1 px-3 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 ' +
@@ -444,6 +461,12 @@
               </a>
             </div>
 
+            <!-- Kopieren — auch im Lesezustand: Aus dem Archiv kopieren ist der Hauptfall (F11). -->
+            <button type="button" onclick={() => (kopierenOffen = true)} class={navBtn}
+                    title="Als Vorlage in eine Gruppe desselben Fachs kopieren">
+              ⧉ Kopieren
+            </button>
+
             <!-- Assistent — im Lesemodus nicht: Einen Bezug setzt nur, wer die Stunde
                  bearbeiten darf (sonst 403 beim ersten Senden). -->
             {#if !nurLesen}
@@ -554,6 +577,31 @@
           {onVorschlagen}
         />
       </section>
+
+      <!-- Notiz aus der Vorlage (0.42, S1) -->
+      {#if lesson.notiz_aus_vorlage?.text}
+        <section class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx">
+                Notiz aus der Vorlage{#if lesson.notiz_aus_vorlage.datum}
+                  <span class="font-normal text-light-tx-2 dark:text-dark-tx-2">
+                    · Stunde vom {datumKurz(lesson.notiz_aus_vorlage.datum)}</span>{/if}
+              </h2>
+              <p class="mt-1 text-sm text-light-tx-2 dark:text-dark-tx-2 whitespace-pre-wrap">{lesson.notiz_aus_vorlage.text}</p>
+            </div>
+            {#if !nurLesen}
+              <button type="button" onclick={notizEntfernen}
+                      class="flex-shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re">
+                Entfernen
+              </button>
+            {/if}
+          </div>
+          {#if notizFehler}
+            <p class="mt-1 text-xs text-light-re dark:text-dark-re">{notizFehler}</p>
+          {/if}
+        </section>
+      {/if}
 
       <!-- Phasen-Tabelle -->
       <section>
@@ -727,4 +775,14 @@
 
     </div>
   </div>
+{/if}
+
+{#if lesson}
+  <KopierenDialog
+    open={kopierenOffen}
+    art="stunde"
+    quelle={{ id: nodeId, titel: lesson.titel, einheitTitel: lesson.ue?.titel ?? '' }}
+    fachId={lesson.subject_id}
+    onClose={() => (kopierenOffen = false)}
+  />
 {/if}
