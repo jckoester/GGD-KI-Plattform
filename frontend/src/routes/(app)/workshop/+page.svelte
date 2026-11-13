@@ -262,13 +262,29 @@
         triggerDownload(blob, `${slugify(item.title)}.${codeExt(item.kind)}`);
     }
 
+    async function exportLoeschen(dokument, ex) {
+        busyId = ex.id;
+        try {
+            await deleteArtifact(ex.id);
+            items = items.map((i) => (i.id === dokument.id
+                ? { ...i, exporte: i.exporte.filter((e) => e.id !== ex.id) }
+                : i));
+            usedBytes = Math.max(0, usedBytes - ex.byte_size);
+        } catch (err) {
+            error = err.message ?? 'Löschen fehlgeschlagen.';
+        } finally {
+            busyId = null;
+        }
+    }
+
     async function confirmDelete(item) {
         busyId = item.id;
         try {
             await deleteArtifact(item.id);
             items = items.filter((i) => i.id !== item.id);
             total = Math.max(0, total - 1);
-            usedBytes = Math.max(0, usedBytes - item.byte_size);
+            const exporte = (item.exporte ?? []).reduce((summe, e) => summe + e.byte_size, 0);
+            usedBytes = Math.max(0, usedBytes - item.byte_size - exporte);
             confirmDeleteId = null;
         } catch (err) {
             error = err.message ?? 'Löschen fehlgeschlagen.';
@@ -371,7 +387,44 @@
                     </p>
                 {/if}
 
-                <!-- Aktionen -->
+                <!-- Exporte am Dokument (0.41, F5): eingeklappt, nicht als eigene Karten. -->
+        {#if item.exporte?.length}
+            <details class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                <summary class="cursor-pointer select-none">
+                    {item.exporte.length} {item.exporte.length === 1 ? 'Export' : 'Exporte'}
+                </summary>
+                <ul class="mt-1 space-y-1">
+                    {#each item.exporte as ex (ex.id)}
+                        <li class="flex items-center gap-2">
+                            <span class={BADGE}>{kindLabel(ex.kind)}</span>
+                            <span class="flex-1 truncate">{fmtDate(ex.created_at)} · {formatBytes(ex.byte_size)}</span>
+                            <a
+                                href="/api/artifacts/{ex.id}"
+                                download="{slugify(ex.title)}.{mimeExt(ex.mime_type)}"
+                                aria-label="Export herunterladen"
+                                title="Herunterladen"
+                                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                            >
+                                <Download class="w-3.5 h-3.5" />
+                            </a>
+                            <button
+                                type="button"
+                                onclick={() => exportLoeschen(item, ex)}
+                                disabled={busyId === ex.id}
+                                aria-label="Export löschen"
+                                title="Export löschen"
+                                class="p-1 rounded hover:text-light-re dark:hover:text-dark-re
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 disabled:opacity-50"
+                            >
+                                <Trash2 class="w-3.5 h-3.5" />
+                            </button>
+                        </li>
+                    {/each}
+                </ul>
+            </details>
+        {/if}
+
+        <!-- Aktionen -->
                 <div class="flex flex-wrap items-center gap-1 mt-3 pt-2
                             border-t border-light-ui-3 dark:border-dark-ui-3">
                     {#if zitiername(item.provider_model)}
@@ -490,7 +543,9 @@
                                            hover:bg-light-re-bg dark:hover:bg-dark-re-bg/20
                                            disabled:opacity-50"
                                 >
-                                    Löschen?
+                                    {item.exporte?.length
+                                        ? `Samt ${item.exporte.length} ${item.exporte.length === 1 ? 'Export' : 'Exporten'} löschen?`
+                                        : 'Löschen?'}
                                 </button>
                                 <button
                                     type="button"

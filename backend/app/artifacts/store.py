@@ -330,7 +330,9 @@ def _bedingungen(owner_pseudonym: str, f: Filter, now: datetime) -> list:
     # Lokale Importe: `Group`/`ContextNode` werden nur hier gebraucht.
     from app.db.models import ContextNode, Group
 
-    wo = [Artifact.owner_pseudonym == owner_pseudonym]
+    # Abgeleitete Produkte (Exporte) stehen nicht für sich in der Liste, sondern an ihrem
+    # Dokument (0.41, F5). Exporte aus der Zeit davor tragen keinen Verweis und bleiben sichtbar.
+    wo = [Artifact.owner_pseudonym == owner_pseudonym, Artifact.derived_from.is_(None)]
     if f.group_id is not None:
         fach_der_gruppe = select(Group.subject_id).where(Group.id == f.group_id).scalar_subquery()
         wo.append(Artifact.subject_id == fach_der_gruppe)
@@ -465,14 +467,53 @@ async def collect_pseudonym_artifact_paths(
     return [_file_path(artifact_id, mime_type) for artifact_id, mime_type in zeilen]
 
 
-async def delete_artifact(db: AsyncSession, record: Artifact) -> None:
-    path = _file_path(record.id, record.mime_type)
-    try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        logger.warning("Artefakt-Datei nicht löschbar: %s", path)
+async def abgeleitete(db: AsyncSession, artifact_ids) -> list[tuple[UUID, str, UUID]]:
+    """(id, mime_type, derived_from) der Produkte, die von diesen abgeleitet sind — etwa die
+    Exporte eines Dokuments (0.41, F5).
+
+    Eine Ebene genügt: Abgeleitet wird bislang nur aus Dokumenten, und ein Export hat
+    selbst keine Exporte.
+    """
+    ids = list(artifact_ids)
+    if not ids:
+        return []
+    return [tuple(z) for z in (await db.execute(
+        select(Artifact.id, Artifact.mime_type, Artifact.derived_from)
+        .where(Artifact.derived_from.in_(ids))
+    )).all()]
+
+
+async def exporte_zu(db: AsyncSession, dokument_ids) -> list[Artifact]:
+    """Die Exporte dieser Dokumente, neueste zuerst — eine Abfrage für die ganze Liste."""
+    ids = list(dokument_ids)
+    if not ids:
+        return []
+    return list((await db.execute(
+        select(Artifact).where(Artifact.derived_from.in_(ids))
+        .order_by(Artifact.created_at.desc(), Artifact.id)
+    )).scalars().all())
+
+
+def _dateien_entfernen(paare) -> None:
+    for artifact_id, mime_type in paare:
+        try:
+            _file_path(artifact_id, mime_type).unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Artefakt-Datei nicht löschbar: %s", artifact_id)
+
+
+async def delete_artifact(db: AsyncSession, record: Artifact) -> int:
+    """Löscht ein Produkt samt allem, was davon abgeleitet ist; gibt deren Anzahl zurück.
+
+    Die Zeilen der Exporte nimmt die Datenbank mit (`derived_from … ON DELETE CASCADE`,
+    Alembic 0103) — **ihre Dateien nicht**. Deshalb werden sie hier vorher eingesammelt;
+    sonst blieben sie verwaist auf der Platte und zählten in keiner Belegung mehr.
+    """
+    kinder = await abgeleitete(db, [record.id])
+    _dateien_entfernen([(record.id, record.mime_type), *[(k[0], k[1]) for k in kinder]])
     await db.delete(record)
     await db.commit()
+    return len(kinder)
 
 
 @dataclass
@@ -488,12 +529,13 @@ async def cleanup_artifacts(
     ts = _now(now)
     result = await db.execute(select(Artifact).where(Artifact.expires_at < ts))
     expired = list(result.scalars().all())
+    # Was von einem abgelaufenen Produkt abgeleitet ist, geht mit (CASCADE) — auch wenn die
+    # eigene Frist noch läuft. Seine Datei muss deshalb ebenfalls weg.
+    abgelaufen = {a.id for a in expired}
+    mitgenommen = [(k[0], k[1]) for k in await abgeleitete(db, abgelaufen) if k[0] not in abgelaufen]
     if not dry_run and expired:
-        for a in expired:
-            try:
-                _file_path(a.id, a.mime_type).unlink(missing_ok=True)
-            except OSError:
-                logger.warning("Artefakt-Datei nicht löschbar: %s", a.id)
+        _dateien_entfernen([(a.id, a.mime_type) for a in expired] + mitgenommen)
         await db.execute(delete(Artifact).where(Artifact.expires_at < ts))
         await db.commit()
-    return ArtifactCleanupStats(scanned=len(expired), expired_removed=len(expired))
+    entfernt = len(expired) + len(mitgenommen)
+    return ArtifactCleanupStats(scanned=entfernt, expired_removed=entfernt)

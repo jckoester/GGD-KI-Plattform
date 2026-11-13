@@ -154,3 +154,46 @@ async def test_belegung_bleibt_unverfiltert(test_client, auth_headers_teacher2, 
     antwort = await _liste(test_client, auth_headers_teacher2, subject_id=FACH)
     assert antwort["total"] == 1
     assert antwort["used_bytes"] == 20
+
+
+# ── Exporte am Dokument (Schritt 5, F5) ──────────────────────────────────────
+
+def _export(conn, dokument_id, titel, kind="export_pdf"):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO artifacts (owner_pseudonym, kind, mime_type, byte_size, title, derived_from, expires_at)"
+            " VALUES (%s, %s, 'application/pdf', 5, %s, %s, %s) RETURNING id",
+            (ICH, kind, titel, dokument_id, JETZT + timedelta(days=300)),
+        )
+        eid = cur.fetchone()[0]
+    conn.commit()
+    return str(eid)
+
+
+async def test_exporte_haengen_am_dokument(test_client, auth_headers_teacher2, conn):
+    dok = _p(conn, "Arbeitsblatt")
+    export = _export(conn, dok, "Arbeitsblatt")
+    _p(conn, "alter Export ohne Verweis", kind="export_pdf")
+
+    antwort = await _liste(test_client, auth_headers_teacher2, sort="title")
+
+    assert _titel(antwort) == ["alter Export ohne Verweis", "Arbeitsblatt"]
+    assert antwort["total"] == 2
+    karte = next(i for i in antwort["items"] if i["id"] == dok)
+    assert [e["id"] for e in karte["exporte"]] == [export]
+    # Auch der Filter „Dateien“ zeigt nur, was für sich steht.
+    assert _titel(await _liste(test_client, auth_headers_teacher2, art="file")) == ["alter Export ohne Verweis"]
+
+
+async def test_dokument_loeschen_nimmt_die_exporte_mit(test_client, auth_headers_teacher2, conn):
+    dok = _p(conn, "Arbeitsblatt")
+    _export(conn, dok, "Arbeitsblatt")
+    _export(conn, dok, "Arbeitsblatt", kind="export_docx")
+
+    resp = await test_client.delete(f"/artifacts/{dok}", headers=auth_headers_teacher2)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["mitgeloescht"] == 2
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM artifacts WHERE derived_from = %s", (dok,))
+        assert cur.fetchone()[0] == 0

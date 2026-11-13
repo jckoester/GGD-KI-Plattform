@@ -14,6 +14,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Werkstatt: Suche in Titel und Inhalt, Filter nach Art, Fach, Thema, „läuft bald ab“ und „als Baustein übernommen“,
   Sortierung (zuletzt bearbeitet, zuletzt angelegt, Titel) und Gruppierung nach Fach; Sortierung und Gruppierung
   werden gemerkt. Titel, Fach und Thema lassen sich an jeder Karte ändern, mit Vorschlägen fürs Thema.
+- Exporte eines Dokuments, die in der Werkstatt behalten werden, stehen eingeklappt am Dokument statt als eigene
+  Karten und werden mit ihm gelöscht.
 
 ### Behoben
 

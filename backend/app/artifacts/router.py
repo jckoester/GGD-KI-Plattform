@@ -92,6 +92,8 @@ class ArtifactItem(BaseModel):
     topic: str | None = None
     updated_at: datetime | None = None
     assistant_name: str | None = None
+    # Exporte dieses Dokuments (0.41, F5); sie stehen nicht mehr für sich in der Liste.
+    exporte: list[ExportItem] = []
     # Lässt sich daraus ein Baustein machen (AP8)? Die Antwort kommt vom Server, damit
     # der Knopf in der Bibliothek nicht nach eigener Rechnung erscheint.
     uebernehmbar: bool = False
@@ -99,6 +101,17 @@ class ArtifactItem(BaseModel):
     # übernommen →". None heißt: noch keiner, oder der letzte wurde gelöscht.
     baustein_id: UUID | None = None
     baustein_titel: str | None = None
+
+
+class ExportItem(BaseModel):
+    """Ein Export am Dokument (0.41, F5) — eingeklappt an dessen Karte."""
+
+    id: UUID
+    kind: str
+    mime_type: str
+    title: str
+    byte_size: int
+    created_at: datetime
 
 
 class LibraryResponse(BaseModel):
@@ -337,6 +350,12 @@ async def list_library(
     bausteine = await uebernahme.bausteine_zu_artefakten(
         db, artifact_ids=[r.id for r in records], pseudonym=current_user.sub
     )
+    exporte_je_dokument: dict[UUID, list[ExportItem]] = {}
+    for kind_ in await store.exporte_zu(db, [r.id for r in records if r.kind == "document"]):
+        exporte_je_dokument.setdefault(kind_.derived_from, []).append(ExportItem(
+            id=kind_.id, kind=kind_.kind, mime_type=kind_.mime_type, title=kind_.title,
+            byte_size=kind_.byte_size, created_at=kind_.created_at,
+        ))
 
     def _item(r: Artifact) -> ArtifactItem:
         baustein = bausteine.get(str(r.id))
@@ -347,6 +366,7 @@ async def list_library(
             provider_model=r.provider_model,
             subject_id=r.subject_id, topic=r.topic, updated_at=r.updated_at,
             assistant_name=r.assistant_name,
+            exporte=exporte_je_dokument.get(r.id, []),
             uebernehmbar=uebernahme.ist_uebernehmbar(r),
             baustein_id=baustein.id if baustein else None,
             baustein_titel=baustein.title if baustein else None,
@@ -539,6 +559,10 @@ async def export_document(
                 title=record.title,
                 source=None,
                 origin_ref=None,
+                # Der Export hängt am Dokument (0.41, F5): Die Werkstatt zeigt ihn dort, und er
+                # geht mit ihm. Fach und Thema wie das Dokument.
+                derived_from=record.id,
+                subject_id=record.subject_id,
             )
         except store.QuotaExceeded:
             raise HTTPException(
@@ -710,14 +734,14 @@ async def delete_artifact_endpoint(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Löscht ein Artefakt (Row + Datei) — nur die Eigentümer:in."""
+    """Löscht ein Produkt samt seinen Exporten (Zeilen und Dateien) — nur die Eigentümer:in."""
     record = await store.get_artifact(db, artifact_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Produkt nicht gefunden")
     if record.owner_pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
-    await store.delete_artifact(db, record)
-    return {"ok": True}
+    mitgeloescht = await store.delete_artifact(db, record)
+    return {"ok": True, "mitgeloescht": mitgeloescht}
 
 
 @router.post("/ggb")

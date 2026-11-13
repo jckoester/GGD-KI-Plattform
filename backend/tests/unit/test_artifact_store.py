@@ -84,6 +84,7 @@ def test_read_missing_returns_none(monkeypatch, tmp_path):
 
 async def test_cleanup_removes_expired(monkeypatch, tmp_path):
     monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "abgeleitete", AsyncMock(return_value=[]))
     aid = uuid4()
     (tmp_path / f"{aid}.svg").write_bytes(b"svg")
     art = SimpleNamespace(id=aid, mime_type="image/svg+xml")
@@ -98,6 +99,7 @@ async def test_cleanup_removes_expired(monkeypatch, tmp_path):
 
 async def test_cleanup_dry_run_keeps_files(monkeypatch, tmp_path):
     monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "abgeleitete", AsyncMock(return_value=[]))
     aid = uuid4()
     (tmp_path / f"{aid}.svg").write_bytes(b"svg")
     art = SimpleNamespace(id=aid, mime_type="image/svg+xml")
@@ -237,3 +239,38 @@ async def test_save_artifact_traegt_fach_assistent_und_zeitpunkte(monkeypatch, t
     assert (art.subject_id, art.assistant_name) == (7, "Mathe-Aufgaben")
     assert art.created_at == art.updated_at == _NOW
     assert art.topic is None and art.derived_from is None
+
+
+async def test_cleanup_nimmt_die_dateien_abgeleiteter_mit(monkeypatch, tmp_path):
+    """0.41, F5: Läuft ein Dokument ab, gehen seine Exporte per CASCADE mit — ihre Dateien
+    müssen hier mit weg, auch wenn ihre eigene Frist noch läuft."""
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    dok, export = uuid4(), uuid4()
+    (tmp_path / f"{dok}.md").write_bytes(b"md")
+    (tmp_path / f"{export}.pdf").write_bytes(b"pdf")
+    monkeypatch.setattr(store, "abgeleitete", AsyncMock(return_value=[(export, "application/pdf", dok)]))
+    sel = MagicMock(); sel.scalars.return_value.all.return_value = [SimpleNamespace(id=dok, mime_type="text/markdown")]
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(side_effect=[sel, MagicMock()])
+
+    stats = await store.cleanup_artifacts(db, now=_NOW)
+
+    assert stats.expired_removed == 2
+    assert not (tmp_path / f"{dok}.md").exists()
+    assert not (tmp_path / f"{export}.pdf").exists()
+
+
+async def test_loeschen_nimmt_die_dateien_der_exporte_mit(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    dok, export = uuid4(), uuid4()
+    (tmp_path / f"{dok}.md").write_bytes(b"md")
+    (tmp_path / f"{export}.docx").write_bytes(b"docx")
+    monkeypatch.setattr(store, "abgeleitete", AsyncMock(return_value=[
+        (export, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", dok),
+    ]))
+    db = MagicMock(); db.delete = AsyncMock(); db.commit = AsyncMock()
+
+    anzahl = await store.delete_artifact(db, SimpleNamespace(id=dok, mime_type="text/markdown"))
+
+    assert anzahl == 1
+    assert not (tmp_path / f"{dok}.md").exists()
+    assert not (tmp_path / f"{export}.docx").exists()

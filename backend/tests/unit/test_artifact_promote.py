@@ -343,6 +343,7 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     )
     monkeypatch.setattr(store_mod, "count_artifacts", AsyncMock(return_value=1))
     monkeypatch.setattr(store_mod, "facetten", AsyncMock(return_value=([], [])))
+    monkeypatch.setattr(store_mod, "exporte_zu", AsyncMock(return_value=[]))
     # Die Übernahme-Zuordnung (AP8) fragt die DB; hier steht nur ein MagicMock.
     monkeypatch.setattr(
         "app.artifacts.uebernahme.bausteine_zu_artefakten", AsyncMock(return_value={})
@@ -369,7 +370,7 @@ def test_delete_artifact_owner_ok(monkeypatch):
     client = _client(monkeypatch)
     resp = client.request("DELETE", f"/artifacts/{uuid4()}")
     assert resp.status_code == 200
-    assert resp.json() == {"ok": True}
+    assert resp.json()["ok"] is True
     deleted.assert_awaited_once()
 
 
@@ -443,6 +444,7 @@ def _doc(**kw):
     base = dict(
         id=uuid4(), owner_pseudonym="p", kind="document", mime_type="text/markdown",
         title="Arbeitsblatt", source="# Titel", byte_size=7, created_at=ts, expires_at=ts,
+        subject_id=None, topic=None, updated_at=ts,
     )
     base.update(kw)
     return SimpleNamespace(**base)
@@ -535,12 +537,16 @@ def test_export_save_returns_json(monkeypatch):
         AsyncMock(return_value=(b"PKdocx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
     )
     saved = _doc(kind="export_docx", mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    monkeypatch.setattr(store_mod, "save_artifact", AsyncMock(return_value=saved))
+    speichern = AsyncMock(return_value=saved)
+    monkeypatch.setattr(store_mod, "save_artifact", speichern)
     client = _client(monkeypatch)
     resp = client.post(f"/artifacts/{uuid4()}/export?format=docx&save=true")
     assert resp.status_code == 200
     body = resp.json()
     assert body["created"] is True and body["kind"] == "export_docx"
+    # 0.41, F5: Der Export hängt am Dokument.
+    dokument = store_mod.get_artifact.return_value
+    assert speichern.await_args.kwargs["derived_from"] == dokument.id
 
 
 def test_export_wrong_kind_422(monkeypatch):
