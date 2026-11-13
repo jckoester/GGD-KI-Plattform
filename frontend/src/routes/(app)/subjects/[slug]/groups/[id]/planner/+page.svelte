@@ -36,11 +36,53 @@
   import Parkplatz from '$lib/components/planner/Parkplatz.svelte'
   import { getParkplatz, unparkEintrag } from '$lib/api.js'
   import { umhaengeErgebnis } from '$lib/jahresraster.js'
+  // Einheitenansicht (0.42.3): Einheiten mit Stunden, auch ohne Termin — etwa Kopien.
+  import { getGruppenInhalt, getPreferences, patchPreferences } from '$lib/api.js'
+  import {
+    EINHEITEN, JAHR, PLANUNGS_ANSICHT_SCHLUESSEL, planerAnsichtPfad, planungsAnsichtAusAdresse,
+    planungsAnsichtAusEinstellungen,
+  } from '$lib/planung_archiv.js'
+  import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
+  import EinheitenAnsicht from '$lib/components/planner/EinheitenAnsicht.svelte'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
   const group = $derived($myTeachingGroups.find(g => g.id === groupId) ?? null)
   const subject = $derived(group ? ($subjectMap[group.subject_id] ?? null) : null)
+
+  // ── Ansicht: Jahresübersicht oder Einheiten (0.42.3) ───────────────────────────
+  // Die Adresse gewinnt; ohne `?ansicht=` gilt die gemerkte (Plan F2/F3) — so öffnen die
+  // Kachel auf `/planning`, das Menü und der Rückweg aus dem Stundenentwurf sie von selbst.
+  let gemerkt = $state(null)
+  getPreferences()
+    .then((p) => (gemerkt = planungsAnsichtAusEinstellungen(p)))
+    .catch(() => (gemerkt = JAHR))
+  const ansicht = $derived(planungsAnsichtAusAdresse($page.url.searchParams) ?? gemerkt)
+  const einheitSchluessel = $derived($page.url.searchParams.get('einheit'))
+  const gruppeFuerPfad = $derived({ id: groupId, fach: { slug } })
+  let darstellung = $state('kacheln')   // Liste oder Kacheln — gemerkt wie im Archiv
+  let inhalt = $state(null)
+  let inhaltFehler = $state(null)
+
+  function wechsleAnsicht(neu) {
+    if (neu === ansicht) return
+    gemerkt = neu
+    patchPreferences({ [PLANUNGS_ANSICHT_SCHLUESSEL]: neu }).catch(() => {})
+    goto(planerAnsichtPfad(gruppeFuerPfad, neu), { noScroll: true, keepFocus: true })
+  }
+
+  async function ladeInhalt() {
+    inhaltFehler = null
+    try {
+      inhalt = await getGruppenInhalt(groupId)
+    } catch (e) {
+      inhaltFehler = e.message
+    }
+  }
+
+  $effect(() => {
+    if (ansicht === EINHEITEN && groupId) ladeInhalt()
+  })
 
   // ── Planungs-Daten ───────────────────────────────────────────────────────────
   let overview = $state(null)
@@ -111,7 +153,9 @@
   // „Übersicht" aus dem Stundenentwurf. afterNavigate feuert auch initial, deshalb
   // kein zusätzlicher Mount-Effect (sonst Doppel-Load). Sonst zeigte der Plan
   // veraltete Slot↔Stunde-Verknüpfungen.
-  afterNavigate(() => {
+  afterNavigate((nav) => {
+    // Nur die Adresse innerhalb des Planers geändert (Ansicht, Einheit) — nichts neu zu laden.
+    if (nav.from && nav.from.url.pathname === nav.to?.url.pathname) return
     if (groupId) loadOverview()
   })
 
@@ -330,10 +374,13 @@
   }
 
   // Einheit als Vorlage kopieren (0.42). In dieselbe Gruppe kopiert → Übersicht neu laden.
-  let kopierEinheit = $state(null)
+  // Kopieren als Vorlage (0.42): {art, quelle} oder null.
+  let kopieren = $state(null)
 
   function einheitKopiert(_ergebnis, ziel) {
-    if (ziel?.id === groupId) loadOverview()
+    if (ziel?.id !== groupId) return
+    loadOverview()
+    if (ansicht === EINHEITEN) ladeInhalt()
   }
 
   function openEditUnit(unit) {
@@ -469,6 +516,21 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <!-- Ansicht (0.42.3): wann (Jahresübersicht) oder was (Einheiten mit ihren Stunden). -->
+      <div class="flex rounded-lg border border-light-ui-3 dark:border-dark-ui-3 overflow-hidden text-sm"
+           role="group" aria-label="Ansicht der Planung">
+        {#each [[JAHR, 'Jahresübersicht'], [EINHEITEN, 'Einheiten']] as [wert, name] (wert)}
+          <button
+            type="button"
+            onclick={() => wechsleAnsicht(wert)}
+            aria-pressed={ansicht === wert}
+            class="px-3 py-1.5 transition-colors {ansicht === wert
+              ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx font-medium'
+              : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2'}"
+          >{name}</button>
+        {/each}
+      </div>
+
       <!-- Assistent-Link -->
       <a
         href={neuerChatPfad({ groupId, faehigkeit: 'planning' })}
@@ -487,7 +549,7 @@
       <!-- Zur Woche von heute (0.21): Die Liste ist ein ganzes Schuljahr lang. -->
       <button
         onclick={() => plannerTable?.scrollToCurrentWeek()}
-        disabled={!overview}
+        disabled={!overview || ansicht !== JAHR}
         class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
                text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors
                disabled:opacity-50"
@@ -587,11 +649,13 @@
   </div>
 {/if}
 
+{#if ansicht === JAHR}
 <Parkplatz
   eintraege={parkplatz.items}
   ueberhang={parkplatz.ueberhang}
   onGeaendert={ladeParkplatz}
 />
+{/if}
 
 {#if reflowBanner}
   <div class="px-4 pt-2">
@@ -629,7 +693,51 @@
   </div>
 {/if}
 
-{#if loading}
+{#if ansicht === EINHEITEN}
+  <!-- Einheitenansicht (0.42.3) -->
+  <div class="flex-1 overflow-y-auto">
+    <div class="max-w-5xl mx-auto p-6 space-y-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <nav class="text-sm text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1.5 flex-wrap">
+          {#if einheitSchluessel}
+            <a href={planerAnsichtPfad(gruppeFuerPfad, EINHEITEN)}
+               class="hover:text-light-bl dark:hover:text-dark-bl">Alle Einheiten</a>
+            <span>›</span>
+            <span class="text-light-tx dark:text-dark-tx font-medium">
+              {inhalt?.einheiten.find((e) => e.id === einheitSchluessel)?.titel
+                ?? (einheitSchluessel === 'ohne' ? 'Stunden ohne Einheit' : '…')}
+            </span>
+          {:else}
+            <span class="text-light-tx dark:text-dark-tx font-medium">Einheiten und Stunden</span>
+          {/if}
+        </nav>
+        <ArchivAnsicht bind:ansicht={darstellung} />
+      </div>
+      {#if inhaltFehler}
+        <ErrorBanner message={inhaltFehler} />
+      {:else if !inhalt}
+        <LoadingBanner message="Einheiten werden geladen …" />
+      {:else}
+        <EinheitenAnsicht
+          {inhalt}
+          ansicht={darstellung}
+          schluessel={einheitSchluessel}
+          einheitPfad={(k) => planerAnsichtPfad(gruppeFuerPfad, EINHEITEN, k)}
+          onKopiereEinheit={(e) => (kopieren = { art: 'einheit', quelle: { id: e.id, titel: e.titel } })}
+          onKopiereStunde={(st, e) => (kopieren = {
+            art: 'stunde', quelle: { id: st.id, titel: st.titel, einheitTitel: e?.id ? e.titel : '' },
+          })}
+          termine
+          leerText="Diese Gruppe hat noch keine Einheiten. Du legst sie in der Jahresübersicht an."
+        />
+      {/if}
+    </div>
+  </div>
+{:else if ansicht === null}
+  <div class="flex-1 flex items-center justify-center">
+    <LoadingBanner message="Planung wird geladen …" />
+  </div>
+{:else if loading}
   <div class="flex-1 flex items-center justify-center">
     <LoadingBanner message="Jahresplanung wird geladen …" />
   </div>
@@ -644,7 +752,7 @@
     balance={overview.balance}
     onCreateUnit={() => { editUnit = null; showUnitDialog = true }}
     onEditUnit={openEditUnit}
-    onCopyUnit={(unit) => (kopierEinheit = unit)}
+    onCopyUnit={(unit) => (kopieren = { art: 'einheit', quelle: { id: unit.id, titel: unit.title } })}
     onSelectUnit={(unit) => plannerTable?.scrollToUnit(unit.id)}
   />
 
@@ -690,11 +798,11 @@
 />
 
 <KopierenDialog
-  open={kopierEinheit != null}
-  art="einheit"
-  quelle={kopierEinheit ? { id: kopierEinheit.id, titel: kopierEinheit.title } : null}
+  open={kopieren != null}
+  art={kopieren?.art ?? 'einheit'}
+  quelle={kopieren?.quelle ?? null}
   fachId={group?.subject_id ?? null}
-  onClose={() => (kopierEinheit = null)}
+  onClose={() => (kopieren = null)}
   onKopiert={einheitKopiert}
 />
 

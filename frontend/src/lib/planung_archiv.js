@@ -127,3 +127,40 @@ export function datumKurz(iso) {
     const [j, m, t] = String(iso).slice(0, 10).split('-')
     return `${t}.${m}.${j}`
 }
+
+// ── Einheitenansicht des Planers (0.42.3) ────────────────────────────────────
+
+/**
+ * Welche Ansicht der Planer zeigt: die Jahresübersicht oder die Einheiten mit ihren Stunden.
+ * Gemerkt je Nutzer (Plan F3) — der Planer ohne `?ansicht=` öffnet die gemerkte, also auch
+ * aus der Übersicht `/planning`, dem Menü und dem Rückweg aus dem Stundenentwurf (F2).
+ */
+export const PLANUNGS_ANSICHT_SCHLUESSEL = 'planung_ansicht'
+export const JAHR = 'jahr'
+export const EINHEITEN = 'einheiten'
+
+export function planungsAnsichtAusEinstellungen(einstellungen) {
+    return einstellungen?.[PLANUNGS_ANSICHT_SCHLUESSEL] === EINHEITEN ? EINHEITEN : JAHR
+}
+
+/**
+ * Die Ansicht aus der Adresse — `null`, wenn sie dort nicht steht (dann gilt die gemerkte).
+ * `?einheit=` allein meint die Einheitenansicht.
+ */
+export function planungsAnsichtAusAdresse(params) {
+    const roh = params?.get('ansicht')
+    if (roh === EINHEITEN || roh === JAHR) return roh
+    return params?.get('einheit') ? EINHEITEN : null
+}
+
+/** Pfad in den Planer mit ausdrücklicher Ansicht (und in der Einheitenansicht ggf. einer Einheit). */
+export function planerAnsichtPfad(gruppe, ansicht, einheit = null) {
+    const params = new URLSearchParams({ ansicht })
+    if (ansicht === EINHEITEN && einheit) params.set('einheit', einheit)
+    return `${plannerPfad(gruppe)}?${params}`
+}
+
+/** Wie viele Stunden einer Einheit noch keinen Termin haben. */
+export function ohneTermin(stunden) {
+    return (stunden ?? []).filter((s) => !s.slot_id).length
+}

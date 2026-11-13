@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import {
     ansichtAusEinstellungen, anzahl, archivPfad, datumKurz, einheitenMitOhne, gewaehlteEinheit, klassenKurz,
     menueBeschriftung, menueGruppen, mitBeschriftung, OHNE_EINHEIT, plannerPfad, stundenPfad,
+    EINHEITEN, JAHR, ohneTermin, planerAnsichtPfad, planungsAnsichtAusAdresse, planungsAnsichtAusEinstellungen,
 } from './planung_archiv.js'
 
 const SRC = join(__dirname, '..')
@@ -102,7 +103,46 @@ describe('Kleinkram', () => {
     })
 })
 
+describe('Ansicht des Planers (0.42.3)', () => {
+    const gruppe = { id: 7, fach: { slug: 'chemie' } }
+
+    it('gemerkt je Nutzer, Vorgabe Jahresübersicht', () => {
+        expect(planungsAnsichtAusEinstellungen({ planung_ansicht: 'einheiten' })).toBe(EINHEITEN)
+        expect(planungsAnsichtAusEinstellungen({ planung_ansicht: 'quatsch' })).toBe(JAHR)
+        expect(planungsAnsichtAusEinstellungen(null)).toBe(JAHR)
+    })
+
+    it('die Adresse gewinnt; ohne Angabe null (dann gilt die gemerkte); ?einheit= allein heißt Einheiten', () => {
+        expect(planungsAnsichtAusAdresse(new URLSearchParams('ansicht=jahr'))).toBe(JAHR)
+        expect(planungsAnsichtAusAdresse(new URLSearchParams('ansicht=einheiten'))).toBe(EINHEITEN)
+        expect(planungsAnsichtAusAdresse(new URLSearchParams('einheit=u1'))).toBe(EINHEITEN)
+        expect(planungsAnsichtAusAdresse(new URLSearchParams(''))).toBeNull()
+    })
+
+    it('Pfade mit Ansicht und Einheit', () => {
+        expect(planerAnsichtPfad(gruppe, JAHR)).toBe('/subjects/chemie/groups/7/planner?ansicht=jahr')
+        expect(planerAnsichtPfad(gruppe, EINHEITEN, 'u1'))
+            .toBe('/subjects/chemie/groups/7/planner?ansicht=einheiten&einheit=u1')
+        expect(planerAnsichtPfad(gruppe, JAHR, 'u1')).toBe('/subjects/chemie/groups/7/planner?ansicht=jahr')
+    })
+
+    it('Stunden ohne Termin zählen', () => {
+        expect(ohneTermin([{ slot_id: 'a' }, { slot_id: null }, {}])).toBe(2)
+        expect(ohneTermin(undefined)).toBe(0)
+    })
+})
+
 describe('Verdrahtung', () => {
+    it('Planer (0.42.3): Umschalter, gemerkte Ansicht, Einheitenansicht mit Terminen', () => {
+        const seite = quelle('routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte')
+        expect(seite).toContain('planungsAnsichtAusAdresse($page.url.searchParams) ?? gemerkt')
+        expect(seite).toContain('[PLANUNGS_ANSICHT_SCHLUESSEL]: neu')
+        expect(seite).toContain('getGruppenInhalt(groupId)')
+        expect(seite).toMatch(/<EinheitenAnsicht[\s\S]*?\btermine\b/)
+        // Archiv und Planer teilen sich die Darstellung.
+        expect(quelle('routes/(app)/planning/archive/[id]/+page.svelte')).toContain('<EinheitenAnsicht')
+    })
+
     it('Menüpunkt „Planung“ mit Gruppen und Archiv, Stufen-Schlüssel planner', () => {
         const sidebar = quelle('lib/components/Sidebar.svelte')
         expect(sidebar).toMatch(/\$zeigtEintrag\('planner'\)/)

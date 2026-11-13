@@ -65,8 +65,18 @@ describe('Verdrahtung (Einstiege, Plan Vorschlag 5)', () => {
     it('Archiv: Einheiten und Stunden', () => {
         const seite = quelle('routes/(app)/planning/archive/[id]/+page.svelte')
         expect(seite).toContain('<KopierenDialog')
-        expect(seite).toContain('kopiereEinheit(e)')
-        expect(seite).toContain('kopiereStunde(s)')
+        expect(seite).toContain('onKopiereEinheit={kopiereEinheit}')
+        expect(seite).toContain('onKopiereStunde={kopiereStunde}')
+        // Die Knöpfe selbst stehen in der gemeinsamen Darstellung (0.42.3).
+        const ansicht = quelle('lib/components/planner/EinheitenAnsicht.svelte')
+        expect(ansicht).toContain('onKopiereEinheit(e)')
+        expect(ansicht).toContain('onKopiereStunde(s, einheit)')
+    })
+
+    it('Einheitenansicht des Planers (0.42.3): Einheiten und Stunden', () => {
+        const seite = quelle('routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte')
+        expect(seite).toMatch(/onKopiereEinheit=\{\(e\) => \(kopieren = \{ art: 'einheit'/)
+        expect(seite).toMatch(/onKopiereStunde=\{\(st, e\) => \(kopieren = \{\s*art: 'stunde'/)
     })
 
     it('Jahresübersicht an der Einheit', () => {

@@ -2215,6 +2215,14 @@ export async function getPlanungsArchivGruppe(groupId) {
     return res.json()
 }
 
+// Einheitenansicht des Planers (0.42.3): Einheiten mit Stunden, mit oder ohne Termin —
+// dieselbe Form wie das Archiv einer Gruppe.
+export async function getGruppenInhalt(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/inhalt`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Die Einheiten konnten nicht geladen werden')
+    return res.json()
+}
+
 export async function getPlanningOverview(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')
