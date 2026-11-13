@@ -114,7 +114,9 @@ def run_migrations(db_url):
             f"('test' im DB-Namen erwartet, gefunden: '{db_name}')."
         )
 
-    engine = create_engine(sync_url)
+    # Treiber ausdrücklich: SQLAlchemy 2.1 nimmt für `postgresql://` psycopg 3 statt psycopg2 — das
+    # ist nicht installiert (frische Installation ab 2.1, Prod-Image; Dev hatte 2.0).
+    engine = create_engine(sync_url.replace("postgresql://", "postgresql+psycopg2://", 1))
     with engine.connect() as connection:
         connection.execute(text("DROP SCHEMA public CASCADE"))
         connection.execute(text("CREATE SCHEMA public"))

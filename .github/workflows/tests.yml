@@ -62,7 +62,10 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          # Wie das Prod-Image (`backend/Dockerfile`: python:3.12-slim). Mit 3.14 blieb in 0.42.0 ein
+          # Vorwärtsverweis im Klassenrumpf unbemerkt (3.14 wertet Annotationen aufgeschoben aus, PEP 649),
+          # und das Backend startete auf Prod nicht.
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             backend/requirements.txt

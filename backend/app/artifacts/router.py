@@ -72,6 +72,19 @@ class SavedArtifact(BaseModel):
     created: bool  # False ⇒ war bereits in der Bibliothek (idempotent)
 
 
+# ⚠️ Vor `ArtifactItem`: Python 3.12 (Prod-Image) wertet Annotationen im Klassenrumpf sofort aus,
+# erst 3.14 (Dev) aufgeschoben (PEP 649). Umgekehrt angeordnet startete das Backend auf Prod nicht.
+class ExportItem(BaseModel):
+    """Ein Export am Dokument (0.41, F5) — eingeklappt an dessen Karte."""
+
+    id: UUID
+    kind: str
+    mime_type: str
+    title: str
+    byte_size: int
+    created_at: datetime
+
+
 class ArtifactItem(BaseModel):
     """Ein Bibliotheks-Eintrag (Metadaten + roher Quelltext für Kopieren/Download)."""
 
@@ -101,17 +114,6 @@ class ArtifactItem(BaseModel):
     # übernommen →". None heißt: noch keiner, oder der letzte wurde gelöscht.
     baustein_id: UUID | None = None
     baustein_titel: str | None = None
-
-
-class ExportItem(BaseModel):
-    """Ein Export am Dokument (0.41, F5) — eingeklappt an dessen Karte."""
-
-    id: UUID
-    kind: str
-    mime_type: str
-    title: str
-    byte_size: int
-    created_at: datetime
 
 
 class LibraryResponse(BaseModel):

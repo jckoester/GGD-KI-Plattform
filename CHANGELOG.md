@@ -5,6 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.42.1] – 2026-11-13
+
+### Behoben
+
+- Das Backend startete mit 0.42.0 nicht (`NameError: name 'ExportItem' is not defined`).
+
+### Entwicklung
+
+- Die CI prüft das Backend mit Python 3.12 wie das Prod-Image, nicht mehr mit 3.14.
+- Integrationstests nennen den Datenbanktreiber ausdrücklich (SQLAlchemy 2.1 nimmt sonst psycopg 3).
+
+### Nach dem Update
+
+- Wie 0.42.0; wer 0.42.0 schon ausgerollt hat: `git fetch --tags && git checkout 0.42.1`,
+  `docker compose build --no-cache backend cron && docker compose up -d`. Keine Migration.
+
 ## [0.42.0] – 2026-11-13
 
 Planung mit eigenem Ort: Menüpunkt „Planung“ mit dem Planer jeder Gruppe und einem Archiv früherer Schuljahre;
