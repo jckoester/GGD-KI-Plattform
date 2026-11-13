@@ -98,6 +98,8 @@ def _scope(name):
     ("POST", "app.artifacts.router.create_document", True),
     ("POST", "app.artifacts.router.save_image_to_library", True),
     ("POST", "app.artifacts.router.ggb_from_source", False),
+    # Bausteine an Vorschau-Chats heften (0.41); welche Chats, prüft `darf_chat_sehen`.
+    ("POST", "app.context.router.add_chat_context_node", False),
     ("GET", "app.auth.router.step_up_challenge", True),
 ])
 def test_regel(methode, name, gesperrt):

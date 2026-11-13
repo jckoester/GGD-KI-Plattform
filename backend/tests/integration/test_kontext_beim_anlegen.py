@@ -20,6 +20,7 @@ from tests.integration.conftest import STUDENT_PSEUDO, TEACHER1_PSEUDO, TEACHER2
 pytestmark = pytest.mark.asyncio
 
 ICH = TEACHER2_PSEUDO
+GRUPPE = 9641
 
 
 @pytest.fixture
@@ -30,6 +31,7 @@ def conn(db_url, run_migrations):
         with c.cursor() as cur:
             cur.execute("DELETE FROM conversations WHERE title = 'FIX1 Chat'")
             cur.execute("DELETE FROM context_nodes WHERE title LIKE 'FIX1 %%'")
+            cur.execute("DELETE FROM groups WHERE id = %s", (GRUPPE,))
         c.commit()
 
     aufraeumen()
@@ -48,13 +50,14 @@ def _chat(conn, owner=ICH):
     return cid
 
 
-def _knoten(conn, titel, *, owner=TEACHER1_PSEUDO, scope="school", status="active"):
+def _knoten(conn, titel, *, owner=TEACHER1_PSEUDO, scope="school", status="active", gruppe=None):
     nid = uuid.uuid4()
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO context_nodes (id, category, content_type, title, content, read_scope, write_scope,"
-            " owner_pseudonym, status) VALUES (%s, 'artifact', 'arbeitsblatt', %s, %s, %s, 'private', %s, %s)",
-            (str(nid), f"FIX1 {titel}", f"Inhalt {titel}", scope, owner, status))
+            " owner_pseudonym, status, read_scope_group_id) VALUES (%s, 'artifact', 'arbeitsblatt', %s, %s, %s,"
+            " 'private', %s, %s, %s)",
+            (str(nid), f"FIX1 {titel}", f"Inhalt {titel}", scope, owner, status, gruppe))
     conn.commit()
     return nid
 
@@ -88,12 +91,60 @@ async def test_lehrkraft_lesbare_aktive_knoten_vor_dem_kontext(conn, async_engin
     assert "FIX1 Fremd privat" not in text and "FIX1 Archiviert" not in text
 
 
-async def test_schuelerin_heftet_nichts_an(conn, async_engine):
-    """Wie der Endpunkt: Anheften ist bisher Lehrkraft-Sache."""
+async def test_schuelerin_heftet_an_was_sie_lesen_darf(conn, async_engine):
+    """Rollenoffen seit 0.41 — die Leseprüfung bleibt: Stundenentwürfe (`group_teachers`) nie."""
     chat = _chat(conn, owner=STUDENT_PSEUDO)
+    lesbar = _knoten(conn, "Schulweit")
+    # Die Schüler:in ist Mitglied der Gruppe — trotzdem kein Stundenentwurf.
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO groups (id, name, slug, type) VALUES (%s, 'fix1', 'fix1', 'teaching_group')",
+                    (GRUPPE,))
+        cur.execute("INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)"
+                    " VALUES (%s, %s, 'student', 'manuell')", (GRUPPE, STUDENT_PSEUDO))
+    conn.commit()
+    lehrkraft = _knoten(conn, "Nur Lehrkräfte", scope="group_teachers", gruppe=GRUPPE)
     zahl, text = await _anheften_und_kontext(
-        async_engine, chat, _user(STUDENT_PSEUDO, "student"), [_knoten(conn, "Schulweit")])
-    assert zahl == 0 and "FIX1 Schulweit" not in text
+        async_engine, chat, _user(STUDENT_PSEUDO, "student"), [lesbar, lehrkraft])
+    assert zahl == 1
+    assert "FIX1 Schulweit" in text and "FIX1 Nur Lehrkräfte" not in text
+
+
+async def test_schuelerin_ueber_die_schnittstelle(test_client, auth_headers_student, conn):
+    chat = _chat(conn, owner=STUDENT_PSEUDO)
+    lesbar, privat = _knoten(conn, "Schulweit"), _knoten(conn, "Fremd privat", scope="private")
+    pfad = f"/context/conversations/{chat}/nodes"
+
+    ok = await test_client.post(pfad, json={"node_id": str(lesbar)}, headers=auth_headers_student)
+    verboten = await test_client.post(pfad, json={"node_id": str(privat)}, headers=auth_headers_student)
+    liste = await test_client.get(pfad, headers=auth_headers_student)
+    weg = await test_client.delete(f"{pfad}/{lesbar}", headers=auth_headers_student)
+
+    assert (ok.status_code, verboten.status_code, weg.status_code) == (201, 403, 204)
+    assert [n["node_id"] for n in liste.json()] == [str(lesbar)]
+
+
+async def test_vorschau_heftet_nur_an_vorschau_chats(test_client, jwt_service, conn):
+    import time
+    from app.auth.vorschau import Vorschau
+
+    echt = _chat(conn)
+    vorschau_chat = uuid.uuid4()
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO conversations (id, pseudonym, model_used, title, preview_context) "
+                    "VALUES (%s, %s, 'test', 'FIX1 Chat', '{\"jahrgang\": \"8\"}')", (str(vorschau_chat), ICH))
+    conn.commit()
+    lesbar = _knoten(conn, "Schulweit")
+    jetzt = int(time.time())
+    token, _ = jwt_service.issue(
+        pseudonym=ICH, roles=["student"], grade="8",
+        preview=Vorschau(echte_rollen=["teacher"], beginn=jetzt, sitzung_ablauf=jetzt + 3600), exp=jetzt + 3600)
+    kopf = {"Cookie": f"session={token}"}
+
+    im_vorschau_chat = await test_client.post(f"/context/conversations/{vorschau_chat}/nodes",
+                                              json={"node_id": str(lesbar)}, headers=kopf)
+    im_echten_chat = await test_client.post(f"/context/conversations/{echt}/nodes",
+                                            json={"node_id": str(lesbar)}, headers=kopf)
+    assert (im_vorschau_chat.status_code, im_echten_chat.status_code) == (201, 403)
 
 
 async def test_chat_heftet_vor_dem_kontextaufbau_an():

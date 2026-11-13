@@ -1362,14 +1362,20 @@ async def remove_context_anchor(
 
 async def _get_conversation_or_403(
     conversation_id: UUID,
-    pseudonym: str,
+    user: JwtPayload,
     db: AsyncSession,
 ) -> None:
-    """404 wenn Konversation nicht existiert, 403 wenn sie nicht dem Nutzer gehört."""
+    """404 wenn Konversation nicht existiert, 403 wenn sie nicht dem Nutzer gehört.
+
+    In der Vorschau nur Vorschau-Chats (`vorschau.darf_chat_sehen`): Seit 0.41 ist das Anheften
+    dort erlaubt (`vorschau.ERLAUBT`) — es darf aber nie einen echten Chat der Lehrkraft treffen.
+    """
+    from app.auth import vorschau
+
     conv = await db.get(Conversation, conversation_id)
     if conv is None:
         raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
-    if conv.pseudonym != pseudonym:
+    if not vorschau.darf_chat_sehen(conv, user):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
@@ -1380,11 +1386,9 @@ async def knoten_beim_anlegen_anheften(
 
     Bis 0.41 heftete der Chat sie erst nach der ersten Antwort an (`POST …/nodes`, sobald die
     Konversation eine ID hatte); die erste Antwort sah sie nicht. Dieselben Regeln wie der
-    Endpunkt: nur Lehrkräfte, nur aktive und lesbare Knoten. Was nicht passt, fällt still heraus.
-    Committet nicht — das tut der Chat mit der Konversation.
+    Endpunkt: nur aktive und lesbare Knoten (rollenoffen seit 0.41). Was nicht passt, fällt still
+    heraus. Committet nicht — das tut der Chat mit der Konversation.
     """
-    if not ({"teacher", "admin"} & set(user.roles or [])):
-        return 0
     zahl = 0
     for node_id in dict.fromkeys(node_ids):
         node = await db.get(ContextNode, node_id)
@@ -1408,9 +1412,10 @@ async def knoten_beim_anlegen_anheften(
 async def list_chat_context_nodes(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen seit 0.41: Schüler:innen heften an, was sie lesen dürfen.
+    user: JwtPayload = Depends(get_current_user),
 ):
-    await _get_conversation_or_403(conversation_id, user.sub, db)
+    await _get_conversation_or_403(conversation_id, user, db)
 
     result = await db.execute(
         sa.select(ContextNode, ChatContextNode.added_at)
@@ -1443,9 +1448,10 @@ async def add_chat_context_node(
     conversation_id: UUID,
     payload: ChatContextNodeAdd,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen seit 0.41: Schüler:innen heften an, was sie lesen dürfen.
+    user: JwtPayload = Depends(get_current_user),
 ):
-    await _get_conversation_or_403(conversation_id, user.sub, db)
+    await _get_conversation_or_403(conversation_id, user, db)
 
     # Knoten existiert und ist aktiv?
     node = await db.get(ContextNode, payload.node_id)
@@ -1489,9 +1495,10 @@ async def remove_chat_context_node(
     conversation_id: UUID,
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen seit 0.41: Schüler:innen heften an, was sie lesen dürfen.
+    user: JwtPayload = Depends(get_current_user),
 ):
-    await _get_conversation_or_403(conversation_id, user.sub, db)
+    await _get_conversation_or_403(conversation_id, user, db)
 
     entry = await db.get(ChatContextNode, (conversation_id, node_id))
     if entry is None:

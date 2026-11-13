@@ -16,6 +16,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   werden gemerkt. Titel, Fach und Thema lassen sich an jeder Karte ändern, mit Vorschlägen fürs Thema.
 - Exporte eines Dokuments, die in der Werkstatt behalten werden, stehen eingeklappt am Dokument statt als eigene
   Karten und werden mit ihm gelöscht.
+- Schüler:innen können Bausteine im Chat anheften (`@`, Suchknopf) — alles, was sie in der Bibliothek lesen dürfen,
+  etwa Kompetenzen, Operatoren und Begriffe. Auch in Vorschau-Chats lässt sich anheften.
 - Eigene Dokumente und Diagramme aus der Werkstatt lassen sich im Chat mitgeben: unter `@` in der Gruppe „Aus deiner
   Werkstatt“ oder mit „Im Chat verwenden“ am Produkt. Die KI bekommt ihren Inhalt zu jeder Frage im Chat.
 

@@ -44,6 +44,7 @@ Daten echter Schüler:innen kommen darin nicht vor.
 - **Ändern** — nein. Einstellungen, Werkstatt, Gruppen, Zugangstoken bleiben, wie sie sind;
   die Plattform antwortet mit „In der Vorschau lässt sich nichts ändern.“ Im Chat fehlen deshalb
   „Speichern“ und „Als Dokument bearbeiten“; Herunterladen, Code kopieren und GeoGebra gehen.
+  Bausteine per `@` an den Vorschau-Chat heften geht — Produkte aus deiner Werkstatt nicht.
 - **Krisenhinweis:** Schreibst du eine Nachricht, die nach einer Notlage klingt, erscheint der
   Hinweis mit den Hilfsangeboten wie bei einer Schüler:in. Es entsteht aber **keine Meldung**
   für die Krisen-Einsicht.
