@@ -274,6 +274,8 @@ class LessonUpdate(BaseModel):
     phasen: Optional[list[LessonPhaseItem]] = None
     refs: Optional[list[LessonRefItem]] = None
     refs_dismissed: Optional[list[UUID]] = None
+    # „Entfernen“ am Hinweis „Notiz aus der Vorlage“ (0.42, S1). Nur ``True`` wirkt.
+    notiz_aus_vorlage_entfernen: bool = False
     # Optimistisches Sperren (freiwillig): Steht hier der `updated_at`-Stand, den
     # der Client gelesen hat, und hat sich seither etwas geändert, antwortet der
     # Endpunkt mit 409 statt still zu überschreiben. Weglassen = bisheriges
@@ -326,6 +328,10 @@ class LessonRead(BaseModel):
     begriffe_vorschlag: Optional[dict] = None
     # Ob „Begriffe vorschlagen" geht: Modell konfiguriert, Stunde mit Fach, bearbeitbar.
     begriffe_vorschlagen: bool = False
+    # Kopie (0.42): Kennung der Quelle und deren Nachbereitungsnotiz als Hinweis (S1) —
+    # `{text, kopie_von, datum}`. Keine Nachbereitung dieser Stunde.
+    kopie_von: Optional[str] = None
+    notiz_aus_vorlage: Optional[dict] = None
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────
@@ -450,3 +456,31 @@ class JetztRead(BaseModel):
     naechste_einheit: Optional[JetztEinheit] = None
     zuletzt: Optional[JetztStunde] = None
     kommende: list[JetztStunde] = []
+
+
+# ── Kopieren (0.42, Päckchen AO) ─────────────────────────────────────────────
+
+
+class StundeKopieren(BaseModel):
+    """Ziel einer Stundenkopie: Gruppe und genau eins von Einheit oder neuer Einheit (F6)."""
+
+    gruppe_id: int
+    einheit_id: Optional[UUID] = None
+    neue_einheit: Optional[str] = Field(None, max_length=500)
+
+
+class KopieMeldung(BaseModel):
+    art: str     # "kompetenz" | "begriff" | "material"
+    titel: str
+    was: str     # "weggelassen" | "umgestellt"
+    grund: str
+    phase: Optional[str] = None
+
+
+class StundeKopiertRead(BaseModel):
+    id: UUID
+    titel: str
+    gruppe_id: int
+    einheit_id: UUID
+    einheit_neu: bool
+    meldungen: list[KopieMeldung]

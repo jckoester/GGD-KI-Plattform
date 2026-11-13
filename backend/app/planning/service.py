@@ -67,8 +67,14 @@ async def create_unit_node(
     titel: str,
     farbe: int | None = None,
     kapitel_node_id: UUID | None = None,
+    *,
+    commit: bool = True,
 ) -> ContextNode:
-    """Legt eine Unterrichtseinheit an und gibt den ContextNode zurück (committed)."""
+    """Legt eine Unterrichtseinheit an und gibt den ContextNode zurück (committed).
+
+    ``commit=False``: nur flushen — für Aufrufer, die mehr in derselben Transaktion
+    anlegen (Kopieren, 0.42). Embedding-Job und Commit sind dann ihre Sache.
+    """
     from app.planning.calendar import load_school_year
 
     cfg = load_school_year()
@@ -113,6 +119,9 @@ async def create_unit_node(
             )
         )
 
+    if not commit:
+        await db.flush()
+        return ue_node
     await db.commit()
     await db.refresh(ue_node)
     return ue_node

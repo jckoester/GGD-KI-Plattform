@@ -604,6 +604,15 @@ async def copy_node(
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     # Nur lesbare Quellknoten dürfen kopiert werden (sonst Exfiltration per UUID, Audit #1).
     await _check_read_permission(source, user, db)
+    # Planung hat ihren eigenen Weg (0.42, F8): Diese Kopie nähme Gruppe, Termine und
+    # Nachbereitung unverändert mit und hängte die Stunde in keine Einheit.
+    from app.context.taxonomy import PLANUNG_CONTENT_TYPES
+
+    if source.content_type in PLANUNG_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Planung kopierst du im Planer oder im Archiv der Planung.",
+        )
 
     # Neuen Knoten anlegen
     new_node = ContextNode(

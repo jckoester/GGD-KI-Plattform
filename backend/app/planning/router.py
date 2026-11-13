@@ -31,7 +31,7 @@ from app.context.embedding import (
 )
 from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
-from app.planning import archiv, teilen, zuordnung
+from app.planning import archiv, kopieren, teilen, zuordnung
 from app.db.models import (
     ContextEdge,
     ContextNode,
@@ -86,6 +86,8 @@ from app.planning.schemas import (
     SlotUpdate,
     SnapshotCreate,
     SnapshotRead,
+    StundeKopieren,
+    StundeKopiertRead,
     UnitBalanceItem,
     UnitCreate,
     UnitUpdate,
@@ -1377,6 +1379,8 @@ async def get_lesson(
         updated_at=lesson.updated_at,
         begriffe_vorschlag=vorschlag_zur_anzeige(lesson.title, meta),
         begriffe_vorschlagen=bool(settings.begriffe_model) and lesson.subject_id is not None and darf_bearbeiten,
+        kopie_von=meta.get("kopie_von"),
+        notiz_aus_vorlage=meta.get("notiz_aus_vorlage") or None,
     )
 
 
@@ -1483,6 +1487,8 @@ async def patch_lesson(
         meta["refs"] = [r.model_dump(mode="json") for r in refs]
     if payload.refs_dismissed is not None:
         meta["refs_dismissed"] = [str(rid) for rid in payload.refs_dismissed]
+    if payload.notiz_aus_vorlage_entfernen:
+        meta.pop("notiz_aus_vorlage", None)
 
     lesson.metadata_ = meta
     lesson.updated_at = now
@@ -1678,6 +1684,51 @@ async def export_lesson(
         )
     else:
         raise HTTPException(status_code=422, detail=f"Unbekanntes Format: {format}")
+
+
+# ── POST /planning/lessons/{node_id}/copy (0.42) ─────────────────────────────
+
+
+@router.post("/lessons/{node_id}/copy", response_model=StundeKopiertRead, status_code=201)
+async def copy_lesson(
+    node_id: UUID,
+    payload: StundeKopieren,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Stunde als Vorlage in eine Einheit einer aktuellen Gruppe desselben Fachs kopieren.
+
+    Wer die Stunde lesen darf, darf sie kopieren (F9) — auch aus dem Archiv (F11). Was
+    mitkommt und was nicht, steht in `app/planning/kopieren.py`; was an der Kopie anders ist
+    als an der Quelle, nennt `meldungen`. Ohne Termin: Die Zuordnung geschieht im Planer.
+    """
+    quelle = await db.get(ContextNode, node_id)
+    if quelle is None or quelle.status not in LESBAR or quelle.content_type != "unterrichtsstunde":
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+    await zugang_zur_stunde(quelle, user, db)  # 403 ohne Lesezugang
+
+    fach_id = quelle.subject_id
+    if fach_id is None and quelle.write_scope_group_id is not None:
+        alte = await db.get(Group, quelle.write_scope_group_id)
+        fach_id = alte.subject_id if alte else None
+    ziel = await kopieren.pruefe_ziel(db, payload.gruppe_id, fach_id, user)
+    einheit = await kopieren.zieleinheit(db, ziel, payload.einheit_id, payload.neue_einheit)
+
+    meldungen: list[kopieren.Meldung] = []
+    stunde = await kopieren.kopiere_stunde(db, quelle, ziel, einheit, meldungen)
+    stunde_id, titel, einheit_id, gruppe_id = stunde.id, stunde.title, einheit.id, ziel.gruppe.id
+    await db.commit()
+    await enqueue_embedding_job(stunde_id, db)
+    if payload.einheit_id is None:
+        await enqueue_embedding_job(einheit_id, db)
+    return StundeKopiertRead(
+        id=stunde_id,
+        titel=titel,
+        gruppe_id=gruppe_id,
+        einheit_id=einheit_id,
+        einheit_neu=payload.einheit_id is None,
+        meldungen=kopieren.meldungen_als_dicts(meldungen),
+    )
 
 
 # ── GET /planning/groups ──────────────────────────────────────────────────────
