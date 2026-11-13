@@ -2077,6 +2077,11 @@ async def chat(
         await db.flush()
         await db.refresh(new_conv)
         conversation_id = new_conv.id
+        # Produkte aus der Werkstatt (0.41, Schritt 10) vor dem Kontextaufbau anhängen.
+        # In der Vorschau nicht: Die Werkstatt bleibt dort außen vor.
+        if request.produkt_ids and not vorschau.ist_vorschau(current_user):
+            from app.artifacts import im_chat
+            await im_chat.beim_anlegen_anhaengen(db, conversation_id, current_user.sub, request.produkt_ids)
         # Kein commit hier — verhindert leere Einträge wenn LiteLLM nicht erreichbar ist.
         if settings.title_model and len(first_user_msg) > 20:
             title_prompt = first_user_msg

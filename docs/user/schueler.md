@@ -61,6 +61,9 @@ Unter jeder Antwort, an jedem Bild und jedem Diagramm steht **„Speichern"**. D
 unabhängig vom Chat, und nur du kannst es sehen. Einen Text kannst du dort weiterschreiben
 und als PDF oder Word herunterladen. Löschen kannst du es dort jederzeit selbst.
 
+Willst du später mit der KI daran weiterarbeiten, tippst du im Chat **`@`** und wählst es unter
+„Aus deiner Werkstatt" aus — oder klickst in der Werkstatt auf **„Im Chat verwenden"**.
+
 > Bis zum Herbst 2026 hießen gespeicherte Arbeiten von Schüler:innen „Bausteine" und standen
 > unter „Meine Bausteine". Sie sind jetzt Dokumente in deiner Werkstatt.
 

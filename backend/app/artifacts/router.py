@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import re
 
-from app.artifacts import geogebra, promote, store, uebernahme
+from app.artifacts import geogebra, im_chat, promote, store, uebernahme
 from app.assistants import produkte
 from app.artifacts.limits import get_artifact_limits
 from app.auth.dependencies import get_current_user
@@ -297,6 +297,114 @@ async def themen_vorschlaege(
         bekannt = set(eigene)
         einheiten = [t for t in einheiten if t and t not in bekannt]
     return ThemenAntwort(eigene=eigene, einheiten=einheiten)
+
+
+# ── Produkte im Chat (0.41, Schritt 10) ──────────────────────────────────────
+#
+# Vor `/{artifact_id}` registriert (wie `/topics`), sonst hielte FastAPI „anhaengbar“ und
+# „chats“ für eine ID. Rollenoffen; in der Vorschau sperrt `vorschau.ERLAUBT` das Anhängen.
+
+
+class AnhangItem(BaseModel):
+    artifact_id: UUID
+    kind: str
+    title: str
+    subject_id: int | None = None
+    added_at: datetime | None = None
+
+
+class AnhangRequest(BaseModel):
+    artifact_id: UUID
+
+
+def _anhang(r: Artifact, added_at: datetime | None = None) -> AnhangItem:
+    return AnhangItem(artifact_id=r.id, kind=r.kind, title=r.title, subject_id=r.subject_id,
+                      added_at=added_at)
+
+
+async def _eigener_chat(db: AsyncSession, conversation_id: UUID, user: JwtPayload):
+    from app.auth import vorschau
+    from app.db.models import Conversation
+
+    conv = await db.get(Conversation, conversation_id)
+    if not vorschau.darf_chat_sehen(conv, user):
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+    return conv
+
+
+@router.get("/anhaengbar", response_model=list[AnhangItem])
+async def anhaengbare_produkte(
+    q: str = Query(default="", max_length=200, description="Teil des Titels"),
+    limit: int = Query(default=8, ge=1, le=20),
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[AnhangItem]:
+    """Eigene Produkte, die sich an einen Chat hängen lassen (`@`-Dropdown)."""
+    return [_anhang(r) for r in await im_chat.anhaengbare(db, current_user.sub, q, limit=limit)]
+
+
+@router.get("/chats/{conversation_id}", response_model=list[AnhangItem])
+async def produkte_im_chat(
+    conversation_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[AnhangItem]:
+    import sqlalchemy as sa
+    from app.db.models import ChatArtifact
+
+    await _eigener_chat(db, conversation_id, current_user)
+    zeilen = (await db.execute(
+        sa.select(Artifact, ChatArtifact.added_at)
+        .join(ChatArtifact, ChatArtifact.artifact_id == Artifact.id)
+        .where(ChatArtifact.chat_id == conversation_id,
+               Artifact.owner_pseudonym == current_user.sub)
+        .order_by(ChatArtifact.added_at, Artifact.id)
+    )).all()
+    return [_anhang(r, added) for r, added in zeilen]
+
+
+@router.post("/chats/{conversation_id}", response_model=AnhangItem, status_code=201)
+async def produkt_anhaengen(
+    conversation_id: UUID,
+    req: AnhangRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AnhangItem:
+    """Ein eigenes Produkt an einen eigenen Chat hängen. Zweimal dasselbe: kein zweiter Eintrag."""
+    from app.db.models import ChatArtifact
+
+    await _eigener_chat(db, conversation_id, current_user)
+    r = await _eigenes_artefakt(db, req.artifact_id, current_user)
+    if not im_chat.ist_anhaengbar(r):
+        raise HTTPException(
+            status_code=422,
+            detail="Dieses Produkt lässt sich nicht im Chat verwenden — möglich sind Dokumente und Diagramme.",
+        )
+    vorhanden = await db.get(ChatArtifact, (conversation_id, r.id))
+    if vorhanden is None:
+        vorhanden = ChatArtifact(chat_id=conversation_id, artifact_id=r.id)
+        db.add(vorhanden)
+        await db.commit()
+        await db.refresh(vorhanden)
+    return _anhang(r, vorhanden.added_at)
+
+
+@router.delete("/chats/{conversation_id}/{artifact_id}", status_code=204)
+async def produkt_abhaengen(
+    conversation_id: UUID,
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    from app.db.models import ChatArtifact
+
+    await _eigener_chat(db, conversation_id, current_user)
+    eintrag = await db.get(ChatArtifact, (conversation_id, artifact_id))
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    await db.delete(eintrag)
+    await db.commit()
+    return Response(status_code=204)
 
 
 @router.get("", response_model=LibraryResponse)

@@ -34,6 +34,7 @@ from app.context.search import (
 from app.context.stufen import bp_baender_zu, vermerke as stufen_vermerke
 from app.context.schemas import CurriculumDraftConfirmed
 from app.auth.vorschau import mitglied
+from app.artifacts import im_chat
 from app.db.models import (
     AssistantContextAnchor,
     ChatContextNode,
@@ -111,8 +112,12 @@ def _assemble_context(
     pinned_nodes: list[ContextNode],
     vorab_eintraege: list[dict] | None = None,
     vorab_angebot: Sequence[Angebot] = (),
+    produkte: Sequence = (),
 ) -> str:
     """Den Kontext-Block für den Prompt bauen.
+
+    ``produkte`` sind angehängte Produkte aus der eigenen Werkstatt (0.41, Schritt 10); sie
+    stehen im selben Abschnitt wie die angehefteten Bausteine, nach ihnen.
 
     ``semantic_treffer`` sind Treffer der Suchschicht (Dicts), keine ORM-Knoten: Seit
     ADR-017/AP5 liefert der Anker-Weg dasselbe wie jede andere Suche. Gepinnte Knoten
@@ -147,11 +152,12 @@ def _assemble_context(
             lines.append(f"- **{entry.node.title}** ({label})")
         sections.append("\n".join(lines))
 
-    if pinned_nodes:
+    if pinned_nodes or produkte:
         lines = ["## Explizit hinzugefügter Kontext\n"]
         for node in pinned_nodes:
             content = node.content or ""
             lines.append(f"### {node.title}\n{content}\n")
+        lines.extend(im_chat.abschnitt(p) for p in produkte)
         sections.append("\n".join(lines))
 
     if not sections:
@@ -372,6 +378,8 @@ async def kontext_fuer_frage(
             )
         )
         pinned_nodes = list(pinned_result.scalars().all())
+    # Angehängte Produkte (0.41, Schritt 10) — nur eigene, das prüft `angehaengte`.
+    produkte = await im_chat.angehaengte(db, chat_id, pseudonym)
 
     # ⚠️ **Ein Embedding für beide Wege.** Grundschicht und Ankersuche stellen dieselbe
     # Frage; zweimal zu holen kostete je Nachricht einen zweiten Anbieteraufruf (rund
@@ -443,7 +451,8 @@ async def kontext_fuer_frage(
         grund.angebot = [a for a in grund.angebot if a.node_id not in im_inhalt]
 
     base = _assemble_context(
-        semantic_treffer, engagement_entries, pinned_nodes, grund.eintraege, grund.angebot
+        semantic_treffer, engagement_entries, pinned_nodes, grund.eintraege, grund.angebot,
+        produkte=produkte,
     )
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.

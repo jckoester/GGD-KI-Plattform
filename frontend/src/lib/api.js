@@ -364,7 +364,8 @@ export async function* streamChat(
   // 0.19: `signal` (Stopp-Knopf, AbortController) und `ersetztLetzte` (die letzte eigene
   // Nachricht samt Antwort wird durch diese ersetzt).
   // C2 (0.24): `assistentBeenden` — zurück zum Standard-Chat in derselben Konversation.
-  { signal = null, ersetztLetzte = false, assistentBeenden = false } = {},
+  // 0.41: `produktIds` — Produkte aus der Werkstatt, nur beim Anlegen (erste Antwort sieht sie).
+  { signal = null, ersetztLetzte = false, assistentBeenden = false, produktIds = [] } = {},
 ) {
   let res;
   try {
@@ -379,6 +380,7 @@ export async function* streamChat(
       if (subjectId != null) body.subject_id = subjectId;
       if (groupId != null) body.group_id = groupId;
       if (stundeId != null) body.stunde_node_id = stundeId;
+      if (produktIds.length) body.produkt_ids = produktIds;
     }
     res = await fetch(`${BASE}/chat`, {
       method: "POST",
@@ -1910,6 +1912,40 @@ export async function removeChatContextNode(conversationId, nodeId) {
     `${BASE}/context/conversations/${conversationId}/nodes/${nodeId}`,
     { method: 'DELETE', credentials: 'include' },
   );
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+}
+
+// ── Produkte im Chat (0.41, Schritt 10) ─────────────────────────────────────
+// Gegenstück zu den Kontext-Knoten für Produkte aus der eigenen Werkstatt. Rollenoffen.
+
+export async function getAnhaengbareProdukte(q = '', limit = 8) {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const res = await fetch(`${BASE}/artifacts/anhaengbar?${params}`, { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // AnhangItem[]
+}
+
+export async function getChatProdukte(conversationId) {
+  const res = await fetch(`${BASE}/artifacts/chats/${conversationId}`, { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // AnhangItem[]
+}
+
+export async function addChatProdukt(conversationId, artifactId) {
+  const res = await fetch(`${BASE}/artifacts/chats/${conversationId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ artifact_id: artifactId }),
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Anhängen fehlgeschlagen');
+  return res.json(); // AnhangItem
+}
+
+export async function removeChatProdukt(conversationId, artifactId) {
+  const res = await fetch(`${BASE}/artifacts/chats/${conversationId}/${artifactId}`, {
+    method: 'DELETE', credentials: 'include',
+  });
   if (!res.ok) throw new ApiError(res.status, await res.text());
 }
 

@@ -96,6 +96,26 @@ Hat eine Schulvorlage kein Seitenformat, setzt `nachbearbeitung._docx_seitenform
 Pandoc-Ausgabe prüfen, vergleichen Attribute einzeln: Pandoc 3.11 (Prod, CI) schreibt sie alphabetisch
 (`w:h` vor `w:w`) und lässt im ODT Zeilenumbrüche zwischen ihnen stehen, 3.13 nicht.
 
+## Produkte im Chat (0.41, Schritt 10)
+
+Eigene Produkte mit lesbarer Quelle (Dokument, `mermaid`, `circuit`, `plot`, `smiles`; keine Bilder, keine
+Exporte) hängen über `chat_artifacts` (Migration 0104, Kaskade auf beiden Seiten) an einer Konversation.
+Logik in `app/artifacts/im_chat.py`; Schnittstelle `GET /artifacts/anhaengbar?q=` (fürs `@`-Dropdown),
+`GET|POST /artifacts/chats/{conversation_id}`, `DELETE /artifacts/chats/{conversation_id}/{artifact_id}` —
+rollenoffen, in der Vorschau gesperrt (`vorschau.ERLAUBT`).
+
+- **Prompt:** `kontext_fuer_frage` legt die Quellen in den Abschnitt „Explizit hinzugefügter Kontext“, nach
+  den angehefteten Bausteinen, als `### <Titel> — <Art> aus der eigenen Werkstatt`; Diagramme im Zaun ihrer
+  Sprache. Je Produkt höchstens `MAX_ZEICHEN` (12 000), danach ein Satz, dass gekürzt wurde. Geladen wird mit
+  `owner_pseudonym` = Person der Anfrage — ein fremder Anhang käme nie in den Prompt.
+- **Erste Antwort:** Ein neuer Chat schickt die gepufferten Produkte mit der ersten Nachricht
+  (`ChatRequest.produkt_ids`); der Chat hängt sie an, **bevor** er den Kontext baut. (Gepufferte Bausteine
+  werden dagegen erst nach der ersten Antwort angeheftet.)
+- **Frontend:** `lib/produkt_im_chat.js` (eine Liste für das Dropdown mit Gruppe „Aus deiner Werkstatt“,
+  Übergabe „Im Chat verwenden“ über `sessionStorage`), `ProduktChips.svelte`, Chat-Seite.
+- **Messung** (Bedingung F2): `scripts/produkt_im_chat_messung.py`, Protokoll im Plan-Ordner
+  `Messungen-0.41/produkte-im-chat.md` — zwei Modelle, 17 von 17 aufgegriffen, Kontrolle ohne Anhang 4/4 ohne.
+
 ## Frontend
 
 `lib/api.js` (`createDocument`/`getDocument`/`updateDocument`, `getDocumentExportBlob`/

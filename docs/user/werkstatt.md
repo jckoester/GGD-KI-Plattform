@@ -44,6 +44,9 @@ Zu jedem Eintrag gibt es:
   über die Suche wiederauffindbar ist und im Unterricht als Material verwendet werden
   kann. Ist das geschehen, trägt die Karte das Kennzeichen
   **„als Baustein übernommen →"** mit einem Link dorthin.
+- **Im Chat verwenden** — bei Dokumenten und Diagrammen: beginnt einen neuen Chat, in dem die KI
+  das Produkt kennt (siehe [Chat](chat.md#eigene-produkte-aus-der-werkstatt-mitgeben)). In einem
+  laufenden Chat holst du es mit **`@`** dazu.
 - **Zitieren** — Plattform, Modell und Datum als Textbaustein für eine Quellenangabe
   (siehe [KI-Ergebnisse zitieren](zitieren.md)).
 - **Löschen** — entfernt den Eintrag (mit Rückfrage).

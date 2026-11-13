@@ -1843,6 +1843,28 @@ class SlotPlanSnapshot(Base):
     )
 
 
+# 15b. chat_artifacts (0.41, Päckchen AN, Schritt 10)
+class ChatArtifact(Base):
+    """Ein Produkt aus der eigenen Werkstatt, das an einer Konversation hängt (`@`).
+
+    Gegenstück zu `ChatContextNode` für Produkte. Kaskade auf beiden Seiten: Verschwindet das
+    Produkt, fällt der Anhang weg; die Konversation bleibt.
+    """
+    __tablename__ = "chat_artifacts"
+
+    chat_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    artifact_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="CASCADE"), primary_key=True
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (Index("idx_chat_artifacts_artifact", "artifact_id"),)
+
+
 # 16. chat_context_nodes
 class ChatContextNode(Base):
     __tablename__ = "chat_context_nodes"

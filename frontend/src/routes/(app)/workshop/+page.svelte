@@ -8,8 +8,10 @@
     import { subjectMap } from '$lib/stores/subjects.js';
     import {
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
-        Share2,
+        Share2, MessageSquarePlus,
     } from 'lucide-svelte';
+    import { user } from '$lib/stores/user.js';
+    import { ANHAENGBARE_ARTEN, produktFuerNeuenChat } from '$lib/produkt_im_chat.js';
     import { getLibrary, deleteArtifact, createDocument, getPreferences, patchPreferences } from '$lib/api.js';
     import { subjects } from '$lib/stores/subjects.js';
     import { ladeProduktarten } from '$lib/produktarten.js';
@@ -292,6 +294,11 @@
             busyId = null;
         }
     }
+
+    function imChatVerwenden(item) {
+        produktFuerNeuenChat({ artifact_id: item.id, kind: item.kind, title: item.title });
+        goto('/chat');
+    }
 </script>
 
 {#snippet karte(item)}
@@ -456,6 +463,20 @@
                         >
                             <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
                         </a>
+                    {/if}
+                    <!-- Im Chat verwenden (0.41, Schritt 10): neuer Chat mit dem Produkt als Anhang.
+                         Nicht in der Vorschau — dort bleibt die Werkstatt außen vor. -->
+                    {#if ANHAENGBARE_ARTEN.has(item.kind) && item.source?.trim() && !$user?.vorschau}
+                        <button
+                            type="button"
+                            onclick={() => imChatVerwenden(item)}
+                            title="Einen neuen Chat mit diesem Produkt beginnen"
+                            class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                   text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <MessageSquarePlus class="w-3.5 h-3.5" /> Im Chat verwenden
+                        </button>
                     {/if}
                     <!-- Ob das geht, sagt der Server (`uebernehmbar`) — sonst
                          zeigte der Knopf irgendwann etwas anderes an, als der

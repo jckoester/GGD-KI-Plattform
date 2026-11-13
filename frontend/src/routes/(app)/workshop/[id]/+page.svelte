@@ -5,7 +5,9 @@
     // Datei: Verweis auf ihr Dokument. Bis 0.41 hatten nur Dokumente eine eigene Ansicht.
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { ArrowLeft, Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil } from 'lucide-svelte';
+    import { ArrowLeft, Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil, MessageSquarePlus } from 'lucide-svelte';
+    import { user } from '$lib/stores/user.js';
+    import { ANHAENGBARE_ARTEN, produktFuerNeuenChat } from '$lib/produkt_im_chat.js';
     import { getProduktInfo, produktKopieren, deleteArtifact } from '$lib/api.js';
     import { subjects, subjectMap } from '$lib/stores/subjects.js';
     import { kindLabel, mimeExt, slugify, formatBytes } from '$lib/library.js';
@@ -66,6 +68,17 @@
         await navigator.clipboard.writeText(info.source ?? '');
         kopiert = true;
         setTimeout(() => (kopiert = false), 1500);
+    }
+
+    // Im Chat verwenden (0.41, Schritt 10): neuer Chat, das Produkt hängt schon an der ersten
+    // Frage. Nicht in der Vorschau.
+    const imChatMoeglich = $derived(
+        !!info && ANHAENGBARE_ARTEN.has(info.kind) && !!info.source?.trim() && !info.derived_from && !$user?.vorschau,
+    );
+
+    function imChatVerwenden() {
+        produktFuerNeuenChat({ artifact_id: info.id, kind: info.kind, title: info.title });
+        goto('/chat');
     }
 
     async function alsKopie() {
@@ -158,6 +171,12 @@
                     <a href="/api/artifacts/{info.id}" download="{slugify(info.title)}.{mimeExt(info.mime_type)}" class={knopf}>
                         <Download class="w-4 h-4" /> Herunterladen
                     </a>
+                    {#if imChatMoeglich}
+                        <button type="button" onclick={imChatVerwenden} class={knopf}
+                                title="Einen neuen Chat mit diesem Produkt beginnen">
+                            <MessageSquarePlus class="w-4 h-4" /> Im Chat verwenden
+                        </button>
+                    {/if}
                     {#if info.uebernehmbar}
                         <button type="button" onclick={() => (uebernahmeOffen = true)} class={knopf}>
                             <Share2 class="w-4 h-4" /> {info.baustein_id ? 'Baustein aktualisieren' : 'Als Baustein übernehmen'}

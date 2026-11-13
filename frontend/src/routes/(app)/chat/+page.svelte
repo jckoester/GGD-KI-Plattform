@@ -12,7 +12,9 @@
         Info,
         Search,
         Sigma,
+        Hammer,
     } from "lucide-svelte";
+    import { kindLabel } from "$lib/library.js";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { hatteAnhaenge, istAbbruch, istBearbeitbar, letzteEigeneIndex, wirkungsHinweis } from "$lib/chat_bearbeiten.js";
     import AssistentVorschlag from "$lib/components/AssistentVorschlag.svelte";
@@ -57,7 +59,13 @@
         addChatContextNode,
         removeChatContextNode,
         searchContextNodes,
+        getAnhaengbareProdukte,
+        getChatProdukte,
+        addChatProdukt,
+        removeChatProdukt,
     } from "$lib/api.js";
+    import { mentionEintraege, mitProdukt, produkteUebernehmen } from "$lib/produkt_im_chat.js";
+    import ProduktChips from "$lib/components/ProduktChips.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
@@ -90,6 +98,8 @@
     const istLehrkraft = $derived(
         $user?.roles.includes("teacher") || $user?.roles.includes("admin"),
     );
+    // In der Vorschau bleibt die Werkstatt außen vor (Produkte werden nicht angeboten).
+    const inVorschau = $derived(!!$user?.vorschau);
     let messages = $state([]);
     let input = $state("");
     let textarea = $state(null);
@@ -209,6 +219,13 @@
     // Kontext-Knoten für diese Konversation
     let contextNodes = $state([]); // ChatContextNodeRead[]
     let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
+    // Produkte aus der Werkstatt (0.41, Schritt 10). Für eine neue Konversation gepuffert und
+    // mit der **ersten** Nachricht geschickt (`produkt_ids`) — so sieht schon die erste
+    // Antwort sie. (Gepufferte Bausteine werden erst danach angeheftet.)
+    let produkteImChat = $state([]); // AnhangItem[]
+    let pendingProdukte = $state([]);
+    let mentionProdukte = $state([]);
+    const mentionListe = $derived(mentionEintraege(mentionResults, mentionProdukte));
 
     // Treffer des Suchknopfs, die auf Bestätigung warten. Kommen **nur** von dort:
     // Eine Suche des Assistenten öffnet kein Fenster mehr (ADR-017, Befund 7).
@@ -229,6 +246,19 @@
     const displayContextNodes = $derived(
         conversationId ? contextNodes : pendingContextNodes,
     );
+    const displayProdukte = $derived(conversationId ? produkteImChat : pendingProdukte);
+
+    async function handleRemoveProdukt(artifactId) {
+        produkteImChat = produkteImChat.filter((p) => p.artifact_id !== artifactId);
+        pendingProdukte = pendingProdukte.filter((p) => p.artifact_id !== artifactId);
+        if (conversationId) {
+            try {
+                await removeChatProdukt(conversationId, artifactId);
+            } catch (err) {
+                console.error("Produkt konnte nicht aus dem Chat genommen werden:", err);
+            }
+        }
+    }
 
 
     async function handleRemoveContextNode(nodeId) {
@@ -740,7 +770,10 @@
                 pendingSubjectId, // subjectId
                 pendingGroupId, // groupId
                 pendingStundeId, // stundeId
-                { signal, ersetztLetzte, assistentBeenden },
+                {
+                    signal, ersetztLetzte, assistentBeenden,
+                    produktIds: conversationId ? [] : pendingProdukte.map((p) => p.artifact_id),
+                },
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
@@ -824,6 +857,11 @@
                     // Sidebar-Zähler aktualisieren für neue Konversation
                     if (wasNewConversation) {
                         refreshConversationCounts();
+                    }
+                    // Produkte hängen schon serverseitig an (`produkt_ids`).
+                    if (wasNewConversation && pendingProdukte.length > 0) {
+                        produkteImChat = pendingProdukte;
+                        pendingProdukte = [];
                     }
                     // Pending-Kontext-Knoten persistieren (neue Konversation)
                     if (wasNewConversation && pendingContextNodes.length > 0) {
@@ -992,7 +1030,7 @@
                 e.preventDefault();
                 mentionSelectedIndex = Math.min(
                     mentionSelectedIndex + 1,
-                    mentionResults.length - 1,
+                    mentionListe.length - 1,
                 );
                 return;
             }
@@ -1002,9 +1040,9 @@
                 return;
             }
             if (e.key === "Enter" || e.key === "Tab") {
-                if (mentionResults.length > 0) {
+                if (mentionListe.length > 0) {
                     e.preventDefault();
-                    selectMention(mentionResults[mentionSelectedIndex]);
+                    waehleEintrag(mentionListe[mentionSelectedIndex]);
                     return;
                 }
             }
@@ -1068,6 +1106,7 @@
         } else {
             mentionOpen = false;
             mentionResults = [];
+            mentionProdukte = [];
         }
     }
 
@@ -1081,30 +1120,61 @@
             // Namensnachschlag: nur die Identifikation. Die thematische Auswahl kostete
             // je Tastendruck einen Embedding-Netzaufruf für Treffer, die hier weder
             // gezeigt noch gewollt sind.
-            const umschlag = await searchContextNodes(q, conversationId, {
-                identification_only: true,
-                conversation_subject_id: activeSubjectId,
-            });
+            // Dazu die eigenen Produkte (0.41, Schritt 10) — nicht in der Vorschau.
+            const [umschlag, produkte] = await Promise.all([
+                searchContextNodes(q, conversationId, {
+                    identification_only: true,
+                    conversation_subject_id: activeSubjectId,
+                }).catch(() => null),
+                inVorschau ? [] : getAnhaengbareProdukte(q, 5).catch(() => []),
+            ]);
             if (lauf !== mentionLauf) return;
             mentionResults = (umschlag?.identifikation?.treffer ?? []).slice(0, 8);
+            mentionProdukte = produkte ?? [];
         } catch {
             if (lauf !== mentionLauf) return;
             mentionResults = [];
+            mentionProdukte = [];
         }
         // Abbruchregel: Ohne Treffer schließt das Dropdown. Nicht nur der Optik wegen —
         // solange `mentionOpen` gilt, fängt `handleKeydown` die Eingabetaste ab; ein
         // offenes, leeres Dropdown ließe die Nachricht nicht mehr abschicken.
-        if (mentionResults.length === 0) mentionOpen = false;
+        if (mentionListe.length === 0) mentionOpen = false;
     }
 
-    async function selectMention(node) {
+    function waehleEintrag(eintrag) {
+        if (!eintrag) return;
+        if (eintrag.art === "produkt") selectProdukt(eintrag.produkt);
+        else selectMention(eintrag.node);
+    }
+
+    function mentionSchliessen() {
         mentionOpen = false;
         mentionResults = [];
-
+        mentionProdukte = [];
         // @-Fragment im Eingabefeld entfernen — mit derselben Regel, die es erkannt hat.
         const cursorPos = textarea?.selectionStart ?? input.length;
         const replaced = ohneMentionFragment(input.slice(0, cursorPos));
         input = replaced + input.slice(cursorPos);
+    }
+
+    async function selectProdukt(produkt) {
+        mentionSchliessen();
+        if (conversationId) {
+            try {
+                const angehaengt = await addChatProdukt(conversationId, produkt.artifact_id);
+                produkteImChat = mitProdukt(produkteImChat, angehaengt);
+            } catch (err) {
+                console.error("Produkt konnte nicht angehängt werden:", err);
+            }
+        } else {
+            pendingProdukte = mitProdukt(pendingProdukte, produkt);
+        }
+        textarea?.focus();
+    }
+
+    async function selectMention(node) {
+        mentionSchliessen();
 
         // Knoten zum Kontext hinzufügen. Der Ergebnisumschlag führt `node_id`, die
         // frühere Auflistung führte `id` — hier hängt die richtige Kennung dran.
@@ -1295,6 +1365,11 @@
                 } catch {
                     contextNodes = [];
                 }
+                try {
+                    produkteImChat = await getChatProdukte(data.id);
+                } catch {
+                    produkteImChat = [];
+                }
                 pendingSuggestions = null;
             } catch (err) {
                 if (err instanceof ApiError) {
@@ -1352,6 +1427,9 @@
             // starten"). Einmalig — `uebernehmen()` verbraucht die Übergabe, sonst
             // tauchten sie beim nächsten neuen Chat ungefragt wieder auf.
             pendingContextNodes = uebernehmen();
+            // „Im Chat verwenden“ aus der Werkstatt (0.41, Schritt 10) — ebenso einmalig.
+            produkteImChat = [];
+            pendingProdukte = inVorschau ? [] : produkteUebernehmen();
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
             if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;
@@ -1652,6 +1730,11 @@
                 onremove={handleRemoveContextNode}
                 disabled={isStreaming}
             />
+            <ProduktChips
+                produkte={displayProdukte}
+                onremove={handleRemoveProdukt}
+                disabled={isStreaming}
+            />
 
             <!-- Kontext-Vorschläge aus LLM-Tool-Call -->
             {#if pendingSuggestions !== null}
@@ -1664,14 +1747,19 @@
             {/if}
 
             <!-- @-Mention Dropdown -->
-            {#if mentionOpen && mentionResults.length > 0}
+            {#if mentionOpen && mentionListe.length > 0}
                 <div
                     class="absolute bottom-full left-0 right-0 mb-1 z-50
                            bg-light-bg-2 dark:bg-dark-bg-2
                            border border-light-ui-3 dark:border-dark-ui-3
                            rounded-lg shadow-lg overflow-hidden"
                 >
-                    {#each mentionResults as node, i}
+                    {#each mentionListe as eintrag, i (eintrag.schluessel)}
+                        {#if eintrag.gruppe}
+                            <div class="px-3 pt-2 pb-1 text-xs font-medium text-light-tx-2 dark:text-dark-tx-2">
+                                {eintrag.gruppe}
+                            </div>
+                        {/if}
                         <button
                             type="button"
                             class="w-full text-left px-3 py-2 text-sm flex items-center gap-2
@@ -1680,13 +1768,21 @@
                                 : 'text-light-tx dark:text-dark-tx hover:bg-light-ui dark:hover:bg-dark-ui'}"
                             onmousedown={(e) => {
                                 e.preventDefault();
-                                selectMention(node);
+                                waehleEintrag(eintrag);
                             }}
                         >
-                            <ContextNodeLabel
-                                {node}
-                                fassung={mentionFassungen.get(node.node_id)}
-                            />
+                            {#if eintrag.art === "produkt"}
+                                <Hammer class="w-4 h-4 shrink-0 text-light-tx-2 dark:text-dark-tx-2" />
+                                <span class="truncate">{eintrag.produkt.title}</span>
+                                <span class="ml-auto shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    {kindLabel(eintrag.produkt.kind)}
+                                </span>
+                            {:else}
+                                <ContextNodeLabel
+                                    node={eintrag.node}
+                                    fassung={mentionFassungen.get(eintrag.node.node_id)}
+                                />
+                            {/if}
                         </button>
                     {/each}
                 </div>

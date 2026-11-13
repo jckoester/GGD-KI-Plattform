@@ -60,6 +60,22 @@ Alternativ tippst du **`@`** ins Textfeld, um direkt nach einem Baustein zu such
 
 Mehr dazu: [Bibliothek](bibliothek.md)
 
+## Eigene Produkte aus der Werkstatt mitgeben
+
+Unter **`@`** stehen auch deine eigenen Dokumente und Diagramme aus der
+[Werkstatt](werkstatt.md), in einer eigenen Gruppe **„Aus deiner Werkstatt"**. Wählst du eins
+aus, erscheint es als Chip über dem Textfeld, und die KI bekommt seinen Inhalt zu jeder Frage
+in diesem Chat dazu — etwa „Ergänze in meinem Arbeitsblatt eine vierte Aufgabe". Über das ✕ am
+Chip nimmst du es wieder heraus.
+
+Direkt aus der Werkstatt geht es mit **„Im Chat verwenden"** am Produkt: Ein neuer Chat beginnt,
+das Produkt hängt schon an der ersten Frage.
+
+- Mitgeben lassen sich **Dokumente und Diagramme**, keine Bilder und keine exportierten Dateien.
+- Sehr lange Dokumente bekommt die KI nur bis zu einer bestimmten Länge.
+- Was du später am Produkt änderst, sieht die KI bei der nächsten Frage.
+- Löschst du das Produkt, verschwindet es auch aus dem Chat; der Chat selbst bleibt.
+
 ## Kontext unter der Antwort
 
 Unter einer Antwort steht oft **„Kontext (n)“**. Aufgeklappt zeigt die Zeile die Bausteine

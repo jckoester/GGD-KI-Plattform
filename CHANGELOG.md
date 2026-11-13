@@ -16,6 +16,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   werden gemerkt. Titel, Fach und Thema lassen sich an jeder Karte ändern, mit Vorschlägen fürs Thema.
 - Exporte eines Dokuments, die in der Werkstatt behalten werden, stehen eingeklappt am Dokument statt als eigene
   Karten und werden mit ihm gelöscht.
+- Eigene Dokumente und Diagramme aus der Werkstatt lassen sich im Chat mitgeben: unter `@` in der Gruppe „Aus deiner
+  Werkstatt“ oder mit „Im Chat verwenden“ am Produkt. Die KI bekommt ihren Inhalt zu jeder Frage im Chat.
 
 ### Geändert
 
@@ -41,7 +43,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0103).
+- `alembic upgrade head` (0103, 0104).
 - `python scripts/schueler_bausteine_ueberfuehren.py --dry-run` (im Backend-Container), Protokoll ansehen, dann ohne
   `--dry-run`.
 
