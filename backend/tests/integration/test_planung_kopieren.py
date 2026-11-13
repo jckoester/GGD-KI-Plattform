@@ -358,3 +358,121 @@ async def test_allgemeines_kopieren_lehnt_planung_ab(test_client, auth_headers, 
     resp = await test_client.post(f"/context/nodes/{_stunde(conn, QUELLE)}/copy", headers=auth_headers, json={})
     assert resp.status_code == 422
     assert "Planung" in resp.json()["detail"]
+
+
+# ── Einheit kopieren (Schritt 4) ─────────────────────────────────────────────
+
+
+def _setze(conn, sql, *args):
+    with conn.cursor() as cur:
+        cur.execute(sql, args)
+    conn.commit()
+
+
+def _kette(conn, gruppe, titel, namen, *, owner=TEACHER1_PSEUDO, besitzer=None):
+    """Einheit mit Stunden in Reihenfolge `namen`; angelegt rückwärts, damit nur `follows` ordnet."""
+    ue = _knoten(conn, "unterrichtseinheit", titel, gruppe=gruppe, owner=owner,
+                 meta={"schuljahr": "2000/01", "farbe": 3})
+    ids = {}
+    for name in reversed(namen):
+        ids[name] = _stunde(conn, gruppe, name, owner=(besitzer or {}).get(name, owner))
+        _kante(conn, ids[name], ue, "part_of")
+    for frueher, spaeter in zip(namen, namen[1:]):
+        _kante(conn, ids[spaeter], ids[frueher], "follows")
+    return ue, ids
+
+
+def _stunden_der_einheit(conn, einheit):
+    """Titel der Stunden einer Einheit in `follows`-Reihenfolge."""
+    zeilen = _lies(conn, "SELECT n.id::text, n.title FROM context_edges e JOIN context_nodes n "
+                         "ON n.id = e.from_node_id WHERE e.to_node_id = %s AND e.relation = 'part_of'", einheit)
+    titel = dict(zeilen)
+    folgt = dict(_lies(conn, "SELECT from_node_id::text, to_node_id::text FROM context_edges "
+                             "WHERE relation = 'follows' AND from_node_id = ANY(%s::uuid[])", list(titel)))
+    assert set(folgt.values()) <= set(titel), "follows zeigt aus der Einheit hinaus"
+    anfang = [i for i in titel if i not in folgt]
+    assert len(anfang) == 1, folgt
+    nach = {v: k for k, v in folgt.items()}
+    reihe, aktuell = [], anfang[0]
+    while aktuell:
+        reihe.append(titel[aktuell])
+        aktuell = nach.get(aktuell)
+    return reihe
+
+
+async def test_einheit_mit_stunden_in_reihenfolge(test_client, auth_headers, conn):
+    _setze(conn, "UPDATE groups SET jahrgang = 8 WHERE id = %s", ZIEL)
+    curriculum = _knoten(conn, "curriculum", "Chemie 8", scope="school", kategorie="document")
+    passt = _knoten(conn, "kapitel", "Säuren", scope="school", kategorie="document")
+    _kante(conn, passt, curriculum, "part_of")
+    fremdes = _knoten(conn, "kapitel", "Kapitel ohne Curriculum der Gruppe", scope="school", kategorie="document")
+    ue, ids = _kette(conn, QUELLE, "Säuren und Basen", ["Eins", "Zwei", "Drei"],
+                     besitzer={"Zwei": TEACHER2_PSEUDO})
+    _setze(conn, "UPDATE context_nodes SET content = 'Beschreibung' WHERE id = %s", ue)
+    _kante(conn, ue, passt, "references")
+    _kante(conn, ue, fremdes, "references")
+    weg = _stunde(conn, QUELLE, "Gelöscht", status="deleted")
+    _kante(conn, weg, ue, "part_of")
+
+    resp = await test_client.post(f"/planning/units/{ue}/copy", headers=auth_headers, json={"gruppe_id": ZIEL})
+
+    assert resp.status_code == 201, resp.text
+    antwort = resp.json()
+    assert (antwort["titel"], antwort["gruppe_id"], antwort["stunden"]) == ("Säuren und Basen", ZIEL, 3)
+    assert [(m["art"], m["titel"]) for m in antwort["meldungen"]] == [
+        ("kapitel", "Kapitel ohne Curriculum der Gruppe")]
+    neu = antwort["id"]
+    (owner, wgid, content, meta), = _lies(
+        conn, "SELECT owner_pseudonym, write_scope_group_id, content, metadata FROM context_nodes WHERE id = %s", neu)
+    assert (owner, wgid, content) == (TEACHER1_PSEUDO, ZIEL, "Beschreibung")
+    assert (meta["schuljahr"], meta["farbe"], meta["kopie_von"]) == (JAHR.schuljahr, 3, ue)
+    kanten = _lies(conn, "SELECT e.relation, n.content_type, n.id::text FROM context_edges e "
+                         "JOIN context_nodes n ON n.id = e.to_node_id WHERE e.from_node_id = %s", neu)
+    assert sorted(k[:2] for k in kanten) == [("part_of", "jahresplan"), ("references", "kapitel")]
+    assert ("references", "kapitel", passt) in kanten
+    assert _stunden_der_einheit(conn, neu) == ["Eins", "Zwei", "Drei"]
+    assert _lies(conn, "SELECT DISTINCT owner_pseudonym FROM context_nodes n JOIN context_edges e "
+                       "ON e.from_node_id = n.id WHERE e.to_node_id = %s", neu) == [(TEACHER1_PSEUDO,)]
+    assert _lies(conn, "SELECT count(*) FROM lesson_slots WHERE ue_node_id = %s", neu) == [(0,)]
+
+
+async def test_einheit_ohne_mitgliedschaft_nur_eigene_stunden(test_client, auth_headers, conn):
+    gemischt, _ = _kette(conn, FREMD, "Gemischt", ["Meine", "Ihre"], owner=TEACHER2_PSEUDO,
+                         besitzer={"Meine": TEACHER1_PSEUDO})
+    nur_ihre, _ = _kette(conn, FREMD, "Nur ihre", ["Ihre"], owner=TEACHER2_PSEUDO)
+
+    ok = await test_client.post(f"/planning/units/{gemischt}/copy", headers=auth_headers, json={"gruppe_id": ZIEL})
+    nein = await test_client.post(f"/planning/units/{nur_ihre}/copy", headers=auth_headers, json={"gruppe_id": ZIEL})
+
+    assert (ok.status_code, nein.status_code) == (201, 403), ok.text
+    assert ok.json()["stunden"] == 1
+    assert _stunden_der_einheit(conn, ok.json()["id"]) == ["Meine"]
+
+
+async def test_einheit_ganz_oder_gar_nicht(test_client, auth_headers, conn, monkeypatch):
+    ue, _ = _kette(conn, QUELLE, "Abbruch", ["Eins", "Zwei", "Drei"])
+    echt = kopieren.kopiere_stunde
+    aufrufe = []
+
+    async def bricht_bei_der_zweiten(*args, **kwargs):
+        aufrufe.append(1)
+        if len(aufrufe) == 2:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=422, detail="Absichtlich")
+        return await echt(*args, **kwargs)
+
+    monkeypatch.setattr(kopieren, "kopiere_stunde", bricht_bei_der_zweiten)
+
+    resp = await test_client.post(f"/planning/units/{ue}/copy", headers=auth_headers, json={"gruppe_id": ZIEL})
+
+    assert resp.status_code == 422
+    assert _lies(conn, "SELECT count(*) FROM context_nodes WHERE write_scope_group_id = %s", ZIEL) == [(0,)]
+
+
+async def test_einheit_ziel_wie_bei_der_stunde(test_client, auth_headers, conn):
+    ue, _ = _kette(conn, QUELLE, "Ziel", ["Eins"])
+    anderes = await test_client.post(f"/planning/units/{ue}/copy", headers=auth_headers, json={"gruppe_id": ANDERES})
+    fremd = await test_client.post(f"/planning/units/{ue}/copy", headers=auth_headers, json={"gruppe_id": FREMD})
+    stunde = await test_client.post(f"/planning/units/{_stunde(conn, QUELLE)}/copy", headers=auth_headers,
+                                    json={"gruppe_id": ZIEL})
+    assert (anderes.status_code, fremd.status_code, stunde.status_code) == (422, 403, 404)

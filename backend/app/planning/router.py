@@ -87,6 +87,8 @@ from app.planning.schemas import (
     SnapshotCreate,
     SnapshotRead,
     StundeKopieren,
+    EinheitKopieren,
+    EinheitKopiertRead,
     StundeKopiertRead,
     UnitBalanceItem,
     UnitCreate,
@@ -1727,6 +1729,55 @@ async def copy_lesson(
         gruppe_id=gruppe_id,
         einheit_id=einheit_id,
         einheit_neu=payload.einheit_id is None,
+        meldungen=kopieren.meldungen_als_dicts(meldungen),
+    )
+
+
+# ── POST /planning/units/{node_id}/copy (0.42) ───────────────────────────────
+
+
+@router.post("/units/{node_id}/copy", response_model=EinheitKopiertRead, status_code=201)
+async def copy_unit(
+    node_id: UUID,
+    payload: EinheitKopieren,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einheit samt Stunden in eine aktuelle Gruppe desselben Fachs kopieren — ohne Termine.
+
+    Eine Transaktion: Entweder entsteht die Einheit mit allen Stunden oder nichts. Kopiert
+    werden die Stunden, die man lesen darf — als Lehrkraft der Gruppe alle, sonst die eigenen
+    (wie das Archiv sie zeigt). Lesen darf die Einheit, wer Lehrkraft der Gruppe ist, wem sie
+    gehört oder wer eigene Stunden darin hat.
+    """
+    quelle = await db.get(ContextNode, node_id)
+    if quelle is None or quelle.status not in LESBAR or quelle.content_type != "unterrichtseinheit":
+        raise HTTPException(status_code=404, detail="Unterrichtseinheit nicht gefunden")
+    stunden = await kopieren.lesbare_stunden_der_einheit(db, quelle, user)
+    try:
+        await zugang_zur_stunde(quelle, user, db)
+    except HTTPException:
+        if not stunden:
+            raise
+
+    fach_id = quelle.subject_id
+    if fach_id is None and quelle.write_scope_group_id is not None:
+        alte = await db.get(Group, quelle.write_scope_group_id)
+        fach_id = alte.subject_id if alte else None
+    ziel = await kopieren.pruefe_ziel(db, payload.gruppe_id, fach_id, user)
+
+    meldungen: list[kopieren.Meldung] = []
+    einheit, neue = await kopieren.kopiere_einheit(db, quelle, stunden, ziel, meldungen)
+    einheit_id, titel, gruppe_id = einheit.id, einheit.title, ziel.gruppe.id
+    neue_ids = [s.id for s in neue]
+    await db.commit()
+    for nid in (einheit_id, *neue_ids):
+        await enqueue_embedding_job(nid, db)
+    return EinheitKopiertRead(
+        id=einheit_id,
+        titel=titel,
+        gruppe_id=gruppe_id,
+        stunden=len(neue_ids),
         meldungen=kopieren.meldungen_als_dicts(meldungen),
     )
 

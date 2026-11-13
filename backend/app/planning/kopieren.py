@@ -1,4 +1,4 @@
-"""Stunden (und ab Schritt 4 Einheiten) als Vorlage kopieren (0.42, Päckchen AO).
+"""Stunden und Einheiten als Vorlage kopieren (0.42, Päckchen AO).
 
 Eine Kopie ist ein **neuer Entwurf in einer aktuellen Gruppe desselben Fachs** (F5): Er gehört
 der kopierenden Person, liegt in einer Einheit der Zielgruppe (F6) und vermerkt seine Herkunft
@@ -24,8 +24,12 @@ in ``metadata.kopie_von`` (F9). Kopieren darf, wer die Quelle lesen darf
 **Was nicht mitkommt:** Termin, Nachbereitungsstand, Kürzungen und Übertrag
 (``refs_offen``), verworfene und vorgeschlagene Begriffe, Chat-Bezug (``assistant_id``).
 
-Die Funktionen hier **committen nicht** — das tut die Route, damit die Einheiten-Kopie
-(Schritt 4) alle Stunden in einer Transaktion anlegen kann.
+**Einheit** (Schritt 4): neue Einheit am Jahresplan der Zielgruppe, laufendes Schuljahr, Titel,
+Beschreibung, Farbe; Kapitelverweise nur, wenn das Kapitel in einem Curriculum der Zielgruppe
+liegt (S2); alle lesbaren Stunden in Reihenfolge, ohne Termine.
+
+Die Funktionen hier **committen nicht** — das tut die Route. Eine Einheit entsteht damit ganz
+oder gar nicht: Scheitert eine Stunde, rollt die Sitzung alles zurück.
 """
 from __future__ import annotations
 
@@ -59,11 +63,12 @@ _GRUPPEN_SCOPES = ("group", "group_teachers")
 class Meldung:
     """Was an der Kopie anders ist als an der Quelle."""
 
-    art: str    # "kompetenz" | "begriff" | "material"
+    art: str    # "kompetenz" | "begriff" | "material" | "kapitel"
     titel: str
     was: str    # "weggelassen" | "umgestellt"
     grund: str
     phase: str | None = None
+    stunde: str | None = None   # bei der Einheiten-Kopie: in welcher Stunde
 
 
 @dataclass
@@ -358,6 +363,110 @@ async def kopiere_stunde(
     await synchronisiere_materialkanten(db, stunde.id, meta)
     await db.flush()
     return stunde
+
+
+# ── Einheit (Schritt 4) ───────────────────────────────────────────────────────
+
+
+async def lesbare_stunden_der_einheit(
+    db: AsyncSession, einheit: ContextNode, user: JwtPayload
+) -> list[ContextNode]:
+    """Die Stunden der Einheit, die diese Person lesen darf, in Reihenfolge (`follows`).
+
+    Lehrkraft der Gruppe: alle. Sonst nur eigene — wie im Archiv (F12, Fall 4b). Gelöschte nie,
+    archivierte schon (F11).
+    """
+    from app.planning.archiv import _ordne
+    from app.planning.permissions import ist_gruppenlehrkraft
+
+    abfrage = (
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == einheit.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "unterrichtsstunde",
+            ContextNode.status.in_(LESBAR),
+        )
+    )
+    gruppe_id = einheit.write_scope_group_id
+    if gruppe_id is None or not await ist_gruppenlehrkraft(gruppe_id, user, db):
+        abfrage = abfrage.where(ContextNode.owner_pseudonym == user.sub)
+    stunden = {n.id: n for n in (await db.execute(abfrage)).scalars()}
+    folgt: dict[UUID, UUID] = {}
+    if stunden:
+        folgt = dict((await db.execute(
+            sa.select(ContextEdge.from_node_id, ContextEdge.to_node_id).where(
+                ContextEdge.from_node_id.in_(list(stunden)), ContextEdge.relation == "follows")
+        )).all())
+    return [stunden[i] for i in _ordne(stunden, folgt)]
+
+
+async def _kapitel_fuer_ziel(
+    db: AsyncSession, ziel: Ziel, quelle: ContextNode, meldungen: list[Meldung]
+) -> list[UUID]:
+    """Kapitelverweise der Quelle, die in einem Curriculum der Zielgruppe liegen (S2)."""
+    from app.planning.curriculum_resolver import resolve_group_curricula
+
+    kapitel = (await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+        .where(
+            ContextEdge.from_node_id == quelle.id,
+            ContextEdge.relation == "references",
+            ContextNode.content_type == "kapitel",
+        )
+    )).scalars().all()
+    if not kapitel:
+        return []
+    erlaubt = {
+        k.id for cur in (await resolve_group_curricula(db, ziel.gruppe.id)).curricula for k in cur.kapitel
+    }
+    behalten = []
+    for k in kapitel:
+        if k.id in erlaubt:
+            behalten.append(k.id)
+        else:
+            meldungen.append(Meldung(
+                "kapitel", k.title, "weggelassen", "Gehört zu keinem Curriculum der Gruppe."))
+    return behalten
+
+
+async def kopiere_einheit(
+    db: AsyncSession, quelle: ContextNode, stunden: list[ContextNode], ziel: Ziel,
+    meldungen: list[Meldung],
+) -> tuple[ContextNode, list[ContextNode]]:
+    """Legt die Einheit samt Stunden in der Zielgruppe an (ohne Commit, ohne Termine).
+
+    Die neue Einheit hängt am Jahresplan der Zielgruppe im laufenden Schuljahr, trägt Titel,
+    Beschreibung und Farbe der Quelle und die Kapitel, die dort passen. Die Stunden folgen
+    einander in der Reihenfolge der Quelle — über ``vorgaenger`` durchgereicht, weil alle
+    in derselben Transaktion entstehen und dieselbe Anlegezeit tragen.
+    """
+    from app.planning.service import create_unit_node
+
+    md = quelle.metadata_ or {}
+    einheit = await create_unit_node(
+        db, ziel.gruppe.id, ziel.gruppe.subject_id, ziel.user, quelle.title,
+        farbe=md.get("farbe"), commit=False)
+    if quelle.content:
+        einheit.content = quelle.content
+    einheit.metadata_ = {**(einheit.metadata_ or {}), "kopie_von": str(quelle.id)}
+    for kapitel_id in await _kapitel_fuer_ziel(db, ziel, quelle, meldungen):
+        db.add(ContextEdge(
+            from_node_id=einheit.id, to_node_id=kapitel_id, relation="references", metadata_={}))
+
+    neue: list[ContextNode] = []
+    vorgaenger: ContextNode | None = None
+    for stunde in stunden:
+        eigene: list[Meldung] = []
+        vorgaenger = await kopiere_stunde(db, stunde, ziel, einheit, eigene, vorgaenger=vorgaenger)
+        for m in eigene:
+            m.stunde = stunde.title
+        meldungen.extend(eigene)
+        neue.append(vorgaenger)
+    await db.flush()
+    return einheit, neue
 
 
 def meldungen_als_dicts(meldungen: list[Meldung]) -> list[dict]:

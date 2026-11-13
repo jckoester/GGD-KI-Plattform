@@ -11,9 +11,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Archiv.
 - Archiv der Planung: frühere Gruppen mit ihren Einheiten und Stunden, als Liste oder Kacheln; Stunden öffnen sich
   zum Lesen.
-- Stunden als Vorlage kopieren: in eine Einheit einer Gruppe desselben Fachs, auch aus dem Archiv. Kompetenzen
-  folgen der Bildungsplan-Fassung der Gruppe; was nicht passt, wird genannt. Die Nachbereitungsnotiz kommt als
-  „Notiz aus der Vorlage“ mit.
+- Stunden und Einheiten als Vorlage kopieren: in eine Gruppe desselben Fachs, auch aus dem Archiv; eine Einheit
+  kommt mit allen Stunden in ihrer Reihenfolge, ohne Termine. Kompetenzen folgen der Bildungsplan-Fassung der
+  Gruppe; was nicht passt, wird genannt. Die Nachbereitungsnotiz kommt als „Notiz aus der Vorlage“ mit.
 
 ### Geändert
 

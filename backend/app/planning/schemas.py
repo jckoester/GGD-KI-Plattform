@@ -475,6 +475,7 @@ class KopieMeldung(BaseModel):
     was: str     # "weggelassen" | "umgestellt"
     grund: str
     phase: Optional[str] = None
+    stunde: Optional[str] = None
 
 
 class StundeKopiertRead(BaseModel):
@@ -483,4 +484,16 @@ class StundeKopiertRead(BaseModel):
     gruppe_id: int
     einheit_id: UUID
     einheit_neu: bool
+    meldungen: list[KopieMeldung]
+
+
+class EinheitKopieren(BaseModel):
+    gruppe_id: int
+
+
+class EinheitKopiertRead(BaseModel):
+    id: UUID
+    titel: str
+    gruppe_id: int
+    stunden: int
     meldungen: list[KopieMeldung]
