@@ -45,6 +45,8 @@
   import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
   import EinheitenAnsicht from '$lib/components/planner/EinheitenAnsicht.svelte'
   import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
+  import { deleteLesson } from '$lib/api.js'
+  import LoeschenDialog from '$lib/components/planner/LoeschenDialog.svelte'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -70,6 +72,18 @@
   let einplanStunde = $state(null)
 
   function eingeplant() {
+    loadOverview()   // lädt die Einheiten mit
+  }
+
+  // Löschen (0.42.4): endgültig, deshalb mit Rückfrage; der Server prüft Eigentum und Nachbereitung.
+  let loeschStunde = $state(null)
+
+  function loescheStunde(s) {
+    loeschStunde = s
+  }
+
+  async function loeschenBestaetigt() {
+    await deleteLesson(loeschStunde.id)
     loadOverview()   // lädt die Einheiten mit
   }
 
@@ -756,6 +770,7 @@
             art: 'stunde', quelle: { id: st.id, titel: st.titel, einheitTitel: e?.id ? e.titel : '' },
           })}
           termine
+          onLoeschen={loescheStunde}
           onEinplanen={(st, e) => (einplanStunde = { stunde: { id: st.id, titel: st.titel }, einheitId: e?.id ?? null })}
           leerText="Diese Gruppe hat noch keine Einheiten. Du legst sie in der Jahresübersicht an."
         />
@@ -833,6 +848,13 @@
   fachId={group?.subject_id ?? null}
   onClose={() => (kopieren = null)}
   onKopiert={einheitKopiert}
+/>
+
+<LoeschenDialog
+  open={loeschStunde != null}
+  stunde={loeschStunde}
+  onLoeschen={loeschenBestaetigt}
+  onClose={() => (loeschStunde = null)}
 />
 
 <EinplanenDialog

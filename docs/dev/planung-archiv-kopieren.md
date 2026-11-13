@@ -113,6 +113,27 @@ Termins**. Trägt der Termin keine, fällt die `part_of`-Kante der Stunde weg �
 Auswahl bietet nur Termine ohne Entwurf an, und `expected_updated_at` lehnt einen inzwischen
 geänderten Termin mit 409 (`grund: veraltet`) ab.
 
+## Stunde löschen (0.42.4)
+
+`DELETE /planning/lessons/{id}` — endgültig, die Oberfläche fragt vorher (`LoeschenDialog.svelte`, kein `confirm` auf der Planungsseite; Regeln in `lib/stunde_loeschen.js`).
+
+- **Wer:** `zugang_zur_stunde` muss Ändern erlauben **und** `owner_pseudonym` die eigene Kennung sein —
+  Mitlehrkräfte ändern mit, löschen aber nicht (403). Archiviertes ist ohnehin nur lesbar.
+- **Nicht:** nachbereitete Stunden (`lesson_slots.nachbereitet_at`, 409) — sie halten fest, was
+  unterrichtet wurde, und speisen die Begriffe der Gruppe.
+- **Folgen:** Der Termin verliert den Entwurf (explizit, mit neuem `updated_at`), Thema und Einheit
+  bleiben; `conversations.stunde_node_id` wird `NULL`, ein Parkplatz-Eintrag fällt per `CASCADE`.
+  Die `follows`-Kette schließt sich (Nachfolgerin → Vorgängerin).
+- **Anzeige:** `LessonRead.darf_loeschen`, `ArchivStundeRead.eigen` (+ `nachbereitet`) — dieselbe Regel.
+
+⚠️ **Wiederherstellen nach dem Löschen.** Ein Snapshot kann auf einen Entwurf oder eine Einheit
+zeigen, die es nicht mehr gibt. Bis 0.42.4 setzte `restore_snapshot` die Kennungen ungeprüft und
+scheiterte am Fremdschlüssel — auch nach dem Löschen einer **Einheit**, das es schon länger gab.
+Jetzt fallen fehlende Kennungen weg; der Termin behält den Rest des Snapshots.
+
+Der allgemeine Weg `DELETE /context/nodes/{id}` kennt diese Regeln nicht (Eigentümerin ja,
+Nachbereitung und Reihenfolge nein). Die Oberfläche bietet ihn für Planung nirgends an.
+
 ## „Meine Bausteine“
 
 Planungstypen sind persönlich gepflegt (`PERSOENLICHE_CONTENT_TYPES`), stehen aber nicht in
@@ -122,5 +143,5 @@ für Liste, Typfilter und Aufmerksamkeitszähler. „Eingesetzt in“ am Materia
 ## Tests
 
 `tests/integration/test_planung_archiv.py`, `test_planung_kopieren.py`,
-`test_planung_einheitenansicht.py`, `test_meine_bausteine.py`; Frontend `planung_archiv.test.js`,
-`planung_kopieren.test.js`, `einplanen.test.js`.
+`test_planung_einheitenansicht.py` (auch Löschen und Wiederherstellen), `test_meine_bausteine.py`;
+Frontend `planung_archiv.test.js`, `planung_kopieren.test.js`, `einplanen.test.js`, `stunde_loeschen.test.js`.

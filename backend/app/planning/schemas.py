@@ -332,6 +332,8 @@ class LessonRead(BaseModel):
     # `{text, kopie_von, datum}`. Keine Nachbereitung dieser Stunde.
     kopie_von: Optional[str] = None
     notiz_aus_vorlage: Optional[dict] = None
+    # Löschen (0.42.4): nur die Eigentümerin, nur änderbar, nicht nachbereitet.
+    darf_loeschen: bool = False
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────

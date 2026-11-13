@@ -137,6 +137,21 @@ async def restore_snapshot(
     payload = snapshot.payload
     skipped: list[str] = []
 
+    # Einheiten und Entwürfe, die es seit dem Snapshot nicht mehr gibt (gelöscht), fallen weg —
+    # sonst scheiterte das Wiederherstellen am Fremdschlüssel (0.42.4). Der Termin behält dann,
+    # was der Snapshot sonst sagt; der gelöschte Inhalt kommt nicht zurück.
+    verwiesen = {
+        UUID(str(d[f])) for d in payload.get("slots", []) for f in ("ue_node_id", "stunde_node_id") if d.get(f)
+    }
+    vorhanden = {
+        str(i) for (i,) in (await db.execute(
+            sa.select(ContextNode.id).where(ContextNode.id.in_(verwiesen or {None}))
+        )).all()
+    }
+
+    def noch_da(wert):
+        return wert if wert and str(wert) in vorhanden else None
+
     for slot_data in payload.get("slots", []):
         slot = await db.get(LessonSlot, slot_data["slot_id"])
         if slot is None:
@@ -158,8 +173,8 @@ async def restore_snapshot(
             # `setze_kategorie` die Felder; zurück in den Ausfall bekommt er die Herkunft
             # `eigen` — „Rückgängig" ist eine Handlung der Lehrkraft, kein Abgleich.
             setze_kategorie(slot, slot_data["kategorie"], herkunft="eigen")
-        slot.ue_node_id = slot_data.get("ue_node_id")
-        slot.stunde_node_id = slot_data.get("stunde_node_id")
+        slot.ue_node_id = noch_da(slot_data.get("ue_node_id"))
+        slot.stunde_node_id = noch_da(slot_data.get("stunde_node_id"))
         if tuple(str(x) if x else None for x in (slot.ue_node_id, slot.stunde_node_id)) != vorher:
             await ordne_entwurf_ein(db, slot)
         slot.thema = slot_data.get("thema")
@@ -170,7 +185,7 @@ async def restore_snapshot(
     # Doppelstunde), bleiben unberührt — und könnten einen Entwurf tragen, den der Snapshot
     # wieder an seinen alten Termin hängt. Ein Entwurf gehört an höchstens einen Termin
     # (0087): Der Snapshot gewinnt, der neuere Termin wird gelöst.
-    zurueck = {d["stunde_node_id"] for d in payload.get("slots", []) if d.get("stunde_node_id")}
+    zurueck = {d["stunde_node_id"] for d in payload.get("slots", []) if noch_da(d.get("stunde_node_id"))}
     if zurueck:
         await db.execute(
             sa.update(LessonSlot)

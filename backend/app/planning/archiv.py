@@ -65,6 +65,8 @@ class ArchivStunde:
     archiviert: bool
     # Der Termin, an dem die Stunde hängt — None heißt „ohne Termin“ (0.42.3, Einplanen).
     slot_id: UUID | None = None
+    # Eigene Stunde — im Planer darf nur die Eigentümerin löschen (0.42.4).
+    eigen: bool = False
 
 
 @dataclass
@@ -291,6 +293,7 @@ async def archiv_inhalt(
             nachbereitet=nachbereitet,
             archiviert=n.status == "archived",
             slot_id=slot_id,
+            eigen=n.owner_pseudonym == user.sub,
         )
 
     je_einheit: dict[UUID, dict[UUID, ContextNode]] = {eid: {} for eid in einheiten}

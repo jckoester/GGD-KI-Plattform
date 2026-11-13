@@ -2497,6 +2497,12 @@ export async function getLesson(nodeId) {
     return res.json()
 }
 
+// Stundenentwurf löschen (0.42.4) — endgültig. 403 für Mitlehrkräfte, 409 wenn nachbereitet.
+export async function deleteLesson(nodeId) {
+    const res = await fetch(`${BASE}/planning/lessons/${nodeId}`, { method: 'DELETE', credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht gelöscht werden')
+}
+
 export async function patchLesson(nodeId, updates) {
     const res = await fetch(`${BASE}/planning/lessons/${nodeId}`, {
         method: 'PATCH',

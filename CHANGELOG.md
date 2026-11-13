@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.42.4] – 2026-11-13
+
+### Neu
+
+- Stundenentwürfe löschen, im Stundenentwurf und in der Einheitenansicht. Nur die Lehrkraft, die die Stunde
+  angelegt hat; nachbereitete Stunden nicht.
+
+### Behoben
+
+- „Verlauf“ → „Wiederherstellen“ scheiterte, wenn eine Einheit oder Stunde seitdem gelöscht worden war.
+
+### Nach dem Update
+
+- Neu bauen und starten. Keine Migration, keine Konfiguration.
+
 ## [0.42.3] – 2026-11-13
 
 ### Neu

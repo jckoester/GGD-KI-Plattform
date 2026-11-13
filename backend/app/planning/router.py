@@ -1299,6 +1299,81 @@ async def _darf_stunde_aendern(lesson: ContextNode, user: JwtPayload, db: AsyncS
         raise HTTPException(status_code=403, detail="Diese Stunde lässt sich nur noch lesen")
 
 
+# ── DELETE /planning/lessons/{node_id} (0.42.4) ─────────────────────────────
+
+
+@router.delete("/lessons/{node_id}", status_code=204)
+async def delete_lesson(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Löscht einen Stundenentwurf — endgültig, die Oberfläche fragt vorher.
+
+    **Wer:** nur die Eigentümerin, und nur solange sie die Stunde ändern darf
+    (`zugang_zur_stunde`). Mitlehrkräfte ändern mit, löschen aber nicht (Plan 0.42.4, F1).
+
+    **Was nicht:** eine nachbereitete Stunde (409, F2). Sie hält fest, was unterrichtet wurde;
+    die Begriffe der Gruppe im Schüler-Chat stützen sich darauf.
+
+    **Was mitgeht:** Der Termin verliert den Entwurf und behält Thema und Einheit; Chats
+    verlieren den Stundenbezug (FK `SET NULL`), ein Parkplatz-Eintrag verschwindet (`CASCADE`).
+    Die Reihenfolge in der Einheit schließt sich: Die Nachfolgerin folgt danach der Vorgängerin.
+    """
+    lesson = await db.get(ContextNode, node_id)
+    if lesson is None or lesson.content_type != "unterrichtsstunde" or lesson.status not in LESBAR:
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+    await _darf_stunde_aendern(lesson, user, db)
+    if lesson.owner_pseudonym != user.sub:
+        raise HTTPException(
+            status_code=403,
+            detail="Löschen kann nur, wer die Stunde angelegt hat. Vom Termin lösen kannst du sie.",
+        )
+
+    slots = (await db.execute(
+        sa.select(LessonSlot).where(LessonSlot.stunde_node_id == node_id)
+    )).scalars().all()
+    if any(s.nachbereitet_at is not None for s in slots):
+        raise HTTPException(
+            status_code=409,
+            detail="Diese Stunde ist nachbereitet und hält fest, was unterrichtet wurde. "
+                   "Sie lässt sich nicht löschen.",
+        )
+
+    # Reihenfolge schließen: `a follows b` heißt, b ist die Vorgängerin von a.
+    folgt = (await db.execute(
+        sa.select(ContextEdge.from_node_id, ContextEdge.to_node_id).where(
+            ContextEdge.relation == "follows",
+            sa.or_(ContextEdge.from_node_id == node_id, ContextEdge.to_node_id == node_id),
+        )
+    )).all()
+    vorgaenger = [b for a, b in folgt if a == node_id]
+    nachfolger = [a for a, b in folgt if b == node_id]
+    for neu_von in nachfolger:
+        for neu_nach in vorgaenger:
+            if neu_von == neu_nach:
+                continue
+            schon = (await db.execute(
+                sa.select(ContextEdge.id).where(
+                    ContextEdge.from_node_id == neu_von,
+                    ContextEdge.to_node_id == neu_nach,
+                    ContextEdge.relation == "follows",
+                )
+            )).first()
+            if schon is None:
+                db.add(ContextEdge(from_node_id=neu_von, to_node_id=neu_nach, relation="follows", metadata_={}))
+
+    # Der Termin ändert sich sichtbar — der Stand soll das zeigen (`expected_updated_at`).
+    jetzt = datetime.now(timezone.utc)
+    for s in slots:
+        s.stunde_node_id = None
+        s.updated_at = jetzt
+    await db.flush()
+    await db.delete(lesson)
+    await db.commit()
+    logger.info("stunde_geloescht pseudonym=%s stunde=%s termine=%d", user.sub, node_id, len(slots))
+
+
 # ── GET /planning/lessons/{node_id} ──────────────────────────────────────────
 
 
@@ -1383,6 +1458,10 @@ async def get_lesson(
         begriffe_vorschlagen=bool(settings.begriffe_model) and lesson.subject_id is not None and darf_bearbeiten,
         kopie_von=meta.get("kopie_von"),
         notiz_aus_vorlage=meta.get("notiz_aus_vorlage") or None,
+        # Dieselbe Regel wie `DELETE /planning/lessons/{id}` (0.42.4): eigene, änderbare,
+        # nicht nachbereitete Stunde.
+        darf_loeschen=darf_bearbeiten and lesson.owner_pseudonym == user.sub
+        and not (slot is not None and slot.nachbereitet_at is not None),
     )
 
 
@@ -1940,6 +2019,7 @@ class ArchivStundeRead(BaseModel):
     nachbereitet: bool
     archiviert: bool
     slot_id: UUID | None = None
+    eigen: bool = False
 
 
 class ArchivEinheitRead(BaseModel):

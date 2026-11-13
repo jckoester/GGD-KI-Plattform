@@ -11,6 +11,7 @@
   import {
     getLesson,
     patchLesson,
+    deleteLesson,
     begriffeVorschlagen,
     exportLesson,
     createReview,
@@ -33,6 +34,7 @@
   import AssistentenKnopf from '$lib/components/AssistentenKnopf.svelte'
   import KopierenDialog from '$lib/components/planner/KopierenDialog.svelte'
   import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
+  import LoeschenDialog from '$lib/components/planner/LoeschenDialog.svelte'
 
   const { data } = $props()
   const nodeId = $derived(data.nodeId)
@@ -292,6 +294,16 @@
   let kopierenOffen = $state(false)
   // Einplanen (0.42.3): eine Stunde ohne Termin, etwa eine Kopie, auf einen freien Termin legen.
   let einplanenOffen = $state(false)
+  let loeschenOffen = $state(false)
+
+  // Löschen (0.42.4): endgültig, mit Rückfrage. Danach in die Einheitenansicht, zur Einheit der Stunde.
+  async function loeschen() {
+    clearTimeout(saveTimer)   // kein Autospeichern auf einen gelöschten Entwurf
+    await deleteLesson(nodeId)
+    const params = new URLSearchParams({ ansicht: 'einheiten' })
+    if (lesson.ue?.id) params.set('einheit', lesson.ue.id)
+    goto(`${plannerBase}?${params}`)
+  }
 
   // Nur Termin und Navigation auffrischen — der Editor bleibt, wie er ist (ungespeicherte Eingaben).
   async function eingeplant() {
@@ -478,6 +490,13 @@
               <button type="button" onclick={() => (einplanenOffen = true)} class={navBtn}
                       title="Diese Stunde hat noch keinen Termin — auf einen freien legen">
                 📅 Einplanen
+              </button>
+            {/if}
+
+            {#if lesson.darf_loeschen}
+              <button type="button" onclick={() => (loeschenOffen = true)} class="{navBtn} hover:text-light-re dark:hover:text-dark-re"
+                      title="Diesen Stundenentwurf endgültig löschen">
+                Löschen
               </button>
             {/if}
 
@@ -804,6 +823,12 @@
     quelle={{ id: nodeId, titel: lesson.titel, einheitTitel: lesson.ue?.titel ?? '' }}
     fachId={lesson.subject_id}
     onClose={() => (kopierenOffen = false)}
+  />
+  <LoeschenDialog
+    open={loeschenOffen}
+    stunde={{ titel: lesson.titel, datum: lesson.slot?.date ?? null }}
+    onLoeschen={loeschen}
+    onClose={() => (loeschenOffen = false)}
   />
   <EinplanenDialog
     open={einplanenOffen}

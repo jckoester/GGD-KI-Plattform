@@ -261,3 +261,128 @@ async def test_einplanen_veralteter_stand_und_doppelt(test_client, auth_headers,
     doppelt = await test_client.patch(f"/planning/slots/{zweiter}", headers=auth_headers,
                                       json={"stunde_node_id": stunde, "ue_node_id": einheit})
     assert doppelt.status_code == 409
+
+
+# ── Stunde löschen (0.42.4; Plan F1–F3) ──────────────────────────────────────
+
+
+async def _loesche(client, headers, stunde):
+    return await client.delete(f"/planning/lessons/{stunde}", headers=headers)
+
+
+def _gibt_es(conn, nid):
+    return bool(_lies(conn, "SELECT 1 FROM context_nodes WHERE id = %s", nid))
+
+
+async def test_loeschen_mit_termin_und_reihenfolge(test_client, auth_headers, conn):
+    einheit = _einheit(conn, EIGENE)
+    eins = _stunde(conn, EIGENE, einheit, "Eins")
+    zwei = _stunde(conn, EIGENE, einheit, "Zwei", nach=eins)
+    drei = _stunde(conn, EIGENE, einheit, "Drei", nach=zwei)
+    slot = _termin(conn, EIGENE, date(2026, 9, 21), zwei)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lesson_slots SET ue_node_id = %s, thema = 'Getriebe' WHERE id = %s", (einheit, slot))
+    conn.commit()
+
+    resp = await _loesche(test_client, auth_headers, zwei)
+
+    assert resp.status_code == 204, resp.text
+    assert not _gibt_es(conn, zwei)
+    # Der Termin bleibt mit Thema und Einheit, nur ohne Entwurf.
+    assert _lies(conn, "SELECT stunde_node_id, ue_node_id::text, thema FROM lesson_slots WHERE id = %s", slot) \
+        == [(None, einheit, "Getriebe")]
+    # Die Reihenfolge schließt sich.
+    daten = (await _inhalt(test_client, auth_headers)).json()
+    assert [s["titel"] for s in daten["einheiten"][0]["stunden"]] == ["Eins", "Drei"]
+    assert _lies(conn, "SELECT to_node_id::text FROM context_edges WHERE from_node_id = %s "
+                       "AND relation = 'follows'", drei) == [(eins,)]
+
+
+async def test_loeschen_nur_eigentuemerin(test_client, auth_headers_teacher2, conn):
+    """F1: Die Mitlehrkraft darf die Stunde ändern, aber nicht löschen."""
+    stunde = _stunde(conn, EIGENE, _einheit(conn, EIGENE), "Von teacher1")
+
+    resp = await _loesche(test_client, auth_headers_teacher2, stunde)
+
+    assert resp.status_code == 403
+    assert "angelegt" in resp.json()["detail"]
+    assert _gibt_es(conn, stunde)
+
+
+async def test_nachbereitete_stunde_bleibt(test_client, auth_headers, conn):
+    """F2: Eine nachbereitete Stunde hält fest, was unterrichtet wurde."""
+    stunde = _stunde(conn, EIGENE, _einheit(conn, EIGENE), "Gehalten")
+    slot = _termin(conn, EIGENE, date(2026, 9, 14), stunde)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lesson_slots SET nachbereitet_at = now() WHERE id = %s", (slot,))
+    conn.commit()
+
+    resp = await _loesche(test_client, auth_headers, stunde)
+
+    assert resp.status_code == 409
+    assert _gibt_es(conn, stunde)
+
+
+async def test_archiviert_und_fremd_und_unbekannt(test_client, auth_headers, conn):
+    archiviert = _stunde(conn, EIGENE, _einheit(conn, EIGENE), "Abgelaufen", status="archived")
+    assert (await _loesche(test_client, auth_headers, archiviert)).status_code == 403
+    fremd = _stunde(conn, FREMD, _einheit(conn, FREMD), "Fremd", owner=TEACHER2_PSEUDO)
+    assert (await _loesche(test_client, auth_headers, fremd)).status_code == 403
+    assert (await _loesche(test_client, auth_headers, uuid.uuid4())).status_code == 404
+    einheit = _einheit(conn, EIGENE)
+    assert (await _loesche(test_client, auth_headers, einheit)).status_code == 404
+
+
+async def _snapshot_mit(test_client, auth_headers, conn, slot):
+    """Ein Snapshot, der den jetzigen Stand des Termins festhält (PATCH legt ihn vorher an)."""
+    resp = await test_client.patch(f"/planning/slots/{slot}", headers=auth_headers, json={"thema": "danach"})
+    assert resp.status_code == 200, resp.text
+    snaps = (await test_client.get(f"/planning/groups/{EIGENE}/snapshots", headers=auth_headers)).json()
+    return snaps[0]["id"]
+
+
+async def test_wiederherstellen_nach_loeschen_der_stunde(test_client, auth_headers, conn):
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Später gelöscht")
+    slot = _termin(conn, EIGENE, date(2026, 9, 29), stunde)
+    snap = await _snapshot_mit(test_client, auth_headers, conn, slot)
+    assert (await _loesche(test_client, auth_headers, stunde)).status_code == 204
+
+    resp = await test_client.post(f"/planning/snapshots/{snap}/restore", headers=auth_headers)
+
+    assert resp.status_code == 200, resp.text
+    assert _lies(conn, "SELECT stunde_node_id FROM lesson_slots WHERE id = %s", slot) == [(None,)]
+
+
+async def test_wiederherstellen_nach_loeschen_der_einheit(test_client, auth_headers, conn):
+    """Dieselbe Lücke gab es schon beim Löschen einer Einheit."""
+    einheit = _einheit(conn, EIGENE)
+    slot, _ = _leerer_termin(conn, EIGENE, date(2026, 9, 30), einheit=einheit, thema="mit Einheit")
+    snap = await _snapshot_mit(test_client, auth_headers, conn, slot)
+    assert (await test_client.delete(f"/planning/groups/{EIGENE}/units/{einheit}",
+                                     headers=auth_headers)).status_code == 204
+
+    resp = await test_client.post(f"/planning/snapshots/{snap}/restore", headers=auth_headers)
+
+    assert resp.status_code == 200, resp.text
+    assert _lies(conn, "SELECT ue_node_id, thema FROM lesson_slots WHERE id = %s", slot) == [(None, "mit Einheit")]
+
+
+async def test_oberflaeche_erfaehrt_ob_loeschen_geht(test_client, auth_headers, auth_headers_teacher2, conn):
+    einheit = _einheit(conn, EIGENE)
+    eigene = _stunde(conn, EIGENE, einheit, "Eigene")
+    gehalten = _stunde(conn, EIGENE, einheit, "Gehalten")
+    slot = _termin(conn, EIGENE, date(2026, 9, 14), gehalten)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lesson_slots SET nachbereitet_at = now() WHERE id = %s", (slot,))
+    conn.commit()
+
+    async def darf(headers, stunde):
+        return (await test_client.get(f"/planning/lessons/{stunde}", headers=headers)).json()["darf_loeschen"]
+
+    assert await darf(auth_headers, eigene) is True
+    assert await darf(auth_headers, gehalten) is False
+    assert await darf(auth_headers_teacher2, eigene) is False
+    stunden = _stunden((await _inhalt(test_client, auth_headers_teacher2)).json())
+    assert stunden["Eigene"]["eigen"] is False
+    assert _stunden((await _inhalt(test_client, auth_headers)).json())["Eigene"]["eigen"] is True

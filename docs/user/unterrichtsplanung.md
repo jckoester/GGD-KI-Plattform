@@ -116,6 +116,22 @@ Termine einer anderen Einheit erscheinen nicht. Steht am Termin schon ein Thema,
 sonst wird der Titel der Stunde zum Thema. Rückgängig machst du das Einplanen wie jede
 Änderung über **Verlauf** in der Jahresübersicht.
 
+### Eine Stunde löschen
+
+Einen Stundenentwurf löschst du über **Löschen** im Kopf des Stundenentwurfs oder an der
+Stunde in der Ansicht **Einheiten**. Vorher fragt die Plattform nach — gelöscht ist gelöscht,
+auch der **Verlauf** holt den Entwurf nicht zurück.
+
+- Löschen kann nur, **wer die Stunde angelegt hat**. Unterrichtet ihr eine Gruppe gemeinsam,
+  kann deine Kollegin deine Stunden bearbeiten, aber nicht löschen — und umgekehrt.
+- Eine **nachbereitete** Stunde lässt sich nicht löschen. Sie hält fest, was unterrichtet wurde.
+- Ist die Stunde eingeplant, bleibt ihr Termin mit Thema und Einheit stehen, nur ohne Entwurf.
+  Die übrigen Stunden der Einheit rücken in der Reihenfolge zusammen.
+
+Willst du eine Stunde nur von ihrem Termin nehmen, ohne sie zu löschen, nimm im Menü **⋯** der
+Zeile in der Jahresübersicht *Stunden-Verknüpfung lösen* — sie steht danach „ohne Termin“ unter
+**Einheiten**.
+
 ## Das ganze Jahr planen
 
 Viele Lehrkräfte legen ihre Jahresplanung **im September** an — für das ganze Schuljahr,

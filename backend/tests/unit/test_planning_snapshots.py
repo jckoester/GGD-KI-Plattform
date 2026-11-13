@@ -143,7 +143,8 @@ async def test_restore_snapshot_roundtrip():
     db.get = mock_get
     db.execute = AsyncMock(return_value=MagicMock(
         scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[]))),
-        all=MagicMock(return_value=[]),
+        # Die Existenzprüfung des Restores (0.42.4) findet die Einheit noch.
+        all=MagicMock(return_value=[(ue_id,)]),
     ))
     db.scalar = AsyncMock(return_value=0)
     db.add = MagicMock()
