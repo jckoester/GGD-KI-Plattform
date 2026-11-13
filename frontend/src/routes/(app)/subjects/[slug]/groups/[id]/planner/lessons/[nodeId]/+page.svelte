@@ -1,6 +1,7 @@
 <script>
   import { dauerZusatz } from '$lib/phasendauer.js'
   import { neuerChatPfad } from '$lib/chatziel.js'
+  import { archivPfad } from '$lib/planung_archiv.js'
   import { passendeAssistenten } from '$lib/assistentenwahl.js'
   import { mitVerworfen } from '$lib/begriffe_der_stunde.js'
   import { user } from '$lib/stores/user.js'
@@ -280,6 +281,9 @@
   })
 
   const plannerBase = $derived(`/subjects/${slug}/groups/${groupId}/planner`)
+  // Im Lesezustand liegt die Stunde im Archiv (0.42): Zurück führt dorthin, nicht in einen
+  // Planer, den man nicht (mehr) ändern darf — oder gar nicht öffnen kann.
+  const uebersicht = $derived(nurLesen ? archivPfad(groupId) : plannerBase)
 
   // Einheitliche Button-Höhe für die Kopf-Aktionen; Export-Buttons sind kleiner (eigene Zeile).
   const navBtn =
@@ -370,11 +374,17 @@
     <div class="flex-shrink-0 border-b border-light-ui-3 dark:border-dark-ui-3 px-4 py-3 bg-light-bg dark:bg-dark-bg">
       <!-- Breadcrumb -->
       <nav class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2 flex items-center gap-1.5 flex-wrap">
-        {#if gruppe}
-          <a href="/subjects/{slug}/groups/{groupId}" class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl">{gruppe.name}</a>
+        {#if nurLesen}
+          <a href={archivPfad()} class="hover:text-light-bl dark:hover:text-dark-bl">Archiv</a>
           <span>›</span>
+          <a href={uebersicht} class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl">{gruppe?.name ?? 'Gruppe'}</a>
+        {:else}
+          {#if gruppe}
+            <a href="/subjects/{slug}/groups/{groupId}" class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl">{gruppe.name}</a>
+            <span>›</span>
+          {/if}
+          <a href={plannerBase} class="hover:text-light-bl dark:hover:text-dark-bl">Jahresübersicht</a>
         {/if}
-        <a href={plannerBase} class="hover:text-light-bl dark:hover:text-dark-bl">Jahresübersicht</a>
         {#if lesson.ue}
           <span>›</span>
           <span>{lesson.ue.titel}</span>
@@ -429,8 +439,8 @@
                   Stunde {lesson.nav.position + 1} →
                 </a>
               {/if}
-              <a href={plannerBase} class={navBtn} title="Zur Jahresübersicht">
-                ↩︎ Übersicht
+              <a href={uebersicht} class={navBtn} title={nurLesen ? 'Zurück ins Archiv' : 'Zur Jahresübersicht'}>
+                ↩︎ {nurLesen ? 'Archiv' : 'Übersicht'}
               </a>
             </div>
 
@@ -508,8 +518,7 @@
 
       {#if nurLesen}
         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-2">
-          Diese Stunde gehört zu einer früheren Unterrichtsgruppe. Sie lässt sich
-          lesen, aber nicht mehr ändern.
+          Diese Stunde liegt im Archiv. Sie lässt sich lesen, aber nicht mehr ändern.
         </p>
       {/if}
       {#if saveError}

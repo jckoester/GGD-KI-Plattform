@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Menüpunkt „Planung“ für Lehrkräfte: je Unterrichtsgruppe des Schuljahres ein Link in ihren Planer, dazu das
+  Archiv.
+- Archiv der Planung: frühere Gruppen mit ihren Einheiten und Stunden, als Liste oder Kacheln; Stunden öffnen sich
+  zum Lesen.
+
 ### Geändert
 
 - Stundenentwürfe bleiben nach dem Schuljahresende lesbar und exportierbar; ändern lassen sich nur Stunden aktueller

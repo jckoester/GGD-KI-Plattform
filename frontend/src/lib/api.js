@@ -2171,6 +2171,29 @@ export async function getConversationCosts(conversationId) {
 
 // ── Unterrichtsplanung ────────────────────────────────────────────────────────
 
+// Gruppen, in denen ich Lehrkraft bin, mit `aktuell` und Fach-Slug — für das Menü „Planung“ (0.42).
+export async function getPlanungsgruppen() {
+    const res = await fetch(`${BASE}/planning/groups`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Gruppen konnten nicht geladen werden')
+    return (await res.json()).items ?? []
+}
+
+// Archiv der Planung (0.42): Gruppen, dann Einheiten und Stunden einer Gruppe — immer lesend.
+export async function getPlanungsArchiv() {
+    const res = await fetch(`${BASE}/planning/archive`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Archiv konnte nicht geladen werden')
+    return (await res.json()).items ?? []
+}
+
+export async function getPlanungsArchivGruppe(groupId) {
+    const res = await fetch(`${BASE}/planning/archive/groups/${groupId}`, { credentials: 'include' })
+    if (!res.ok) {
+        throw new ApiError(res.status, res.status === 404
+            ? 'Diese Gruppe gibt es im Archiv nicht.' : 'Archiv konnte nicht geladen werden')
+    }
+    return res.json()
+}
+
 export async function getPlanningOverview(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')

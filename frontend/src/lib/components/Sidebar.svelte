@@ -21,6 +21,8 @@
         FolderHeart,
         Search,
         Hammer,
+        CalendarRange,
+        Archive,
     Check,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
@@ -41,6 +43,8 @@
     import { aufmerksamkeit, refreshAufmerksamkeit } from "$lib/stores/meineBausteine.js"
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
+    import { getPlanungsgruppen } from "$lib/api.js";
+    import { menueGruppen, plannerPfad } from "$lib/planung_archiv.js";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
 
@@ -88,6 +92,25 @@
     const istLehrkraft = $derived(
         $user?.roles.includes('teacher') || $user?.roles.includes('admin'),
     );
+
+    // Menüpunkt „Planung“ (0.42): je aktuelle Gruppe ein Link in ihren Planer, dazu das
+    // Archiv. Geladen nur für Lehrkräfte mit der Stufe des Planers; neu bei jedem Wechsel
+    // in einen Planer oder ins Archiv — dort ändert sich, was aktuell ist.
+    let planungsgruppen = $state([]);
+    const imPlaner = $derived(
+        /^\/subjects\/[^/]+\/groups\/\d+\/planner/.test($page.url.pathname)
+        || $page.url.pathname.startsWith('/planning'),
+    );
+    $effect(() => {
+        if (!istLehrkraft || !$zeigtEintrag('planner')) return;
+        imPlaner;
+        getPlanungsgruppen()
+            .then((g) => (planungsgruppen = menueGruppen(g)))
+            .catch(() => (planungsgruppen = []));
+    });
+    $effect(() => {
+        if (imPlaner) openSection = 'planning';
+    });
 
     // Wissensgraph-Sektion beim Navigieren auf /knowledge/* auto-öffnen
     $effect(() => {
@@ -465,6 +488,61 @@
                         </button>
                         {/if}
                         {/if}
+                    </div>
+                {/if}
+              </div>
+
+        {/if}
+        {#if istLehrkraft && $zeigtEintrag('planner')}
+    <!-- Planung (0.42, Päckchen AO): je aktuelle Gruppe der Planer, darunter das Archiv.
+         Keine Liste aller Planungsknoten (Jan, F2). Der Kopf klappt nur auf — eine
+         Übersichtsseite „Planung“ gibt es nicht. -->
+              <div class="mt-2">
+                <button
+                    onclick={() => toggle('planning')}
+                    aria-expanded={openSection === 'planning'}
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {imPlaner ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <span class="flex items-center gap-2">
+                        <CalendarRange class="w-4 h-4" />
+                        Planung
+                    </span>
+                    {#if openSection === 'planning'}
+                        <ChevronDown class="w-4 h-4" />
+                    {:else}
+                        <ChevronRight class="w-4 h-4" />
+                    {/if}
+                </button>
+                {#if openSection === 'planning'}
+                    <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
+                        {#each planungsgruppen as g (g.id)}
+                            {@const pfad = plannerPfad(g)}
+                            <button
+                                onclick={() => goto(pfad)}
+                                title={g.fach.name}
+                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                       {$page.url.pathname.startsWith(pfad) ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                            >
+                                <span class="block truncate">{g.name}</span>
+                            </button>
+                        {:else}
+                            <p class="px-3 py-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Keine Unterrichtsgruppe in diesem Schuljahr.
+                            </p>
+                        {/each}
+                        <button
+                            onclick={() => goto('/planning/archive')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname.startsWith('/planning/archive') ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <Archive class="w-4 h-4" />
+                                Archiv
+                            </span>
+                        </button>
                     </div>
                 {/if}
               </div>
