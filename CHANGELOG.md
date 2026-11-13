@@ -38,6 +38,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Behoben
 
 - Dokumente und Diagramme aus dem Chat merkten sich ihren Chat nicht; die Gruppenseite zeigte sie deshalb nie.
+- Bausteine, die vor der ersten Nachricht eines neuen Chats angeheftet wurden (`@`, Suchknopf, „Neuen Chat damit
+  starten“), berücksichtigte erst die zweite Antwort.
 - Im Vorschaumodus bot der Chat „Speichern“ und „Als Dokument bearbeiten“ an, die dort gesperrt sind; sie fehlen jetzt.
   Die GeoGebra-Datei aus dem Chat lässt sich in der Vorschau herunterladen.
 

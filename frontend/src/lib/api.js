@@ -365,7 +365,8 @@ export async function* streamChat(
   // Nachricht samt Antwort wird durch diese ersetzt).
   // C2 (0.24): `assistentBeenden` — zurück zum Standard-Chat in derselben Konversation.
   // 0.41: `produktIds` — Produkte aus der Werkstatt, nur beim Anlegen (erste Antwort sieht sie).
-  { signal = null, ersetztLetzte = false, assistentBeenden = false, produktIds = [] } = {},
+  // 0.41: `kontextIds` — gepufferte Bausteine, ebenso nur beim Anlegen.
+  { signal = null, ersetztLetzte = false, assistentBeenden = false, produktIds = [], kontextIds = [] } = {},
 ) {
   let res;
   try {
@@ -381,6 +382,7 @@ export async function* streamChat(
       if (groupId != null) body.group_id = groupId;
       if (stundeId != null) body.stunde_node_id = stundeId;
       if (produktIds.length) body.produkt_ids = produktIds;
+      if (kontextIds.length) body.kontext_node_ids = kontextIds;
     }
     res = await fetch(`${BASE}/chat`, {
       method: "POST",

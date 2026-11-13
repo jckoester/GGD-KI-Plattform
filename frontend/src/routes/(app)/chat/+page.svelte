@@ -773,6 +773,7 @@
                 {
                     signal, ersetztLetzte, assistentBeenden,
                     produktIds: conversationId ? [] : pendingProdukte.map((p) => p.artifact_id),
+                    kontextIds: conversationId ? [] : pendingContextNodes.map((n) => n.node_id),
                 },
             )) {
                 // Start-Event mit conversationId
@@ -863,18 +864,12 @@
                         produkteImChat = pendingProdukte;
                         pendingProdukte = [];
                     }
-                    // Pending-Kontext-Knoten persistieren (neue Konversation)
+                    // Gepufferte Bausteine hat der Server mit der ersten Nachricht angeheftet
+                    // (`kontext_node_ids`, 0.41) — vorher geschah das erst hier, nach dem
+                    // Kontextaufbau, und die erste Antwort sah sie nicht.
                     if (wasNewConversation && pendingContextNodes.length > 0) {
-                        // Fire-and-forget: Fehler werden nur geloggt, nicht dem User angezeigt
-                        const toAdd = [...pendingContextNodes];
+                        contextNodes = pendingContextNodes;
                         pendingContextNodes = [];
-                        for (const node of toAdd) {
-                            addChatContextNode(
-                                item.conversationId,
-                                node.node_id,
-                            ).catch(console.error);
-                        }
-                        contextNodes = toAdd; // optimistisch setzen
                     }
                     continue;
                 }

@@ -68,6 +68,13 @@ describe("Chat", () => {
     expect(chat).toContain("produktIds: conversationId ? [] : pendingProdukte.map((p) => p.artifact_id)")
   })
 
+  it("schickt gepufferte Bausteine mit der ersten Nachricht statt sie danach anzuheften", () => {
+    expect(chat).toContain("kontextIds: conversationId ? [] : pendingContextNodes.map((n) => n.node_id)")
+    const start = chat.indexOf('if (item.type === "start")')
+    const ende = chat.indexOf("continue;", start)
+    expect(chat.slice(start, ende)).not.toContain("addChatContextNode")
+  })
+
   it("bietet in der Vorschau keine Produkte an", () => {
     expect(chat).toContain("inVorschau ? [] : getAnhaengbareProdukte(q, 5)")
     expect(chat).toContain("pendingProdukte = inVorschau ? [] : produkteUebernehmen()")

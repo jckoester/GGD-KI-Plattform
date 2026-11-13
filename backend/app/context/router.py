@@ -1373,6 +1373,34 @@ async def _get_conversation_or_403(
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
+async def knoten_beim_anlegen_anheften(
+    db: AsyncSession, chat_id: UUID, user: JwtPayload, node_ids: list[UUID]
+) -> int:
+    """Gepufferte Bausteine an eine eben angelegte Konversation heften — **vor** dem Kontextaufbau.
+
+    Bis 0.41 heftete der Chat sie erst nach der ersten Antwort an (`POST …/nodes`, sobald die
+    Konversation eine ID hatte); die erste Antwort sah sie nicht. Dieselben Regeln wie der
+    Endpunkt: nur Lehrkräfte, nur aktive und lesbare Knoten. Was nicht passt, fällt still heraus.
+    Committet nicht — das tut der Chat mit der Konversation.
+    """
+    if not ({"teacher", "admin"} & set(user.roles or [])):
+        return 0
+    zahl = 0
+    for node_id in dict.fromkeys(node_ids):
+        node = await db.get(ContextNode, node_id)
+        if node is None or node.status != "active":
+            continue
+        try:
+            await _check_read_permission(node, user, db)
+        except HTTPException:
+            continue
+        db.add(ChatContextNode(chat_id=chat_id, node_id=node.id))
+        zahl += 1
+    if zahl:
+        await db.flush()
+    return zahl
+
+
 @router.get(
     "/conversations/{conversation_id}/nodes",
     response_model=list[ChatContextNodeRead],

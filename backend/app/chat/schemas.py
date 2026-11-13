@@ -55,6 +55,9 @@ class ChatRequest(BaseModel):
     # Sie müssen schon in der **ersten** Antwort vorliegen; nachträglich angehängt (wie die
     # gepufferten Bausteine) sähe erst die zweite Antwort sie.
     produkt_ids: list[UUID] = Field(default_factory=list, max_length=10)
+    # Ebenso gepufferte Bausteine (`@`, Suchknopf, „Neuen Chat damit starten“) — bis 0.41 erst
+    # nach der ersten Antwort angeheftet, die sie deshalb nicht sah.
+    kontext_node_ids: list[UUID] = Field(default_factory=list, max_length=50)
     # Die letzte eigene Nachricht wird ersetzt (0.19): Sie und ihre Antwort werden
     # ausgeblendet, sobald die neue gespeichert ist. `messages` trägt dann den Verlauf ohne sie.
     ersetzt_letzte: bool = False

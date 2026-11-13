@@ -2082,6 +2082,10 @@ async def chat(
         if request.produkt_ids and not vorschau.ist_vorschau(current_user):
             from app.artifacts import im_chat
             await im_chat.beim_anlegen_anhaengen(db, conversation_id, current_user.sub, request.produkt_ids)
+        # Ebenso die gepufferten Bausteine — sonst sähe sie erst die zweite Antwort.
+        if request.kontext_node_ids:
+            from app.context.router import knoten_beim_anlegen_anheften
+            await knoten_beim_anlegen_anheften(db, conversation_id, current_user, request.kontext_node_ids)
         # Kein commit hier — verhindert leere Einträge wenn LiteLLM nicht erreichbar ist.
         if settings.title_model and len(first_user_msg) > 20:
             title_prompt = first_user_msg

@@ -109,8 +109,9 @@ rollenoffen, in der Vorschau gesperrt (`vorschau.ERLAUBT`).
   Sprache. Je Produkt höchstens `MAX_ZEICHEN` (12 000), danach ein Satz, dass gekürzt wurde. Geladen wird mit
   `owner_pseudonym` = Person der Anfrage — ein fremder Anhang käme nie in den Prompt.
 - **Erste Antwort:** Ein neuer Chat schickt die gepufferten Produkte mit der ersten Nachricht
-  (`ChatRequest.produkt_ids`); der Chat hängt sie an, **bevor** er den Kontext baut. (Gepufferte Bausteine
-  werden dagegen erst nach der ersten Antwort angeheftet.)
+  (`ChatRequest.produkt_ids`); der Chat hängt sie an, **bevor** er den Kontext baut. Gepufferte Bausteine
+  ebenso (`kontext_node_ids`, `knoten_beim_anlegen_anheften` in `app/context/router.py`, gleiche Regeln wie
+  `POST …/nodes`) — bis 0.41 heftete der Chat sie erst nach der ersten Antwort an, die sie deshalb nicht sah.
 - **Frontend:** `lib/produkt_im_chat.js` (eine Liste für das Dropdown mit Gruppe „Aus deiner Werkstatt“,
   Übergabe „Im Chat verwenden“ über `sessionStorage`), `ProduktChips.svelte`, Chat-Seite.
 - **Messung** (Bedingung F2): `scripts/produkt_im_chat_messung.py`, Protokoll im Plan-Ordner
