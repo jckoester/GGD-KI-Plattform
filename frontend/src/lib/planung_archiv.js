@@ -18,7 +18,7 @@ export function ansichtAusEinstellungen(einstellungen) {
 
 /**
  * Die Gruppen fürs Menü: nur aktuelle mit Fach (der Planer braucht den Fach-Slug),
- * nach Fach, dann Name.
+ * nach Fach, dann Beschriftung (`menueBeschriftung`).
  *
  * `aktuell !== false` wie in `myGroups.js`: Eine Antwort ohne das Feld zeigt alles.
  */
@@ -27,7 +27,52 @@ export function menueGruppen(gruppen) {
         .filter((g) => g.aktuell !== false && g.fach?.slug)
         .sort((a, b) =>
             (a.fach.name ?? '').localeCompare(b.fach.name ?? '', 'de')
-            || (a.name ?? '').localeCompare(b.name ?? '', 'de'))
+            || menueBeschriftung(a).localeCompare(menueBeschriftung(b), 'de', { numeric: true }))
+}
+
+/**
+ * Klassen kurz: „10A/B/C“ statt „10A, 10B, 10C“; verschiedene Stufen mit Komma („9D, 10A“).
+ */
+export function klassenKurz(klassen) {
+    const stufen = new Map()
+    const rest = []
+    for (const k of klassen ?? []) {
+        const m = /^(\d+)\s*(\S*)$/.exec(String(k).trim())
+        if (m) {
+            if (!stufen.has(m[1])) stufen.set(m[1], [])
+            stufen.get(m[1]).push(m[2])
+        } else if (k) {
+            rest.push(String(k).trim())
+        }
+    }
+    const teile = [...stufen].map(([stufe, zuege]) => stufe + zuege.join('/'))
+    return [...teile, ...rest].join(', ')
+}
+
+/**
+ * Wie eine Gruppe im Menü „Planung“ heißt.
+ *
+ * Der Name aus dem Schulkonto ist oft eine Kennung („ch-ks-9d“). Deshalb: der selbst
+ * vergebene Anzeigename, sonst Fach und Klasse(n), sonst Fach und Jahrgang, sonst der Name.
+ */
+export function menueBeschriftung(gruppe) {
+    const eigen = (gruppe?.display_name ?? '').trim()
+    if (eigen) return eigen
+    const fach = gruppe?.fach?.name
+    const zusatz = klassenKurz(gruppe?.klassen) || (gruppe?.jahrgang ? `Kl. ${gruppe.jahrgang}` : '')
+    return fach && zusatz ? `${fach} ${zusatz}` : (gruppe?.name ?? '')
+}
+
+/**
+ * Die Gruppen mit `beschriftung`. Heißen zwei gleich (etwa zwei Kurse derselben Klasse),
+ * steht bei beiden der Name aus dem Schulkonto dahinter — sonst wären sie nicht zu unterscheiden.
+ */
+export function mitBeschriftung(gruppen) {
+    const liste = (gruppen ?? []).map((g) => ({ ...g, beschriftung: menueBeschriftung(g) }))
+    const zahl = {}
+    for (const g of liste) zahl[g.beschriftung] = (zahl[g.beschriftung] ?? 0) + 1
+    return liste.map((g) =>
+        zahl[g.beschriftung] > 1 && g.beschriftung !== g.name ? { ...g, beschriftung: `${g.beschriftung} · ${g.name}` } : g)
 }
 
 export function plannerPfad(gruppe) {

@@ -5,15 +5,15 @@
  * Ziel sind nur eigene **aktuelle** Gruppen **desselben Fachs** (Plan F5); das Backend prüft es
  * ebenso. Eine Stunde braucht eine Zieleinheit — eine bestehende oder eine neue (F6).
  */
-import { menueGruppen, plannerPfad, stundenPfad } from './planung_archiv.js'
+import { menueGruppen, mitBeschriftung, plannerPfad, stundenPfad } from './planung_archiv.js'
 
 /** Wert der Auswahl „neue Einheit“ im Einheiten-Feld. */
 export const NEUE_EINHEIT = '__neu__'
 
-/** Mögliche Zielgruppen: aktuell, mit Fach, und zwar demselben wie die Quelle. */
+/** Mögliche Zielgruppen: aktuell, mit Fach, und zwar demselben wie die Quelle — beschriftet wie im Menü. */
 export function zielGruppen(gruppen, fachId) {
     if (fachId == null) return []
-    return menueGruppen(gruppen).filter((g) => g.fach?.id === fachId)
+    return mitBeschriftung(menueGruppen(gruppen).filter((g) => g.fach?.id === fachId))
 }
 
 /**

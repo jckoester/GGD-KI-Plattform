@@ -44,7 +44,8 @@
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { getPlanungsgruppen } from "$lib/api.js";
-    import { menueGruppen, plannerPfad } from "$lib/planung_archiv.js";
+    import { menueGruppen, mitBeschriftung, plannerPfad } from "$lib/planung_archiv.js";
+    import SubjectIcon from "./SubjectIcon.svelte";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
 
@@ -105,7 +106,7 @@
         if (!istLehrkraft || !$zeigtEintrag('planner')) return;
         imPlaner;
         getPlanungsgruppen()
-            .then((g) => (planungsgruppen = menueGruppen(g)))
+            .then((g) => (planungsgruppen = mitBeschriftung(menueGruppen(g))))
             .catch(() => (planungsgruppen = []));
     });
     $effect(() => {
@@ -518,14 +519,18 @@
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         {#each planungsgruppen as g (g.id)}
                             {@const pfad = plannerPfad(g)}
+                            {@const fach = $subjectMap[g.fach.id]}
+                            <!-- Wie „Meine Fächer“: Fachsymbol in Fachfarbe. Beschriftung statt der
+                                 Kennung aus dem Schulkonto; die steht im Tooltip. -->
                             <button
                                 onclick={() => goto(pfad)}
-                                title={g.fach.name}
-                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                title={g.beschriftung === g.name ? g.fach.name : `${g.fach.name} · ${g.name}`}
+                                class="w-full flex items-center gap-2 text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                        {$page.url.pathname.startsWith(pfad) ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
                             >
-                                <span class="block truncate">{g.name}</span>
+                                <SubjectIcon name={fach?.icon ?? null} size={15} color={fach?.color ?? null} />
+                                <span class="flex-1 min-w-0 truncate">{g.beschriftung}</span>
                             </button>
                         {:else}
                             <p class="px-3 py-1 text-xs text-light-tx-2 dark:text-dark-tx-2">

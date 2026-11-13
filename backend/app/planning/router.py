@@ -1798,6 +1798,9 @@ class PlanungsgruppeRead(BaseModel):
     id: int
     # `Group.anzeigename`, wie `GroupOut.name` in `/groups/me` — nicht der rohe Name.
     name: str
+    # Der selbst vergebene Anzeigename allein (oder None) — das Menü „Planung“ (0.42) nimmt
+    # ihn, sonst baut es aus Fach und Klasse eine Beschriftung statt der Schulkonto-Kennung.
+    display_name: str | None = None
     fach: FachKurzRead | None
     # Der tatsächliche Jahrgang, dieselbe Regel wie die Curriculum-Auswahl
     # (`groups.jahrgang.jahrgang_aus`), nicht nur die von Hand gesetzte Festlegung.
@@ -1885,6 +1888,7 @@ async def list_planungsgruppen(
         PlanungsgruppeRead(
             id=g.id,
             name=g.anzeigename,
+            display_name=g.display_name,
             fach=(
                 FachKurzRead(id=f.id, slug=f.slug, name=f.name, fach_code=f.fach_code)
                 if f is not None

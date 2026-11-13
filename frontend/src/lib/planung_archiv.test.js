@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-    ansichtAusEinstellungen, anzahl, archivPfad, datumKurz, einheitenMitOhne, gewaehlteEinheit,
-    menueGruppen, OHNE_EINHEIT, plannerPfad, stundenPfad,
+    ansichtAusEinstellungen, anzahl, archivPfad, datumKurz, einheitenMitOhne, gewaehlteEinheit, klassenKurz,
+    menueBeschriftung, menueGruppen, mitBeschriftung, OHNE_EINHEIT, plannerPfad, stundenPfad,
 } from './planung_archiv.js'
 
 const SRC = join(__dirname, '..')
@@ -27,6 +27,33 @@ describe('menueGruppen', () => {
 
     it('leer bleibt leer', () => {
         expect(menueGruppen(undefined)).toEqual([])
+    })
+})
+
+describe('Beschriftung im Menü', () => {
+    it('Klassen kurz', () => {
+        expect(klassenKurz(['10A', '10B', '10C'])).toBe('10A/B/C')
+        expect(klassenKurz(['9D', '10A'])).toBe('9D, 10A')
+        expect(klassenKurz(['J1'])).toBe('J1')
+        expect(klassenKurz([])).toBe('')
+    })
+
+    it('Anzeigename, sonst Fach und Klasse, sonst Fach und Jahrgang, sonst Name', () => {
+        const g = { name: 'ch-ks-9d', fach: { name: 'Chemie' }, klassen: ['9D'], jahrgang: 9 }
+        expect(menueBeschriftung({ ...g, display_name: 'Ch 9d (Mo)' })).toBe('Ch 9d (Mo)')
+        expect(menueBeschriftung({ ...g, display_name: '  ' })).toBe('Chemie 9D')
+        expect(menueBeschriftung({ ...g, klassen: [] })).toBe('Chemie Kl. 9')
+        expect(menueBeschriftung({ ...g, klassen: [], jahrgang: null })).toBe('ch-ks-9d')
+    })
+
+    it('gleich Beschriftete bekommen den Namen dazu', () => {
+        const fach = { name: 'NwT' }
+        const liste = mitBeschriftung([
+            { id: 1, name: 'nwt-a', fach, klassen: [], jahrgang: 9 },
+            { id: 2, name: 'nwt-b', fach, klassen: [], jahrgang: 9 },
+            { id: 3, name: 'nwt-c', fach, klassen: [], jahrgang: 10 },
+        ])
+        expect(liste.map((g) => g.beschriftung)).toEqual(['NwT Kl. 9 · nwt-a', 'NwT Kl. 9 · nwt-b', 'NwT Kl. 10'])
     })
 })
 
@@ -79,7 +106,9 @@ describe('Verdrahtung', () => {
     it('Menüpunkt „Planung“ mit Gruppen und Archiv, Stufen-Schlüssel planner', () => {
         const sidebar = quelle('lib/components/Sidebar.svelte')
         expect(sidebar).toMatch(/\$zeigtEintrag\('planner'\)/)
-        expect(sidebar).toContain('menueGruppen(')
+        expect(sidebar).toContain('mitBeschriftung(menueGruppen(')
+        expect(sidebar).toContain('{g.beschriftung}')
+        expect(sidebar).toMatch(/<SubjectIcon name=\{fach\?\.icon/)
         expect(sidebar).toContain("goto('/planning/archive')")
     })
 

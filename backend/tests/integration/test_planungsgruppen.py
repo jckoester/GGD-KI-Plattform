@@ -120,6 +120,8 @@ async def test_felder(test_client, auth_headers, gruppen):
 
     # Anzeigename, nicht der rohe
     assert g[NWT_9]["name"] == "NwT 9"
+    # Der selbst vergebene allein (0.42, Menü „Planung“) — ohne ihn None, nicht der rohe Name
+    assert (g[NWT_9]["display_name"], g[CH_9D]["display_name"]) == ("NwT 9", None)
     # Klassen sortiert, beim Kurs ohne Klassenverband leer
     assert g[NWT_9]["klassen"] == ["9A", "9C"]
     assert g[CH_9D]["klassen"] == ["9D"]

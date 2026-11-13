@@ -107,8 +107,8 @@
 
     {#if ergebnis}
       <SuccessBanner message={istStunde
-        ? `Die Stunde liegt jetzt in ${gruppe?.name ?? 'der Gruppe'}.`
-        : `Die Einheit liegt mit ${ergebnis.stunden} ${ergebnis.stunden === 1 ? 'Stunde' : 'Stunden'} in ${gruppe?.name ?? 'der Gruppe'}, noch ohne Termine.`} />
+        ? `Die Stunde liegt jetzt in ${gruppe?.beschriftung ?? 'der Gruppe'}.`
+        : `Die Einheit liegt mit ${ergebnis.stunden} ${ergebnis.stunden === 1 ? 'Stunde' : 'Stunden'} in ${gruppe?.beschriftung ?? 'der Gruppe'}, noch ohne Termine.`} />
       {#if ergebnis.meldungen?.length}
         <div class="mt-3">
           <p class="text-sm font-medium text-light-tx dark:text-dark-tx">{meldungenZusammenfassung(ergebnis.meldungen)}</p>
@@ -142,7 +142,7 @@
           <select id="kopieren-gruppe" bind:value={gruppeId} class={feld}>
             {#if gruppen.length > 1}<option value={null}>— Gruppe wählen —</option>{/if}
             {#each gruppen as g (g.id)}
-              <option value={g.id}>{g.name}</option>
+              <option value={g.id}>{g.beschriftung}</option>
             {/each}
           </select>
         </div>
