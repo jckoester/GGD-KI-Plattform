@@ -15,13 +15,14 @@ Idempotenz, Eigentümer-Bindung und Quota liegen in `store.save_artifact` bzw. h
 `origin_ref` (Herkunftsschlüssel). Eigentümer:in ist stets die eingeloggte Nutzer:in.
 """
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.artifacts import store
+from app.artifacts import store, titel
 from app.db.models import Assistant, Conversation, Group, Message
 from app.auth.jwt import JwtPayload
 from app.chat import image_store
@@ -99,12 +100,49 @@ async def herkunft(
     return Herkunft(*zeile)
 
 
-_DIAGRAM_DEFAULT_TITLE = {
-    "circuit": "Schaltplan",
-    "plot": "Funktionsgraph",
-    "smiles": "Strukturformel",
-    "mermaid": "Diagramm",
-}
+async def frage_zur_nachricht(
+    db: AsyncSession, *, pseudonym: str, message_id: Optional[UUID]
+) -> Optional[str]:
+    """Die Nutzerfrage, auf die eine Antwort folgte — Titelquelle für Diagramme (0.41, F6).
+
+    Die letzte geltende (nicht ersetzte) Nachricht mit `role='user'` derselben Konversation bis
+    zur Antwort; nur in eigenen Konversationen. Keine oder fremde ID → None.
+
+    ⚠️ **`<=`, nicht `<`.** Frage und Antwort eines Zugs entstehen in **einer** Transaktion
+    (`chat.router._persist`), und `now()` ist dort der Beginn der Transaktion — beide tragen
+    denselben Zeitstempel. Frühere Züge liegen in früheren Transaktionen.
+    """
+    if message_id is None:
+        return None
+    antwort = (
+        select(Message.conversation_id, Message.created_at)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Message.id == message_id, Conversation.pseudonym == pseudonym)
+        .subquery()
+    )
+    zeile = (await db.execute(
+        select(Message.content)
+        .join(antwort, Message.conversation_id == antwort.c.conversation_id)
+        .where(
+            Message.role == "user",
+            Message.ersetzt_am.is_(None),
+            Message.created_at <= antwort.c.created_at,
+        )
+        # Nur Fragen, rückwärts: Die Gleichstands-Regel von `NACHRICHTEN_FOLGE` (Frage vor
+        # Antwort) greift hier nicht, weil Antworten gar nicht in der Auswahl stehen. Zwei Fragen
+        # mit demselben Zeitstempel gibt es nicht (ein Zug je Transaktion); die ID macht die
+        # Folge trotzdem eindeutig.
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(1)
+    )).first()
+    if not zeile:
+        return None
+    # Mit Anhang steht die Frage als JSON in der Zeile (`_serialize_user_message`).
+    from app.chat.router import _parse_stored_content   # lokal: keine Importschleife
+
+    return _parse_stored_content(zeile[0])[0]
+
+
 _SERVER_RENDER_KINDS = ("circuit", "plot", "smiles", "mermaid")
 DIAGRAM_KINDS = ("circuit", "plot", "smiles", "mermaid")
 
@@ -142,7 +180,7 @@ async def promote_image(
         kind="image",
         mime_type=record.mime_type,
         data=data,
-        title=_title(title, "Bild"),
+        title=_title(title, titel.bild(record.prompt, date.today())),
         source=record.prompt,
         origin_ref=origin_ref,
         origin_conversation_id=record.conversation_id,
@@ -194,7 +232,11 @@ async def promote_diagram(
         kind=kind,
         mime_type="image/svg+xml",
         data=svg_out.encode("utf-8"),
-        title=_title(title, _DIAGRAM_DEFAULT_TITLE.get(kind, "Diagramm")),
+        title=_title(title, titel.diagramm(
+            kind, source,
+            await frage_zur_nachricht(db, pseudonym=user.sub, message_id=message_id),
+            date.today(),
+        )),
         source=source,
         origin_ref=origin_ref,
         origin_conversation_id=quelle.conversation_id,

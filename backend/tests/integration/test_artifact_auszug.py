@@ -212,3 +212,46 @@ async def test_vorbelegung_aus_der_lebenden_konversation(db_session):
     assert (falscher_chat.subject_id, falscher_chat.assistant_name) == (None, None)
     assert ohne.subject_id is None
     assert ohne.updated_at == ohne.created_at
+
+
+# ── Titelquelle: die Frage zur Antwort (Schritt 2) ───────────────────────────
+
+async def _zug(db, chat, frage: str, zeit: datetime, antwort: str = "…"):
+    """Ein Zug wie in `chat.router._persist`: Frage und Antwort mit **demselben** Zeitstempel."""
+    f = Message(id=uuid4(), conversation_id=chat.id, role="user", content=frage, created_at=zeit)
+    a = Message(id=uuid4(), conversation_id=chat.id, role="assistant", content=antwort, created_at=zeit)
+    db.add_all([f, a])
+    await db.flush()
+    return a
+
+
+@pytest.mark.asyncio
+async def test_frage_zur_antwort_auch_bei_gleichem_zeitstempel(db_session):
+    chat = await _chat(db_session, ICH)
+    await _zug(db_session, chat, "Erste Frage", T0)
+    zweite = await _zug(db_session, chat, "Zeichne zwei Lampen in Reihe", T0 + timedelta(minutes=3))
+    await _zug(db_session, chat, "Spätere Frage", T0 + timedelta(minutes=9))
+
+    assert await promote.frage_zur_nachricht(db_session, pseudonym=ICH, message_id=zweite.id) == \
+        "Zeichne zwei Lampen in Reihe"
+
+
+@pytest.mark.asyncio
+async def test_frage_mit_anhang_liefert_nur_den_text(db_session):
+    import json
+
+    chat = await _chat(db_session, ICH)
+    antwort = await _zug(db_session, chat, json.dumps(
+        {"v": 1, "text": "Mach daraus ein Diagramm", "files": [{"name": "a.txt", "type": "text"}]}
+    ), T0)
+
+    assert await promote.frage_zur_nachricht(db_session, pseudonym=ICH, message_id=antwort.id) == \
+        "Mach daraus ein Diagramm"
+
+
+@pytest.mark.asyncio
+async def test_frage_aus_fremdem_chat_bleibt_verborgen(db_session):
+    chat = await _chat(db_session, FREMD)
+    antwort = await _zug(db_session, chat, "Geheim", T0)
+
+    assert await promote.frage_zur_nachricht(db_session, pseudonym=ICH, message_id=antwort.id) is None

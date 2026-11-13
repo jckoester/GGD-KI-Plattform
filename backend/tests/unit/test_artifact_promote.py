@@ -45,6 +45,7 @@ def _ohne_herkunft(monkeypatch):
     """Die Herkunft fragt die Datenbank (0.41); hier steht nur `object()`. Tests, die sie
     prüfen, setzen sie selbst."""
     monkeypatch.setattr(promote, "herkunft", AsyncMock(return_value=promote.KEINE_HERKUNFT))
+    monkeypatch.setattr(promote, "frage_zur_nachricht", AsyncMock(return_value=None))
 
 
 def _user(sub="p", roles=("student",), grade="5") -> JwtPayload:
@@ -78,7 +79,7 @@ async def test_promote_image_copies_bytes_and_prompt(monkeypatch):
     assert captured["mime_type"] == "image/png"
     assert captured["data"] == b"PNGDATA"
     assert captured["source"] == "ein roter Fuchs"          # Prompt → source
-    assert captured["title"] == "Bild"
+    assert captured["title"] == "ein roter Fuchs"            # Titel aus dem Prompt (0.41)
     assert captured["origin_ref"] == f"image:{image_id}"
     assert captured["origin_conversation_id"] == conv_id
 
@@ -144,7 +145,8 @@ async def test_promote_diagram_circuit_server_renders(monkeypatch):
     assert captured["mime_type"] == "image/svg+xml"
     assert captured["data"] == b"<svg>circuit</svg>"     # serverseitig gerendert
     assert captured["source"] == source                   # roher Quelltext bewahrt
-    assert captured["title"] == "Schaltplan"
+    # Ohne Titel in der Quelle und ohne Frage: Art und Datum (0.41).
+    assert captured["title"].startswith("Schaltplan vom ")
     assert captured["origin_ref"] == f"circuit:{svg_hash('circuit', source)}"
 
 
@@ -162,7 +164,8 @@ async def test_promote_diagram_plot_title(monkeypatch):
 
     monkeypatch.setattr(promote.store, "save_artifact", fake_save)
     await promote.promote_diagram(object(), user=_user(), kind="plot", source="functions: []")
-    assert captured["title"] == "Funktionsgraph"
+    # Ohne Titel in der Quelle und ohne Frage: Art und Datum (0.41).
+    assert captured["title"].startswith("Funktionsgraph vom ")
 
 
 async def test_promote_diagram_smiles_wird_serverseitig_gerendert(monkeypatch):
@@ -179,7 +182,8 @@ async def test_promote_diagram_smiles_wird_serverseitig_gerendert(monkeypatch):
 
     monkeypatch.setattr(promote.store, "save_artifact", fake_save)
     await promote.promote_diagram(object(), user=_user(), kind="smiles", source="CCO")
-    assert captured["title"] == "Strukturformel"
+    # Ohne Titel in der Quelle und ohne Frage: Art und Datum (0.41).
+    assert captured["title"].startswith("Strukturformel vom ")
     assert render.await_args.args[1:] == ("smiles", "CCO")
 
 
@@ -215,7 +219,8 @@ async def test_promote_diagram_mermaid_rendert_serverseitig(monkeypatch):
     assert captured["kind"] == "mermaid"
     assert captured["data"] == b"<svg>pele</svg>"
     assert captured["mime_type"] == "image/svg+xml"
-    assert captured["title"] == "Diagramm"
+    # Ohne Titel in der Quelle und ohne Frage: Art und Datum (0.41).
+    assert captured["title"].startswith("Diagramm vom ")
 
 
 async def test_promote_diagram_mermaid_renderfehler(monkeypatch):
@@ -776,3 +781,39 @@ def test_ohne_werkzeugnamen_nur_modell_und_datum():
     assert herkunftszeile(werkzeug=None, modell="gpt-oss-120b", zeitpunkt="29.08.2026") == (
         "Modell gpt-oss-120b · 29.08.2026"
     )
+
+
+async def test_promote_diagram_titel_aus_der_frage(monkeypatch):
+    """0.41, F6: Ein Schaltplan kennt keinen Titel — dann die Frage, die ihn auslöste."""
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    monkeypatch.setattr(promote, "frage_zur_nachricht",
+                        AsyncMock(return_value="Zeichne zwei Lampen in Reihe"))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    monkeypatch.setattr(promote.service, "render",
+                        AsyncMock(return_value={"svg": "<svg>x</svg>", "error": None, "cached": False}))
+    await promote.promote_diagram(object(), user=_user(), kind="circuit", source="\\draw", message_id=uuid4())
+
+    assert captured["title"] == "Zeichne zwei Lampen in Reihe"
+
+
+async def test_ausdruecklicher_titel_geht_vor(monkeypatch):
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    monkeypatch.setattr(promote.service, "render",
+                        AsyncMock(return_value={"svg": "<svg>x</svg>", "error": None, "cached": False}))
+    await promote.promote_diagram(object(), user=_user(), kind="mermaid",
+                                  source="pie title Anteile\n A: 1", title="Mein Titel")
+
+    assert captured["title"] == "Mein Titel"

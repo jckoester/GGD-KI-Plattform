@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Produkte in der Werkstatt tragen ein eigenes Fach; beim Speichern aus dem Chat wird es übernommen und bleibt, auch
   wenn der Chat gelöscht ist. Ebenso der Name des Assistenten.
+- Gespeicherte Bilder und Diagramme bekommen einen sprechenden Titel: aus dem Bild-Prompt, aus dem Titel des Diagramms
+  oder aus der Frage im Chat; sonst Art und Datum.
 
 ### Behoben
 
