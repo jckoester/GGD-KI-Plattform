@@ -464,7 +464,8 @@ async def update_angaben(
             raise HTTPException(status_code=422, detail="Unbekanntes Fach")
     try:
         record = await store.update_angaben(
-            db, record, **{feld: getattr(req, feld) for feld in gesendet}
+            db, record, **{feld: getattr(req, feld) for feld in gesendet},
+            roles=current_user.roles, grade=current_user.grade,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -547,6 +548,9 @@ async def export_document(
         raise HTTPException(status_code=422, detail=f"Export fehlgeschlagen: {exc}")
 
     if save:
+        # Erst die Frist des Dokuments (Schritt 6), dann der Export — `save_artifact` schreibt
+        # beides in einem Zug fest.
+        store.frist_erneuern(record, current_user.roles, current_user.grade)
         try:
             artifact = await store.save_artifact(
                 db,
@@ -570,6 +574,10 @@ async def export_document(
                 detail="Deine Werkstatt ist voll. Bitte lösche zuerst ältere Produkte.",
             )
         return JSONResponse(jsonable_encoder(_saved(artifact, True)))
+
+    # Exportieren heißt benutzen (Schritt 6): Die Frist des Dokuments erneuert sich.
+    store.frist_erneuern(record, current_user.roles, current_user.grade)
+    await db.commit()
 
     filename = f"{_slug(record.title, 'dokument')}.{format}"
     return Response(
@@ -696,6 +704,9 @@ async def baustein_aus_artefakt(
         await db.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
 
+    # Übernehmen heißt benutzen (Schritt 6): Das Produkt bleibt so lange wie ein frisch
+    # bearbeitetes.
+    store.frist_erneuern(record, current_user.roles, current_user.grade)
     await db.commit()
     await db.refresh(node)
     await enqueue_embedding_job(node.id, db)

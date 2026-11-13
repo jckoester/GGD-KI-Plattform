@@ -401,3 +401,30 @@ class TestMermaid:
             headers=auth_headers,
         )
         assert abgelehnt.status_code == 422
+
+
+async def test_uebernahme_erneuert_die_frist_des_produkts(test_client, auth_headers, dokument, db_url):
+    """0.41, Schritt 6: Übernehmen heißt benutzen — das Produkt bleibt so lange wie ein frisch
+    bearbeitetes. (Direkt über psycopg2: Die Test-Sitzung lässt kein zweites Festschreiben zu.)"""
+    import psycopg2
+
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("UPDATE artifacts SET expires_at = now() + interval '2 days' WHERE id = %s",
+                    (dokument["id"],))
+    conn.commit()
+
+    resp = await test_client.post(
+        f"/artifacts/{dokument['id']}/baustein",
+        json={"content_type": "lerntext", "title": "Sätze am Kreis"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT expires_at > now() + interval '30 days' FROM artifacts WHERE id = %s",
+                    (dokument["id"],))
+        assert cur.fetchone()[0] is True
+        cur.execute("DELETE FROM context_nodes WHERE id = %s", (resp.json()["node_id"],))
+    conn.commit()
+    conn.close()

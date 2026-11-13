@@ -22,10 +22,11 @@ roles:
     quota_bytes: 1073741824 # 1 GB
 ```
 
-- **`retention_days`** — nach so vielen Tagen entfernt der Cleanup-Cron ein Artefakt. Der
-  anwendbare Wert wird **beim Speichern** aus dieser Datei in `expires_at` eingefroren —
-  spätere Änderungen an der YAML wirken nur auf **neu** gespeicherte Artefakte, nicht
-  rückwirkend.
+- **`retention_days`** — so viele Tage nach dem **letzten Benutzen** entfernt der Cleanup-Cron
+  ein Produkt. Der anwendbare Wert wird in `expires_at` eingefroren: beim Speichern und seit 0.41
+  **erneut bei jedem Benutzen** — Inhalt ändern, Titel/Fach/Thema ändern, exportieren, als Baustein
+  übernehmen. Die Frist wird dabei nie verkürzt. Spätere Änderungen an der YAML wirken also auf
+  neu gespeicherte und auf wieder benutzte Produkte, nicht rückwirkend auf den Rest.
 - **`quota_bytes`** — maximale Gesamtgröße der Werkstatt pro Nutzer:in. Ist sie erreicht,
   lehnt das Speichern mit einer klaren Meldung ab (die Nutzer:in muss erst löschen).
 - **Auflösung:** `teacher` (auch `teacher`+`admin`) → `roles.teacher`; `student` →
@@ -58,7 +59,8 @@ nirgends redundant).
 ## Cleanup-Cron
 
 Der Cron-Container ruft täglich `scripts/cleanup_artifacts.py` auf: es löscht alle Artefakte
-mit `expires_at < now` samt Datei. Idempotent, gefahrlos wiederholbar.
+mit `expires_at < now` samt Datei. Seit 0.41 gehen die Exporte eines abgelaufenen Dokuments
+mit (samt Dateien), auch wenn ihre eigene Frist noch läuft. Idempotent, gefahrlos wiederholbar.
 
 ```yaml
 # docker-compose.yml (cron command)

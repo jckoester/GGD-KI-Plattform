@@ -17,6 +17,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Exporte eines Dokuments, die in der Werkstatt behalten werden, stehen eingeklappt am Dokument statt als eigene
   Karten und werden mit ihm gelöscht.
 
+### Geändert
+
+- Die Aufbewahrungsfrist eines Produkts erneuert sich bei jedem Benutzen: Inhalt bearbeiten, Titel, Fach oder Thema
+  ändern, exportieren, als Baustein übernehmen.
+
 ### Behoben
 
 - Dokumente und Diagramme aus dem Chat merkten sich ihren Chat nicht; die Gruppenseite zeigte sie deshalb nie.

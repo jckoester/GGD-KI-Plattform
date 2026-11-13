@@ -246,7 +246,12 @@ def _client(monkeypatch, user=None):
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_current_user] = lambda: user or _user()
-    app.dependency_overrides[get_db] = lambda: MagicMock()
+    def _db():
+        db = MagicMock()
+        db.commit = AsyncMock()   # seit 0.41 erneuert der Export die Frist und schreibt fest
+        return db
+
+    app.dependency_overrides[get_db] = _db
     return TestClient(app)
 
 
@@ -825,3 +830,19 @@ async def test_ausdruecklicher_titel_geht_vor(monkeypatch):
                                   source="pie title Anteile\n A: 1", title="Mein Titel")
 
     assert captured["title"] == "Mein Titel"
+
+
+def test_export_erneuert_die_frist_des_dokuments(monkeypatch):
+    """0.41, Schritt 6: Exportieren heißt benutzen."""
+    from datetime import datetime, timezone
+    _stub_templates(monkeypatch)
+    alt = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    dokument = _doc(expires_at=alt)
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=dokument))
+    monkeypatch.setattr(doc_export_mod, "export_document", AsyncMock(return_value=(b"%PDF", "application/pdf")))
+    monkeypatch.setattr(store_mod, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+
+    resp = _client(monkeypatch).post(f"/artifacts/{uuid4()}/export?format=pdf")
+
+    assert resp.status_code == 200
+    assert dokument.expires_at > alt

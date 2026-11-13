@@ -338,7 +338,8 @@ gehört der Schule, der Personenbezug nicht.
 
 #### Die Werkstatt geht mit dem Konto
 
-Artefakte haben eine **eigene** Frist (`expires_at`, bei Lehrkräften bis zu zwei Jahre).
+Artefakte haben eine **eigene** Frist (`expires_at`, bei Lehrkräften bis zu zwei Jahre ab dem
+letzten Benutzen — seit 0.41 erneuert sie sich beim Bearbeiten, Ordnen, Exportieren und Übernehmen).
 Trotzdem gewinnt die Kontolöschung: Die Werkstatt ist strikt privat — die Liste filtert
 auf die Eigentümerin, der Abruf einer fremden Datei wird abgewiesen. Damit gilt dieselbe
 Regel wie für einen privaten Baustein. Bis 09/2026 überlebten Artefakte das Konto samt

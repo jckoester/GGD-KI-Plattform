@@ -221,6 +221,20 @@ async def create_document(
     )
 
 
+def frist_erneuern(record: Artifact, roles: list[str], grade: Optional[int],
+                   now: Optional[datetime] = None) -> None:
+    """Wer ein Produkt benutzt, behält es (0.41, Schritt 6): Frist = jetzt + Aufbewahrung.
+
+    Auslöser: Inhalt ändern, Angaben ändern, exportieren, als Baustein übernehmen. Nie
+    kürzer als bisher — sinkt die Aufbewahrung in `artifact_limits.yaml`, soll ein
+    Benutzen die Frist nicht vorziehen. Schreibt nicht fest; das tut der Aufrufer.
+    """
+    retention_days, _ = get_artifact_limits(roles, grade)
+    neu = _now(now) + timedelta(days=retention_days)
+    if record.expires_at is None or neu > record.expires_at:
+        record.expires_at = neu
+
+
 async def update_document(
     db: AsyncSession,
     *,
@@ -247,7 +261,7 @@ async def update_document(
     record.title = _clean_title(title)
     record.source = markdown
     record.byte_size = new_size
-    record.expires_at = ts + timedelta(days=retention_days)
+    frist_erneuern(record, roles, grade, ts)
     record.updated_at = ts
     await db.commit()
     return record
@@ -266,6 +280,8 @@ async def update_angaben(
     title=_UNVERAENDERT,
     subject_id=_UNVERAENDERT,
     topic=_UNVERAENDERT,
+    roles: Optional[list[str]] = None,
+    grade: Optional[int] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Titel, Fach, Thema eines Produkts ändern — für alle Arten (0.41, Schritt 3).
@@ -273,7 +289,7 @@ async def update_angaben(
     Nur, was übergeben wird, ändert sich; ``None`` bei Fach oder Thema heißt „entfernen“.
     Ein leerer Titel ist nicht erlaubt (``ValueError``), ein leeres Thema heißt „keins“.
     Prüfen, ob das Produkt der Person gehört und das Fach existiert, ist Sache des Aufrufers.
-    Die Frist bleibt hier unberührt; sie zu erneuern ist Schritt 6.
+    Mit ``roles`` erneuert sich die Frist (Schritt 6) — wer ordnet, benutzt.
     """
     if title is not _UNVERAENDERT:
         neu = (title or "").strip()[:200]
@@ -285,6 +301,8 @@ async def update_angaben(
     if topic is not _UNVERAENDERT:
         record.topic = (topic or "").strip()[:THEMA_MAX] or None
     record.updated_at = _now(now)
+    if roles is not None:
+        frist_erneuern(record, roles, grade, now)
     await db.commit()
     return record
 

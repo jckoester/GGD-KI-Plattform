@@ -161,3 +161,18 @@ async def test_schuelerin_bekommt_keine_einheiten(test_client, auth_headers_stud
     t = (await test_client.get(f"/artifacts/topics?subject_id={FACH}", headers=auth_headers_student)).json()
 
     assert t["einheiten"] == []
+
+
+async def test_angaben_aendern_erneuert_die_frist(test_client, auth_headers_teacher2, conn):
+    """0.41, Schritt 6: Wer ordnet, benutzt."""
+    pid = _produkt(conn, TEACHER2_PSEUDO, "AN3 Frist")   # Frist: T0 + 365 Tage (Sept. 2027)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE artifacts SET expires_at = now() + interval '2 days' WHERE id = %s", (pid,))
+    conn.commit()
+
+    resp = await test_client.patch(f"/artifacts/{pid}", headers=auth_headers_teacher2, json={"topic": "Redox"})
+
+    assert resp.status_code == 200, resp.text
+    with conn.cursor() as cur:
+        cur.execute("SELECT expires_at > now() + interval '30 days' FROM artifacts WHERE id = %s", (pid,))
+        assert cur.fetchone()[0] is True

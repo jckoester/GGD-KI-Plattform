@@ -274,3 +274,28 @@ async def test_loeschen_nimmt_die_dateien_der_exporte_mit(monkeypatch, tmp_path)
     assert anzahl == 1
     assert not (tmp_path / f"{dok}.md").exists()
     assert not (tmp_path / f"{export}.docx").exists()
+
+
+def test_frist_erneuern_verlaengert_nie_verkuerzt(monkeypatch):
+    """0.41, Schritt 6: Benutzen erneuert die Frist — aber zieht sie nie vor."""
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    kurz = SimpleNamespace(expires_at=_NOW + timedelta(days=10))
+    lang = SimpleNamespace(expires_at=_NOW + timedelta(days=900))
+
+    store.frist_erneuern(kurz, ["student"], 7, _NOW)
+    store.frist_erneuern(lang, ["student"], 7, _NOW)
+
+    assert kurz.expires_at == _NOW + timedelta(days=365)
+    assert lang.expires_at == _NOW + timedelta(days=900)
+
+
+async def test_angaben_aendern_erneuert_die_frist(monkeypatch):
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    record = SimpleNamespace(title="Alt", subject_id=None, topic=None, updated_at=None,
+                             expires_at=_NOW + timedelta(days=3))
+    db = MagicMock(); db.commit = AsyncMock()
+
+    await store.update_angaben(db, record, topic="Redox", roles=["teacher"], grade=None, now=_NOW)
+
+    assert record.expires_at == _NOW + timedelta(days=365)
+    assert record.updated_at == _NOW

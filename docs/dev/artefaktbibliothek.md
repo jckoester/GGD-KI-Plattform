@@ -14,7 +14,7 @@ als `generated_images` (konversationsgebunden, stirbt per FK-Cascade mit der Kon
 | `title`, `source` | Anzeige + **roher Quelltext** (Prompt bzw. Diagramm-Code) |
 | `origin_ref` | Herkunfts-**Idempotenzschlüssel**; partieller Unique-Index `(owner, origin_ref)` |
 | `origin_conversation_id` | nur Herkunfts-Notiz (**kein** FK/CASCADE) |
-| `expires_at` | Aufbewahrung, **beim Speichern eingefroren** |
+| `expires_at` | Aufbewahrung, beim Speichern eingefroren und bei jedem Benutzen erneuert (`store.frist_erneuern`, 0.41; nie verkürzt) |
 
 Die Bytes liegen auf Disk unter `settings.artifact_storage_dir`; `store.storage_dir()` löst
 relative Pfade **repo-root-relativ** auf (cwd-unabhängig — der Cron läuft nicht aus `backend/`).
@@ -102,5 +102,6 @@ meldet sie in einem `message`-Event **vor** `[DONE]`; beim Nachladen liefert sie
 
 ## Cleanup
 
-`store.cleanup_artifacts(db, now=?, dry_run=?)` löscht `expires_at < now` samt Dateien;
+`store.cleanup_artifacts(db, now=?, dry_run=?)` löscht `expires_at < now` samt Dateien — und die
+Dateien der davon abgeleiteten Produkte (`derived_from`, Exporte), deren Zeilen per `CASCADE` gehen;
 `scripts/cleanup_artifacts.py` ist der Cron-Einstieg. Betrieb → [Admin-Doku](../admin/artefaktbibliothek.md).
