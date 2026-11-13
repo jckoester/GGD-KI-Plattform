@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderMarkdown } from './markdown.js'
 import {
-    diagrammKnoepfe, formelKnopf, formelZumKopieren, svgDatei, texQuelle,
+    diagrammQuelleKopieren, diagrammSvgHerunterladen, formelKnopf, formelZumKopieren, svgDatei, texQuelle,
 } from './kopieren.js'
 import { triggerDownload } from './download.js'
 import { readFileSync } from 'node:fs'
@@ -94,14 +94,15 @@ describe('kopieren — Knopf an abgesetzten Formeln', () => {
 })
 
 describe('kopieren — Leiste an Diagrammen', () => {
+    // Seit 0.41 sind es zwei Funktionen; die Knöpfe baut die Produktleiste.
     function diagramm(art, quelle, svg = '<svg><g/></svg>') {
         const block = document.createElement('div')
         block.dataset.source = quelle
         block.innerHTML = svg
-        const leiste = document.createElement('div')
-        diagrammKnoepfe(leiste, block, art, 'k')
-        const [code, datei] = leiste.querySelectorAll('button')
-        return { code, datei }
+        return {
+            code: { click: () => diagrammQuelleKopieren(block) },
+            datei: { click: () => diagrammSvgHerunterladen(block, art) },
+        }
     }
 
     it('„Code kopieren" kopiert die Quelle', async () => {
@@ -147,8 +148,9 @@ describe('kopieren — eingebunden', () => {
     it('der Chat hängt beide Knopfarten an', () => {
         const bubble = readFileSync(join(SRC, 'lib', 'components', 'MessageBubble.svelte'), 'utf8')
         expect(bubble).toContain('formelKnopf(formel)')
-        expect(bubble).toContain('diagrammKnoepfe(bar, block, kind, btnClass)')
+        expect(bubble).toContain('aktion: () => diagrammQuelleKopieren(block)')
+        expect(bubble).toContain('herunterladen: () => diagrammSvgHerunterladen(block, kind)')
         // Seit 0.36 rendert der Server auch Mermaid für die Bibliothek; der Chat schickt kein SVG.
-        expect(bubble).toContain('saveDiagramToLibrary(kind, src, { messageId')
+        expect(bubble).toContain('saveDiagramToLibrary(kind, quelle(), { messageId')
     })
 })

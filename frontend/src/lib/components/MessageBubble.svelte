@@ -1,9 +1,12 @@
 <script>
-    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2, Pencil, ThumbsUp, ThumbsDown } from 'lucide-svelte';
+    import { AlertCircle, BookOpen, Check, FileText, Image, Info, Copy, Pencil, ThumbsUp, ThumbsDown } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderInlineMath, renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
-    import { diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
+    import { diagrammQuelleKopieren, diagrammSvgHerunterladen, formelKnopf } from '$lib/kopieren.js';
+    import { mount, unmount } from 'svelte';
+    import ProduktLeiste from '$lib/components/ProduktLeiste.svelte';
+    import { textDateiname } from '$lib/produktleiste.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild, rateMessage } from '$lib/api.js';
     import { DAUMEN, alsAnzeige, naechsteBewertung, zeigeDaumen } from '$lib/bewertung.js';
@@ -161,36 +164,11 @@
         failedImages = new Set(failedImages).add(id);
     }
 
-    // „In der Werkstatt speichern" (Phase 18; bis 0.40 „In Bibliothek speichern"): Status je Bild — idle | saving | saved | exists | full | error.
+    // Gespeicherte Bilder (Phase 18): Nach dem Speichern bleibt der Link „In der Werkstatt ✓“
+    // unter dem Bild stehen (0.40, F11) — die Leiste darüber erscheint nur beim Überfahren.
     let imageSaveState = $state({});
-    async function saveImage(imageId) {
-        if (imageSaveState[imageId] === 'saving') return;
-        imageSaveState = { ...imageSaveState, [imageId]: 'saving' };
-        try {
-            const r = await saveImageToLibrary(imageId);
-            imageSaveState = { ...imageSaveState, [imageId]: r.created ? 'saved' : 'exists' };
-        } catch (e) {
-            imageSaveState = { ...imageSaveState, [imageId]: e?.status === 409 ? 'full' : 'error' };
-            // Nur der Fehler verschwindet wieder; „gespeichert“ bleibt stehen — samt Link in die
-            // Werkstatt (0.40, F11): Auf Stufe 1 steht sie nicht in der Seitenleiste.
-            setTimeout(() => {
-                imageSaveState = { ...imageSaveState, [imageId]: 'idle' };
-            }, 2500);
-        }
-    }
-
     /** Link „In der Werkstatt ✓“ unter einem gespeicherten Bild oder Diagramm (0.40, F11). */
     const WERKSTATT_LINK_KLASSE = 'mt-1 inline-block text-xs text-light-bl dark:text-dark-bl hover:underline';
-    function imageSaveTitle(state) {
-        return {
-            saving: 'Wird gespeichert…',
-            saved: 'In der Werkstatt gespeichert',
-            exists: 'Bereits in der Werkstatt',
-            full: 'Werkstatt voll',
-            error: 'Speichern fehlgeschlagen',
-        }[state] ?? 'In der Werkstatt speichern';
-    }
-
     // Server-/Client-gerenderte Diagramme (circuit/plot/mermaid) bekommen einen
     // „In der Werkstatt speichern"-Knopf, sobald sie erfolgreich zu SVG gerendert wurden.
     // Die Rohquelle liegt in `data-source` (von serverRender.js/diagrams.js gestasht).
@@ -219,77 +197,57 @@
                     'transition-opacity',
                 ].join(' ');
 
-                const btnClass = [
-                    'px-1.5 py-0.5 rounded text-xs',
-                    'bg-light-bg-2/80 dark:bg-dark-bg-2/80',
-                    'text-light-tx-2 dark:text-dark-tx-2',
-                    'hover:bg-light-ui-3 dark:hover:bg-dark-ui-3',
-                ].join(' ');
-
-                // Quelle kopieren und als SVG sichern (0.12, AP6c) — ohne Umweg über die
-                // Bibliothek.
-                diagrammKnoepfe(bar, block, kind, btnClass);
-
-                const saveBtn = document.createElement('button');
-                saveBtn.type = 'button';
-                saveBtn.setAttribute('aria-label', 'In der Werkstatt speichern');
-                saveBtn.title = 'In der Werkstatt speichern';
-                saveBtn.className = btnClass;
-                saveBtn.textContent = 'In Werkstatt';
-                saveBtn.addEventListener('click', async () => {
-                    if (saveBtn.disabled) return;
-                    saveBtn.disabled = true;
-                    const src = block.dataset.source ?? '';
-                    try {
-                        const r = await saveDiagramToLibrary(kind, src, { messageId: message.id ?? null });
-                        saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
+                // Dieselbe Leiste wie an Bild und Text (0.41, Schritt 7). Svelte-Komponente in
+                // gerendertem HTML: `mount`, beim Abbau `unmount` (siehe `destroy`).
+                const quelle = () => block.dataset.source ?? '';
+                const extras = [{
+                    id: 'code', label: 'Code kopieren', titel: 'Quelltext des Diagramms kopieren',
+                    aktion: () => diagrammQuelleKopieren(block),
+                }];
+                if (kind === 'plot') {
+                    // Funktionsgraphen zusätzlich als GeoGebra-Datei (.ggb).
+                    extras.push({
+                        id: 'ggb', label: 'GeoGebra', titel: 'Als GeoGebra-Datei (.ggb) herunterladen',
+                        aktion: async () => {
+                            triggerDownload(await getPlotGgbBlob(quelle()), 'funktionsgraph.ggb');
+                            return '✓ .ggb';
+                        },
+                    });
+                }
+                eingehaengt.push(mount(ProduktLeiste, {
+                    target: bar,
+                    props: {
+                        variante: 'overlay',
+                        speichern: () => saveDiagramToLibrary(kind, quelle(), { messageId: message.id ?? null }),
+                        herunterladen: () => diagrammSvgHerunterladen(block, kind),
+                        extras,
                         // Bleibender Link unter dem Diagramm — die Leiste erscheint nur beim Überfahren.
-                        if (!block.querySelector(':scope > a[data-werkstatt-link]')) {
+                        onGespeichert: () => {
+                            if (block.querySelector(':scope > a[data-werkstatt-link]')) return;
                             const link = document.createElement('a');
                             link.href = '/workshop';
                             link.dataset.werkstattLink = '';
                             link.className = WERKSTATT_LINK_KLASSE;
                             link.textContent = 'In der Werkstatt ✓';
                             block.appendChild(link);
-                        }
-                    } catch (e) {
-                        saveBtn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
-                    }
-                    setTimeout(() => { saveBtn.textContent = 'In Werkstatt'; saveBtn.disabled = false; }, 2200);
-                });
-                bar.appendChild(saveBtn);
-
-                // Funktionsgraphen zusätzlich als GeoGebra-Datei (.ggb) herunterladbar.
-                if (kind === 'plot') {
-                    const ggbBtn = document.createElement('button');
-                    ggbBtn.type = 'button';
-                    ggbBtn.setAttribute('aria-label', 'Als GeoGebra-Datei herunterladen');
-                    ggbBtn.title = 'Als GeoGebra-Datei (.ggb) herunterladen';
-                    ggbBtn.className = btnClass;
-                    ggbBtn.textContent = 'GeoGebra';
-                    ggbBtn.addEventListener('click', async () => {
-                        if (ggbBtn.disabled) return;
-                        ggbBtn.disabled = true;
-                        try {
-                            const blob = await getPlotGgbBlob(block.dataset.source ?? '');
-                            triggerDownload(blob, 'funktionsgraph.ggb');
-                            ggbBtn.textContent = '✓ .ggb';
-                        } catch {
-                            ggbBtn.textContent = 'Fehler';
-                        }
-                        setTimeout(() => { ggbBtn.textContent = 'GeoGebra'; ggbBtn.disabled = false; }, 2200);
-                    });
-                    bar.appendChild(ggbBtn);
-                }
+                        },
+                    },
+                }));
 
                 block.appendChild(bar);
             });
         }
 
+        const eingehaengt = [];
         attach();
         const observer = new MutationObserver(attach);
         observer.observe(node, { childList: true, subtree: true });
-        return { destroy() { observer.disconnect(); } };
+        return {
+            destroy() {
+                observer.disconnect();
+                eingehaengt.forEach((k) => unmount(k));
+            },
+        };
     }
 
     // Svelte-Action: Copy-Buttons in code-block-Containern einbinden
@@ -346,23 +304,27 @@
     // „Als Dokument bearbeiten" (Phase 19; Knopftext seit 0.12, F5): den Antworttext als
     // Markdown-Dokument ablegen und in die Werkstatt springen. Der Knopf nennt die
     // Tätigkeit, „Werkstatt" bleibt der Name der Ansicht.
-    let openingWorkshop = $state(false);
-    let workshopError = $state(null);
+    async function textAlsDokument() {
+        return createDocument(deriveDocTitle(message.content), message.content ?? '', {
+            messageId: message.id ?? null,
+        });
+    }
+
+    // Speichern: Das Dokument liegt danach in der Werkstatt, der Chat bleibt offen (0.41).
+    // `createDocument` ist über die Nachricht idempotent — dreimal klicken, ein Dokument.
+    async function textSpeichern() {
+        return textAlsDokument();
+    }
+
     async function openInWorkshop() {
-        if (openingWorkshop) return;
-        openingWorkshop = true;
-        workshopError = null;
-        try {
-            const doc = await createDocument(deriveDocTitle(message.content), message.content ?? '', {
-                messageId: message.id ?? null,
-            });
-            await goto(`/workshop/${doc.id}/edit`);
-        } catch (e) {
-            openingWorkshop = false;
-            workshopError = e?.status === 409
-                ? 'Werkstatt voll — bitte zuerst aufräumen.'
-                : 'Konnte nicht als Dokument angelegt werden.';
-        }
+        const doc = await textAlsDokument();
+        await goto(`/workshop/${doc.id}/edit`);
+    }
+
+    async function textHerunterladen() {
+        const blob = new Blob([message.content ?? ''], { type: 'text/markdown;charset=utf-8' });
+        triggerDownload(blob, textDateiname(deriveDocTitle(message.content)));
+        return '✓ .md';
     }
 
     // „Als Baustein speichern" (AP8): derselbe Redaktionsakt wie in der Bibliothek,
@@ -377,27 +339,10 @@
     // einer neuen Fassung, auch schon nach einem simplen Neuladen der Seite.
     let bausteinArtefakt = $state(null);
     let bausteinDialogOffen = $state(false);
-    let bausteinLaeuft = $state(false);
-    let bausteinFehler = $state(null);
 
     async function alsBausteinSpeichern() {
-        if (bausteinLaeuft) return;
-        if (bausteinArtefakt) { bausteinDialogOffen = true; return; }
-        bausteinLaeuft = true;
-        bausteinFehler = null;
-        try {
-            bausteinArtefakt = await createDocument(
-                deriveDocTitle(message.content), message.content ?? '',
-                { messageId: message.id ?? null },
-            );
-            bausteinDialogOffen = true;
-        } catch (e) {
-            bausteinFehler = e?.status === 409
-                ? 'Werkstatt voll — bitte zuerst aufräumen.'
-                : 'Konnte nicht als Baustein gespeichert werden.';
-        } finally {
-            bausteinLaeuft = false;
-        }
+        if (!bausteinArtefakt) bausteinArtefakt = await textAlsDokument();
+        bausteinDialogOffen = true;
     }
 </script>
 
@@ -502,60 +447,24 @@
                                     class="rounded-xl max-w-full h-auto border border-light-ui-3 dark:border-dark-ui-3"
                                     onerror={() => onImageError(img.image_id)}
                                 />
-                                <div class="absolute top-1.5 right-1.5 flex gap-1
-                                            opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        type="button"
-                                        onclick={() => saveImage(img.image_id)}
-                                        disabled={imageSaveState[img.image_id] === 'saving'}
-                                        aria-label={imageSaveTitle(imageSaveState[img.image_id])}
-                                        title={imageSaveTitle(imageSaveState[img.image_id])}
-                                        class="p-1.5 rounded-lg
-                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
-                                    >
-                                        {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
-                                            <Check class="w-4 h-4" />
-                                        {:else if imageSaveState[img.image_id] === 'full' || imageSaveState[img.image_id] === 'error'}
-                                            <AlertCircle class="w-4 h-4" />
-                                        {:else}
-                                            <BookmarkPlus class="w-4 h-4" />
-                                        {/if}
-                                    </button>
-                                    <a
-                                        href="/api/images/{img.image_id}"
-                                        download="bild-{img.image_id}.png"
-                                        aria-label="Bild herunterladen"
-                                        title="Bild herunterladen"
-                                        class="p-1.5 rounded-lg
-                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
-                                    >
-                                        <Download class="w-4 h-4" />
-                                    </a>
-                                    {#if img.bildart}
-                                        <button
-                                            type="button"
-                                            onclick={() => variiere(img.image_id)}
-                                            disabled={variiereStatus[img.image_id] === 'laeuft'}
-                                            aria-label="Noch einmal erzeugen"
-                                            title="Noch einmal erzeugen — gleiche Beschreibung, neues Bild"
-                                            class="p-1.5 rounded-lg
-                                                   bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                                   text-light-tx-2 dark:text-dark-tx-2
-                                                   hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
-                                                   disabled:opacity-60"
-                                        >
-                                            {#if variiereStatus[img.image_id] === 'laeuft'}
-                                                <Loader2 class="w-4 h-4 animate-spin" />
-                                            {:else}
-                                                <RefreshCw class="w-4 h-4" />
-                                            {/if}
-                                        </button>
-                                    {/if}
+                                <div class="absolute top-1.5 right-1.5
+                                            opacity-0 group-hover:opacity-100 group-focus-within:opacity-100
+                                            transition-opacity">
+                                    <ProduktLeiste
+                                        variante="overlay"
+                                        speichern={() => saveImageToLibrary(img.image_id)}
+                                        herunterladen={{ href: `/api/images/${img.image_id}`, dateiname: `bild-${img.image_id}.png` }}
+                                        extras={img.bildart ? [{
+                                            id: 'neu', label: 'Neu erzeugen',
+                                            titel: 'Noch einmal erzeugen — gleiche Beschreibung, neues Bild',
+                                            aktion: () => variiere(img.image_id),
+                                        }] : []}
+                                        onGespeichert={() => (imageSaveState = { ...imageSaveState, [img.image_id]: 'saved' })}
+                                    />
                                 </div>
+                                {#if variiereStatus[img.image_id] === 'laeuft'}
+                                    <p class="mt-0.5 text-xs text-light-tx-2 dark:text-dark-tx-2">Wird neu erzeugt…</p>
+                                {/if}
                                 {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
                                     <a href="/workshop" class="block {WERKSTATT_LINK_KLASSE}">In der Werkstatt ✓</a>
                                 {/if}
@@ -575,47 +484,15 @@
                 </div>
             {/if}
             {#if message.content && !isStreaming}
-                <div class="mt-3 flex flex-wrap items-center gap-1">
-                    <button
-                        type="button"
-                        onclick={openInWorkshop}
-                        disabled={openingWorkshop}
-                        title={textHinweis ?? undefined}
-                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                               text-light-tx-2 dark:text-dark-tx-2
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50"
-                    >
-                        <FileEdit class="w-3.5 h-3.5" />
-                        {openingWorkshop ? 'Wird geöffnet…' : 'Als Dokument bearbeiten'}
-                    </button>
-                    <!-- Der zweite Einstieg in dasselbe Formular (AP8). Die Werkstatt ist
-                         zum Weiterschreiben da, der Baustein zum Wiederfinden — zwei
-                         verschiedene Absichten, deshalb zwei Knöpfe. -->
-                    <button
-                        type="button"
-                        onclick={alsBausteinSpeichern}
-                        disabled={bausteinLaeuft}
-                        title={textHinweis ?? undefined}
-                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                               text-light-tx-2 dark:text-dark-tx-2
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50"
-                    >
-                        <Share2 class="w-3.5 h-3.5" />
-                        {bausteinLaeuft ? 'Wird vorbereitet…' : 'Als Baustein speichern'}
-                    </button>
-                    {#if textHinweis}
-                        <p class="w-full text-xs text-light-tx-2 dark:text-dark-tx-2 mt-0.5">
-                            {textHinweis}
-                        </p>
-                    {/if}
-                    {#if workshopError}
-                        <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
-                    {/if}
-                    {#if bausteinFehler}
-                        <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{bausteinFehler}</p>
-                    {/if}
+                <div class="mt-3">
+                    <ProduktLeiste
+                        variante="zeile"
+                        speichern={textSpeichern}
+                        bearbeiten={openInWorkshop}
+                        herunterladen={textHerunterladen}
+                        alsBaustein={alsBausteinSpeichern}
+                        hinweis={textHinweis}
+                    />
                 </div>
             {/if}
             {#if kosten !== null || (hatHerkunftsangaben && !isStreaming) || kontext || daumen}

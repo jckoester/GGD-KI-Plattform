@@ -13,11 +13,10 @@ Chat, bis du es löschst oder die Aufbewahrungsfrist abläuft.
 
 ## Etwas in der Werkstatt speichern
 
-Fahre im Chat mit der Maus über ein **erzeugtes Bild** oder ein gerendertes **Diagramm**
-(Schaltplan, Funktionsgraph, Flussdiagramm). Es erscheint ein Knopf:
-
-- Bei Bildern das **Lesezeichen-Symbol** oben rechts.
-- Bei Diagrammen der Knopf **„In Werkstatt"**.
+Bilder, Diagramme und Texte im Chat tragen dieselbe Leiste mit **„Speichern"**: über einem
+**erzeugten Bild** oder einem gerenderten **Diagramm** (Schaltplan, Funktionsgraph,
+Flussdiagramm) erscheint sie, wenn du mit der Maus darüberfährst; unter einer **Textantwort**
+steht sie immer. Ein Text wird dabei als Dokument gespeichert — der Chat bleibt offen.
 
 Ein Klick speichert das Element. Darunter erscheint der Link **„In der Werkstatt ✓“**, der
 dich direkt dorthin führt. Speicherst du dasselbe Element zweimal, entsteht **kein Duplikat** —

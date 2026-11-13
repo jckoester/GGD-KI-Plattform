@@ -21,6 +21,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Die Aufbewahrungsfrist eines Produkts erneuert sich bei jedem Benutzen: Inhalt bearbeiten, Titel, Fach oder Thema
   ändern, exportieren, als Baustein übernehmen.
+- Im Chat tragen Bilder, Diagramme und Texte dieselbe Leiste: Speichern · Als Dokument bearbeiten (Text) ·
+  Herunterladen · Weiteres der Art · Als Baustein speichern. Texte lassen sich jetzt auch speichern, ohne den Chat zu
+  verlassen, und als Markdown herunterladen.
 
 ### Behoben
 

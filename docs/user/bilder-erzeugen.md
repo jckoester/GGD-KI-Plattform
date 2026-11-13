@@ -17,14 +17,14 @@ In der **Assistentenliste** tragen Assistenten, die etwas herstellen, eine Marke
 1. In der Assistentenliste den Filter **Bilder** wählen und einen Bild-Assistenten öffnen.
 2. Im Chat **beschreiben**, was das Bild zeigen soll — je genauer, desto besser
    (Motiv, Stil, Bildausschnitt).
-3. Das fertige Bild erscheint in der Antwort. Über die Symbole oben rechts am Bild
-   kannst du es **herunterladen** oder mit dem Lesezeichen-Symbol in deine
-   [Werkstatt](werkstatt.md) übernehmen — sonst verschwindet es mit dem Chat.
+3. Das fertige Bild erscheint in der Antwort. Über die Leiste oben rechts am Bild kannst du
+   es **speichern** (in deiner [Werkstatt](werkstatt.md) — sonst verschwindet es mit dem
+   Chat), **herunterladen** oder **neu erzeugen** lassen.
 
 ## Noch einmal versuchen
 
-Gefällt dir ein Bild nicht ganz, brauchst du deine Beschreibung nicht zu wiederholen: Das
-**Wiederholen-Symbol** am Bild erzeugt einen neuen Versuch mit derselben Beschreibung. Das alte
+Gefällt dir ein Bild nicht ganz, brauchst du deine Beschreibung nicht zu wiederholen: Der
+Knopf **„Neu erzeugen"** am Bild erzeugt einen neuen Versuch mit derselben Beschreibung. Das alte
 Bild bleibt stehen, du kannst also vergleichen.
 
 > Jeder Versuch kostet wie ein neues Bild. Wer zehnmal wiederholt, zahlt zehnmal —

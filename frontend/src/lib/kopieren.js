@@ -88,44 +88,28 @@ export function formelKnopf(formel) {
     return btn;
 }
 
-function leistenKnopf(leiste, klasse, text, titel, aktion) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.setAttribute('aria-label', titel);
-    btn.title = titel;
-    btn.className = klasse;
-    btn.textContent = text;
-    btn.addEventListener('click', async () => {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        try {
-            btn.textContent = await aktion();
-        } catch {
-            btn.textContent = 'Fehler';
-        }
-        setTimeout(() => { btn.textContent = text; btn.disabled = false; }, 1500);
-    });
-    leiste.appendChild(btn);
-    return btn;
+/**
+ * Die Quelle eines gerenderten Diagramms kopieren — für die Produktleiste im Chat (0.41).
+ * Die Quelle liegt in `data-source`.
+ *
+ * @returns {Promise<string>} kurze Rückmeldung für den Knopf
+ */
+export async function diagrammQuelleKopieren(block) {
+    await navigator.clipboard.writeText(block.dataset.source ?? '');
+    return '✓ Kopiert';
 }
 
 /**
- * „Code kopieren" und „SVG" in die Hover-Leiste eines gerenderten Diagramms.
- *
- * Die Quelle liegt in `data-source`. Mermaid wird fürs SVG mit **festen hellen** Farben neu
- * gerendert (`mermaidSvgHell`); die Server-Diagramme (Schaltplan, Funktionsgraph)
+ * Ein gerendertes Diagramm als SVG-Datei herunterladen. Mermaid wird dafür mit **festen hellen**
+ * Farben neu gerendert (`mermaidSvgHell`); die Server-Diagramme (Schaltplan, Funktionsgraph)
  * kennen keinen Dunkelmodus und gehen so, wie sie dastehen.
+ *
+ * @returns {Promise<string>} kurze Rückmeldung für den Knopf
  */
-export function diagrammKnoepfe(leiste, block, art, klasse) {
-    leistenKnopf(leiste, klasse, 'Code kopieren', 'Quelltext des Diagramms kopieren', async () => {
-        await navigator.clipboard.writeText(block.dataset.source ?? '');
-        return '✓ Kopiert';
-    });
-    leistenKnopf(leiste, klasse, 'SVG', 'Als SVG-Datei herunterladen', async () => {
-        const svg = art === 'mermaid'
-            ? await mermaidSvgHell(block.dataset.source ?? '')
-            : block.querySelector('svg').outerHTML;
-        triggerDownload(svgDatei(svg), SVG_DATEINAME[art]);
-        return '✓ SVG';
-    });
+export async function diagrammSvgHerunterladen(block, art) {
+    const svg = art === 'mermaid'
+        ? await mermaidSvgHell(block.dataset.source ?? '')
+        : block.querySelector('svg').outerHTML;
+    triggerDownload(svgDatei(svg), SVG_DATEINAME[art]);
+    return '✓ SVG';
 }

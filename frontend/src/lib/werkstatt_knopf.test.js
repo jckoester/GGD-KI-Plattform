@@ -39,7 +39,8 @@ describe("Knopftext „Als Dokument bearbeiten“", () => {
     });
 
     it("der Knopf trägt den neuen Text, und die Anleitung nennt ihn", () => {
-        const knopf = readFileSync(join(SRC, "lib", "components", "MessageBubble.svelte"), "utf8");
+        // Seit 0.41 steht der Knopf in der gemeinsamen Produktleiste.
+        const knopf = readFileSync(join(SRC, "lib", "components", "ProduktLeiste.svelte"), "utf8");
         const anleitung = readFileSync(join(WURZEL, "docs", "user", "werkstatt.md"), "utf8");
         expect(knopf).toContain("'Als Dokument bearbeiten'");
         expect(anleitung).toContain("„Als Dokument bearbeiten\"");
@@ -55,8 +56,15 @@ describe("nach dem Speichern: Link in die Werkstatt (0.40, F11)", () => {
         expect(quelle).toContain("link.textContent = 'In der Werkstatt ✓'");
     });
 
-    it("nur ein Fehler setzt den Bildzustand zurück, „gespeichert“ bleibt", () => {
-        const speichern = quelle.slice(quelle.indexOf("async function saveImage"), quelle.indexOf("function imageSaveTitle"));
+    it("nur ein Fehler setzt den Speicherzustand zurück, „gespeichert“ bleibt", () => {
+        // Seit 0.41 in der gemeinsamen Produktleiste (Bild, Diagramm, Text).
+        const leiste = readFileSync(join(SRC, "lib/components/ProduktLeiste.svelte"), "utf8");
+        const speichern = leiste.slice(leiste.indexOf("async function speichernKlick"), leiste.indexOf("async function ausfuehren"));
         expect(speichern.indexOf("setTimeout")).toBeGreaterThan(speichern.indexOf("catch"));
+    });
+
+    it("unter einer Textantwort zeigt die Leiste den Link selbst", () => {
+        const leiste = readFileSync(join(SRC, "lib/components/ProduktLeiste.svelte"), "utf8");
+        expect(leiste).toMatch(/<a href="\/workshop"[^>]*>In der Werkstatt ✓<\/a>/);
     });
 });

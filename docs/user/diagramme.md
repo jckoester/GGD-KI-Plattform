@@ -15,14 +15,15 @@ nichts installieren oder zeichnen können, sondern nur danach fragen.
   Grenzformeln des Phenolat-Ions". Mehr dazu [unten](#strukturformeln).
 
 Der Assistent beschreibt die Grafik in einem Code-Block, der bei uns automatisch als Bild
-dargestellt wird. Fährst du mit der Maus über die Grafik, erscheinen oben rechts:
+dargestellt wird. Fährst du mit der Maus über die Grafik, erscheint oben rechts dieselbe Leiste
+wie an Bildern und Texten:
 
-- **„Code kopieren"** — der Quelltext der Grafik, etwa um sie in der
-  [Werkstatt](werkstatt.md) weiterzuverwenden.
-- **„SVG"** — die Grafik als Datei. Sie ist **immer hell**, auch wenn du den Dunkelmodus
-  nutzt, damit sie auf weißem Papier lesbar bleibt.
-- **„In Werkstatt"** — legt die Grafik dauerhaft ab; sonst verschwindet sie mit dem Chat
-  (→ [Werkstatt](werkstatt.md)).
+- **„Speichern"** — legt die Grafik dauerhaft in der [Werkstatt](werkstatt.md) ab; sonst
+  verschwindet sie mit dem Chat.
+- **„Herunterladen"** — die Grafik als SVG-Datei. Sie ist **immer hell**, auch wenn du den
+  Dunkelmodus nutzt, damit sie auf weißem Papier lesbar bleibt.
+- **„Code kopieren"** — der Quelltext der Grafik, etwa um sie in einem Dokument der
+  Werkstatt weiterzuverwenden.
 - **„GeoGebra"** — nur bei Funktionsgraphen: eine `.ggb`-Datei zum Weiterbearbeiten.
 
 ## Schaltpläne
