@@ -12,6 +12,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Stundenentwürfe löschen, im Stundenentwurf und in der Einheitenansicht. Nur die Lehrkraft, die die Stunde
   angelegt hat; nachbereitete Stunden nicht.
 
+### Geändert
+
+- Stunden, Einheiten und Jahrespläne lassen sich nicht mehr über die Bibliothek löschen, nur im Planer.
+
 ### Behoben
 
 - „Verlauf“ → „Wiederherstellen“ scheiterte, wenn eine Einheit oder Stunde seitdem gelöscht worden war.

@@ -1191,6 +1191,17 @@ async def delete_node(
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
 
+    # Planung hat ihren eigenen Weg (0.42.4), wie beim Kopieren: Dieser hier kennt weder die
+    # Sperre für nachbereitete Stunden noch Termin und Reihenfolge der Einheit. Auch nicht mit
+    # `force` — der Planer löscht Stunden (`DELETE /planning/lessons/{id}`) und Einheiten selbst.
+    from app.context.taxonomy import PLANUNG_CONTENT_TYPES
+
+    if node.content_type in PLANUNG_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Planung löschst du im Planer: Stunden im Stundenentwurf oder unter „Einheiten“.",
+        )
+
     # ── F7: Archivieren vor Löschen (ADR-019) ────────────────────────────────
     # Zeigen **aktive Knoten anderer Eigentümer** auf diesen, ist Löschen die falsche
     # Aktion: Es reißt in fremde Planungen ein Loch, das dort niemand erklären kann.

@@ -386,3 +386,19 @@ async def test_oberflaeche_erfaehrt_ob_loeschen_geht(test_client, auth_headers, 
     stunden = _stunden((await _inhalt(test_client, auth_headers_teacher2)).json())
     assert stunden["Eigene"]["eigen"] is False
     assert _stunden((await _inhalt(test_client, auth_headers)).json())["Eigene"]["eigen"] is True
+
+
+async def test_allgemeiner_loeschweg_lehnt_planung_ab(test_client, auth_headers, conn):
+    """Wie beim Kopieren (F8): Planung löscht nur der Planer — sonst fiele die Sperre für
+    nachbereitete Stunden weg, und Termin und Reihenfolge blieben ungeschlossen."""
+    einheit = _einheit(conn, EIGENE)
+    stunde = _stunde(conn, EIGENE, einheit, "Nicht hierüber")
+    slot = _termin(conn, EIGENE, date(2026, 9, 14), stunde)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE lesson_slots SET nachbereitet_at = now() WHERE id = %s", (slot,))
+    conn.commit()
+
+    for nid in (stunde, einheit):
+        resp = await test_client.delete(f"/context/nodes/{nid}", headers=auth_headers)
+        assert resp.status_code == 422, resp.text
+        assert _gibt_es(conn, nid)

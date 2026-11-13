@@ -131,8 +131,9 @@ zeigen, die es nicht mehr gibt. Bis 0.42.4 setzte `restore_snapshot` die Kennung
 scheiterte am Fremdschlüssel — auch nach dem Löschen einer **Einheit**, das es schon länger gab.
 Jetzt fallen fehlende Kennungen weg; der Termin behält den Rest des Snapshots.
 
-Der allgemeine Weg `DELETE /context/nodes/{id}` kennt diese Regeln nicht (Eigentümerin ja,
-Nachbereitung und Reihenfolge nein). Die Oberfläche bietet ihn für Planung nirgends an.
+Der allgemeine Weg `DELETE /context/nodes/{id}` lehnt Planungsknoten mit 422 ab, auch Admins mit
+`force` — wie `POST /context/nodes/{id}/copy`. Er kennt weder die Sperre für Nachbereitetes noch
+Termin und Reihenfolge. Einheiten löscht der Planer über `DELETE /planning/groups/{id}/units/{id}`.
 
 ## „Meine Bausteine“
 

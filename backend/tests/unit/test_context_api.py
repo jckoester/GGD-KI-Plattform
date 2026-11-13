@@ -424,6 +424,16 @@ class TestDeleteNode:
         resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204
 
+    @pytest.mark.parametrize("typ", ["unterrichtsstunde", "unterrichtseinheit", "jahresplan"])
+    def test_planung_nicht_hierueber_auch_nicht_mit_force(self, typ):
+        """0.42.4: Planung löscht der Planer — mit Sperre für Nachbereitetes, Termin und Reihenfolge."""
+        node = make_node(owner_pseudonym="pseudo-admin", category="artifact", content_type=typ)
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        client = TestClient(make_app(_delete_db(node), user))
+        resp = client.delete(f"/context/nodes/{node.id}?force=true")
+        assert resp.status_code == 422
+        assert "Planer" in resp.json()["detail"]
+
 
 class TestF7ArchivierenVorLoeschen:
     """Fremde aktive Verweise machen aus dem Löschen ein Archivieren (ADR-019 F7).
