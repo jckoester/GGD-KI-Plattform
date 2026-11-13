@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.42.3] – 2026-11-13
+
+### Neu
+
+- Planer mit zweiter Ansicht „Einheiten“: Einheiten mit ihren Stunden, auch denen ohne Termin. Die gewählte
+  Ansicht wird gemerkt.
+- „Einplanen“ an Stunden ohne Termin, in der Einheitenansicht und im Stundenentwurf.
+- Hinweis in der Jahresübersicht, solange Stunden ohne Termin da sind.
+
+### Behoben
+
+- Kopierte Stunden und Einheiten waren im Planer nicht zu finden. Der Kopierdialog führt jetzt zur Einheit.
+
+### Nach dem Update
+
+- Neu bauen und starten. Keine Migration, keine Konfiguration.
+
 ## [0.42.2] – 2026-11-13
 
 ### Neu

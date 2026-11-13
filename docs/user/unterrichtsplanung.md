@@ -86,6 +86,36 @@ Der Jahrgang entscheidet, **welche** Curricula angeboten werden. Ist er unbekann
 gar keines angeboten — früher waren es alle des Fachs, was einem Abiturkurs auch
 Curricula der Mittelstufe vorlegte.
 
+## Einheiten und Stunden
+
+Die Jahresübersicht beantwortet, **wann** etwas stattfindet. Was zu einer Einheit gehört,
+zeigt die zweite Ansicht des Planers: Oben rechts schaltest du zwischen **Jahresübersicht**
+und **Einheiten** um. Die Plattform merkt sich deine Wahl — die Kachel auf der Übersicht
+„Planung“ und die Gruppen im Menü öffnen dann gleich diese Ansicht.
+
+Unter **Einheiten** stehen die Einheiten der Gruppe als Liste oder Kacheln, mit der Zahl
+ihrer Stunden („5 Stunden · 1 ohne Termin“). Ein Klick auf eine Einheit zeigt ihre Stunden
+in ihrer Reihenfolge, jeweils mit Datum oder dem Vermerk **ohne Termin**. Ein Klick auf eine
+Stunde öffnet ihren Stundenentwurf.
+
+**Ohne Termin** ist eine Stunde, die zur Einheit gehört, aber an keinem Termin hängt — zum
+Beispiel eine [Kopie](#stunden-und-einheiten-kopieren). In der Jahresübersicht ist sie nicht zu
+sehen; dort steht oben nur der Hinweis „2 Stunden haben noch keinen Termin“, solange es
+welche gibt.
+
+### Eine Stunde einplanen
+
+Über **Einplanen** an der Stunde — in der Ansicht **Einheiten** oder im Kopf ihres
+Stundenentwurfs — wählst du einen Termin. Zur Wahl stehen Unterrichtsstunden **ab heute, an
+denen noch kein Entwurf hängt**:
+
+- zuerst **Termine dieser Einheit** — Stunden, die du der Einheit schon zugeteilt hast,
+- dann **freie Termine** ohne Einheit.
+
+Termine einer anderen Einheit erscheinen nicht. Steht am Termin schon ein Thema, bleibt es;
+sonst wird der Titel der Stunde zum Thema. Rückgängig machst du das Einplanen wie jede
+Änderung über **Verlauf** in der Jahresübersicht.
+
 ## Das ganze Jahr planen
 
 Viele Lehrkräfte legen ihre Jahresplanung **im September** an — für das ganze Schuljahr,
@@ -134,7 +164,8 @@ Zwei Wege führen von dort weg:
 
 - **Auf eine freie Stunde ziehen.** Der Inhalt wird dort eingeplant.
 - **Verwerfen** (Papierkorb). Der Eintrag verschwindet; **der Stundenentwurf bleibt
-  erhalten** — du findest ihn weiterhin über die Einheit.
+  erhalten** — du findest ihn weiterhin über die Einheit, in der Ansicht
+  [Einheiten](#einheiten-und-stunden).
 
 Der zweite Weg ist der ehrlichere, wenn eine Einheit ohnehin über Soll liegt: Dann ist
 nicht der Termin das Problem, sondern der Umfang. Kürze die Einheit, statt Stunden
@@ -454,16 +485,18 @@ wieder verwenden, kopierst du sie.
 
 Kopieren kannst du an drei Stellen:
 
-- im **Archiv** an jeder Einheit und jeder Stunde,
+- im **Archiv** und in der Ansicht [Einheiten](#einheiten-und-stunden) an jeder Einheit und jeder
+  Stunde,
 - in der **Jahresübersicht** über das Kopiersymbol an einer Einheit (es erscheint, wenn du mit der
   Maus darüberfährst),
 - im **Stundenentwurf** über **Kopieren** im Kopf — auch, wenn die Stunde im Archiv liegt.
 
 Ziel ist immer eine deiner Gruppen **dieses Schuljahres im selben Fach**. Eine Stunde braucht
 außerdem eine Einheit: eine bestehende der Gruppe oder eine neue, die du im Dialog benennst. Die
-Kopie kommt ans Ende der Einheit, **ohne Termin** — wann sie stattfindet, legst du wie gewohnt in
-der Jahresübersicht fest. Eine Einheit kommt mit allen Stunden in ihrer Reihenfolge und ebenfalls
-ohne Termine.
+Kopie kommt ans Ende der Einheit, **ohne Termin**. Eine Einheit kommt mit allen Stunden in ihrer
+Reihenfolge und ebenfalls ohne Termine. Du findest sie im Planer der Zielgruppe unter
+[Einheiten](#einheiten-und-stunden) und legst sie dort mit **Einplanen** auf ihre Termine; der
+Dialog nach dem Kopieren führt mit **Zur Einheit** direkt hin.
 
 Kopieren darfst du, was du lesen kannst — also auch die Stunde einer Kollegin aus einer Gruppe,
 die ihr gemeinsam unterrichtet. Die Kopie gehört dir.
@@ -531,6 +564,11 @@ Reflexionen, der Pin-Status oder Phasen-Details. Mehr dazu unter
 **Was wird am Schuljahresende aus meiner Planung?**
 Sie wandert ins [Archiv](#archiv-und-kopieren). Dort kannst du sie lesen, exportieren und als
 Vorlage in eine Gruppe des neuen Schuljahres kopieren.
+
+**Wo finde ich eine kopierte Stunde?**
+Im Planer der Zielgruppe unter [Einheiten](#einheiten-und-stunden), in der Einheit, die du beim
+Kopieren gewählt hast — mit dem Vermerk „ohne Termin“. In der Jahresübersicht erscheint sie erst,
+wenn du sie [eingeplant](#eine-stunde-einplanen) hast.
 
 **Warum stehen meine Stunden nicht mehr unter „Meine Bausteine“?**
 Planung hat seit 0.42 ihren eigenen Ort: den Menüpunkt **Planung** mit Planer und Archiv. Unter

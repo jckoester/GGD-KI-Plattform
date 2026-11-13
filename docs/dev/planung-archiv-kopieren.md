@@ -1,9 +1,10 @@
-# Planung: Archiv, Rechte und Kopieren (0.42)
+# Planung: Archiv, Rechte, Kopieren und Einheitenansicht (0.42)
 
 Seit 0.42 hat die Unterrichtsplanung einen eigenen Menüpunkt „Planung“: je aktuelle Gruppe ein
 Link in ihren Planer, darunter das Archiv früherer Schuljahre. Seit 0.42.2 öffnet der Menükopf die
 Übersicht `/planning` mit denselben Gruppen als Kacheln (Beschriftung `menueBeschriftung`, Quelle
-`GET /planning/groups`) und dem Archiv abgesetzt darunter. Diese Seite beschreibt, wer was
+`GET /planning/groups`) und dem Archiv abgesetzt darunter. Seit 0.42.3 zeigt der Planer neben der
+Jahresübersicht die Einheiten mit ihren Stunden, auch denen ohne Termin. Diese Seite beschreibt, wer was
 sieht und ändern darf und was eine Kopie mitnimmt. Die Regeln stehen ausführlich in den
 Moduldocstrings; hier steht, wo sie liegen und warum sie so sind.
 
@@ -83,6 +84,35 @@ Antwort mit `meldungen`: was weggelassen oder umgestellt wurde.
 Der allgemeine Kopierweg `POST /context/nodes/{id}/copy` lehnt Planungsknoten mit 422 ab — es
 gibt einen Weg, nicht zwei.
 
+## Einheitenansicht und Einplanen (0.42.3)
+
+Eine Stunde erscheint in der Jahresübersicht nur über einen Termin (`lesson_slots.stunde_node_id`).
+Eine Kopie — oder eine Stunde, die über `POST /planning/units/{id}/lessons` ohne `slot_id` entsteht —
+hängt nur per `part_of` an ihrer Einheit. Damit sie nicht verloren geht, hat der Planer eine zweite
+Ansicht:
+
+- **Daten:** `GET /planning/groups/{id}/inhalt` (`require_group_teacher`) — dieselbe Aufbereitung wie
+  das Archiv (`archiv.archiv_inhalt`, Antwort `ArchivInhaltRead`, gemeinsam über `_inhalt_read`), aber
+  nur `active` (`stati=("active",)`), wie die Jahresübersicht. Je Stunde `slot_id`; `None` heißt
+  „ohne Termin“. Das Archiv liefert das Feld mit.
+- **Ansicht:** `?ansicht=jahr|einheiten` (dazu `?einheit=`) am Planer; ohne Angabe gilt die
+  Einstellung `planung_ansicht` (je Nutzer). Kachel auf `/planning`, Menü und Rückweg aus dem
+  Stundenentwurf brauchen deshalb keine eigenen Links. Darstellung: `EinheitenAnsicht.svelte`,
+  gemeinsam mit der Archivseite; Hilfen in `lib/planung_archiv.js`.
+- **Einplanen:** kein eigener Endpunkt, sondern `PATCH /planning/slots/{id}` mit `stunde_node_id`,
+  `expected_updated_at` und — wenn der Termin keine trägt — `ue_node_id`. Auswahl und Anfrage:
+  `lib/einplanen.js` (Unterricht, ohne Entwurf, ab heute; Termine der Einheit zuerst, dann leere;
+  andere Einheiten nicht).
+
+⚠️ **Die Einheit gehört in die Anfrage.** `ordne_entwurf_ein` hängt den Entwurf an die Einheit **des
+Termins**. Trägt der Termin keine, fällt die `part_of`-Kante der Stunde weg — sie stünde danach
+„ohne Einheit“ (`test_einplanen_ohne_einheit_am_termin_loeste_die_stunde`). Ob andere Aufrufer
+(Planungsassistent) denselben Fall erzeugen, ist als Todo offen.
+
+⚠️ **Frei prüft der Server nicht.** `PATCH /slots/{id}` überschreibt einen Entwurf am Termin; die
+Auswahl bietet nur Termine ohne Entwurf an, und `expected_updated_at` lehnt einen inzwischen
+geänderten Termin mit 409 (`grund: veraltet`) ab.
+
 ## „Meine Bausteine“
 
 Planungstypen sind persönlich gepflegt (`PERSOENLICHE_CONTENT_TYPES`), stehen aber nicht in
@@ -92,4 +122,5 @@ für Liste, Typfilter und Aufmerksamkeitszähler. „Eingesetzt in“ am Materia
 ## Tests
 
 `tests/integration/test_planung_archiv.py`, `test_planung_kopieren.py`,
-`test_meine_bausteine.py`; Frontend `planung_archiv.test.js`, `planung_kopieren.test.js`.
+`test_planung_einheitenansicht.py`, `test_meine_bausteine.py`; Frontend `planung_archiv.test.js`,
+`planung_kopieren.test.js`, `einplanen.test.js`.
