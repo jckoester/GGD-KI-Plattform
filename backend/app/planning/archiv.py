@@ -63,6 +63,8 @@ class ArchivStunde:
     datum: date | None
     nachbereitet: bool
     archiviert: bool
+    # Der Termin, an dem die Stunde hängt — None heißt „ohne Termin“ (0.42.3, Einplanen).
+    slot_id: UUID | None = None
 
 
 @dataclass
@@ -223,13 +225,22 @@ def _ordne(stunden: dict[UUID, ContextNode], folgt: dict[UUID, UUID]) -> list[UU
 
 
 async def archiv_inhalt(
-    db: AsyncSession, gruppe: Group, fach: Subject | None, zugang: str, user: JwtPayload
+    db: AsyncSession,
+    gruppe: Group,
+    fach: Subject | None,
+    zugang: str,
+    user: JwtPayload,
+    stati: tuple[str, ...] = LESBAR,
 ) -> ArchivInhalt:
-    """Einheiten mit ihren Stunden in Reihenfolge, dazu „Stunden ohne Einheit“."""
+    """Einheiten mit ihren Stunden in Reihenfolge, dazu „Stunden ohne Einheit“.
+
+    Auch die Einheitenansicht des Planers (0.42.3) liest hierüber — dort mit
+    `stati=("active",)`, also dem, was auch die Jahresübersicht zeigt.
+    """
     nur_eigene = zugang == EIGENTUM
     bedingung = [
         ContextNode.write_scope_group_id == gruppe.id,
-        ContextNode.status.in_(LESBAR),
+        ContextNode.status.in_(stati),
     ]
     stunden_abfrage = sa.select(ContextNode).where(ContextNode.content_type == STUNDE, *bedingung)
     if nur_eigene:
@@ -258,20 +269,20 @@ async def archiv_inhalt(
         )
     einheiten = {n.id: n for n in (await db.execute(einheiten_abfrage)).scalars()}
 
-    termine: dict[UUID, tuple[date, bool]] = {}
+    termine: dict[UUID, tuple[date, bool, UUID]] = {}
     if stunden:
-        for sid, datum, nachbereitet_at in (
+        for sid, datum, nachbereitet_at, slot_id in (
             await db.execute(
-                sa.select(LessonSlot.stunde_node_id, LessonSlot.date, LessonSlot.nachbereitet_at).where(
-                    LessonSlot.stunde_node_id.in_(list(stunden))
-                )
+                sa.select(
+                    LessonSlot.stunde_node_id, LessonSlot.date, LessonSlot.nachbereitet_at, LessonSlot.id
+                ).where(LessonSlot.stunde_node_id.in_(list(stunden)))
             )
         ).all():
-            termine[sid] = (datum, nachbereitet_at is not None)
+            termine[sid] = (datum, nachbereitet_at is not None, slot_id)
 
     def stunde(sid: UUID) -> ArchivStunde:
         n = stunden[sid]
-        datum, nachbereitet = termine.get(sid, (None, False))
+        datum, nachbereitet, slot_id = termine.get(sid, (None, False, None))
         return ArchivStunde(
             id=n.id,
             titel=n.title,
@@ -279,6 +290,7 @@ async def archiv_inhalt(
             datum=datum,
             nachbereitet=nachbereitet,
             archiviert=n.status == "archived",
+            slot_id=slot_id,
         )
 
     je_einheit: dict[UUID, dict[UUID, ContextNode]] = {eid: {} for eid in einheiten}

@@ -1939,6 +1939,7 @@ class ArchivStundeRead(BaseModel):
     datum: date | None
     nachbereitet: bool
     archiviert: bool
+    slot_id: UUID | None = None
 
 
 class ArchivEinheitRead(BaseModel):
@@ -1997,13 +1998,34 @@ async def get_archiv_gruppe(
         raise HTTPException(status_code=404, detail="Nicht im Archiv")
     fach = await db.get(Subject, gruppe.subject_id) if gruppe.subject_id else None
     inhalt = await archiv.archiv_inhalt(db, gruppe, fach, zugang, user)
+    return _inhalt_read(inhalt)
 
+
+@router.get("/groups/{group_id}/inhalt", response_model=ArchivInhaltRead)
+async def get_gruppen_inhalt(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einheitenansicht des Planers (0.42.3): Einheiten mit Stunden, mit oder ohne Termin.
+
+    Dieselbe Aufbereitung wie im Archiv, aber für die eigene Gruppe und nur Aktives — so
+    erscheinen auch Stunden, auf die kein Termin zeigt (etwa Kopien).
+    """
+    gruppe = await require_group_teacher(group_id, user, db)
+    fach = await db.get(Subject, gruppe.subject_id) if gruppe.subject_id else None
+    inhalt = await archiv.archiv_inhalt(db, gruppe, fach, archiv.MITGLIED, user, stati=("active",))
+    return _inhalt_read(inhalt)
+
+
+def _inhalt_read(inhalt: archiv.ArchivInhalt) -> ArchivInhaltRead:
     def stunde(s):
         return ArchivStundeRead(**s.__dict__)
 
+    gruppe = inhalt.gruppe
     return ArchivInhaltRead(
         gruppe=ArchivGruppeRead(
-            id=gruppe.id, name=gruppe.anzeigename, fach=_archiv_fach(fach), zugang=zugang,
+            id=gruppe.id, name=gruppe.anzeigename, fach=_archiv_fach(inhalt.fach), zugang=inhalt.zugang,
             schuljahr=max((e.schuljahr for e in inhalt.einheiten if e.schuljahr), default=None),
             einheiten=len(inhalt.einheiten),
             stunden=sum(len(e.stunden) for e in inhalt.einheiten) + len(inhalt.ohne_einheit),
