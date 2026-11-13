@@ -64,23 +64,23 @@ LEHRKRAFT_TYPEN: tuple[str, ...] = (
     "strukturierung",
 )
 
-# Schüler:innen legen nur Eigenes ab. `strukturierung` steht in beiden Listen: Der Typ
-# ist rollenoffen — die Mindmap einer Schüler:in und die einer Lehrkraft für ihre Klasse
-# sind dasselbe Ding mit anderer Sichtbarkeit.
-SCHUELER_TYPEN: tuple[str, ...] = (
-    "schuelertext",
-    "lernplan",
-    "schuelerpraesentation",
-    "strukturierung",
-)
-
 # Nicht übernehmbar — mit dem Grund, damit die Entscheidung nachlesbar bleibt.
 NICHT_UEBERNEHMBAR: dict[str, str] = {
     "unterrichtsstunde": "Planungsobjekt — entsteht im Unterrichtsplaner, nicht im Chat",
     "unterrichtseinheit": "Planungsobjekt — entsteht im Unterrichtsplaner, nicht im Chat",
     "formatierungsvorlage": "schulweite Vorlage — wird in den Einstellungen gepflegt",
     "feedback_text": "entsteht im Feedback-Flow, den es noch nicht gibt",
+    # Seit 0.41 (Päckchen AN, harter Wechsel): Was Schüler:innen aus dem Chat behalten,
+    # bleibt ein Produkt in ihrer Werkstatt. Die drei Arten ruhen; `strukturierung` ist
+    # rollenoffen und bleibt für Lehrkräfte.
+    "schuelertext": "Schüler-Arbeit — bleibt seit 0.41 als Produkt in der Werkstatt",
+    "lernplan": "Schüler-Arbeit — bleibt seit 0.41 als Produkt in der Werkstatt",
+    "schuelerpraesentation": "Schüler-Arbeit — bleibt seit 0.41 als Produkt in der Werkstatt",
 }
+
+NUR_LEHRKRAEFTE = (
+    "Als Baustein übernehmen können nur Lehrkräfte. Deine Arbeiten bleiben in der Werkstatt."
+)
 
 
 def ist_lehrkraft(roles: list[str]) -> bool:
@@ -91,19 +91,23 @@ def ist_lehrkraft(roles: list[str]) -> bool:
 def angebotene_typen(roles: list[str]) -> tuple[str, ...]:
     """Bausteinarten, die diese Rolle aus einem Artefakt machen darf.
 
+    Schüler:innen: keine — seit 0.41 bleibt ihre Arbeit ein Produkt in der Werkstatt.
+
     ⚠️ **Ruhende Arten fallen heraus.** „Ruhend" heißt: Es gibt keinen Weg, so einen
     Knoten anzulegen (ADR-019 F6). Die Übernahme wäre so ein Weg — sie hier anzubieten
     machte den `ui_status` zur Lüge und umginge die eine Stelle, an der über die
-    Sichtbarkeit einer Bausteinart entschieden wird. Solange die vier Schülerarten
-    ruhen, bekommt eine Schüler:in also eine leere Liste; das ist die richtige Antwort,
-    bis AP8 Schritt 2 sie weckt.
+    Sichtbarkeit einer Bausteinart entschieden wird.
     """
-    basis = LEHRKRAFT_TYPEN if ist_lehrkraft(roles) else SCHUELER_TYPEN
-    return tuple(t for t in basis if t not in RUHENDE_CONTENT_TYPES)
+    if not ist_lehrkraft(roles):
+        return ()
+    return tuple(t for t in LEHRKRAFT_TYPEN if t not in RUHENDE_CONTENT_TYPES)
 
 
 def erzwungene_scopes(roles: list[str]) -> tuple[str, str] | None:
     """Sichtbarkeit, die die Rolle nicht wählen darf — `None` heißt „freie Wahl".
+
+    Seit 0.41 übernehmen Schüler:innen nichts mehr (`pruefe` lehnt vorher ab); die Regel
+    bleibt als zweite Sicherung, falls die Übernahme für sie je wiederkommt.
 
     Ein Schüler-Baustein ist `private`/`private`, ohne Ausnahme und ohne Formularfeld.
     Die Alternative wäre ein Auswahlfeld, das eine Sichtbarkeit anbietet, die es nicht
@@ -137,6 +141,11 @@ def inhalt_aus_artefakt(artifact: Artifact) -> str:
     return quelle
 
 
+def uebernehmbar_fuer(artifact: Artifact, roles: list[str]) -> bool:
+    """Bekommt diese Person am Produkt den Knopf „Als Baustein übernehmen“?"""
+    return ist_lehrkraft(roles) and ist_uebernehmbar(artifact)
+
+
 def ist_uebernehmbar(artifact: Artifact) -> bool:
     """Taugt dieses Artefakt überhaupt als Baustein?
 
@@ -147,8 +156,10 @@ def ist_uebernehmbar(artifact: Artifact) -> bool:
     return artifact.kind in UEBERNEHMBARE_KINDS and bool((artifact.source or "").strip())
 
 
-def ablehnungsgrund(artifact: Artifact) -> str | None:
+def ablehnungsgrund(artifact: Artifact, roles: list[str] | None = None) -> str | None:
     """Warum nicht — in einem Satz für die Oberfläche. ``None``, wenn es geht."""
+    if roles is not None and not ist_lehrkraft(roles):
+        return NUR_LEHRKRAEFTE
     if artifact.kind not in UEBERNEHMBARE_KINDS:
         return (
             "Aus dieser Art Produkt lässt sich kein Baustein machen — übernehmbar sind "
@@ -166,6 +177,8 @@ def pruefe(artifact: Artifact, content_type: str, roles: list[str]) -> None:
             f"Aus einem Produkt der Art „{artifact.kind}“ lässt sich kein Baustein "
             "machen — übernehmbar sind Dokumente und Mermaid-Diagramme."
         )
+    if not ist_lehrkraft(roles):
+        raise UebernahmeFehler(NUR_LEHRKRAEFTE)
     erlaubt = angebotene_typen(roles)
     if not erlaubt:
         raise UebernahmeFehler(

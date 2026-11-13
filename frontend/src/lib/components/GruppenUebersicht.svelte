@@ -399,9 +399,11 @@
         Zuletzt entstanden
       </h2>
       <div class="flex items-center gap-3 text-sm">
-        <a href="/knowledge/mine" class="text-light-bl dark:text-dark-bl hover:underline">
-          meine Bausteine →
-        </a>
+        {#if istLehrkraft}
+          <a href="/knowledge/mine" class="text-light-bl dark:text-dark-bl hover:underline">
+            meine Bausteine →
+          </a>
+        {/if}
         <a
           href="/workshop?subject_id={subject?.id}"
           class="text-light-bl dark:text-dark-bl hover:underline"

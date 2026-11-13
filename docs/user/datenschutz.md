@@ -99,13 +99,18 @@ und wird nur in diesen geregelten Verfahren — und außerhalb der Software — 
 |-----|---------|
 | Einzelne Konversation | 3 Monate nach der letzten Nachricht |
 | Gesamter Account | 3 Monate nach dem letzten Login |
-| Eigene Bausteine, die nur du siehst | mit dem Account |
-| Eigene Bausteine, die du geteilt hast | bleiben — ohne deinen Namen |
-| Deine Werkstatt (Bilder, Diagramme, Dokumente) | mit dem Account |
+| Eigene Bausteine, die nur du siehst *(Lehrkräfte)* | mit dem Account |
+| Eigene Bausteine, die du geteilt hast *(Lehrkräfte)* | bleiben — ohne deinen Namen |
+| Deine Werkstatt (Bilder, Diagramme, Dokumente) | nach der Aufbewahrungsfrist oder mit dem Account |
 | Gruppenmitgliedschaften, Lernstand, eigene Einstellungen | mit dem Account |
 | Rückmeldungen (Feedback) | 180 Tage nach dem Abschluss; offene bleiben stehen |
 
 Die Löschung erfolgt automatisch. Es gibt keine manuelle Wiederherstellung gelöschter Daten.
+
+**Was du aus dem Chat behältst, liegt in deiner [Werkstatt](werkstatt.md)** — nur du siehst
+es, auch keine Lehrkraft. Löschen kannst du jedes Produkt dort selbst. Sonst verschwindet es
+nach der Aufbewahrungsfrist (sie beginnt bei jedem Bearbeiten neu) oder mit deinem Account.
+Schüler:innen legen keine Bausteine in der Bibliothek an; das tun nur Lehrkräfte.
 
 Was du mit einer Klasse, einer Fachschaft oder der Schule geteilt hast, wird beim
 Löschen deines Accounts **nicht** mitgelöscht — sonst fehlte es plötzlich in den

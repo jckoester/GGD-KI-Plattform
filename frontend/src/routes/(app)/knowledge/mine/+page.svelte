@@ -1,5 +1,6 @@
 <script>
     import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
     import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
   /**
    * „Meine Bausteine" — der eigene Bestand, nach Fach gruppiert (AP7 Schritt 2).
@@ -228,12 +229,24 @@
 <svelte:head><title>Meine Bausteine</title></svelte:head>
 
 <PageBody>
-  <UebergangsHinweis
-    neuigkeitId={WERKSTATT_NEUIGKEIT}
-    message="Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente liegen jetzt in der Werkstatt."
-    href="/workshop"
-    linkLabel="Zur Werkstatt"
-  />
+  {#if istLehrkraft}
+    <UebergangsHinweis
+      neuigkeitId={WERKSTATT_NEUIGKEIT}
+      message="Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente liegen jetzt in der Werkstatt."
+      href="/workshop"
+      linkLabel="Zur Werkstatt"
+    />
+  {:else}
+    <!-- Seit 0.41 (Päckchen AN, Schritt 9) bleibt Schüler-Arbeit ein Produkt in der
+         Werkstatt; die Seite ist für Schüler:innen nicht mehr verlinkt. Wer über ein
+         Lesezeichen kommt, erfährt, wo es hingegangen ist — und sieht darunter, was
+         die Überführung noch nicht erfasst hat. -->
+    <InfoBanner
+      message="Was du aus dem Chat behalten willst, speicherst du jetzt in deiner Werkstatt. Deine bisherigen Bausteine findest du dort als Dokumente."
+      href="/workshop"
+      linkLabel="Zur Werkstatt"
+    />
+  {/if}
   <h1 class="text-2xl font-semibold text-light-tx dark:text-dark-tx">Meine Bausteine</h1>
 
   <!-- Kopfzeile je Rolle. Für Schüler:innen in einfacher Sprache und mit der
@@ -265,8 +278,7 @@
           Bausteine entstehen beim Anlegen in der Bibliothek, in einer Sammlung
           oder aus dem Unterrichtsplaner.
         {:else}
-          Wenn du im Chat etwas erarbeitest, kannst du es dort als Baustein
-          speichern — danach findest du es hier wieder.
+          Deine Arbeiten liegen in der <a href="/workshop" class="text-light-bl dark:text-dark-bl hover:underline">Werkstatt</a>.
         {/if}
       </p>
     </div>

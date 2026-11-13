@@ -453,10 +453,12 @@ categories:
         # Vereinfachte Texte sollen je Thema wiedergefunden werden.
         embedding: true
       # ── Schüler-Artefakte ────────────────────────────────────────────────
-      # Entstehen durch Übernahme aus der Bibliothek, mit Bestätigung — seit AP8
-      # Schritt 1 gibt es diesen Weg (`POST /artifacts/{id}/baustein`), deshalb
-      # ruhen sie nicht mehr. `feedback_text` ruht weiter: Den Feedback-Flow, der
-      # solche Knoten erzeugte, gibt es nicht.
+      # Entstanden durch Übernahme aus der Werkstatt (AP8 Schritt 1). Seit 0.41
+      # (Päckchen AN, harter Wechsel) bleibt Schüler-Arbeit ein Produkt in der
+      # Werkstatt; `lernplan`, `schuelertext` und `schuelerpraesentation` ruhen
+      # wieder, der Bestand wird mit `schueler_bausteine_ueberfuehren.py` überführt.
+      # `strukturierung` bleibt aktiv — rollenoffen, für Lehrkräfte. `feedback_text`
+      # ruht weiter: Den Feedback-Flow, der solche Knoten erzeugte, gibt es nicht.
       # Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei Stunde und
       # Einheit; die früheren 42 Tage waren ein verallgemeinertes Beispiel aus
       # ADR-013 und nie begründet (Todo: Defaults prüfen).
@@ -465,16 +467,19 @@ categories:
         icon: ListChecks
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
+        ui_status: ruhend
       - key: schuelertext
         label_de: "Schülertext"
         icon: NotebookPen
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
+        ui_status: ruhend
       - key: schuelerpraesentation
         label_de: "Schülerpräsentation"
         icon: Album
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
+        ui_status: ruhend
         # Kein Embedding: fremdes Eigentum ohne Suchnutzen (Ausschlussgrund 3).
         # Was eine Schüler:in für sich ablegt, gehört nicht in den Suchraum anderer.
       - key: strukturierung

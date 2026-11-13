@@ -62,6 +62,7 @@ BEZEICHNUNG: dict[str, str] = {
     "conversations_cleaned": "Chats gelöscht (Löschlauf)",
     "node_lifecycle_run": "Lebenszyklus der Bibliothek",
     "audit_log_cleaned": "Audit-Log aufgeräumt",
+    "schueler_bausteine_ueberfuehrt": "Schüler-Bausteine in die Werkstatt überführt",
 }
 
 MAX_PRO_SEITE = 200

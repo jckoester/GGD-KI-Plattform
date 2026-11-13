@@ -77,6 +77,27 @@ docker compose exec cron python scripts/cleanup_artifacts.py             # tats�
 Parallel läuft `cleanup_generated_images.py` (Backstop für generierte Bilder auf demselben
 Volume).
 
+## Schüler-Bausteine überführen (einmalig, 0.41)
+
+Seit 0.41 legen Schüler:innen keine Bausteine mehr an; was sie aus dem Chat behalten, bleibt
+ein Produkt in ihrer Werkstatt. Den Bestand (Bausteinarten `schuelertext`, `lernplan`,
+`schuelerpraesentation`) räumt nach dem Update ein Skript einmal um:
+
+```bash
+docker compose exec backend python scripts/schueler_bausteine_ueberfuehren.py --dry-run
+docker compose exec backend python scripts/schueler_bausteine_ueberfuehren.py
+```
+
+Je Baustein: Gibt es das Produkt, aus dem er übernommen wurde, noch, bekommt es Fach (und
+einen Titel, falls es nur „Dokument" heißt), dann wird der Baustein gelöscht. Sonst legt das
+Skript aus dem Inhalt ein Dokument an und löscht danach. Stehen bleiben Bausteine ohne
+Inhalt, solche, auf die fremde aktive Bausteine verweisen, und solche, für die die Quota der
+Schüler:in nicht reicht — das Protokoll nennt sie mit Kennung (ohne Titel). Gliederungen und
+Mindmaps (`strukturierung`) von Personen ohne Lehrkraft-Rolle werden nur gelistet; sollen
+sie ebenfalls überführt werden, mit `--mit-strukturierung` erneut aufrufen. Der echte Lauf
+schreibt das Ereignis „Schüler-Bausteine in die Werkstatt überführt" mit den Zahlen ins
+Audit-Log. Ein zweiter Lauf findet nur noch, was stehen blieb.
+
 ## Datenschutz
 
 Artefakte sind **pseudonym** (`owner_pseudonym`) und werden nur an die Eigentümer:in

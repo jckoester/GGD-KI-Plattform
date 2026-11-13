@@ -157,7 +157,7 @@
         refreshConversations(limit);
         refreshConversationCounts();
         refreshPotentialTeachingGroups();
-        refreshAufmerksamkeit();
+        if (istLehrkraft) refreshAufmerksamkeit();
     });
 
     // Fächer-Container offen wenn ein Fach oder der Container selbst aktiv ist
@@ -326,10 +326,10 @@
                  Suchknopf im Chat ohnehin erreichen.
 
                  Seit AP7 ist die Sektion **für alle Rollen** aufklappbar. Schüler:innen
-                 sehen darin Suche und „Meine Bausteine" — neben der Suche ihre einzige
-                 Wissensgraph-Fläche (Notiz-Knotentyp-UI A4). Die übrigen Unterpunkte
-                 (Alle Bausteine, Sammlungen, Curricula, Bildungspläne,
-                 Leitperspektiven) bleiben Lehrkraft-Sache. -->
+                 sehen darin seit 0.41 nur die Suche — ihre eigene Arbeit liegt in der
+                 Werkstatt („Meine Bausteine“ entfällt für sie, Päckchen AN Schritt 9). Die
+                 übrigen Unterpunkte (Meine und Alle Bausteine, Sammlungen, Curricula,
+                 Bildungspläne, Leitperspektiven) bleiben Lehrkraft-Sache. -->
               <div class="mt-2">
                 <div
                     class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
@@ -351,7 +351,7 @@
                 </div>
                 {#if openSection === 'knowledge'}
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
-                        <!-- Für alle Rollen: Suche und der eigene Bestand. -->
+                        <!-- Für alle Rollen: die Suche. „Meine Bausteine“ nur für Lehrkräfte (0.41). -->
                         <button
                             onclick={() => goto('/knowledge/search')}
                             class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -364,6 +364,7 @@
                                 Suche
                             </span>
                         </button>
+                        {#if istLehrkraft}
                         <button
                             onclick={() => goto('/knowledge/mine')}
                             class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -383,6 +384,7 @@
                                 {/if}
                             </span>
                         </button>
+                        {/if}
 
                         <!-- Ab hier Lehrkraft-Sache. Bewusst im selben Aufklapp-Container:
                              Zwei `transition:slide` nebeneinander liefen als zwei

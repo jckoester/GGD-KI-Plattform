@@ -249,11 +249,14 @@ class TestUiStatus:
         for ct in ("pruefungsanforderung", "feedback_text"):
             assert ist_ruhend(ct), f"{ct} sollte ruhen"
 
-    def test_schueler_artefakte_sind_seit_ap8_wach(self):
+    def test_schueler_artefakte_ruhen_seit_0_41(self):
+        """Wach seit AP8, seit 0.41 wieder ruhend: Schüler-Arbeit bleibt ein Produkt in der
+        Werkstatt (Päckchen AN). `strukturierung` ist rollenoffen und bleibt für Lehrkräfte."""
         from app.context.taxonomy import ist_ruhend
 
-        for ct in ("lernplan", "schuelertext", "schuelerpraesentation", "strukturierung"):
-            assert not ist_ruhend(ct), f"{ct} braucht seit AP8 keinen Ruhestand mehr"
+        for ct in ("lernplan", "schuelertext", "schuelerpraesentation"):
+            assert ist_ruhend(ct), f"{ct} ruht seit 0.41"
+        assert not ist_ruhend("strukturierung")
 
     def test_tragende_typen_ruhen_nicht(self):
         from app.context.taxonomy import ist_ruhend

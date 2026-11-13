@@ -42,7 +42,7 @@ sie erklärt werden, mit einer Beschreibung darunter. Diese Beschreibung ist kei
 Beiwerk: Sie ist das, was du hörst, wenn du einen Screenreader benutzt, und das, was
 ein Assistent über das Bild weiß. Er sieht die Zeichnung nicht.
 
-Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
+Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)). Schüler:innen speichern ihre Chat-Ergebnisse in ihrer [Werkstatt](werkstatt.md); in der Bibliothek suchen sie.
 
 ## Wozu ist das nützlich?
 
@@ -101,6 +101,8 @@ Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden
 
 ## Meine Bausteine
 
+*(für Lehrkräfte)*
+
 Unter **Bibliothek → Meine Bausteine** steht alles, was unter deinem Konto
 gespeichert ist — über alle Fächer und Entstehungswege hinweg. Die Seite ist für vier
 Dinge da:
@@ -133,11 +135,12 @@ nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
 > zum Bearbeiten sucht, ist über Fachseite, Sammlung oder Planer schneller: Die
 > filtern bereits vor.
 
-**Für Schüler:innen** ist es die einzige Stelle neben der Suche, an der sie die
-Bibliothek sehen. Dort stehen nur ihre eigenen Bausteine — niemand sonst kann sie
-lesen.
+**Schüler:innen** sehen diesen Eintrag nicht: Ihre Arbeiten liegen in der
+[Werkstatt](werkstatt.md).
 
 ## Aus einem Chat-Ergebnis einen Baustein machen
+
+*(für Lehrkräfte)*
 
 Was im Chat entsteht, ist zunächst flüchtig: Nach drei Monaten ohne neue Nachricht wird
 das Gespräch gelöscht. Ein gelungenes Arbeitsblatt, eine Mindmap, eine Zusammenfassung —
@@ -157,9 +160,8 @@ Im Formular legst du fest:
 | **Sichtbarkeit** | Wer lesen und wer ändern darf. |
 | **Ablauf und Schuljahr** | Aufklappbar. Ohne Angabe gilt bei den meisten Arten das Ende des laufenden Schuljahres. |
 
-**Für Schüler:innen ist die Sichtbarkeit nicht wählbar:** Deren Bausteine sind immer
-privat — niemand sonst kann sie sehen, auch keine Lehrkraft. Statt eines Auswahlfelds
-steht dort ein Satz, der das sagt.
+Schüler:innen bekommen den Knopf nicht: Was sie behalten wollen, bleibt ein Produkt in
+ihrer [Werkstatt](werkstatt.md).
 
 **Das Ergebnis steht danach in [Meine Bausteine](#meine-bausteine)** und ist über die
 Suche auffindbar. In der Werkstatt trägt der Eintrag ein Kennzeichen

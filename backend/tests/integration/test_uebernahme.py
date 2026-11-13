@@ -4,6 +4,7 @@ Was hier steht und nicht in den Unit-Tests: alles, was Zeilen braucht — die
 Eigentümerprüfung, die Fassungskette mit `supersedes`, der erzwungene Scope bei
 Schüler:innen und die Idempotenz beim zweiten identischen Übernehmen.
 """
+import time
 import uuid
 
 import pytest
@@ -11,6 +12,7 @@ import pytest_asyncio
 import sqlalchemy as sa
 
 from app.artifacts import store
+from app.auth.vorschau import Vorschau
 from app.db.models import ContextEdge, ContextNode
 from tests.integration.conftest import TEACHER1_PSEUDO, TEACHER2_PSEUDO
 
@@ -289,7 +291,8 @@ class TestUebernahme:
 
 
 class TestSchuelerUebernahme:
-    """Der eigentliche Zweck von AP8: Schüler:innen bekommen ihre vier Bausteinarten."""
+    """Seit 0.41 (harter Wechsel): Schüler:innen übernehmen nichts — ihre Arbeit bleibt
+    ein Produkt in der Werkstatt. Bis dahin bekamen sie vier eigene Bausteinarten."""
 
     @pytest_asyncio.fixture
     async def schueler_dokument(self, test_client, schueler_headers):
@@ -301,7 +304,7 @@ class TestSchuelerUebernahme:
         assert resp.status_code == 200, resp.text
         return resp.json()
 
-    async def test_vorschlag_nennt_nur_die_vier_arten(
+    async def test_vorschlag_bietet_nichts_an(
         self, test_client, schueler_headers, schueler_dokument
     ):
         resp = await test_client.get(
@@ -309,43 +312,59 @@ class TestSchuelerUebernahme:
         )
         assert resp.status_code == 200
         daten = resp.json()
-        assert set(daten["typen"]) == {
-            "schuelertext", "lernplan", "schuelerpraesentation", "strukturierung",
-        }
-        assert daten["scopes_erzwungen"] == ["private", "private"]
+        assert daten["typen"] == []
+        assert daten["uebernehmbar"] is False
+        assert "nur Lehrkräfte" in daten["grund"]
 
-    async def test_scope_wird_erzwungen_und_nicht_geglaubt(
-        self, test_client, schueler_headers, db_session, schueler_dokument
-    ):
-        """Der Client darf `school` schicken — der Server macht trotzdem `private`.
-
-        Das ist der Unterschied zwischen einem Formular ohne Feld und einer Zusage:
-        Nur die serverseitige Klammer hält auch dann, wenn jemand am Formular vorbeigeht.
-        """
-        resp = await test_client.post(
-            f"/artifacts/{schueler_dokument['id']}/baustein",
-            json={
-                "content_type": "lernplan",
-                "read_scope": "school",
-                "write_scope": "school",
-            },
-            headers=schueler_headers,
-        )
-        assert resp.status_code == 201, resp.text
-        node = await db_session.get(ContextNode, uuid.UUID(resp.json()["node_id"]))
-        assert (node.read_scope, node.write_scope) == ("private", "private")
-        assert node.owner_pseudonym == SCHUELER_PSEUDO
-        await _aufraeumen(db_session, [node.id])
-
-    async def test_lehrkraft_arten_bleiben_verschlossen(
+    async def test_liste_und_ansicht_zeigen_keinen_knopf(
         self, test_client, schueler_headers, schueler_dokument
     ):
+        liste = await test_client.get("/artifacts", headers=schueler_headers)
+        karte = next(i for i in liste.json()["items"] if i["id"] == schueler_dokument["id"])
+        assert karte["uebernehmbar"] is False
+        info = await test_client.get(
+            f"/artifacts/{schueler_dokument['id']}/info", headers=schueler_headers
+        )
+        assert info.json()["uebernehmbar"] is False
+
+    @pytest.mark.parametrize("art", ["lernplan", "schuelertext", "strukturierung", "klausur"])
+    async def test_uebernahme_wird_abgewiesen(
+        self, test_client, schueler_headers, db_session, schueler_dokument, art
+    ):
         resp = await test_client.post(
             f"/artifacts/{schueler_dokument['id']}/baustein",
-            json={"content_type": "klausur"},
+            json={"content_type": art},
             headers=schueler_headers,
         )
         assert resp.status_code == 422
+        assert "nur Lehrkräfte" in resp.json()["detail"]
+        angelegt = await db_session.execute(
+            sa.select(sa.func.count()).select_from(ContextNode).where(
+                ContextNode.owner_pseudonym == SCHUELER_PSEUDO
+            )
+        )
+        assert angelegt.scalar_one() == 0
+
+    async def test_lehrkraft_in_der_vorschau_sieht_keinen_knopf(
+        self, test_client, auth_headers, jwt_service, dokument
+    ):
+        """In der Vorschau ist die Lehrkraft Schüler:in — die Werkstatt zeigt, was diese sieht."""
+        jetzt = int(time.time())
+        token, _ = jwt_service.issue(
+            pseudonym=TEACHER1_PSEUDO, roles=["student"], grade="8",
+            preview=Vorschau(echte_rollen=["teacher"], beginn=jetzt, sitzung_ablauf=jetzt + 3600),
+            exp=jetzt + 3600,
+        )
+        vorschau = {"Cookie": f"session={token}"}
+        normal = await test_client.get("/artifacts", headers=auth_headers)
+        in_vorschau = await test_client.get("/artifacts", headers=vorschau)
+        assert in_vorschau.status_code == 200, in_vorschau.text
+
+        def knopf(antwort):
+            return next(i for i in antwort.json()["items"] if i["id"] == dokument["id"])["uebernehmbar"]
+
+        assert knopf(normal) is True
+        assert knopf(in_vorschau) is False
 
 
 class TestMermaid:

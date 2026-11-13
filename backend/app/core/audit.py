@@ -79,6 +79,7 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "conversations_cleaned",
         "node_lifecycle_run",
         "audit_log_cleaned",
+        "schueler_bausteine_ueberfuehrt",
     }),
 }
 

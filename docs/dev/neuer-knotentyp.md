@@ -109,7 +109,7 @@ ohne Ort.
 | **K3** Kuratierte Sammlungen | `methode`, `begriff`, `stoffsteckbrief`, `operatorenblatt` | Sammlung, Upload, Seed | wer den `write_scope` hat — meist die Fachschaft | Sammlung (Schritt 9) |
 | **K4** Lehrkraft-Material | `arbeitsblatt`, `quelltext`, `klausur` | Upload, Übernahme aus der Bibliothek | Eigentümerin | „Meine Bausteine", „Alle Bausteine" |
 | **K5** Lehrkraft-Planung | `jahresplan`, `unterrichtseinheit`, `unterrichtsstunde` | Unterrichtsplanung | Eigentümerin | Planner, dazu „Meine Bausteine" |
-| **K6** Schüler-Artefakte | `schuelertext`, `strukturierung`, `lernplan` | Übernahme aus dem Chat | Schüler:in (umbenennen, löschen — kein Editor) | „Meine Bausteine" |
+| **K6** Schüler-Artefakte | `schuelertext`, `lernplan`, `schuelerpraesentation` — **ruhend seit 0.41** (Schüler-Arbeit bleibt ein Produkt in der Werkstatt; Bestand: `scripts/schueler_bausteine_ueberfuehren.py`); `strukturierung` bleibt für Lehrkräfte | — | — | — |
 
 **Was aus der Klasse folgt** — sie nimmt spätere Antworten vorweg:
 

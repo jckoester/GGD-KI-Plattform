@@ -99,6 +99,9 @@ export const PLANUNG_CONTENT_TYPES = [
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
 export const RUHENDE_CONTENT_TYPES = new Set([
   "pruefungsanforderung",
+  "lernplan",
+  "schuelertext",
+  "schuelerpraesentation",
   "feedback_text"
 ])
 

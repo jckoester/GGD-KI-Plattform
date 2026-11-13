@@ -367,7 +367,7 @@ async def list_library(
             subject_id=r.subject_id, topic=r.topic, updated_at=r.updated_at,
             assistant_name=r.assistant_name,
             exporte=exporte_je_dokument.get(r.id, []),
-            uebernehmbar=uebernahme.ist_uebernehmbar(r),
+            uebernehmbar=uebernahme.uebernehmbar_fuer(r, current_user.roles),
             baustein_id=baustein.id if baustein else None,
             baustein_titel=baustein.title if baustein else None,
         )
@@ -677,7 +677,7 @@ async def produkt_info(
         source=r.source, created_at=r.created_at, expires_at=r.expires_at,
         provider_model=r.provider_model, subject_id=r.subject_id, topic=r.topic,
         updated_at=r.updated_at, assistant_name=r.assistant_name, exporte=exporte,
-        uebernehmbar=uebernahme.ist_uebernehmbar(r),
+        uebernehmbar=uebernahme.uebernehmbar_fuer(r, current_user.roles),
         baustein_id=baustein.id if baustein else None,
         baustein_titel=baustein.title if baustein else None,
         origin_conversation_id=r.origin_conversation_id if chat_vorhanden else None,
@@ -734,8 +734,8 @@ async def baustein_vorschlag(
     )
     return BausteinVorschlag(
         kind=record.kind,
-        uebernehmbar=uebernahme.ist_uebernehmbar(record),
-        grund=uebernahme.ablehnungsgrund(record),
+        uebernehmbar=uebernahme.uebernehmbar_fuer(record, current_user.roles),
+        grund=uebernahme.ablehnungsgrund(record, current_user.roles),
         typen=typen,
         # Beim zweiten Mal die Art des vorhandenen Bausteins, sonst die erste der Liste:
         # Wer aktualisiert, will fast nie die Art wechseln.

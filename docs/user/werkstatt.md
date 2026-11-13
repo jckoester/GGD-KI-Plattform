@@ -39,7 +39,7 @@ Zu jedem Eintrag gibt es:
   Bildern ist das die Bildbeschreibung, mit der das Bild erzeugt wurde.
 - **GeoGebra** — bei Funktionsgraphen eine `.ggb`-Datei, die du in GeoGebra öffnen und dort
   weiterbearbeiten kannst (Funktionen, Punkte, Wertebereich werden übernommen).
-- **Als Baustein** — bei Dokumenten und Flussdiagrammen: übernimmt den Inhalt in die
+- **Als Baustein** *(Lehrkräfte)* — bei Dokumenten und Flussdiagrammen: übernimmt den Inhalt in die
   [Bibliothek](bibliothek.md#aus-einem-chat-ergebnis-einen-baustein-machen), damit er
   über die Suche wiederauffindbar ist und im Unterricht als Material verwendet werden
   kann. Ist das geschehen, trägt die Karte das Kennzeichen
@@ -57,7 +57,7 @@ Zwei Wege:
   Werkstatt öffnet sich. (Rahmensätze wie „Hier ist dein Arbeitsblatt:" kannst du im Editor löschen.)
 - **Leer:** In der Werkstatt oben rechts auf **„Neues Dokument"**.
 
-> **Der Knopf daneben heißt „Als Baustein speichern" und macht etwas anderes.** Die
+> **Der Knopf daneben heißt „Als Baustein speichern" (nur für Lehrkräfte) und macht etwas anderes.** Die
 > Werkstatt ist zum Weiterschreiben da, ein Baustein zum Wiederfinden: Er bekommt eine
 > Bausteinart, eine Sichtbarkeit und einen Platz in der
 > [Bibliothek](bibliothek.md#aus-einem-chat-ergebnis-einen-baustein-machen). Beides

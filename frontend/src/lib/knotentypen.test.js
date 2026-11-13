@@ -109,17 +109,14 @@ describe("auswaehlbareTypOptionen", () => {
 })
 
 describe("Taxonomie-Zusicherungen", () => {
-  it("die Schüler-Artefakte sind seit AP8 wach", () => {
-    // Sie ruhten, solange es keinen Weg gab, so einen Knoten anzulegen. Den gibt es
-    // seit der Übernahme aus der Bibliothek (`POST /artifacts/{id}/baustein`).
-    for (const typ of [
-      "lernplan",
-      "schuelertext",
-      "schuelerpraesentation",
-      "strukturierung",
-    ]) {
-      expect(RUHENDE_CONTENT_TYPES.has(typ)).toBe(false)
+  it("die Schüler-Artefakte ruhen seit 0.41, strukturierung bleibt wach", () => {
+    // Wach seit AP8 (Übernahme aus der Werkstatt); seit 0.41 bleibt Schüler-Arbeit ein
+    // Produkt in der Werkstatt (Päckchen AN, harter Wechsel). `strukturierung` ist
+    // rollenoffen und bleibt für Lehrkräfte.
+    for (const typ of ["lernplan", "schuelertext", "schuelerpraesentation"]) {
+      expect(RUHENDE_CONTENT_TYPES.has(typ)).toBe(true)
     }
+    expect(RUHENDE_CONTENT_TYPES.has("strukturierung")).toBe(false)
   })
 
   it("Feedback-Text ruht weiter — den Flow, der ihn erzeugte, gibt es nicht", () => {

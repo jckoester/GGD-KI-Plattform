@@ -101,6 +101,12 @@
     // für Schüler:innen wäre sie nur Rauschen — sie wählen ohnehin nichts aus.
     let zeigeBildart = $derived(!!$user?.roles?.includes('teacher'));
 
+    // „Als Baustein speichern“ nur für Lehrkräfte (0.41, Schritt 9): Schüler-Arbeit bleibt
+    // ein Produkt in der Werkstatt. In der Vorschau sind die Rollen simuliert — passt.
+    let darfUebernehmen = $derived(
+        !!($user?.roles?.includes('teacher') || $user?.roles?.includes('admin')),
+    );
+
     // ── Herkunft (Modell-Transparenz) ────────────────────────────────────────
     // Standardmäßig verborgen, per Klick einblendbar: Zum Arbeiten braucht die Angabe
     // niemand, für eine Quellenangabe in GFS oder Facharbeit ist sie nötig — und dann
@@ -503,7 +509,7 @@
                         speichern={textSpeichern}
                         bearbeiten={openInWorkshop}
                         herunterladen={textHerunterladen}
-                        alsBaustein={alsBausteinSpeichern}
+                        alsBaustein={darfUebernehmen ? alsBausteinSpeichern : null}
                         hinweis={textHinweis}
                     />
                 </div>

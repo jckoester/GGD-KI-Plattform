@@ -42,10 +42,26 @@ class TestAngeboteneTypen:
             angeboten = set(uebernahme.angebotene_typen(rolle))
             assert not (angeboten & RUHENDE_CONTENT_TYPES)
 
-    def test_schueler_bekommen_keine_lehrkraft_arten(self):
-        angeboten = set(uebernahme.angebotene_typen(SCHUELER))
-        assert "arbeitsblatt" not in angeboten
-        assert "klausur" not in angeboten
+    def test_schueler_bekommen_keine_arten(self):
+        """0.41, harter Wechsel: Schüler-Arbeit bleibt ein Produkt in der Werkstatt."""
+        assert uebernahme.angebotene_typen(SCHUELER) == ()
+
+    def test_schueler_arten_ruhen_strukturierung_nicht(self):
+        assert {"schuelertext", "lernplan", "schuelerpraesentation"} <= RUHENDE_CONTENT_TYPES
+        assert "strukturierung" not in RUHENDE_CONTENT_TYPES
+        assert "strukturierung" in uebernahme.angebotene_typen(LEHRKRAFT)
+
+    def test_knopf_nur_fuer_lehrkraefte(self):
+        dokument = _artefakt()
+        assert uebernahme.uebernehmbar_fuer(dokument, LEHRKRAFT)
+        assert uebernahme.uebernehmbar_fuer(dokument, ADMIN)
+        assert not uebernahme.uebernehmbar_fuer(dokument, SCHUELER)
+        assert uebernahme.ablehnungsgrund(dokument, SCHUELER) == uebernahme.NUR_LEHRKRAEFTE
+        assert uebernahme.ablehnungsgrund(dokument, LEHRKRAFT) is None
+
+    def test_pruefe_lehnt_schueler_mit_lesbarem_grund_ab(self):
+        with pytest.raises(uebernahme.UebernahmeFehler, match="nur Lehrkräfte"):
+            uebernahme.pruefe(_artefakt(), "strukturierung", SCHUELER)
 
     def test_listen_decken_die_taxonomie_ab(self):
         """Wächter: Ein neuer Dokument-/Artefakt-Typ zwingt zur Entscheidung.
@@ -59,17 +75,16 @@ class TestAngeboteneTypen:
         }
         eingeordnet = (
             set(uebernahme.LEHRKRAFT_TYPEN)
-            | set(uebernahme.SCHUELER_TYPEN)
             | set(uebernahme.NICHT_UEBERNEHMBAR)
         )
         assert alle - eingeordnet == set(), (
-            "Bausteinart weder in LEHRKRAFT_TYPEN/SCHUELER_TYPEN noch in "
+            "Bausteinart weder in LEHRKRAFT_TYPEN noch in "
             "NICHT_UEBERNEHMBAR — Entscheidung fehlt (app/artifacts/uebernahme.py)"
         )
         assert eingeordnet - alle == set(), "Unbekannte Bausteinart in den Listen"
 
     def test_uebernehmbar_und_abgelehnt_schliessen_sich_aus(self):
-        anbietbar = set(uebernahme.LEHRKRAFT_TYPEN) | set(uebernahme.SCHUELER_TYPEN)
+        anbietbar = set(uebernahme.LEHRKRAFT_TYPEN)
         assert not (anbietbar & set(uebernahme.NICHT_UEBERNEHMBAR))
 
     def test_jede_ablehnung_nennt_einen_grund(self):
@@ -121,5 +136,5 @@ class TestVorgabeScopes:
     def test_jede_angebotene_art_hat_eine_kategorie(self):
         """`uebernimm` schlägt die Kategorie über CONTENT_TYPE_TO_CATEGORY nach —
         ein fehlender Eintrag wäre dort ein KeyError mitten im Anlegen."""
-        for typ in uebernahme.LEHRKRAFT_TYPEN + uebernahme.SCHUELER_TYPEN:
+        for typ in uebernahme.LEHRKRAFT_TYPEN:
             assert typ in CONTENT_TYPE_TO_CATEGORY

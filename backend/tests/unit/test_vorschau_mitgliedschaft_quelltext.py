@@ -19,6 +19,7 @@ AUSNAHMEN = {
     "auth/group_sync.py": "Abgleich beim Login — keine Vorschau, schreibt echte Mitgliedschaften",
     "api/admin/groups.py": "Admin-Wege, verwalten fremde Mitgliedschaften",
     "crons/cleanup_service.py": "Kontolöschung, läuft ohne Anfrage",
+    "artifacts/schueler_wechsel.py": "einmaliger Überführungslauf (Skript), fragt nach anderen",
 }
 
 

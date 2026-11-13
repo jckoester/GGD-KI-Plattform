@@ -56,8 +56,13 @@ Mehr dazu: [Datenschutz](datenschutz.md)
 ## Wie lange bleiben meine Chats?
 
 **Drei Monate** nach der letzten Nachricht — danach werden sie automatisch gelöscht, und
-zwar endgültig. Was du behalten willst, kopierst du heraus (in ein Dokument, eine Notiz,
-dein Heft).
+zwar endgültig. Was du behalten willst, speicherst du in deiner **[Werkstatt](werkstatt.md)**:
+Unter jeder Antwort, an jedem Bild und jedem Diagramm steht **„Speichern"**. Dort liegt es
+unabhängig vom Chat, und nur du kannst es sehen. Einen Text kannst du dort weiterschreiben
+und als PDF oder Word herunterladen. Löschen kannst du es dort jederzeit selbst.
+
+> Bis zum Herbst 2026 hießen gespeicherte Arbeiten von Schüler:innen „Bausteine" und standen
+> unter „Meine Bausteine". Sie sind jetzt Dokumente in deiner Werkstatt.
 
 ## Darf ich das in einer GFS oder Facharbeit benutzen?
 

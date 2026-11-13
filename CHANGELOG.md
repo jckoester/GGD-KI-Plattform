@@ -29,6 +29,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Dokumente lassen sich als Kopie speichern. Die alte Editor-Adresse leitet um.
 - Diagramme im Chat lassen sich vergrößern, wenn sie nicht in die Breite passen.
 - Ein Klick auf das Vorschaubild einer Karte in der Werkstatt öffnet das Produkt.
+- Schüler:innen speichern ihre Arbeiten nur noch in der Werkstatt: „Als Baustein speichern“ und „Meine Bausteine“
+  gibt es nur für Lehrkräfte. Die Bausteinarten Schülertext, Lernplan und Schülerpräsentation ruhen; vorhandene
+  werden zu Dokumenten in der Werkstatt.
 
 ### Behoben
 
@@ -37,6 +40,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Nach dem Update
 
 - `alembic upgrade head` (0103).
+- `python scripts/schueler_bausteine_ueberfuehren.py --dry-run` (im Backend-Container), Protokoll ansehen, dann ohne
+  `--dry-run`.
 
 ## [0.40.0] – 2026-11-12
 
