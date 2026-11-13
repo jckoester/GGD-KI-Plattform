@@ -17,6 +17,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- „Meine Bausteine“ zeigt keine Jahrespläne, Einheiten und Stunden mehr; sie stehen unter „Planung“.
 - Stundenentwürfe bleiben nach dem Schuljahresende lesbar und exportierbar; ändern lassen sich nur Stunden aktueller
   Gruppen.
 

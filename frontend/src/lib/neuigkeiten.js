@@ -61,6 +61,12 @@ export async function alleSchliessen(liste, merken = neuigkeitGelesen) {
  */
 export const WERKSTATT_NEUIGKEIT = '0.41-werkstatt-reihe'
 
+/**
+ * Der Hinweis zur Planung (0.42, Päckchen AO): „Meine Bausteine“ zeigt keine Planung mehr. Er
+ * erscheint dort, solange die Neuigkeit sichtbar ist; `test_neuigkeiten.py` prüft die `id`.
+ */
+export const PLANUNG_NEUIGKEIT = '0.42-planung'
+
 /** Steht die Neuigkeit `id` in der Liste des Servers (also: sichtbar und nicht geschlossen)? */
 export function istOffen(liste, id) {
     return (liste ?? []).some((n) => n.id === id)

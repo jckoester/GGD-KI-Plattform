@@ -141,3 +141,15 @@ def test_uebergangshinweis_haengt_an_einer_neuigkeit():
     assert eintrag.eintrag == "workshop"
     assert eintrag.bis == date(2027, 1, 31)
     assert {"student", "teacher"} <= set(eintrag.rollen)
+
+
+def test_planungshinweis_haengt_an_einer_neuigkeit():
+    """0.42 (Päckchen AO, Schritt 6): „Meine Bausteine“ zeigt Lehrkräften den Hinweis auf den
+    Menüpunkt „Planung“, solange es diese Neuigkeit gibt (`PLANUNG_NEUIGKEIT`)."""
+    import re
+
+    js = (Path(__file__).resolve().parents[3] / "frontend/src/lib/neuigkeiten.js").read_text(encoding="utf-8")
+    kennung = re.search(r"PLANUNG_NEUIGKEIT = '([^']+)'", js).group(1)
+    eintrag = next(n for n in lade(DATEI) if n.id == kennung)
+    assert (eintrag.eintrag, eintrag.rollen) == ("planner", ["teacher"])
+    assert eintrag.bis is not None

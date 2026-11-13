@@ -1,7 +1,7 @@
 <script>
     import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
-    import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
+    import { PLANUNG_NEUIGKEIT, WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
   /**
    * „Meine Bausteine" — der eigene Bestand, nach Fach gruppiert (AP7 Schritt 2).
    *
@@ -235,6 +235,13 @@
       message="Die Bibliothek hieß bisher „Wissensgraph“. Deine gespeicherten Bilder, Diagramme und Dokumente liegen jetzt in der Werkstatt."
       href="/workshop"
       linkLabel="Zur Werkstatt"
+    />
+    <!-- 0.42 (Päckchen AO, Schritt 6): Planung hat ihren eigenen Ort. -->
+    <UebergangsHinweis
+      neuigkeitId={PLANUNG_NEUIGKEIT}
+      message="Jahrespläne, Einheiten und Stunden stehen hier nicht mehr. Du findest sie unter „Planung“ in der Seitenleiste: im Planer jeder Gruppe und im Archiv."
+      href="/planning/archive"
+      linkLabel="Zum Archiv"
     />
   {:else}
     <!-- Seit 0.41 (Päckchen AN, Schritt 9) bleibt Schüler-Arbeit ein Produkt in der

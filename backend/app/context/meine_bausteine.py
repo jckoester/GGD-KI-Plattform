@@ -30,7 +30,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.metadata import STUB_MARKIERUNG
-from app.context.taxonomy import PERSOENLICHE_CONTENT_TYPES
+from app.context.taxonomy import PERSOENLICHE_CONTENT_TYPES, PLANUNG_CONTENT_TYPES
 from app.db.models import ContextEdge, ContextNode, Subject
 
 #: Ab wann ein Ablaufdatum als „läuft bald ab" gilt (A4).
@@ -56,6 +56,12 @@ def _eigener_bestand(pseudonym: str):
 
     Was mit dem Pseudonym auf fremdbesessenen Dokumenten geschieht, ist eine andere
     Frage (Kontolöschung, M2) und wird nicht hier beantwortet.
+
+    **Ohne Planung (0.42, Päckchen AO, Schritt 6).** Jahrespläne, Einheiten und Stunden sind
+    persönlich gepflegt, haben aber ihren eigenen Ort: den Menüpunkt „Planung“ mit Planer und
+    Archiv. Hier verschwinden sie aus Liste, Typfilter und Aufmerksamkeitszähler — sonst meldete
+    der Zähler zum Schuljahresende jede Stunde als „läuft bald ab“. Bleibt: Wo Material in einer
+    Einheit oder Stunde steckt, zeigt „Eingesetzt in“ (`lade_einsatzorte`) weiter.
     """
     from app.auth.vorschau import eigenes_zaehlt
 
@@ -64,6 +70,7 @@ def _eigener_bestand(pseudonym: str):
         sa.literal(eigenes_zaehlt(pseudonym)),
         ContextNode.owner_pseudonym == pseudonym,
         ContextNode.content_type.in_(PERSOENLICHE_CONTENT_TYPES),
+        ContextNode.content_type.not_in(PLANUNG_CONTENT_TYPES),
     )
 
 

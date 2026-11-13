@@ -403,13 +403,14 @@ def einsatz(sync_conn, faecher):
         stunde = _node(cur, "Stunde 3: Kürzen", owner=TEACHER,
                        content_type="unterrichtsstunde")
         blatt = _node(cur, "Übungsblatt Kürzen", owner=TEACHER)
+        frei = _node(cur, "Blatt ohne Einsatz", owner=TEACHER)
         cur.execute(
             "INSERT INTO context_edges (from_node_id, to_node_id, relation, metadata)"
             " VALUES (%s,%s,'used_with',%s), (%s,%s,'part_of','{}')",
             (str(stunde), str(blatt), json.dumps({"via": "material"}),
              str(stunde), str(einheit)),
         )
-        ids = {"einheit": einheit, "stunde": stunde, "blatt": blatt}
+        ids = {"einheit": einheit, "stunde": stunde, "blatt": blatt, "frei": frei}
     sync_conn.commit()
     yield ids
     sync_conn.rollback()
@@ -436,11 +437,29 @@ async def test_material_zeigt_die_stunde_die_es_benutzt(
 
 
 @pytest.mark.asyncio
-async def test_stunde_zeigt_ihre_einheit(test_client, lehrer_headers, einsatz):
-    """Die andere Kantenrichtung — hier ist das Gefäß der Einsatzort."""
+async def test_planung_steht_nicht_in_meinen_bausteinen(
+    test_client, lehrer_headers, sync_conn, einsatz
+):
+    """0.42 (Päckchen AO, Schritt 6): Einheit und Stunde haben ihren Ort unter „Planung“.
+
+    Sie fehlen in Liste, Typfilter und Zähler — „Eingesetzt in“ am Material bleibt (oben).
+    Damit sie im Zähler auffielen, laufen beide bald ab.
+    """
+    with sync_conn.cursor() as cur:
+        cur.execute("UPDATE context_nodes SET valid_until = CURRENT_DATE + 3 WHERE id = ANY(%s::uuid[])",
+                    ([str(einsatz["einheit"]), str(einsatz["stunde"])],))
+    sync_conn.commit()
+
     daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
-    stunde = _nach_titel(daten)["Stunde 3: Kürzen"]
-    assert [o["titel"] for o in stunde["eingesetzt_in"]] == ["Einheit Bruchrechnung"]
+    gefiltert = (await test_client.get("/context/nodes/mine?content_type=unterrichtsstunde",
+                                       headers=lehrer_headers)).json()
+    zaehler = (await test_client.get("/context/nodes/mine/zaehlung", headers=lehrer_headers)).json()
+
+    titel = set(_nach_titel(daten))
+    assert "Übungsblatt Kürzen" in titel
+    assert not {"Einheit Bruchrechnung", "Stunde 3: Kürzen"} & titel
+    assert gefiltert["abschnitte"] == []
+    assert zaehler["laeuft_bald_ab"] == 0
 
 
 @pytest.mark.asyncio
@@ -448,7 +467,7 @@ async def test_ohne_einsatz_bleibt_die_liste_leer(test_client, lehrer_headers, e
     """Ein Baustein, den keine Einheit mehr nutzt, ist der natürliche
     Archiv-Kandidat (A4) — er trägt schlicht keine Chips."""
     daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
-    assert _nach_titel(daten)["Einheit Bruchrechnung"]["eingesetzt_in"] == []
+    assert _nach_titel(daten)["Blatt ohne Einsatz"]["eingesetzt_in"] == []
 
 
 @pytest.mark.asyncio
