@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Produkte in der Werkstatt tragen ein eigenes Fach; beim Speichern aus dem Chat wird es übernommen und bleibt, auch
+  wenn der Chat gelöscht ist. Ebenso der Name des Assistenten.
+
+### Behoben
+
+- Dokumente und Diagramme aus dem Chat merkten sich ihren Chat nicht; die Gruppenseite zeigte sie deshalb nie.
+
+### Nach dem Update
+
+- `alembic upgrade head` (0103).
+
 ## [0.40.0] – 2026-11-12
 
 Neue Namen und Orte: Werkstatt, Bibliothek, Werkzeuge in der Assistentenliste. Eine Migration (0102).

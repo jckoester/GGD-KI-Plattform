@@ -14,14 +14,15 @@
 Idempotenz, Eigentümer-Bindung und Quota liegen in `store.save_artifact` bzw. hier über den
 `origin_ref` (Herkunftsschlüssel). Eigentümer:in ist stets die eingeloggte Nutzer:in.
 """
+from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts import store
-from app.db.models import Conversation, Message
+from app.db.models import Assistant, Conversation, Group, Message
 from app.auth.jwt import JwtPayload
 from app.chat import image_store
 from app.render import service
@@ -32,30 +33,70 @@ class PromotionError(Exception):
     """Promotion nicht möglich (Quelle fehlt, Render-Fehler, unbekannter Typ)."""
 
 
-async def herkunft_der_nachricht(
-    db: AsyncSession, *, message_id: Optional[UUID], pseudonym: str
-) -> Optional[str]:
-    """Anbietermodell der Nachricht, aus der ein Inhalt stammt — oder None.
+@dataclass(frozen=True)
+class Herkunft:
+    """Woher ein Inhalt stammt — vom Backend ermittelt, nie vom Client behauptet.
+
+    ``provider_model`` nur über eine Nachricht (das Modell steht an ihr); Fach und Assistent
+    über die Konversation. Das Fach ist das der Konversation, sonst das ihrer Gruppe
+    (Schüler-Chats tragen oft nur die Gruppe).
+    """
+
+    provider_model: Optional[str] = None
+    conversation_id: Optional[UUID] = None
+    subject_id: Optional[int] = None
+    assistant_name: Optional[str] = None
+
+
+KEINE_HERKUNFT = Herkunft()
+
+
+async def herkunft(
+    db: AsyncSession,
+    *,
+    pseudonym: str,
+    message_id: Optional[UUID] = None,
+    conversation_id: Optional[UUID] = None,
+) -> Herkunft:
+    """Herkunft über die Nachricht (bevorzugt) oder die Konversation — oder keine.
 
     **Warum über die ID und nicht über eine Angabe des Clients.** Diagramme und Dokumente
-    entstehen aus dem Text einer Chat-Antwort; das Modell dahinter kennt nur das Backend.
-    Ließe man den Browser den Modellnamen mitschicken, stünde in einer Quellenangabe eine
-    Behauptung — ausgerechnet dort, wo Verlässlichkeit der ganze Zweck ist. Deshalb kommt
-    nur die Nachrichten-ID vom Client, das Modell schlägt das Backend selbst nach.
+    entstehen aus dem Text einer Chat-Antwort; Modell, Fach und Assistent dahinter kennt nur
+    das Backend. Ließe man den Browser sie mitschicken, stünde in einer Quellenangabe eine
+    Behauptung — ausgerechnet dort, wo Verlässlichkeit der ganze Zweck ist.
 
-    Die Nachricht muss zu einer Konversation **dieser** Nutzer:in gehören; sonst ließe sich
-    über eine fremde ID zwar kein Inhalt lesen, aber immerhin erraten, welches Modell dort
-    im Einsatz war. Fremde oder unbekannte ID → None, kein Fehler: Die Herkunft ist dann
-    schlicht unbekannt, und das Speichern soll daran nicht scheitern.
+    Die Konversation muss **dieser** Nutzer:in gehören; sonst ließe sich über eine fremde ID
+    zwar kein Inhalt lesen, aber erraten, welches Modell, Fach und welcher Assistent dort im
+    Einsatz waren. Fremde oder unbekannte ID → keine Herkunft, kein Fehler: Das Speichern
+    soll daran nicht scheitern.
+
+    ⚠️ Bis 0.40 bekamen Dokumente und Diagramme aus dem Chat **keine** Herkunfts-Konversation —
+    der Client schickte nur die Nachrichten-ID, und daraus wurde allein das Modell gelesen.
     """
-    if message_id is None:
-        return None
-    treffer = await db.execute(
-        select(Message.provider_model)
-        .join(Conversation, Conversation.id == Message.conversation_id)
-        .where(Message.id == message_id, Conversation.pseudonym == pseudonym)
+    if message_id is None and conversation_id is None:
+        return KEINE_HERKUNFT
+    spalten = [
+        Message.provider_model if message_id is not None else literal(None),
+        Conversation.id,
+        func.coalesce(Conversation.subject_id, Group.subject_id),
+        Assistant.name,
+    ]
+    stmt = select(*spalten).select_from(Conversation)
+    if message_id is not None:
+        stmt = stmt.join(Message, Message.conversation_id == Conversation.id).where(
+            Message.id == message_id
+        )
+    else:
+        stmt = stmt.where(Conversation.id == conversation_id)
+    stmt = (
+        stmt.outerjoin(Group, Group.id == Conversation.group_id)
+        .outerjoin(Assistant, Assistant.id == Conversation.assistant_id)
+        .where(Conversation.pseudonym == pseudonym)
     )
-    return treffer.scalar_one_or_none()
+    zeile = (await db.execute(stmt)).first()
+    if zeile is None:
+        return KEINE_HERKUNFT
+    return Herkunft(*zeile)
 
 
 _DIAGRAM_DEFAULT_TITLE = {
@@ -92,6 +133,7 @@ async def promote_image(
 
     origin_ref = f"image:{image_id}"
     created = await store.find_by_origin_ref(db, user.sub, origin_ref) is None
+    quelle = await herkunft(db, pseudonym=user.sub, conversation_id=record.conversation_id)
     artifact = await store.save_artifact(
         db,
         owner_pseudonym=user.sub,
@@ -105,8 +147,10 @@ async def promote_image(
         origin_ref=origin_ref,
         origin_conversation_id=record.conversation_id,
         # Herkunft mitkopieren: Die generated_images-Zeile stirbt mit der Konversation,
-        # das Artefakt nicht (Alembic 0050).
+        # das Artefakt nicht (Alembic 0050). Fach und Assistent ebenso (0103).
         provider_model=record.provider_model,
+        subject_id=quelle.subject_id,
+        assistant_name=quelle.assistant_name,
     )
     return artifact, created
 
@@ -141,6 +185,7 @@ async def promote_diagram(
 
     origin_ref = f"{kind}:{svg_hash(kind, source)}"
     created = await store.find_by_origin_ref(db, user.sub, origin_ref) is None
+    quelle = await herkunft(db, pseudonym=user.sub, message_id=message_id)
     artifact = await store.save_artifact(
         db,
         owner_pseudonym=user.sub,
@@ -152,8 +197,9 @@ async def promote_diagram(
         title=_title(title, _DIAGRAM_DEFAULT_TITLE.get(kind, "Diagramm")),
         source=source,
         origin_ref=origin_ref,
-        provider_model=await herkunft_der_nachricht(
-            db, message_id=message_id, pseudonym=user.sub
-        ),
+        origin_conversation_id=quelle.conversation_id,
+        provider_model=quelle.provider_model,
+        subject_id=quelle.subject_id,
+        assistant_name=quelle.assistant_name,
     )
     return artifact, created

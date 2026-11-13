@@ -96,6 +96,9 @@ async def save_artifact(
     origin_ref: Optional[str] = None,
     origin_conversation_id: Optional[UUID] = None,
     provider_model: Optional[str] = None,
+    subject_id: Optional[int] = None,
+    assistant_name: Optional[str] = None,
+    derived_from: Optional[UUID] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Speichert ein Artefakt: Quota prüfen → Bytes auf Disk → Row mit `expires_at`.
@@ -133,7 +136,11 @@ async def save_artifact(
         origin_ref=origin_ref,
         origin_conversation_id=origin_conversation_id,
         provider_model=provider_model,
+        subject_id=subject_id,
+        assistant_name=assistant_name,
+        derived_from=derived_from,
         created_at=ts,
+        updated_at=ts,
         expires_at=ts + timedelta(days=retention_days),
     )
     db.add(artifact)
@@ -180,6 +187,8 @@ async def create_document(
     origin_ref: Optional[str] = None,
     origin_conversation_id: Optional[UUID] = None,
     provider_model: Optional[str] = None,
+    subject_id: Optional[int] = None,
+    assistant_name: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Legt ein Text-Dokument (`kind='document'`, Markdown) an.
@@ -205,6 +214,8 @@ async def create_document(
         origin_ref=origin_ref,
         origin_conversation_id=origin_conversation_id,
         provider_model=provider_model,
+        subject_id=subject_id,
+        assistant_name=assistant_name,
         now=now,
     )
 
@@ -236,6 +247,7 @@ async def update_document(
     record.source = markdown
     record.byte_size = new_size
     record.expires_at = ts + timedelta(days=retention_days)
+    record.updated_at = ts
     await db.commit()
     return record
 
@@ -248,42 +260,33 @@ async def list_artifacts(
     subject_id: int | None = None,
     limit: int | None = None,
 ) -> list[Artifact]:
-    """Die eigene Bibliothek, neueste zuerst — wahlweise auf einen Unterrichtsbezug verengt.
+    """Die eigene Werkstatt, neueste zuerst — wahlweise auf ein Fach verengt.
 
-    **Woher der Fach-/Gruppenbezug kommt.** `artifacts` trägt weder `subject_id` noch
-    `group_id`, und das ist richtig so: Die Bibliothek ist strikt privat, ein
-    Gruppenbesitz wäre eine falsche Aussage. Der Bezug entsteht über den Chat, in dem
-    das Artefakt entstand (`origin_conversation_id`). Die Übersicht einer Gruppe zeigt
-    damit *einen Auszug meiner Artefakte mit Bezug zu dieser Gruppe* — so, wie sie
-    einen Auszug meiner Chats zeigt.
+    **Woher der Fachbezug kommt (seit 0.41).** Das Produkt trägt ein eigenes Fach
+    (`subject_id`, Alembic 0103): beim Speichern aus dem Chat kopiert, danach änderbar. Bis
+    0.40 kam der Bezug allein über den Herkunfts-Chat — und fiel weg, sobald der nach
+    spätestens 93 Tagen gelöscht war.
 
-    ⚠️ **Zwei Grenzen dieses Wegs, beide beabsichtigt:**
+    **Gruppe heißt Fach der Gruppe** (Plan 0.41, F3 a). Ein Produkt gehört keiner Gruppe —
+    die Werkstatt ist strikt privat, ein Gruppenbesitz wäre eine falsche Aussage. Die
+    Gruppenseite zeigt deshalb die eigenen Produkte des Fachs; eine Lehrkraft mit mehreren
+    Gruppen im selben Fach sieht dort dasselbe (das Thema unterscheidet bei Bedarf). Eine
+    Gruppe ohne Fach liefert nichts.
 
-    * Ein Artefakt ohne Herkunfts-Chat — etwa ein in der Werkstatt aus dem Nichts
-      angelegtes Dokument — erscheint in **keinem** Auszug. Ausgeschlossen wird es
-      von der Bedingung auf der Chat-Spalte, nicht vom Join-Typ: `NULL = 42` ist
-      unbekannt, also kein Treffer, und ein `outerjoin` änderte daran nichts
-      (nachgemessen 09.09.2026). Der Inner Join sagt nur deutlicher, was gemeint
-      ist. Erreichbar bleibt das Artefakt über die volle Bibliothek.
-    * Wird der Herkunfts-Chat später einem anderen Fach zugeordnet, wandert das
-      Artefakt mit. Es hat keinen eigenen Fachbezug, den es behalten könnte.
-
-    Der Eigentümerfilter steht **vor** dem Join und wird von ihm nicht berührt: Der
-    Join verengt nur, er kann nichts hinzufügen. Fremde Artefakte sind auch dann
-    unerreichbar, wenn ihr Herkunfts-Chat in der gefragten Gruppe liegt.
+    Ohne Fach (etwa ein leer angelegtes Dokument) erscheint ein Produkt in keinem Auszug,
+    nur in der vollen Werkstatt. Der Eigentümerfilter steht immer davor: Fremde Produkte
+    sind auch dann unerreichbar, wenn ihr Fach passt.
     """
-    # Lokaler Import: `Conversation` wird nur hier gebraucht, und `store` soll nicht
-    # bei jedem Import die halbe Chat-Welt mitziehen.
-    from app.db.models import Conversation
+    # Lokaler Import: `Group` wird nur hier gebraucht.
+    from app.db.models import Group
 
     stmt = select(Artifact).where(Artifact.owner_pseudonym == owner_pseudonym)
 
-    if group_id is not None or subject_id is not None:
-        stmt = stmt.join(Conversation, Conversation.id == Artifact.origin_conversation_id)
-        if group_id is not None:
-            stmt = stmt.where(Conversation.group_id == group_id)
-        if subject_id is not None:
-            stmt = stmt.where(Conversation.subject_id == subject_id)
+    if group_id is not None:
+        fach_der_gruppe = select(Group.subject_id).where(Group.id == group_id).scalar_subquery()
+        stmt = stmt.where(Artifact.subject_id == fach_der_gruppe)
+    if subject_id is not None:
+        stmt = stmt.where(Artifact.subject_id == subject_id)
 
     stmt = stmt.order_by(Artifact.created_at.desc())
     if limit is not None:

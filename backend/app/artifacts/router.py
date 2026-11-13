@@ -83,9 +83,14 @@ class ArtifactItem(BaseModel):
     created_at: datetime
     expires_at: datetime
     # Anbietermodell, mit dem der Inhalt erzeugt wurde — Grundlage der Quellenangabe.
-    # None heißt „nicht bekannt": bei Diagrammen und Dokumenten, deren Herkunft heute
-    # nicht mitwandert, und bei Artefakten aus der Zeit vor Alembic 0050.
+    # None heißt „nicht bekannt": bei leer angelegten Dokumenten, bei Diagrammen und
+    # Dokumenten aus der Zeit vor 0.41 und bei Artefakten aus der Zeit vor Alembic 0050.
     provider_model: str | None = None
+    # Ordnung der Werkstatt (0.41): eigenes Fach, Thema, zuletzt bearbeitet, Assistent der Herkunft.
+    subject_id: int | None = None
+    topic: str | None = None
+    updated_at: datetime | None = None
+    assistant_name: str | None = None
     # Lässt sich daraus ein Baustein machen (AP8)? Die Antwort kommt vom Server, damit
     # der Knopf in der Bibliothek nicht nach eigener Rechnung erscheint.
     uebernehmbar: bool = False
@@ -209,10 +214,10 @@ async def save_diagram_to_library(
 @router.get("", response_model=LibraryResponse)
 async def list_library(
     group_id: int | None = Query(
-        default=None, description="nur Produkte aus Chats dieser Unterrichtsgruppe"
+        default=None, description="nur Produkte im Fach dieser Unterrichtsgruppe"
     ),
     subject_id: int | None = Query(
-        default=None, description="nur Produkte aus Chats dieses Fachs"
+        default=None, description="nur Produkte dieses Fachs"
     ),
     limit: int | None = Query(default=None, ge=1, le=200),
     current_user: JwtPayload = Depends(get_current_user),
@@ -220,8 +225,8 @@ async def list_library(
 ) -> LibraryResponse:
     """Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige.
 
-    `group_id`/`subject_id` verengen auf den Unterrichtsbezug — hergeleitet über den
-    Herkunfts-Chat, siehe :func:`app.artifacts.store.list_artifacts`.
+    `group_id`/`subject_id` verengen auf ein Fach (die Gruppe über ihr Fach), siehe
+    :func:`app.artifacts.store.list_artifacts`.
 
     **`used_bytes` und `quota_bytes` bleiben dabei unverfiltert.** Sie beschreiben die
     Belegung der *ganzen* Bibliothek, nicht die des Auszugs; eine mitgefilterte
@@ -245,6 +250,8 @@ async def list_library(
             byte_size=r.byte_size, source=r.source,
             created_at=r.created_at, expires_at=r.expires_at,
             provider_model=r.provider_model,
+            subject_id=r.subject_id, topic=r.topic, updated_at=r.updated_at,
+            assistant_name=r.assistant_name,
             uebernehmbar=uebernahme.ist_uebernehmbar(r),
             baustein_id=baustein.id if baustein else None,
             baustein_titel=baustein.title if baustein else None,
@@ -269,6 +276,12 @@ async def create_document(
     Klick liefert dasselbe Dokument (`created=False`), kein zweites.
     """
     origin_ref = store.document_origin_ref(req.message_id)
+    # Herkunft vom Backend: Eine mitgeschickte `origin_conversation_id` gilt nur, wenn die
+    # Konversation der Nutzer:in gehört (bis 0.41 wurde sie ungeprüft gespeichert).
+    quelle = await promote.herkunft(
+        db, pseudonym=current_user.sub,
+        message_id=req.message_id, conversation_id=req.origin_conversation_id,
+    )
     created = origin_ref is None or (
         await store.find_by_origin_ref(db, current_user.sub, origin_ref) is None
     )
@@ -281,10 +294,10 @@ async def create_document(
             title=req.title,
             markdown=req.markdown,
             origin_ref=origin_ref,
-            origin_conversation_id=req.origin_conversation_id,
-            provider_model=await promote.herkunft_der_nachricht(
-                db, message_id=req.message_id, pseudonym=current_user.sub
-            ),
+            origin_conversation_id=quelle.conversation_id,
+            provider_model=quelle.provider_model,
+            subject_id=quelle.subject_id,
+            assistant_name=quelle.assistant_name,
         )
     except store.QuotaExceeded:
         raise HTTPException(

@@ -197,6 +197,7 @@ async def test_update_document_rewrites_and_refreshes(monkeypatch, tmp_path):
     assert out.source == "viel mehr text"
     assert out.byte_size == len(b"viel mehr text")
     assert out.expires_at == _NOW + timedelta(days=365)     # Aufbewahrung erneuert
+    assert out.updated_at == _NOW                             # zuletzt bearbeitet (0.41)
     assert (tmp_path / f"{aid}.md").read_bytes() == b"viel mehr text"
     db.commit.assert_awaited_once()
 
@@ -217,3 +218,22 @@ async def test_update_document_quota_exceeded(monkeypatch, tmp_path):
             db, record=record, roles=["teacher"], grade=None, title="Neu", markdown="x" * 30,
         )
     db.commit.assert_not_awaited()
+
+
+async def test_save_artifact_traegt_fach_assistent_und_zeitpunkte(monkeypatch, tmp_path):
+    """0.41 (Alembic 0103): Fach und Assistent werden beim Speichern mitgegeben und kopiert;
+    `updated_at` beginnt mit `created_at`."""
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=0)
+    db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    art = await store.save_artifact(
+        db, owner_pseudonym="p", roles=["student"], grade=5, kind="mermaid",
+        mime_type="image/svg+xml", data=b"<svg/>", title="Diagramm", now=_NOW,
+        subject_id=7, assistant_name="Mathe-Aufgaben",
+    )
+
+    assert (art.subject_id, art.assistant_name) == (7, "Mathe-Aufgaben")
+    assert art.created_at == art.updated_at == _NOW
+    assert art.topic is None and art.derived_from is None

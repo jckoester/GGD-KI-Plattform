@@ -848,9 +848,29 @@ class Artifact(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
 
+    # ── Ordnung der Werkstatt (0.41, Alembic 0103) ──────────────────────────
+    # Eigenes Fach: beim Speichern aus dem Chat kopiert, danach änderbar. Überlebt die
+    # Konversation (93 Tage) — bis 0.40 hing der Fachbezug allein an ihr. Keine Gruppe:
+    # die Werkstatt ist privat, ein Gruppenbesitz wäre eine falsche Aussage.
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    topic: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Ursprungsprodukt (etwa das Dokument eines Exports); geht mit ihm (Plan 0.41, F5).
+    derived_from: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Name des Assistenten zur Zeit des Speicherns — Kopie wie `provider_model` (F12).
+    assistant_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         Index("idx_artifacts_owner", "owner_pseudonym"),
         Index("idx_artifacts_expires_at", "expires_at"),
+        Index("idx_artifacts_owner_subject", "owner_pseudonym", "subject_id"),
+        Index("idx_artifacts_derived_from", "derived_from"),
         # Idempotenz: pro Eigentümer:in höchstens ein Artefakt je Herkunft (partiell — nur
         # wenn origin_ref gesetzt; manuell erzeugte Artefakte tragen keine Herkunft).
         Index(

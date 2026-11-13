@@ -40,6 +40,13 @@ from app.db.session import get_db
 from app.render.cache import svg_hash
 
 
+@pytest.fixture(autouse=True)
+def _ohne_herkunft(monkeypatch):
+    """Die Herkunft fragt die Datenbank (0.41); hier steht nur `object()`. Tests, die sie
+    prüfen, setzen sie selbst."""
+    monkeypatch.setattr(promote, "herkunft", AsyncMock(return_value=promote.KEINE_HERKUNFT))
+
+
 def _user(sub="p", roles=("student",), grade="5") -> JwtPayload:
     return JwtPayload(sub=sub, roles=list(roles), grade=grade, jti="j", iat=1, exp=9999999999)
 
@@ -322,7 +329,7 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     rec = SimpleNamespace(
         id=uuid4(), kind="plot", mime_type="image/svg+xml", title="Funktionsgraph",
         byte_size=1234, source="functions: []", created_at=ts, expires_at=ts,
-        provider_model=None,
+        provider_model=None, subject_id=None, topic=None, updated_at=ts, assistant_name=None,
     )
     monkeypatch.setattr(store_mod, "list_artifacts", AsyncMock(return_value=[rec]))
     monkeypatch.setattr(store_mod, "used_bytes", AsyncMock(return_value=1234))
@@ -606,9 +613,13 @@ async def test_promote_image_kopiert_die_herkunft(monkeypatch):
         return SimpleNamespace(id=uuid4(), **kw)
 
     monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    monkeypatch.setattr(promote, "herkunft", AsyncMock(return_value=promote.Herkunft(
+        None, record.conversation_id, 9, "Bilder für den Unterricht",
+    )))
     await promote.promote_image(object(), user=_user(), image_id=uuid4())
 
     assert captured["provider_model"] == "mistral/mistral-small-latest"
+    assert (captured["subject_id"], captured["assistant_name"]) == (9, "Bilder für den Unterricht")
 
 
 async def test_promote_image_ohne_herkunft_bleibt_leer(monkeypatch):
@@ -636,45 +647,52 @@ async def test_promote_image_ohne_herkunft_bleibt_leer(monkeypatch):
 # kennt nur das Backend — deshalb schickt der Client die Nachrichten-ID, nicht den
 # Modellnamen. Eine Client-Behauptung in einer Quellenangabe wäre wertlos.
 
-async def test_herkunft_wird_ueber_die_nachricht_ermittelt():
+def _db_mit_zeile(zeile):
     db = MagicMock()
     ergebnis = MagicMock()
-    ergebnis.scalar_one_or_none.return_value = "openai/openai/gpt-oss-120b"
+    ergebnis.first.return_value = zeile
     db.execute = AsyncMock(return_value=ergebnis)
+    return db
 
-    treffer = await promote.herkunft_der_nachricht(db, message_id=uuid4(), pseudonym="p")
 
-    assert treffer == "openai/openai/gpt-oss-120b"
+async def test_herkunft_wird_ueber_die_nachricht_ermittelt(monkeypatch):
+    monkeypatch.undo()   # die echte Funktion, nicht die Vorgabe der Fixture
+    conv = uuid4()
+    db = _db_mit_zeile(("openai/openai/gpt-oss-120b", conv, 7, "Stundenentwurf"))
+
+    treffer = await promote.herkunft(db, pseudonym="p", message_id=uuid4())
+
+    assert treffer == promote.Herkunft("openai/openai/gpt-oss-120b", conv, 7, "Stundenentwurf")
     db.execute.assert_awaited_once()
 
 
-async def test_herkunft_ohne_id_fragt_die_datenbank_nicht():
+async def test_herkunft_ohne_id_fragt_die_datenbank_nicht(monkeypatch):
+    monkeypatch.undo()
     db = MagicMock()
     db.execute = AsyncMock()
 
-    assert await promote.herkunft_der_nachricht(db, message_id=None, pseudonym="p") is None
+    assert await promote.herkunft(db, pseudonym="p") == promote.KEINE_HERKUNFT
     db.execute.assert_not_awaited()
 
 
-async def test_fremde_nachricht_liefert_keine_herkunft():
+async def test_fremde_nachricht_liefert_keine_herkunft(monkeypatch):
     """Die Abfrage bindet an die Konversation der Nutzer:in.
 
     Über eine fremde ID ließe sich sonst zwar kein Inhalt lesen, aber erraten, welches
-    Modell dort im Einsatz war.
+    Modell, Fach und welcher Assistent dort im Einsatz waren.
     """
-    db = MagicMock()
-    ergebnis = MagicMock()
-    ergebnis.scalar_one_or_none.return_value = None   # Join greift nicht
-    db.execute = AsyncMock(return_value=ergebnis)
+    monkeypatch.undo()
+    db = _db_mit_zeile(None)   # Join greift nicht
 
-    assert await promote.herkunft_der_nachricht(db, message_id=uuid4(), pseudonym="p") is None
+    assert await promote.herkunft(db, pseudonym="p", message_id=uuid4()) == promote.KEINE_HERKUNFT
 
 
 async def test_promote_diagram_uebernimmt_die_herkunft(monkeypatch):
     monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
-    monkeypatch.setattr(
-        promote, "herkunft_der_nachricht", AsyncMock(return_value="mistral/mistral-small-latest")
-    )
+    conv = uuid4()
+    monkeypatch.setattr(promote, "herkunft", AsyncMock(return_value=promote.Herkunft(
+        "mistral/mistral-small-latest", conv, 4, "Mathe-Aufgaben",
+    )))
     captured = {}
 
     async def fake_save(db, **kw):
@@ -689,12 +707,15 @@ async def test_promote_diagram_uebernimmt_die_herkunft(monkeypatch):
     )
 
     assert captured["provider_model"] == "mistral/mistral-small-latest"
+    # Seit 0.41 auch Chat, Fach und Assistent — bis dahin blieb `origin_conversation_id` leer.
+    assert captured["origin_conversation_id"] == conv
+    assert captured["subject_id"] == 4
+    assert captured["assistant_name"] == "Mathe-Aufgaben"
 
 
 async def test_promote_diagram_ohne_nachricht_bleibt_ohne_herkunft(monkeypatch):
     """Etwa beim Speichern aus einer alten Konversation ohne Nachrichten-ID."""
     monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
-    monkeypatch.setattr(promote, "herkunft_der_nachricht", AsyncMock(return_value=None))
     captured = {}
 
     async def fake_save(db, **kw):
