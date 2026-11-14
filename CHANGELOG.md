@@ -12,6 +12,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte (für die Einrichtung neuer Lehrkräfte,
   0.43 im Bau).
 
+### Behoben
+
+- Die Kürzel-Auswahl nannte jede Lehrkraft zweimal (Kürzel und „Nachname (Kürzel)“).
+
 ### Nach dem Update
 
 - `alembic upgrade head` (0105).

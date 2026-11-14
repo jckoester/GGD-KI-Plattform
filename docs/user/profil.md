@@ -37,7 +37,7 @@ Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüle
 
 **Zuschlag für einen besonderen Anlass.** Für eine Projektwoche oder eine größere Aufgabe kann die Schule zusätzliches Budget aufbuchen — Schüler:innen über ihre Klasse oder Unterrichtsgruppe, Lehrkräften auch einzeln. Ein Zuschlag kommt **obendrauf**: Das wöchentliche Guthaben wächst danach normal weiter. Er gilt bis zum Ende des Schuljahres; das Profil nennt ihn als eigene Zeile („Darin enthalten: … als Zuschlag").
 
-**Deine Kennung (nur für Lehrkräfte).** Die Plattform kennt deinen Namen nicht — sie arbeitet mit einem Pseudonym. Soll dir jemand einzeln Budget aufbuchen, braucht diese Person deshalb deine **Kennung**: zwölf Zeichen, die im Profil unter „Budget" stehen (etwa `a3f9 c2b8 1e04`). Nenne sie der Person, die das Budget verwaltet. Deinen Namen erfährt dabei nur sie, nicht die Plattform.
+**Deine Kennung (nur für Lehrkräfte).** Für das Budget führt die Plattform dich nur unter einem Pseudonym. Soll dir jemand einzeln Budget aufbuchen, braucht diese Person deshalb deine **Kennung**: zwölf Zeichen, die im Profil unter „Budget" stehen (etwa `a3f9 c2b8 1e04`). Nenne sie der Person, die das Budget verwaltet.
 
 ## Umfang der Oberfläche
 

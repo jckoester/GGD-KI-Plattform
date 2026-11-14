@@ -471,6 +471,41 @@ async def test_pageconfig_kennt_das_ganze_kollegium():
     assert len(ids) >= 90
 
 
+@pytest.mark.asyncio
+async def test_auswahl_nennt_jede_lehrkraft_einmal():
+    """Zur Auswahl nur das Kürzel; die Langform „Nachname (Kürzel)“ bleibt nachschlagbar (0.43)."""
+    adapter, _ = make_adapter()
+    async with adapter:
+        ids = await adapter.element_ids()
+        liste = await adapter.kuerzel()
+    assert len(liste) >= 90
+    assert len(liste) == len(set(liste))
+    assert not [k for k in liste if "(" in k], "keine Langform in der Auswahl"
+    assert len(ids) >= len(liste)
+    assert ELEMENT_NAME.upper() in liste
+
+
+@pytest.mark.asyncio
+async def test_langform_nicht_in_der_auswahl_aber_nachschlagbar():
+    """Live liefert pageconfig `name` = Kürzel und `displayname` = „Nachname (Kürzel)“ —
+    bis 0.43 stand jede Lehrkraft deshalb zweimal in der Auswahl. (Die Aufzeichnung ist
+    anonymisiert, dort sind beide gleich; daher eine eigene Antwort.)"""
+    adapter, _ = make_adapter()
+    seiten = {"data": {"elements": [
+        {"id": 1, "name": "KOE", "displayname": "Muster (KOE)"},
+        {"id": 2, "name": "abc", "displayname": "Beispiel (ABC)"},
+    ]}}
+
+    async def _get(pfad, params=None):
+        return seiten
+
+    adapter._get = _get
+    adapter._logged_in = True
+    ids = await adapter.element_ids()
+    assert await adapter.kuerzel() == ["ABC", "KOE"]
+    assert ids["MUSTER (KOE)"] == 1 and ids["KOE"] == 1
+
+
 # ── Ferienkalender ───────────────────────────────────────────────────────────
 
 

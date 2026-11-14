@@ -17,7 +17,10 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
 
-    let { teachers = [], kuerzel = $bindable(""), disabled = false } = $props();
+    // ⚠️ `$bindable()` OHNE Vorgabe: Die Seite „Unterricht“ bindet `preferences.webuntis_kuerzel`,
+    // und das ist bei Konten ohne Kürzel `undefined`. Mit Vorgabe bricht Svelte dann ab
+    // (`props_invalid_value`) — das Feld fehlte (0.43, Schritt 2).
+    let { teachers = [], kuerzel = $bindable(), disabled = false } = $props();
 
     let fehler = $state("");
     let gespeichert = $state(false);

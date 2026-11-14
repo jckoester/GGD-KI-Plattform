@@ -126,6 +126,7 @@ class WebUntisAdapter(CalendarAdapter):
         self._owns_client = client is None
         self._logged_in = False
         self._element_ids: dict[str, int] | None = None
+        self._kuerzel: list[str] | None = None
         self._timegrid: list[tuple[int, int]] | None = None
         # Der Schuljahresbezug hängt an der JSESSIONID, nicht am Konto — nach jeder
         # Neuanmeldung ist er weg. Hier eine Instanz = eine Sitzung, deshalb genügt ein
@@ -354,6 +355,7 @@ class WebUntisAdapter(CalendarAdapter):
         node = payload.get("data", payload) if isinstance(payload, dict) else {}
         elements = node.get("elements") if isinstance(node, dict) else None
         mapping: dict[str, int] = {}
+        kuerzel: set[str] = set()
         for entry in elements or []:
             if not isinstance(entry, dict) or entry.get("id") is None:
                 continue
@@ -361,8 +363,20 @@ class WebUntisAdapter(CalendarAdapter):
                 label = str(entry.get(key) or "").strip()
                 if label:
                     mapping.setdefault(label.upper(), int(entry["id"]))
+            # Zur Auswahl nur eine Bezeichnung je Lehrkraft: das Kürzel (`name`). Nachgeschlagen
+            # wird weiter über beide — die Langform „Nachname (Kürzel)“ stand bis 0.43 mit in
+            # der Liste, jede Lehrkraft also doppelt.
+            eins = str(entry.get("name") or entry.get("displayname") or "").strip()
+            if eins:
+                kuerzel.add(eins.upper())
         self._element_ids = mapping
+        self._kuerzel = sorted(kuerzel)
         return mapping
+
+    async def kuerzel(self) -> list[str]:
+        """Die auswählbaren Kürzel — je Lehrkraft eins, sortiert."""
+        await self.element_ids()
+        return list(self._kuerzel or [])
 
     async def timegrid(self, day: date | None = None) -> list[tuple[int, int]]:
         """Das Stundenraster als (Beginn, Ende) in Minuten, aufsteigend.

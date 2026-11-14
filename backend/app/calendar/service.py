@@ -63,8 +63,7 @@ async def list_kuerzel() -> list[str]:
     """Auswählbare Lehrkraft-Kürzel der konfigurierten Quelle."""
     adapter = get_adapter()
     async with adapter:  # type: ignore[attr-defined]
-        mapping = await adapter.element_ids()  # type: ignore[attr-defined]
-    return sorted(mapping)
+        return await adapter.kuerzel()  # type: ignore[attr-defined]
 
 
 async def validate_kuerzel(value: object) -> str:

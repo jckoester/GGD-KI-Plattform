@@ -107,7 +107,7 @@ export function gutZuWissen(daten, budget) {
     return [
         {
             titel: 'Keine echten Namen in den Chat.',
-            text: 'Die Plattform kennt deinen Namen nicht und gibt ihn nicht weiter — aber was du ' +
+            text: 'Die Plattform gibt deinen Namen nicht weiter — aber was du ' +
                 'tippst, geht an den KI-Anbieter. Vor dem Senden warnt sie, wenn sie Namen oder ' +
                 'Kontaktdaten erkennt; verlassen solltest du dich darauf nicht.',
             links: [

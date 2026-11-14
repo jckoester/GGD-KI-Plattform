@@ -25,6 +25,9 @@ describe("Die Seite Unterricht", () => {
         expect(seite).toContain("<KuerzelWahl")
         expect(lies("lib/components/KuerzelWahl.svelte")).toContain("webuntis-kuerzel")
         expect(seite).toContain("<GruppenVorschlaege")
+        // Gebunden wird ein Wert, der bei Konten ohne Kürzel fehlt: keine Vorgabe am Prop,
+        // sonst bricht Svelte ab und das Feld verschwindet (props_invalid_value).
+        expect(lies("lib/components/KuerzelWahl.svelte")).toContain("kuerzel = $bindable()")
         expect(seite).toContain("TimetableSyncButton")
         expect(seite).toContain("Meine Unterrichtsgruppen")
     })
