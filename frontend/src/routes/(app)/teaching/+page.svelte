@@ -7,10 +7,7 @@
         fruehereTeachingGroups,
         refreshMyGroups,
     } from "$lib/stores/myGroups.js";
-    import {
-        potentialTeachingGroups,
-        refreshPotentialTeachingGroups,
-    } from "$lib/stores/potentialTeachingGroups.js";
+    import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js";
     import {
         groupsConfig,
         refreshGroupsConfig,
@@ -23,7 +20,6 @@
         setGruppenJahrgang,
         setGruppenAnzeigename,
         setGruppenSchuelerSichtbarkeit,
-        addExclusion,
     } from "$lib/api.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
@@ -31,11 +27,10 @@
     import GruppenAngebote from "$lib/components/GruppenAngebote.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
-    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
-    import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import TimetableSyncButton from "$lib/components/TimetableSyncButton.svelte";
-    import { getCalendarTeachers, getPreferences, patchPreferences } from "$lib/api.js";
-    import { user } from "$lib/stores/user.js";
+    import { getCalendarTeachers, getPreferences } from "$lib/api.js";
+    import KuerzelWahl from "$lib/components/KuerzelWahl.svelte";
+    import GruppenVorschlaege from "$lib/components/GruppenVorschlaege.svelte";
 
     let exclusions = $state([]);
     let loading = $state(true);
@@ -46,34 +41,9 @@
     // ⚠️ **Es stand im Profil und gehört nicht dorthin** (Jan, 25.09.2026): Was die
     // Lehrkraft in der Regel einmal zu Schuljahresbeginn einstellt und was mit dem
     // Benutzerprofil nichts zu tun hat, steht hier bei den Gruppen — an derselben
-    // Stelle, an der auch die Stunden entstehen.
-    //
-    // Auswahl aus der geladenen Liste statt Freitext: Ein Tippfehler führte sonst zu
-    // einem stillen Nicht-Abruf, den später niemand zuordnet.
+    // Stelle, an der auch die Stunden entstehen. Die Auswahl selbst: `KuerzelWahl` (0.43).
     let preferences = $state({});
     let kuerzelListe = $state({ configured: false, teachers: [], error: null });
-    let kuerzelFehler = $state("");
-    let kuerzelGespeichert = $state(false);
-
-    async function updateKuerzel(event) {
-        const wert = event.target.value;
-        kuerzelFehler = "";
-        kuerzelGespeichert = false;
-        try {
-            await patchPreferences({ webuntis_kuerzel: wert });
-            user.update((u) => ({
-                ...u,
-                preferences: { ...u?.preferences, webuntis_kuerzel: wert },
-            }));
-            preferences = { ...preferences, webuntis_kuerzel: wert };
-            kuerzelGespeichert = true;
-        } catch (err) {
-            kuerzelFehler = err.message;
-            // Anzeige auf den gespeicherten Stand zurücksetzen — sonst zeigt das Feld
-            // eine Auswahl, die der Server abgelehnt hat.
-            event.target.value = preferences?.webuntis_kuerzel ?? "";
-        }
-    }
 
     async function loadData() {
         loading = true;
@@ -85,26 +55,6 @@
             error = err.message || "Fehler beim Laden der Daten";
         } finally {
             loading = false;
-        }
-    }
-
-    async function handleConfirm(classGroupId, subjectId) {
-        try {
-            await createTeachingGroup(classGroupId, subjectId);
-            await refreshMyGroups();
-            await refreshPotentialTeachingGroups();
-        } catch (err) {
-            error = err.message || "Fehler beim Bestätigen";
-        }
-    }
-
-    async function handleExclude(classGroupId, subjectId) {
-        try {
-            await addExclusion(classGroupId, subjectId);
-            await refreshPotentialTeachingGroups();
-            await loadData();
-        } catch (err) {
-            error = err.message || "Fehler beim Ablehnen";
         }
     }
 
@@ -238,41 +188,11 @@
         {#if kuerzelListe.error}
             <div class="mb-3"><WarningBanner message={kuerzelListe.error} /></div>
         {/if}
-        <label
-            for="webuntis-kuerzel"
-            class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
-        >
-            Dein Kürzel im Stundenplan
-        </label>
-        <select
-            id="webuntis-kuerzel"
-            value={preferences?.webuntis_kuerzel ?? ""}
-            onchange={updateKuerzel}
-            class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                   bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
-                   focus:outline-none focus:ring-2 focus:ring-primary"
+        <KuerzelWahl
+            teachers={kuerzelListe.teachers}
+            bind:kuerzel={preferences.webuntis_kuerzel}
             disabled={loading}
-        >
-            <option value="">— nicht zugeordnet —</option>
-            {#each kuerzelListe.teachers as k}
-                <option value={k}>{k}</option>
-            {/each}
-        </select>
-
-        <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
-            Dein Kürzel wird ausschließlich verwendet, um deinen Stundenplan abzurufen
-            (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
-            KI-Modelle übermittelt und erscheint in keinem Chat, keinem
-            Assistenten-Kontext und keinem Wissensknoten. Reichst du einen Assistenten zur
-            Freigabe ein, sehen die Admins dort dein Kürzel, damit sie wissen, wen sie fragen
-            können. Du kannst es jederzeit entfernen; dann entfällt die Stundenplan-Übernahme.
-        </p>
-
-        {#if kuerzelFehler}
-            <div class="mt-3"><ErrorBanner message={kuerzelFehler} /></div>
-        {:else if kuerzelGespeichert}
-            <div class="mt-3"><SuccessBanner message="Kürzel gespeichert." /></div>
-        {/if}
+        />
 
         <!-- Handabgleich und Status. Der Hauptweg ist der Knopf im Jahresplan —
              hier steht er, weil hier auch der Zustand hingehört: wann zuletzt
@@ -358,78 +278,7 @@
     </section>
 
     <!-- Sektion 2: Vorgeschlagene Unterrichtsgruppen -->
-    {#if $groupsConfig.allow_manual_teaching_groups && $potentialTeachingGroups.length > 0}
-        <section class="mb-8">
-            <h2
-                class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1"
-            >
-                Vorgeschlagene Unterrichtsgruppen
-            </h2>
-            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
-                Basierend auf deinen Klassen- und Fachschaft-Mitgliedschaften.
-                Bestätigst du einen Vorschlag, entsteht die Unterrichtsgruppe — und
-                die Schüler:innen der Klasse sind ab ihrer nächsten Anmeldung darin.
-            </p>
-            <div class="space-y-3">
-                {#each $potentialTeachingGroups as pot (pot.class_group_id + "-" + pot.subject_id)}
-                    <div
-                        class="flex items-center justify-between p-3 rounded-lg
-                      bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-2 dark:border-dark-ui-2"
-                    >
-                        <div class="flex items-center gap-3 min-w-0">
-                            {#if pot.subject_icon || pot.subject_color}
-                                <SubjectIcon
-                                    name={pot.subject_icon}
-                                    size={20}
-                                    color={pot.subject_color}
-                                />
-                            {/if}
-                            <div class="min-w-0">
-                                <p
-                                    class="font-medium text-light-tx dark:text-dark-tx truncate"
-                                >
-                                    {pot.class_name}
-                                </p>
-                                <p
-                                    class="text-xs text-light-tx-2 dark:text-dark-tx-2"
-                                >
-                                    {pot.subject_name}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <button
-                                onclick={() =>
-                                    handleConfirm(
-                                        pot.class_group_id,
-                                        pot.subject_id,
-                                    )}
-                                class="px-3 py-1.5 rounded-lg bg-primary dark:bg-primary-dark
-                       text-white text-sm font-medium hover:opacity-90 transition-opacity
-                       flex items-center gap-1.5"
-                                title="Ich unterrichte dieses Fach in dieser Klasse"
-                            >
-                                <Check size={14} />
-                                Bestätigen
-                            </button>
-                            <button
-                                onclick={() =>
-                                    handleExclude(
-                                        pot.class_group_id,
-                                        pot.subject_id,
-                                    )}
-                                class="p-1.5 rounded-lg text-light-tx-2 dark:text-dark-tx-2
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                title="Ich unterrichte dieses Fach nicht in dieser Klasse"
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
-                    </div>
-                {/each}
-            </div>
-        </section>
-    {/if}
+    <GruppenVorschlaege onGeaendert={loadData} onFehler={(text) => (error = text)} />
 
     <!-- Sektion 3: Abgelehnte Kombinationen -->
     <section class="mb-8">

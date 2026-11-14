@@ -21,7 +21,10 @@ const lies = (pfad) => readFileSync(join(SRC, pfad), "utf8")
 describe("Die Seite Unterricht", () => {
     it("liegt unter /teaching und trägt Kürzel, Abgleich und Gruppen", () => {
         const seite = lies("routes/(app)/teaching/+page.svelte")
-        expect(seite).toContain("webuntis-kuerzel")
+        // Die Auswahl steht seit 0.43 in `KuerzelWahl` — auch die Einrichtung nutzt sie.
+        expect(seite).toContain("<KuerzelWahl")
+        expect(lies("lib/components/KuerzelWahl.svelte")).toContain("webuntis-kuerzel")
+        expect(seite).toContain("<GruppenVorschlaege")
         expect(seite).toContain("TimetableSyncButton")
         expect(seite).toContain("Meine Unterrichtsgruppen")
     })
