@@ -8,7 +8,8 @@ from app.db.session import get_db
 router = APIRouter(prefix="/site-texts", tags=["site-texts"])
 
 # Whitelist der gültigen Keys
-VALID_KEYS = {"impressum", "datenschutz", "hilfe", "regeln"}
+# `einrichtung_hinweis`: freier Absatz der Schule auf „Gut zu wissen“ der Einrichtung (0.43, F9 b).
+VALID_KEYS = {"impressum", "datenschutz", "hilfe", "regeln", "einrichtung_hinweis"}
 
 
 @router.get("/{key}")

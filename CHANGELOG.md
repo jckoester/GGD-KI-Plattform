@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte (für die Einrichtung neuer Lehrkräfte,
+  0.43 im Bau).
+
+### Nach dem Update
+
+- `alembic upgrade head` (0105).
+
 ## [0.42.4] – 2026-11-13
 
 ### Neu

@@ -6,12 +6,18 @@
     import { renderMarkdown } from "$lib/markdown.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
-    const VALID_KEYS = ["impressum", "datenschutz", "regeln"];
+    const VALID_KEYS = ["impressum", "datenschutz", "regeln", "einrichtung_hinweis"];
     const LABELS = {
         impressum: "Impressum",
         datenschutz: "Datenschutzerklärung",
         hilfe: "Hilfe",
         regeln: "Nutzungsregeln",
+        einrichtung_hinweis: "Hinweis in der Einrichtung",
+    };
+    // Wo ein Text erscheint, wenn es nicht aus dem Namen hervorgeht.
+    const ERKLAERUNG = {
+        einrichtung_hinweis:
+            "Ein Absatz „Von deiner Schule“ auf der Seite „Gut zu wissen“ der Einrichtung, die neue Lehrkräfte beim ersten Login durchgehen. Leer: kein Absatz.",
     };
 
     // Initialer Tab aus URL-Parameter, Fallback auf 'impressum'
@@ -122,6 +128,10 @@
             </button>
         {/each}
     </div>
+
+    {#if ERKLAERUNG[activeKey]}
+        <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">{ERKLAERUNG[activeKey]}</p>
+    {/if}
 
     {#if loading && !texts[activeKey]}
         <div class="text-center py-8 text-light-tx-2 dark:text-dark-tx-2">

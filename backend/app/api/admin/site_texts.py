@@ -13,7 +13,8 @@ from app.core.audit import audit
 router = APIRouter(prefix="/site-texts", tags=["admin-site-texts"])
 
 # Whitelist der gültigen Keys
-VALID_KEYS = {"impressum", "datenschutz", "hilfe", "regeln"}
+# `einrichtung_hinweis`: freier Absatz der Schule auf „Gut zu wissen“ der Einrichtung (0.43, F9 b).
+VALID_KEYS = {"impressum", "datenschutz", "hilfe", "regeln", "einrichtung_hinweis"}
 
 
 class SiteTextUpdate(BaseModel):

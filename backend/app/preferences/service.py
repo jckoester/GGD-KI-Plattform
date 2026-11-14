@@ -113,3 +113,26 @@ async def stundenplan_kuerzel(db: AsyncSession, pseudonyme: list[str]) -> dict[s
         {"schluessel": KUERZEL_PREFERENCE_KEY, "pseudonyme": list(pseudonyme)},
     )).all()
     return {p: k.strip() for p, k in zeilen if k and k.strip()}
+
+
+# ── Stand der Einrichtung (0.43, `app/einrichtung`) ──────────────────────────
+#
+# Wie oben: Das Einstellungs-Dict verlässt dieses Modul nicht. Die Einrichtung braucht
+# ihren eigenen Stand und, ob ein Kürzel gesetzt ist — nicht das Kürzel selbst.
+
+EINRICHTUNG_SCHLUESSEL = "einrichtung"
+
+
+async def einrichtung_lesen(db: AsyncSession, pseudonym: str) -> tuple[dict | None, bool]:
+    """Gespeicherter Stand der Einrichtung (oder ``None``) und ob ein Stundenplan-Kürzel gesetzt ist."""
+    from app.calendar.service import KUERZEL_PREFERENCE_KEY
+
+    prefs = await get_preferences(db, pseudonym)
+    stand = prefs.get(EINRICHTUNG_SCHLUESSEL)
+    kuerzel = prefs.get(KUERZEL_PREFERENCE_KEY)
+    return (stand if isinstance(stand, dict) else None,
+            isinstance(kuerzel, str) and bool(kuerzel.strip()))
+
+
+async def einrichtung_speichern(db: AsyncSession, pseudonym: str, stand: dict) -> None:
+    await patch_preferences(db, pseudonym, {EINRICHTUNG_SCHLUESSEL: stand})

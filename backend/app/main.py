@@ -36,6 +36,7 @@ from app.api.archiv import router as archiv_router
 from app.api.groups import router as groups_router
 from app.api.subjects import router as subjects_router
 from app.site_texts.router import router as site_texts_router
+from app.einrichtung.router import router as einrichtung_router
 from app.upload.router import router as upload_router
 from app.context.router import router as context_router
 from app.planning.router import router as planning_router
@@ -308,3 +309,4 @@ app.include_router(neuigkeiten_router)
 app.include_router(feedback_router)
 app.include_router(bewertung_router)
 app.include_router(group_join_router)
+app.include_router(einrichtung_router)
