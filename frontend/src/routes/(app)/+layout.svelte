@@ -21,10 +21,26 @@
     import VorschauDialog from "$lib/components/VorschauDialog.svelte";
     import { vorschauDialog, schliesseVorschau } from "$lib/stores/vorschauDialog.js";
     import { HINWEIS_SCHLUESSEL } from "$lib/vorschau.js";
+    import { page } from "$app/stores";
+    import EinrichtungDialog from "$lib/components/EinrichtungDialog.svelte";
+    import { einrichtung, ladeEinrichtung, oeffneEinrichtung, schliesseEinrichtung } from "$lib/stores/einrichtung.js";
+    import { einrichtungsRolle, sollAufgehen } from "$lib/einrichtung.js";
 
     let { children } = $props();
 
     let sidebarOpen = $state(false);
+    let einrichtungsRolle_ = $state(null);
+    // Einmal je Sitzung von selbst — wer „Später“ wählt, sieht ihn beim nächsten Seitenwechsel
+    // nicht wieder (F4: dann der Hinweis auf der Startseite).
+    let einrichtungGezeigt = false;
+
+    // F3: auf jeder Seite, außer in der Hilfe — dort beim nächsten Wechsel.
+    $effect(() => {
+        if (!einrichtungGezeigt && sollAufgehen($einrichtung.daten, $page.url.pathname)) {
+            einrichtungGezeigt = true;
+            oeffneEinrichtung();
+        }
+    });
     let isDesktop = $state(false);
 
     onMount(async () => {
@@ -49,6 +65,9 @@
             refreshGroupsConfig(); // NEU — für allow_manual_teaching_groups Flag
             refreshUiLevels();     // Zuschnitt der Darstellungsstufen
             refreshCrisisAlerts(); // Hinweis auf offene Krisen-Fälle (admin/review)
+            // Einrichtung (0.43): nur für Rollen mit Einrichtung; in der Vorschau ist sie nie fällig.
+            einrichtungsRolle_ = einrichtungsRolle(me.roles);
+            if (einrichtungsRolle_) ladeEinrichtung();
         } catch {
             // Eine abgelaufene Vorschau (Rechner im Ruhezustand, länger als die Stunde)
             // sieht hier aus wie eine fehlende Anmeldung. Das Backend tauscht das abgelaufene
@@ -137,6 +156,14 @@
      verschwinden. Ein Dialog, der dort hinge, ginge mit ihnen. -->
 {#if $vorschauDialog.offen}
     <VorschauDialog vorgabe={$vorschauDialog} onclose={schliesseVorschau} />
+{/if}
+
+{#if $einrichtung.offen && $einrichtung.daten && einrichtungsRolle_}
+    <EinrichtungDialog
+        daten={$einrichtung.daten}
+        rolle={einrichtungsRolle_}
+        onClose={schliesseEinrichtung}
+    />
 {/if}
 
 {#if $feedbackDialog.offen}

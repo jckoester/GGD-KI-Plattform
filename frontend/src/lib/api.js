@@ -3251,3 +3251,24 @@ export async function getVorschauChats(limit = 25, offset = 0) {
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Fehler beim Laden der Vorschau-Chats");
   return res.json();
 }
+
+// ── Einrichtung beim ersten Login (0.43) ─────────────────────────────────────
+
+/** Fällig?, Stand, Stundenplanquelle, Fristen der Löschläufe, Hinweis der Schule. */
+export async function getEinrichtung() {
+    const res = await fetch(`${BASE}/einrichtung`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Die Einrichtung konnte nicht geladen werden')
+    return res.json()
+}
+
+/** @param {'spaeter'|'erledigt'|'abgewaehlt'} stand @param {number} seite Nummer in der vollen Seitenliste */
+export async function putEinrichtung(stand, seite) {
+    const res = await fetch(`${BASE}/einrichtung`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stand, seite }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Stand konnte nicht gespeichert werden')
+    return res.json()
+}
