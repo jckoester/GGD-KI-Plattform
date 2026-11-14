@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    budgetText, einrichtungsRolle, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
+    budgetText, einrichtungsRolle, hinweisText, hinweisZeigen, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
     sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
 } from './einrichtung.js'
 
@@ -165,5 +165,30 @@ describe('Seite 5 (F6)', () => {
         const { join } = await import('node:path')
         const quelle = readFileSync(join(__dirname, 'components/StundenrasterUebernahme.svelte'), 'utf8')
         expect(quelle).toContain('untrack(() => wahl)')
+    })
+})
+
+describe('„Später“ (F4 a)', () => {
+    it('Hinweis nur nach „später“', () => {
+        expect(hinweisZeigen({ stand: 'spaeter', seite: 3 })).toBe(true)
+        for (const stand of [null, 'erledigt', 'abgewaehlt']) expect(hinweisZeigen({ stand })).toBe(false)
+        expect(hinweisZeigen(null)).toBe(false)
+    })
+
+    it('zählt die Seiten vor dem Wiedereinstieg', () => {
+        expect(hinweisText('teacher', { ...mitPlan, stand: 'spaeter', seite: 3 })).toBe('2 von 6 Schritten erledigt.')
+        expect(hinweisText('teacher', { ...ohnePlan, stand: 'spaeter', seite: 5 })).toBe('3 von 5 Schritten erledigt.')
+    })
+
+    it('Startseite, „Unterricht“ und Profil sind verdrahtet', async () => {
+        const { readFileSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        const lies = (p) => readFileSync(join(__dirname, '..', p), 'utf8')
+        const start = lies('routes/(app)/welcome/+page.svelte')
+        expect(start).toContain('hinweisZeigen($einrichtung.daten)')
+        expect(start).toContain('onaction={oeffneEinrichtung}')
+        expect(start).toContain('onclose={einrichtungAbwaehlen}')
+        expect(lies('routes/(app)/teaching/+page.svelte')).toContain('<EinrichtungEintrag')
+        expect(lies('routes/(app)/profile/+page.svelte')).toContain('<EinrichtungEintrag')
     })
 })

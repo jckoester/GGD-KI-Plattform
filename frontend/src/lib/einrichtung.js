@@ -167,3 +167,17 @@ export function wegeWeiter(stufe, abPlanung) {
 export function rasterAnbieten(stufe, abPlanung) {
     return abPlanung != null && stufe != null && stufe >= abPlanung
 }
+
+// ── „Später“ und Wiederaufruf (Schritt 6) ────────────────────────────────────
+
+/** Hinweis auf der Startseite: nur nach „später“, bis abgeschlossen oder weggeklickt (F4 a). */
+export function hinweisZeigen(daten) {
+    return daten?.stand === 'spaeter'
+}
+
+/** „2 von 6 Schritten erledigt“ — erledigt sind die Seiten vor der, an der es weitergeht. */
+export function hinweisText(rolle, daten) {
+    const seiten = sichtbareSeiten(rolle, daten)
+    const i = startIndex(rolle, seiten, daten)
+    return `${i} von ${seiten.length} ${seiten.length === 1 ? 'Schritt' : 'Schritten'} erledigt.`
+}

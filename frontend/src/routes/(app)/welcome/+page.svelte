@@ -5,6 +5,8 @@
     import { getAssistants, getMeinTag, getMeinTagSchueler, getNeuigkeiten } from '$lib/api.js'
     import { alleSchliessen, aufteilen, schliessen } from '$lib/neuigkeiten.js'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
+    import { einrichtung, einrichtungAbwaehlen, oeffneEinrichtung } from '$lib/stores/einrichtung.js'
+    import { einrichtungsRolle, hinweisText, hinweisZeigen } from '$lib/einrichtung.js'
     import {
         KEIN_NAECHSTER,
         zeigtSchuelerTag,
@@ -89,6 +91,8 @@
             && zeigtSchuelerTag(tag.naechster, tag.hat_gruppen),
         fehler: !!tagFehler,
         neuigkeiten: neuigkeiten.length > 0,
+        // Einrichtung nach „später“ (0.43, F4 a) — bis abgeschlossen oder weggeklickt.
+        einrichtung: hinweisZeigen($einrichtung.daten),
     })
 
     // Steht nichts darunter, gehört das Chatfeld in die Mitte — so war die Seite vor den
@@ -119,6 +123,16 @@
     class:justify-center={!hatKacheln}
 >
     <div class="w-full max-w-xl flex flex-col gap-6">
+
+        {#if kacheln.einrichtung}
+            <InfoBanner
+                title="Einrichtung fortsetzen"
+                message={hinweisText(einrichtungsRolle($user?.roles), $einrichtung.daten)}
+                onaction={oeffneEinrichtung}
+                actionLabel="Fortsetzen"
+                onclose={einrichtungAbwaehlen}
+            />
+        {/if}
 
         <!-- Hinweise auf Neuerungen -->
         {#if kacheln.neuigkeiten}

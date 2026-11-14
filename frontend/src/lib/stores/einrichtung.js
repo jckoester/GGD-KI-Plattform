@@ -1,5 +1,5 @@
-import { writable } from 'svelte/store'
-import { getEinrichtung } from '$lib/api.js'
+import { get, writable } from 'svelte/store'
+import { getEinrichtung, putEinrichtung } from '$lib/api.js'
 
 /**
  * Die Einrichtung (0.43): Antwort von `GET /einrichtung` und ob der Dialog offen ist.
@@ -27,4 +27,16 @@ export function oeffneEinrichtung() {
 /** Nach dem Schließen: neuer Stand vom Server (oder der alte). */
 export function schliesseEinrichtung(daten = null) {
     einrichtung.update((e) => ({ daten: daten ?? e.daten, offen: false }))
+}
+
+/** Hinweis auf der Startseite wegklicken (F4 a): Stand „abgewählt“, Seite bleibt. */
+export async function einrichtungAbwaehlen() {
+    const daten = get(einrichtung).daten
+    try {
+        const neu = await putEinrichtung('abgewaehlt', daten?.seite ?? 1)
+        einrichtung.update((e) => ({ ...e, daten: neu }))
+    } catch {
+        // Nicht gespeichert: Der Hinweis kommt beim nächsten Laden wieder.
+        einrichtung.update((e) => ({ ...e, daten: { ...e.daten, stand: 'abgewaehlt' } }))
+    }
 }

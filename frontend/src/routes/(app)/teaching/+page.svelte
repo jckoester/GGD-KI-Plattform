@@ -31,6 +31,7 @@
     import { getCalendarTeachers, getPreferences } from "$lib/api.js";
     import KuerzelWahl from "$lib/components/KuerzelWahl.svelte";
     import GruppenVorschlaege from "$lib/components/GruppenVorschlaege.svelte";
+    import EinrichtungEintrag from "$lib/components/EinrichtungEintrag.svelte";
 
     let exclusions = $state([]);
     let loading = $state(true);
@@ -159,6 +160,7 @@
             Deine Unterrichtsgruppen, dein Kürzel im Stundenplan und der Abgleich — die
             Einstellungen, die du meist zu Schuljahresbeginn einmal treffen.
         </p>
+        <div class="mt-2"><EinrichtungEintrag /></div>
     </div>
 
     {#if error}

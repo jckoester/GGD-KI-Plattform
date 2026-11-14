@@ -150,6 +150,7 @@
     let uebertrag = $derived(uebertragText($budget));
     let zuschlag = $derived(zuschlagText($budget));
     let kennungAnzeige = $derived(eigeneKennung($user));
+    import EinrichtungEintrag from "$lib/components/EinrichtungEintrag.svelte";
 </script>
 
 <button
@@ -236,6 +237,7 @@
         <h2 class="text-lg font-semibold mb-4 text-light-tx dark:text-dark-tx">
             Darstellung
         </h2>
+        <div class="-mt-2 mb-4"><EinrichtungEintrag /></div>
 
         <!-- Umfang der Oberfläche (Darstellungsstufen).
              Bewusst NICHT „Darstellungsstufen" überschrieben: Direkt darunter steht
