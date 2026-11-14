@@ -168,6 +168,8 @@
             <h1 class="text-2xl font-semibold">Profil</h1>
         </div>
 
+        <EinrichtungEintrag />
+
         <!-- Budget-Abschnitt -->
         <section class="mb-8">
             <h2
@@ -237,7 +239,6 @@
         <h2 class="text-lg font-semibold mb-4 text-light-tx dark:text-dark-tx">
             Darstellung
         </h2>
-        <div class="-mt-2 mb-4"><EinrichtungEintrag /></div>
 
         <!-- Umfang der Oberfläche (Darstellungsstufen).
              Bewusst NICHT „Darstellungsstufen" überschrieben: Direkt darunter steht

@@ -160,7 +160,7 @@
             Deine Unterrichtsgruppen, dein Kürzel im Stundenplan und der Abgleich — die
             Einstellungen, die du meist zu Schuljahresbeginn einmal treffen.
         </p>
-        <div class="mt-2"><EinrichtungEintrag /></div>
+        <div class="mt-4"><EinrichtungEintrag /></div>
     </div>
 
     {#if error}
