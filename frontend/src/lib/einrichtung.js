@@ -162,3 +162,8 @@ export function wegeWeiter(stufe, abPlanung) {
         { text: 'Feedback geben', aktion: 'feedback' },
     ]
 }
+
+/** Stundenraster auf Seite 5 nur ab der Planungsstufe (F6); ohne bekannte Planungsstufe nie. */
+export function rasterAnbieten(stufe, abPlanung) {
+    return abPlanung != null && stufe != null && stufe >= abPlanung
+}

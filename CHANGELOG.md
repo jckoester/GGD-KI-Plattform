@@ -8,13 +8,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Neu
 
 - Einrichtung beim ersten Login für neue Lehrkräfte: Erscheinungsbild, das Wichtigste zu Datenschutz,
-  Löschfristen und Budget, Umfang der Oberfläche, Stundenplan-Kürzel (im Bau).
+  Löschfristen und Budget, Umfang der Oberfläche, Stundenplan-Kürzel, Unterrichtsgruppen (im Bau).
 - Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte (für die Einrichtung neuer Lehrkräfte,
   0.43 im Bau).
 
 ### Behoben
 
 - Die Kürzel-Auswahl nannte jede Lehrkraft zweimal (Kürzel und „Nachname (Kürzel)“).
+- „Unterricht“ → Stundenraster: Hatte der Stundenplan Lerngruppen ohne Unterrichtsgruppe, hing die Seite
+  (Endlosschleife bei der Auswahl „Wer gehört dazu?“).
 
 ### Nach dem Update
 

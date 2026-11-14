@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    budgetText, einrichtungsRolle, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
+    budgetText, einrichtungsRolle, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
     sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
 } from './einrichtung.js'
 
@@ -140,5 +140,30 @@ describe('Fertig', () => {
         expect(wegeWeiter(2, 3)[0].href).toBe('/assistants')
         expect(wegeWeiter(3, null)[0].href).toBe('/assistants')
         expect(wegeWeiter(1, 3).map((w) => w.text)).toEqual(['Einen Assistenten ausprobieren', 'Die ersten 30 Minuten', 'Feedback geben'])
+    })
+})
+
+describe('Seite 5 (F6)', () => {
+    it('Stundenraster nur ab der Planungsstufe', () => {
+        expect(rasterAnbieten(3, 3)).toBe(true)
+        expect(rasterAnbieten(4, 3)).toBe(true)
+        expect(rasterAnbieten(2, 3)).toBe(false)
+        expect(rasterAnbieten(3, null)).toBe(false)
+    })
+
+    it('bettet die Bausteine von „Unterricht“ ein, Raster nach Stufe', async () => {
+        const { readFileSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        const dialog = readFileSync(join(__dirname, 'components/EinrichtungDialog.svelte'), 'utf8')
+        expect(dialog).toContain('<GruppenAngebote />')
+        expect(dialog).toContain('<GruppenVorschlaege />')
+        expect(dialog).toContain('<StundenrasterUebernahme raster={mitRaster} />')
+    })
+
+    it('⚠️ Stundenraster: `wahl` im Effekt nur ungetrackt gelesen (sonst Endlosschleife)', async () => {
+        const { readFileSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        const quelle = readFileSync(join(__dirname, 'components/StundenrasterUebernahme.svelte'), 'utf8')
+        expect(quelle).toContain('untrack(() => wahl)')
     })
 })

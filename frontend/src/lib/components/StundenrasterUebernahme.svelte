@@ -9,8 +9,11 @@
    *
    * Geschrieben wird über dieselben Endpunkte wie im Jahresplan
    * (`PUT …/pattern`, `POST …/slots/generate`) — kein zweiter Schreibpfad.
+   *
+   * `raster = false` (Einrichtung, Stufe unter der Planung; 0.43, F6): Der Stundenplan wird nur
+   * gelesen, um fehlende **Gruppen** anzubieten — Wochenmuster und Stunden gehören zur Planung.
    */
-  import { onMount } from "svelte"
+  import { onMount, untrack } from "svelte"
   import { CalendarClock } from "lucide-svelte"
   import {
     createTeachingGroupFromTimetable,
@@ -31,6 +34,8 @@
   import InfoBanner from "$lib/components/InfoBanner.svelte"
   import WarningBanner from "$lib/components/WarningBanner.svelte"
 
+  const { raster = true } = $props()
+
   let laden = $state(false)
   let fehler = $state(null)
   let antwort = $state(null)
@@ -46,10 +51,15 @@
   const anlegbar = $derived(anlegbareGruppen(antwort))
   // Vorbelegt aus der Lage, überschreibbar von der Lehrkraft. Kein `$derived`:
   // Die Wahl muss ein erneutes Lesen überleben, die Lage ist nur ihr Ausgangspunkt.
+  //
+  // ⚠️ `wahl` wird hier gelesen UND geschrieben — gelesen nur über `untrack`, sonst löst das
+  // Schreiben den Effekt erneut aus, mit jedem Mal einem neuen Objekt: Endlosschleife
+  // (`effect_update_depth_exceeded`), sobald es Lerngruppen zum Anlegen gibt (0.43).
   let wahl = $state({})
   $effect(() => {
+    const bisher = untrack(() => wahl)
     const naechste = {}
-    for (const g of anlegbar) naechste[g.gruppe] = wahl[g.gruppe] ?? g.erbtVorbelegt
+    for (const g of anlegbar) naechste[g.gruppe] = bisher[g.gruppe] ?? g.erbtVorbelegt
     wahl = naechste
   })
   const aktuellesHalbjahr = $derived(antwort?.halbjahr ?? 1)
@@ -136,13 +146,22 @@
 </script>
 
 {#if $calendarConfigured}
-  <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
-    Stundenraster aus dem Stundenplan
-  </h2>
-  <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
-    Liest vier Wochen deines Stundenplans und legt für jede Gruppe das Wochenmuster samt
-    Stunden an. Dasselbe geht einzeln im Jahresplan jeder Gruppe.
-  </p>
+  {#if raster}
+    <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
+      Stundenraster aus dem Stundenplan
+    </h2>
+    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
+      Liest vier Wochen deines Stundenplans und legt für jede Gruppe das Wochenmuster samt
+      Stunden an. Dasselbe geht einzeln im Jahresplan jeder Gruppe.
+    </p>
+  {:else}
+    <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
+      Gruppen aus dem Stundenplan
+    </h2>
+    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
+      Liest vier Wochen deines Stundenplans und zeigt Lerngruppen, die es hier noch nicht gibt.
+    </p>
+  {/if}
 
   {#if fehler}<ErrorBanner message={fehler} />{/if}
 
@@ -157,6 +176,10 @@
       <CalendarClock size={16} />
       {laden ? "Stundenplan wird gelesen …" : "Stundenplan lesen"}
     </button>
+  {:else if !raster}
+    {#if !anlegbar.length}
+      <InfoBanner message="Im Stundenplan steht keine Lerngruppe, die hier noch fehlt." />
+    {/if}
   {:else if gruppen.length === 0}
     <InfoBanner
       message={anlegbar.length

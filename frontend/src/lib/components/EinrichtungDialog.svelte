@@ -15,16 +15,20 @@
     import { getCalendarTeachers, putEinrichtung } from '$lib/api.js'
     import {
         ERSCHEINUNGSBILDER, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, SEITEN, seitenNummer,
-        sichtbareSeiten, startIndex, wegeWeiter,
+        rasterAnbieten, sichtbareSeiten, startIndex, wegeWeiter,
     } from '$lib/einrichtung.js'
     import { renderMarkdown } from '$lib/markdown.js'
     import { themePref } from '$lib/stores/theme.js'
     import { budget } from '$lib/stores/budget.js'
     import { user } from '$lib/stores/user.js'
     import { setzeStufe, stufenRegistry, uiStufe } from '$lib/stores/uiLevel.js'
-    import { aktuelleTeachingGroups } from '$lib/stores/myGroups.js'
+    import { aktuelleTeachingGroups, refreshMyGroups } from '$lib/stores/myGroups.js'
     import { oeffneFeedback } from '$lib/stores/feedbackDialog.js'
     import KuerzelWahl from '$lib/components/KuerzelWahl.svelte'
+    import GruppenAngebote from '$lib/components/GruppenAngebote.svelte'
+    import GruppenVorschlaege from '$lib/components/GruppenVorschlaege.svelte'
+    import StundenrasterUebernahme from '$lib/components/StundenrasterUebernahme.svelte'
+    import { refreshPotentialTeachingGroups } from '$lib/stores/potentialTeachingGroups.js'
     import WarningBanner from '$lib/components/WarningBanner.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
 
@@ -74,6 +78,21 @@
                 .catch((e) => (kuerzelListe = { error: e.message, teachers: [] }))
         }
     })
+
+    // Seite 5: Vorschläge frisch lesen (das Layout lädt sie nicht); Raster erst ab der Planungsstufe (F6).
+    let vorschlaegeGelesen = false
+    $effect(() => {
+        if (seite === 'gruppen' && !vorschlaegeGelesen) {
+            vorschlaegeGelesen = true
+            refreshPotentialTeachingGroups()
+        }
+    })
+    // „Fertig“ zählt die Gruppen: Aus dem Stundenplan angelegte meldet der Baustein dem Store nicht.
+    $effect(() => {
+        if (seite === 'fertig') refreshMyGroups()
+    })
+    const mitRaster = $derived(rasterAnbieten($uiStufe, abPlanung))
+    const mitStundenplan = $derived(Boolean(daten?.stundenplan?.configured && $user?.preferences?.webuntis_kuerzel))
 
     const zeilen = $derived(fertigZeilen({
         theme: $themePref,
@@ -206,8 +225,29 @@
                 <KuerzelWahl teachers={kuerzelListe.teachers} bind:kuerzel />
             {/if}
         {:else if seite === 'gruppen'}
-            <!-- Schritt 5 -->
-            <p class="text-light-tx-2 dark:text-dark-tx-2">{SEITEN[seite].titel}</p>
+            <!-- Die Bausteine von „Unterricht“, unverändert (F5 a). Jeder zeigt sich nur, wenn er
+                 etwas anzubieten hat — deshalb steht oben immer, wie Gruppen entstehen. -->
+            <p class="mb-4 text-light-tx-2 dark:text-dark-tx-2">
+                Unterrichtsgruppen entstehen aus dem Schulkonto, aus deinen Klassen und Fachschaften
+                oder aus deinem Stundenplan. Was davon für dich bereitliegt, steht hier; fehlt etwas,
+                legst du es später unter „Unterricht“ an.
+                {#if $aktuelleTeachingGroups.length}
+                    Du hast schon {$aktuelleTeachingGroups.length === 1 ? 'eine Gruppe' : `${$aktuelleTeachingGroups.length} Gruppen`}.
+                {/if}
+            </p>
+            <GruppenAngebote />
+            <GruppenVorschlaege />
+            {#if mitStundenplan}
+                <section class="mb-4">
+                    <StundenrasterUebernahme raster={mitRaster} />
+                </section>
+                {#if !mitRaster && abPlanung}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Das Stundenraster für die Planung (Wochenmuster und Stunden) gibt es ab Stufe
+                        {abPlanung}; du findest es dann unter „Unterricht“.
+                    </p>
+                {/if}
+            {/if}
         {:else if seite === 'fertig'}
             <ul class="space-y-1.5 mb-5">
                 {#each zeilen as z (z.text)}
