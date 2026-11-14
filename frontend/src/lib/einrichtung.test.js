@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-    einrichtungsRolle, fortschritt, seitenNummer, sichtbareSeiten, sollAufgehen, startIndex,
-    SEITEN, SEITEN_JE_ROLLE,
+    budgetText, einrichtungsRolle, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
+    sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
 } from './einrichtung.js'
 
 const mitPlan = { stundenplan: { configured: true } }
@@ -84,5 +84,61 @@ describe('Verdrahtung', () => {
         expect(dialog).toContain("putEinrichtung('spaeter', seitenNummer(rolle, seite))")
         expect(dialog).toContain("putEinrichtung('erledigt', seitenNummer(rolle, seite))")
         expect(dialog).toContain('<Dialog open onClose={schliessen}')
+    })
+})
+
+describe('Gut zu wissen', () => {
+    const daten = { fristen: { chat_tage: 93, konto_tage: 90 } }
+    const budget = { remaining_eur: 1.5, wochenbetrag_eur: 0.5, naechste_aufstockung: '2026-11-16', vorsprung_wochen: 4 }
+
+    it('vier Absätze, Fristen aus der Antwort, Namen zuerst', () => {
+        const absaetze = gutZuWissen(daten, budget)
+        expect(absaetze).toHaveLength(4)
+        expect(absaetze[0].titel).toMatch(/Namen/)
+        expect(absaetze[0].links.map((l) => l.href)).toEqual(['/help/datenschutz', '/info/regeln'])
+        expect(absaetze[1].text).toContain('93 Tagen')
+        expect(absaetze[2].text).toContain('90 Tagen')
+    })
+
+    it('keine Bildkosten, kein Satz zu Assistenten (Prüfung 3, Schritt 0)', () => {
+        const alles = gutZuWissen(daten, budget).map((a) => a.text).join(' ')
+        expect(alles).not.toMatch(/Bild/)
+        expect(alles).not.toMatch(/Assistent/)
+    })
+
+    it('Budget mit eigenen Zahlen, ohne Antwort allgemein', () => {
+        const t = budgetText(budget)
+        expect(t).toMatch(/^Gerade hast du .+Einheiten\./)
+        expect(t).toContain('Jede Unterrichtswoche kommen')
+        expect(t).toContain('4 Wochen')
+        expect(t).toContain('Seitenleiste')
+        expect(budgetText(null)).toBe('Dein Guthaben wächst jede Unterrichtswoche. Den Stand siehst du unten in der Seitenleiste.')
+    })
+})
+
+describe('Fertig', () => {
+    const stufen = [{ stufe: 1, name: 'Chatten', eintraege: ['chat'] }, { stufe: 3, name: 'Unterricht planen', eintraege: ['planner'] }]
+
+    it('tatsächlicher Stand mit Ort zum Nachholen', () => {
+        const z = fertigZeilen({ theme: 'dark', stufe: 3, stufen, kuerzelGesetzt: false, stundenplan: true, gruppen: 2 })
+        expect(z.map((x) => x.text)).toEqual([
+            'Erscheinungsbild: Dunkel', 'Umfang: Stufe 3 – Unterricht planen',
+            'Kein Stundenplan-Kürzel gewählt', '2 Unterrichtsgruppen',
+        ])
+        expect(z[2]).toMatchObject({ ok: false, nachholen: 'Unterricht' })
+    })
+
+    it('ohne Stundenplanquelle keine Kürzel-Zeile', () => {
+        const z = fertigZeilen({ theme: 'system', stufe: 1, stufen, kuerzelGesetzt: false, stundenplan: false, gruppen: 0 })
+        expect(z.map((x) => x.text)).toEqual(['Erscheinungsbild: System', 'Umfang: Stufe 1 – Chatten', 'Noch keine Unterrichtsgruppe'])
+    })
+
+    it('ab der Planungsstufe „Zur Planung“ statt Assistent', () => {
+        expect(planungsStufe({ stufen })).toBe(3)
+        expect(planungsStufe(null)).toBeNull()
+        expect(wegeWeiter(3, 3)[0].href).toBe('/planning')
+        expect(wegeWeiter(2, 3)[0].href).toBe('/assistants')
+        expect(wegeWeiter(3, null)[0].href).toBe('/assistants')
+        expect(wegeWeiter(1, 3).map((w) => w.text)).toEqual(['Einen Assistenten ausprobieren', 'Die ersten 30 Minuten', 'Feedback geben'])
     })
 })

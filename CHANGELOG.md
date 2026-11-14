@@ -7,6 +7,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- Einrichtung beim ersten Login für neue Lehrkräfte: Erscheinungsbild, das Wichtigste zu Datenschutz,
+  Löschfristen und Budget, Umfang der Oberfläche, Stundenplan-Kürzel (im Bau).
 - Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte (für die Einrichtung neuer Lehrkräfte,
   0.43 im Bau).
 

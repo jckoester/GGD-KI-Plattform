@@ -10,6 +10,9 @@
  * Liste der Rolle — eine entfallene Seite verschiebt den Wiedereinstieg nicht.
  */
 
+import { uebertragText, zuwachsText } from './budget_text.js'
+import { ausEuro, text as einheitenText } from './einheiten.js'
+
 export const SEITEN = {
     willkommen: { titel: 'Willkommen' },
     gut_zu_wissen: { titel: 'Gut zu wissen' },
@@ -64,4 +67,98 @@ export function fortschritt(index, seiten) {
  */
 export function sollAufgehen(daten, pfad) {
     return Boolean(daten?.faellig) && !String(pfad ?? '').startsWith('/help')
+}
+
+// ── Texte der Seiten (Schritt 4) ─────────────────────────────────────────────
+
+
+export const ERSCHEINUNGSBILDER = [
+    { wert: 'light', name: 'Hell' },
+    { wert: 'dark', name: 'Dunkel' },
+    { wert: 'system', name: 'System' },
+]
+
+/** Die Stufe, ab der „Planung“ in der Seitenleiste steht — `null`, wenn der Zuschnitt sie nicht kennt. */
+export function planungsStufe(registry) {
+    return registry?.stufen?.find((s) => s.eintraege?.includes('planner'))?.stufe ?? null
+}
+
+/** Budget in Sätzen — mit den eigenen Zahlen, ohne sie, wenn die Antwort fehlt. */
+export function budgetText(b) {
+    const stand = typeof b?.remaining_eur === 'number'
+        ? einheitenText(ausEuro(b.remaining_eur, b?.einheiten_je_euro ?? undefined))
+        : null
+    const saetze = [
+        stand ? `Gerade hast du ${stand}.` : 'Dein Guthaben wächst jede Unterrichtswoche.',
+        zuwachsText(b),
+        uebertragText(b),
+        'Den Stand siehst du unten in der Seitenleiste.',
+    ]
+    return saetze.filter(Boolean).join(' ')
+}
+
+/**
+ * Seite „Gut zu wissen“: vier Absätze, Fristen aus den Löschläufen (`daten.fristen`).
+ * Der Hinweis der Schule (`daten.hinweis`, Markdown) steht im Dialog darunter.
+ */
+export function gutZuWissen(daten, budget) {
+    const chat = daten?.fristen?.chat_tage
+    const konto = daten?.fristen?.konto_tage
+    return [
+        {
+            titel: 'Keine echten Namen in den Chat.',
+            text: 'Die Plattform kennt deinen Namen nicht und gibt ihn nicht weiter — aber was du ' +
+                'tippst, geht an den KI-Anbieter. Vor dem Senden warnt sie, wenn sie Namen oder ' +
+                'Kontaktdaten erkennt; verlassen solltest du dich darauf nicht.',
+            links: [
+                { text: 'Datenschutz', href: '/help/datenschutz' },
+                { text: 'Nutzungsregeln', href: '/info/regeln' },
+            ],
+        },
+        {
+            titel: 'Ein Werkzeug, kein Archiv.',
+            text: `Chats werden nach ${chat} Tagen ohne neue Nachricht gelöscht. Was bleiben soll, ` +
+                'speicherst du in der Werkstatt oder kopierst es heraus.',
+        },
+        {
+            titel: 'Wer lange nicht da ist, verliert sein Konto.',
+            text: `Nach ${konto} Tagen ohne Anmeldung wird es gelöscht — mit Chats, Werkstatt und ` +
+                'privaten Bausteinen. Was du mit einer Gruppe oder der Schule teilst, auch die ' +
+                'Planung, bleibt.',
+        },
+        { titel: 'Budget.', text: budgetText(budget) },
+    ]
+}
+
+/**
+ * Seite „Fertig“: was eingerichtet ist — der **tatsächliche** Stand, nicht welche Seiten man
+ * übersprungen hat. `nachholen`: wo es sich später einstellen lässt.
+ */
+export function fertigZeilen({ theme, stufe, stufen, kuerzelGesetzt, stundenplan, gruppen }) {
+    const zeilen = []
+    const bild = ERSCHEINUNGSBILDER.find((e) => e.wert === theme)?.name ?? 'System'
+    zeilen.push({ ok: true, text: `Erscheinungsbild: ${bild}`, nachholen: 'Profil' })
+    const s = stufen?.find((x) => x.stufe === stufe)
+    if (s) zeilen.push({ ok: true, text: `Umfang: Stufe ${s.stufe} – ${s.name}`, nachholen: 'Profil' })
+    if (stundenplan) {
+        zeilen.push(kuerzelGesetzt
+            ? { ok: true, text: 'Stundenplan-Kürzel gewählt', nachholen: 'Unterricht' }
+            : { ok: false, text: 'Kein Stundenplan-Kürzel gewählt', nachholen: 'Unterricht' })
+    }
+    zeilen.push(gruppen > 0
+        ? { ok: true, text: gruppen === 1 ? '1 Unterrichtsgruppe' : `${gruppen} Unterrichtsgruppen`, nachholen: 'Unterricht' }
+        : { ok: false, text: 'Noch keine Unterrichtsgruppe', nachholen: 'Unterricht' })
+    return zeilen
+}
+
+/** Drei Wege weiter; ab der Planungsstufe ersetzt „Planung“ den Assistenten. */
+export function wegeWeiter(stufe, abPlanung) {
+    const planung = abPlanung != null && stufe != null && stufe >= abPlanung
+    return [
+        planung
+            ? { text: 'Zur Planung', href: '/planning' }
+            : { text: 'Einen Assistenten ausprobieren', href: '/assistants' },
+        { text: 'Die ersten 30 Minuten', href: '/help/erste-30-minuten' },
+        { text: 'Feedback geben', aktion: 'feedback' },
+    ]
 }
