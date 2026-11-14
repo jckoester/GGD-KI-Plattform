@@ -22,7 +22,8 @@ Damit die Plattform weiß, welcher Plan deiner ist, trägst du unter **Unterrich
 „Stundenplan" dein Lehrkraft-Kürzel ein — dasselbe, das im Vertretungsplan steht (z. B. `AK`).
 
 Du wählst es aus einer Liste; freies Tippen ist nicht nötig und ein Vertipper damit
-ausgeschlossen.
+ausgeschlossen. Dieselbe Auswahl steht auch in der **Einrichtung** beim ersten Login
+([Erste Schritte](erste-schritte.md#die-einrichtung-lehrkräfte)).
 
 **Was mit dem Kürzel geschieht:**
 

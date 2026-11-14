@@ -9,6 +9,11 @@ Seite; hier geht es um die **Reihenfolge**.
 > Rechne mit einer halben Stunde. Nichts davon muss heute fertig werden: Jeder
 > Schritt ist für sich nützlich, und du kannst jederzeit aufhören.
 
+> **Die Einrichtung nimmt dir die Schritte 3 und 4 zum Teil ab.** Beim ersten Login führt
+> sie dich durch Erscheinungsbild, Umfang der Oberfläche, Stundenplan-Kürzel und
+> Unterrichtsgruppen. Hast du sie übersprungen: Kasten „Einrichtung“ unter **Unterricht**
+> oder oben im **Profil**. Mehr dazu: [Erste Schritte](erste-schritte.md#die-einrichtung-lehrkräfte)
+
 ---
 
 ## 1. Anmelden und einmal chatten *(2 Minuten)*

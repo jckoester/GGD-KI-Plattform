@@ -6,6 +6,31 @@ Die Anmeldung bei ki@schule erfolgt über dein Schulkonto. Klick auf der Startse
 
 Ein separater Account ist nicht notwendig. Wer ein Schulkonto hat, kann sofort loslegen.
 
+## Die Einrichtung (Lehrkräfte)
+
+Meldest du dich als Lehrkraft zum ersten Mal an, öffnet sich die **Einrichtung**: ein Dialog
+mit sechs kurzen Seiten, etwa fünf Minuten.
+
+1. **Willkommen** — Erscheinungsbild: Hell, Dunkel oder wie dein Gerät.
+2. **Gut zu wissen** — keine echten Namen in den Chat, wann Chats und Konten gelöscht werden,
+   wie dein Budget wächst. Pflegt deine Schule einen eigenen Hinweis, steht er darunter.
+3. **Umfang der Oberfläche** — wie viel du in der Seitenleiste sehen willst (siehe unten).
+4. **Stundenplan** — dein Kürzel, falls deine Schule den Stundenplan angebunden hat; sonst
+   fehlt die Seite.
+5. **Unterrichtsgruppen** — was für dich bereitliegt: Angebote aus dem Schulkonto, Vorschläge
+   aus deinen Klassen und Fachschaften, Gruppen aus deinem Stundenplan. Ab der Stufe
+   „Unterricht planen“ auch das Stundenraster.
+6. **Fertig** — was eingerichtet ist und wo du Fehlendes nachholst.
+
+Jede Wahl gilt sofort; **„Weiter“** geht auch ohne Wahl. **„Später“** (oder Escape) schließt
+den Dialog, ohne dass etwas verloren geht. Auf der Startseite steht dann „Einrichtung
+fortsetzen“; ein Klick führt an die Seite zurück, an der du aufgehört hast, das × blendet
+den Hinweis aus.
+
+Erneut durchgehen kannst du die Einrichtung jederzeit über den Kasten **„Einrichtung“** oben
+im **Profil** und auf der Seite **Unterricht**. Alles, was sie einstellt, findest du dort auch
+einzeln.
+
 ## Die Startseite
 
 Nach der Anmeldung landest du auf der Startseite. Oben steht das Eingabefeld für einen

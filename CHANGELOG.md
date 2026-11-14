@@ -5,13 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.43.0] – 2026-11-14
+
 ### Neu
 
 - Einrichtung beim ersten Login für neue Lehrkräfte: Erscheinungsbild, das Wichtigste zu Datenschutz,
-  Löschfristen und Budget, Umfang der Oberfläche, Stundenplan-Kürzel, Unterrichtsgruppen. Nach „Später“
-  ein Hinweis auf der Startseite; erneut aufrufbar unter „Unterricht“ und im Profil (im Bau).
-- Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte (für die Einrichtung neuer Lehrkräfte,
-  0.43 im Bau).
+  Löschfristen und Budget, Umfang der Oberfläche, Stundenplan-Kürzel, Unterrichtsgruppen (ab der
+  Planungsstufe mit Stundenraster). Nach „Später“ ein Hinweis auf der Startseite.
+- Kasten „Einrichtung“ unter „Unterricht“ und oben im Profil: Einrichtung erneut durchgehen oder fortsetzen.
+- Site-Text „Hinweis in der Einrichtung“ unter Einstellungen → Texte: eigener Absatz der Schule für neue
+  Lehrkräfte.
 
 ### Behoben
 
@@ -21,7 +24,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0105).
+- `alembic upgrade head` (0105), neu bauen und starten.
+- Die eigene `config/ui_levels.yaml` mit `ui_levels.example.yaml` abgleichen: Die Einrichtung zeigt neuen
+  Lehrkräften Namen und Beschreibungen der Stufen.
+- Optional: unter Einstellungen → Texte den „Hinweis in der Einrichtung“ pflegen.
 
 ## [0.42.4] – 2026-11-13
 

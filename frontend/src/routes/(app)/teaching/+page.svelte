@@ -158,7 +158,7 @@
         </h1>
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
             Deine Unterrichtsgruppen, dein Kürzel im Stundenplan und der Abgleich — die
-            Einstellungen, die du meist zu Schuljahresbeginn einmal treffen.
+            Einstellungen, die du meist zu Schuljahresbeginn einmal treffen musst.
         </p>
         <div class="mt-4"><EinrichtungEintrag /></div>
     </div>
@@ -353,7 +353,7 @@
             Gruppen (ohne SSO-Verknüpfung) können gelöscht werden.
         </p>
     </section>
-    
+
 </PageBody>
 
 {#snippet gruppenzeile(group, mitFreigabe = false)}

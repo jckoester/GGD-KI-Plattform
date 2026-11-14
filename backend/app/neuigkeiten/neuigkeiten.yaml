@@ -377,3 +377,17 @@
     in eine Gruppe desselben Fachs. In „Meine Bausteine“ stehen Jahrespläne, Einheiten und
     Stunden nicht mehr.
   link: /help/unterrichtsplanung#archiv-und-kopieren
+
+- id: "0.43-einrichtung"
+  version: "0.43.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md). Gilt dem
+  # Bestand (F2 a): Neue Konten bekommen statt des Hinweises den Dialog selbst.
+  datum: 2026-11-14
+  rollen: [teacher]
+  titel: "Einrichtung in einem Durchgang"
+  text: >-
+    Neue Lehrkräfte führt jetzt beim ersten Login ein kurzer Dialog durch Erscheinungsbild,
+    Umfang der Oberfläche, Stundenplan-Kürzel und Unterrichtsgruppen. Du kannst ihn auch
+    nachträglich durchgehen — etwa wenn dir noch Gruppen fehlen: Kasten „Einrichtung“ unter
+    „Unterricht“ oder oben im Profil.
+  link: /help/erste-schritte#die-einrichtung-lehrkräfte

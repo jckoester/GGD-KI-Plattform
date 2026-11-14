@@ -51,7 +51,8 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [ ] Als Admin einloggen
 - [ ] Modell-Freischaltungsmatrix unter `/settings/models` befüllen — **inklusive
       `TITLE_MODEL` in jeder Gruppe**
-- [ ] Texte (Impressum, Datenschutz, Nutzungsregeln) unter `/settings/texts` hinterlegen
+- [ ] Texte (Impressum, Datenschutz, Nutzungsregeln) unter `/settings/texts` hinterlegen;
+      optional den „Hinweis in der Einrichtung“ für neue Lehrkräfte
 - [ ] Reverse Proxy einrichten und HTTPS aktivieren
 
 ---

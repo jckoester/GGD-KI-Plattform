@@ -362,4 +362,7 @@ Wert dort mindestens so hoch setzen wie `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`, si
    > Lehrkraft. Fehlt die Freigabe, bleibt die Vorschlagszeile im Stundenentwurf leer.
 
 4. **Texte hinterlegen:** Unter `/settings/texts` Impressum, Datenschutzerklärung
-   und Nutzungsregeln eingeben (rechtlich erforderlich).
+   und Nutzungsregeln eingeben (rechtlich erforderlich). Optional der **„Hinweis in der
+   Einrichtung“** (seit 0.43): ein Absatz in Markdown, den neue Lehrkräfte beim ersten Login
+   auf der Seite „Gut zu wissen“ unter „Von deiner Schule“ lesen — etwa eine Ansprechperson
+   oder schuleigene Regeln. Leer bleibt der Absatz weg.
