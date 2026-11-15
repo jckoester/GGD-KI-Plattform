@@ -16,15 +16,26 @@ Du erreichst Curricula über **Wissen → Curricula** oder direkt von der Fachse
 
 ## Wer darf was
 
-Ein Curriculum gehört der **Fachschaft**, nicht einer einzelnen Person.
+Ein Curriculum gehört der **Fachschaft**, nicht einer einzelnen Person. Solange es ein
+**Entwurf** ist, arbeitet die Fachschaft unter sich; mit dem **Veröffentlichen** gilt es für
+alle.
 
-| | |
-|---|---|
-| **Ansehen** | alle Lehrkräfte |
-| **Bearbeiten** | Mitglieder der Fachschaft, dazu Admins |
+| | Entwurf | Veröffentlicht |
+|---|---|---|
+| **Ansehen** | Mitglieder der Fachschaft, Admins | alle Lehrkräfte |
+| **Bearbeiten** | Mitglieder der Fachschaft, Admins | Fachvorsitz und Admins\* |
+| **Veröffentlichen** | Fachvorsitz und Admins\* | — |
+| **Löschen** | wer den Entwurf angelegt hat, Fachvorsitz, Admins | Fachvorsitz und Admins\* |
+| **Als Entwurf kopieren** | — | Mitglieder der Fachschaft, Admins |
+
+\* **Fachvorsitz** gibt es nur, wenn deine Schule dafür eine Gruppe eingerichtet hat. Dann
+gehört dazu, wer zu dieser Gruppe **und** zur Fachschaft gehört. Ohne diese Gruppe dürfen das
+alle Mitglieder der Fachschaft.
 
 Wenn du ein Curriculum nur lesen kannst, obwohl es dein Fach ist, fehlt dir
-wahrscheinlich die Fachschaftsmitgliedschaft — das klärt die Administration.
+wahrscheinlich die Fachschaftsmitgliedschaft — das klärt die Administration. Ein
+veröffentlichtes Curriculum überarbeitest du ohne Fachvorsitz über **„Als Entwurf kopieren“**
+(siehe unten).
 
 ---
 
@@ -36,11 +47,51 @@ wahrscheinlich die Fachschaftsmitgliedschaft — das klärt die Administration.
    oder die überarbeitete Fassung V2).
 2. **Jahrgangsstufe oder Stufenband** eintragen — freie Eingabe: `7`, `7/8`, `5–6`.
 
-Den Rest baust du im Editor auf.
+Den Rest baust du im Editor auf. Das neue Curriculum ist ein **Entwurf** — siehe nächster
+Abschnitt.
 
 > Erscheint dein Fach nicht in der Auswahl, ist sein Bildungsplan in dieser Installation
 > noch nicht eingelesen. Das ist eine Aufgabe der Administration, keine Einstellung, die
 > du ändern kannst.
+
+---
+
+## Entwurf und Veröffentlichen
+
+Ein neues Curriculum ist zunächst ein **Entwurf**: In der Liste trägt es die Marke „Entwurf“,
+in Ansicht und Editor steht ein Hinweis. Den Entwurf sehen und bearbeiten nur die Mitglieder
+der Fachschaft und Admins. In Suche, Chat und Jahresplanung erscheint er nicht — auch nicht für
+die Fachschaft. Ein Entwurf läuft nicht ab; die Liste zeigt, wann er zuletzt geändert wurde.
+
+**Veröffentlichen** — der Knopf steht oben rechts in Ansicht und Editor. Vorher zeigt eine
+Übersicht, was auffällt: Stunden, nicht verknüpfte Kompetenzen, als veraltet markierte
+Kompetenzen, fehlende Begriffe. Sie warnt nur; veröffentlichen kannst du trotzdem. Danach sehen
+alle das Curriculum, und es ist in der Jahresplanung wählbar. Darfst du nicht veröffentlichen,
+steht an der Stelle des Knopfs, wer es darf.
+
+Im Export steht bei einem Entwurf unter dem Titel „Entwurf, Stand …“.
+
+### Ein veröffentlichtes Curriculum überarbeiten
+
+**„Als Entwurf kopieren“** legt eine Kopie an, die du in Ruhe überarbeitest. Das Original
+gilt so lange weiter. Pro Curriculum gibt es höchstens einen solchen Entwurf — gibt es ihn
+schon, führt der Knopf als **„Zum Entwurf“** dorthin.
+
+Wird die Kopie veröffentlicht, **ersetzt** sie das Original:
+
+- Das Original wird archiviert.
+- Unterrichtseinheiten **dieses Schuljahrs**, die an einem Kapitel des Originals hängen,
+  wandern auf das entsprechende Kapitel der Kopie.
+- Hast du in der Kopie ein Kapitel gelöscht, behalten die Einheiten daran das alte Kapitel.
+  Die Übersicht vor dem Veröffentlichen nennt Gruppe und Kapitel; in der Planung erscheint
+  bei solchen Einheiten ein Hinweis, damit die Lehrkraft ein neues Kapitel wählt.
+- Einheiten früherer Schuljahre bleiben, wie sie sind.
+
+### Einen Entwurf löschen
+
+Einen Entwurf löschen die Person, die ihn angelegt hat, der Fachvorsitz und Admins — nicht
+jedes Mitglied der Fachschaft. Kapitel und Lernsequenzen im Entwurf löscht jedes Mitglied
+im Editor wie gewohnt.
 
 ---
 
@@ -90,6 +141,23 @@ und fachliche Konzepte.
 
 Bildungsplan-Kompetenzen erscheinen hier bewusst **nicht** — dafür gibt es die IK- und
 PK-Felder. Zwei Wege für dieselbe Verknüpfung wären nur verwirrend.
+
+### Abdeckung
+
+Über der Tabelle steht aufklappbar die **Abdeckung**: Wie viele inhaltsbezogene Kompetenzen
+des Bands das Curriculum verknüpft, welche nur partiell und welche gar nicht — und wie oft jede
+prozessbezogene Kompetenz gefördert wird. Gezählt wird, was in den Spalten IK und PK steht,
+nicht die Verweise in den Hinweisen.
+
+- **Zum Band** gehören die Kompetenzen deines Fachs in der Fassung des Curriculums, deren
+  Stufen sich mit denen des Curriculums überschneiden. Ein Curriculum für Klasse 9 sieht also
+  die Kompetenzen des Bands 9/10.
+- Fehlt eine Kompetenz, steht dabei, ob ein **anderes veröffentlichtes Curriculum** desselben
+  Bands sie verknüpft — etwa das für Klasse 10.
+- **Aus einem anderen Fach:** Erscheint dieser Abschnitt, hängt das Curriculum an Kompetenzen
+  eines anderen Fachs — meist ein Überbleibsel eines alten Imports. Ersetze sie im Editor oder
+  bitte die Schul-IT um die Reparatur.
+- Die Abdeckung zeigt den **gespeicherten** Stand; im Editor lädt sie nach dem Speichern neu.
 
 ---
 
@@ -181,7 +249,7 @@ In der Ansicht gibt es dafür **„Bildungsplan aktualisieren"**. Du bekommst zu
 |---|---|
 | **Keine Aktualisierung nötig** | Das Curriculum liegt schon auf der aktuellen Fassung. |
 | **Aktualisieren** | Die neue Fassung gilt für dein ganzes Jahrgangsband — das Curriculum wird umgestellt. |
-| **Kopie anlegen** | Die neue Fassung gilt erst für einen Teil des Bandes. Es entsteht eine **Kopie** auf der neuen Fassung; das Original bleibt für die Jahrgänge, die noch nicht gewechselt haben. |
+| **Kopie anlegen** | Die neue Fassung gilt erst für einen Teil des Bandes. Es entsteht eine **Kopie** auf der neuen Fassung — als **Entwurf**; das Original bleibt für die Jahrgänge, die noch nicht gewechselt haben. |
 
 **Was dabei mit den Kompetenzen geschieht:**
 
@@ -220,8 +288,18 @@ Kompetenz gibt es dort nicht mehr oder sie wurde geändert. Ersetze sie, wenn du
 Gelegenheit hast.
 
 **Kann ich ein Curriculum kopieren, statt es neu anzulegen?**
-Beim Fassungswechsel entsteht in einem Fall automatisch eine Kopie (siehe oben). Ein freies
-Duplizieren gibt es derzeit nicht.
+Ja: **„Als Entwurf kopieren“** an einem veröffentlichten Curriculum. Die Kopie ersetzt beim
+Veröffentlichen das Original. Ein zweites, eigenständiges Curriculum entsteht so nicht —
+das gibt es nur beim Fassungswechsel (siehe oben).
+
+**Ich sehe keinen Knopf „Veröffentlichen“.**
+Er erscheint nur bei Entwürfen und nur für die, die veröffentlichen dürfen (siehe „Wer darf
+was“). An seiner Stelle steht dann, wer es darf.
+
+**Beim Speichern erscheint „diese Verweise zeigen auf Bausteine, die es nicht mehr gibt“.**
+Ein Hinweis verweist auf einen Baustein, den ein späterer Import ersetzt hat — etwa einen
+ganzen Bildungsplan-Abschnitt. Gespeichert ist trotzdem alles; ersetze den Verweis im Hinweis
+durch die gemeinte Kompetenz oder entferne ihn.
 
 **Warum kann ich die Bildungsplan-Fassung nicht einfach umstellen?**
 Weil daran alle Kompetenzverweise hängen. Der Weg über „Bildungsplan aktualisieren"
@@ -238,4 +316,5 @@ gehört zu einem Fach, das weder dein Fach noch eines seiner Bezugsfächer ist. 
 Begriffen gibt es mehrere Fassungen; wähle die gemeinte.
 
 **Wer sieht mein Curriculum?**
-Alle Lehrkräfte der Schule. Es ist ein Fachschaftsdokument, kein persönlicher Entwurf.
+Solange es ein Entwurf ist, nur die Fachschaft und Admins. Veröffentlicht sehen es alle
+Lehrkräfte der Schule. Es ist ein Fachschaftsdokument, kein persönlicher Entwurf.

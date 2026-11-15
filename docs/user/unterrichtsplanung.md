@@ -69,6 +69,18 @@ Plattform, **woran** es liegt — die drei Gründe verlangen verschiedene Schrit
 | „Der Jahrgang dieser Gruppe ist nicht bekannt." | die **Stufe** | Trag sie unter **Unterricht → Meine Unterrichtsgruppen** im Feld „Jahrgang" ein. |
 | „Für diese Stufe ist kein Curriculum hinterlegt." | tatsächlich das Curriculum | Nichts — die Verknüpfung ist optional. Wer eines braucht, legt es unter [Schulcurriculum](curriculum.md) an. |
 
+Zur Auswahl stehen nur **veröffentlichte** Curricula. Ein Entwurf deiner Fachschaft erscheint
+erst nach dem Veröffentlichen.
+
+### Wenn das Curriculum ersetzt wurde
+
+Veröffentlicht deine Fachschaft eine überarbeitete Fassung eines Curriculums, wandern die
+Einheiten dieses Schuljahrs von selbst auf die neuen Kapitel. Gibt es ein Kapitel in der neuen
+Fassung nicht mehr, behält deine Einheit das alte — und Jahresübersicht, Einheitenansicht und
+Stundenentwurf zeigen einen Hinweis. Wähle dann unter **Einheit bearbeiten** ein Kapitel des
+neuen Curriculums; bis dahin steht das alte als „Bisheriges Kapitel (Curriculum ersetzt)“ in der
+Auswahl.
+
 ### Der Jahrgang einer Unterrichtsgruppe
 
 Meist ergibt er sich von selbst: aus der Klasse, aus der die Gruppe stammt, sonst aus

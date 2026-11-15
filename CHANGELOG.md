@@ -5,39 +5,37 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.45.0] – 2026-11-15
+
 ### Neu
 
-- Curricula können Entwürfe sein: Sie sehen und bearbeiten nur die Mitglieder der Fachschaft und Admins;
-  in Suche, Chat und Jahresplanung erscheinen sie nicht.
-- Neue Rolle `fachvorsitz`, über `group_role_map` einer SSO-Gruppe zuzuordnen.
-- Neue Curricula entstehen als Entwurf, ebenso Kopien beim Aktualisieren auf eine neue Bildungsplan-Fassung.
-  Entwürfe tragen in der Curricula-Liste die Marke „Entwurf“, in Ansicht und Editor einen Hinweis und im
-  Export (PDF, DOCX, ODT) den Vermerk „Entwurf, Stand …“.
-- Curriculum: aufklappbare Abdeckung der Kompetenzen des Bands — je IK verknüpft, partiell oder fehlend, mit
-  Hinweis auf andere Curricula desselben Bands; je PK, in wie vielen Lernsequenzen sie gefördert wird.
-  Kompetenzen aus einem anderen Fach in den Spalten IK und PK stehen dort mit Warnung.
-- Skript `curriculum_kompetenzen_reparieren.py`: hängt solche Kompetenzen auf dieselbe Nummer im eigenen
-  Fach um.
-- Curriculum: „Veröffentlichen“ mit Übersicht (Stunden, Abdeckung, veraltete Kompetenzen, fehlende Begriffe,
-  betroffene Einheiten). Ist der Rolle `fachvorsitz` eine Gruppe zugeordnet, veröffentlichen und ändern
-  veröffentlichte Curricula nur Fachvorsitzende der Fachschaft und Admins; sonst die Fachschaft. Jede
-  Veröffentlichung steht im Audit-Log.
-- Curriculum: „Als Entwurf kopieren“. Beim Veröffentlichen ersetzt die Kopie das Original: Es wird
-  archiviert, und die Einheiten des laufenden Schuljahrs wandern auf die neuen Kapitel.
-- Planung: Hinweis, wenn eine Einheit an einem Kapitel eines ersetzten Curriculums hängt — in Jahresübersicht,
-  Einheitenansicht und Stundenentwurf.
-- Curricula-Liste: Entwürfe nennen ihre letzte Änderung.
+- Curricula als Entwurf: Neue Curricula und Kopien sind zunächst Entwürfe. Sie sehen und bearbeiten nur die
+  Mitglieder der Fachschaft und Admins; in Suche, Chat und Jahresplanung erscheinen sie nicht. Marke
+  „Entwurf“ mit letzter Änderung in der Liste, Hinweis in Ansicht und Editor, Vermerk „Entwurf, Stand …“
+  im Export.
+- „Veröffentlichen“ mit Übersicht (Stunden, Abdeckung, veraltete Kompetenzen, fehlende Begriffe, betroffene
+  Einheiten). Jede Veröffentlichung steht im Audit-Log.
+- Neue Rolle `fachvorsitz`. Ist ihr eine SSO-Gruppe zugeordnet, veröffentlichen, ändern und löschen
+  veröffentlichte Curricula nur Fachvorsitzende der Fachschaft und Admins.
+- „Als Entwurf kopieren“: Die veröffentlichte Kopie ersetzt das Original; Einheiten des laufenden Schuljahrs
+  wandern auf die neuen Kapitel.
+- Planung: Hinweis bei Einheiten, deren Kapitel zu einem ersetzten Curriculum gehört.
+- Curriculum: Abdeckung der Kompetenzen des Bands — je IK verknüpft, partiell oder fehlend, mit anderen
+  Curricula desselben Bands; je PK die Zahl der Lernsequenzen; Kompetenzen aus einem anderen Fach mit Warnung.
+- Skript `curriculum_kompetenzen_reparieren.py`: hängt Kompetenzen aus einem anderen Fach auf dieselbe Nummer
+  im eigenen Fach um.
 
 ### Geändert
 
-- Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
+- Unterrichtseinheiten lassen sich nur mit Kapiteln veröffentlichter Curricula verknüpfen.
 - Einen Curriculum-Entwurf löschen die Person, die ihn angelegt hat, Fachvorsitzende und Admins.
-- Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
+- Wer in einer zweiten Fachschaftsgruppe desselben Fachs ist, darf Titel und Band eines Curriculums ändern.
+
+### Behoben
+
 - Die Marke „Bearbeitbar“ in der Curricula-Liste erscheint wieder.
-- Curriculum-Editor: Ein Verweis in Hinweisen oder Material auf einen Baustein, den es nicht mehr gibt, bricht
-  das Speichern nicht mehr ab; der Editor speichert und nennt den Verweis.
-- Wer in einer zweiten Fachschaftsgruppe desselben Fachs ist, darf Titel und Band eines Curriculums ändern wie
-  Kapitel und Lernsequenzen.
+- Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
+- Curriculum-Editor: Ein Verweis auf einen Baustein, den es nicht mehr gibt, bricht das Speichern nicht mehr ab.
 
 ### Nach dem Update
 
@@ -45,6 +43,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Curricula, die vor dem 25.08.2026 importiert wurden, prüfen und reparieren:
   `scripts/curriculum_kompetenzen_reparieren.py` (erst Probelauf, dann `--anwenden`), siehe
   `docs/admin/updates-und-wartung.md`.
+- Optional: der Rolle `fachvorsitz` eine SSO-Gruppe zuordnen (`docs/admin/konfiguration.md`).
 
 ## [0.44.0] – 2026-11-15
 

@@ -406,3 +406,18 @@
     Begriffe des Kapitels vor. Hast du einen eigenen Stundenassistenten, leg ihn neu an — die Hilfe
     erklärt, wie.
   link: /help/curriculum#begriffe-und-fachmethoden
+
+- id: "0.45-curriculum-entwurf"
+  version: "0.45.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-15
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curricula als Entwurf"
+  text: >-
+    Ein neues Curriculum ist zunächst ein Entwurf: Nur deine Fachschaft sieht und bearbeitet es,
+    bis es veröffentlicht ist. Ein veröffentlichtes Curriculum überarbeitest du über „Als Entwurf
+    kopieren“ — die Kopie ersetzt beim Veröffentlichen das Original, die Einheiten dieses
+    Schuljahrs wandern mit. Neu ist auch die Abdeckung: welche Kompetenzen des Bands verknüpft
+    sind und welche fehlen.
+  link: /help/curriculum#entwurf-und-veröffentlichen
