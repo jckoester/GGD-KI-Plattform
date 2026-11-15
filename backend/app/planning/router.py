@@ -125,7 +125,10 @@ async def _kapitel_std(db: AsyncSession, kapitel_node_id: UUID) -> int | None:
 
 
 async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int | None]:
-    """Verknüpftes Curriculum-Kapitel einer UE: (kapitel_node_id, std) oder (None, None)."""
+    """Verknüpftes Curriculum-Kapitel einer UE: (kapitel_node_id, std) oder (None, None).
+
+    Archivierte Kapitel zählen mit (ersetztes Curriculum, 0.45) — die Verknüpfung bleibt
+    gültig, `_kapitel_felder` meldet sie für das Banner."""
     edges = await db.execute(
         sa.select(ContextEdge).where(
             ContextEdge.from_node_id == ue_id,
@@ -137,6 +140,16 @@ async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int 
         if kap and kap.content_type == "kapitel":
             return kap.id, als_stundenzahl((kap.metadata_ or {}).get("std"))
     return None, None
+
+
+async def _kapitel_felder(db: AsyncSession, ue_id: UUID) -> dict:
+    """Kapitelfelder für `UnitRead` — mit `kapitel_archiviert` für das Banner (0.45, E15)."""
+    kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue_id)
+    archiviert = False
+    if kapitel_node_id is not None:
+        archiviert = (await db.get(ContextNode, kapitel_node_id)).status == "archived"
+    return {"kapitel_node_id": kapitel_node_id, "kapitel_std": kapitel_std,
+            "kapitel_archiviert": archiviert}
 
 
 async def _build_balance(
@@ -262,14 +275,12 @@ async def get_overview(
 
     unit_reads = []
     for ue in units:
-        kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue.id)
         unit_reads.append(
             UnitRead(
                 id=ue.id,
                 title=ue.title,
                 metadata_=ue.metadata_ or {},
-                kapitel_node_id=kapitel_node_id,
-                kapitel_std=kapitel_std,
+                **await _kapitel_felder(db, ue.id),
                 updated_at=ue.updated_at,
             )
         )
@@ -906,13 +917,11 @@ async def update_unit(
         update_kapitel="kapitel_node_id" in payload.model_fields_set,
     )
 
-    kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue_node.id)
     return UnitRead(
         id=ue_node.id,
         title=ue_node.title,
         metadata_=ue_node.metadata_ or {},
-        kapitel_node_id=kapitel_node_id,
-        kapitel_std=kapitel_std,
+        **await _kapitel_felder(db, ue_node.id),
         updated_at=ue_node.updated_at,
     )
 
@@ -945,14 +954,12 @@ async def list_units(
     units = await _load_units(db, group_id)
     result = []
     for ue in units:
-        kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue.id)
         result.append(
             UnitRead(
                 id=ue.id,
                 title=ue.title,
                 metadata_=ue.metadata_ or {},
-                kapitel_node_id=kapitel_node_id,
-                kapitel_std=kapitel_std,
+                **await _kapitel_felder(db, ue.id),
                 updated_at=ue.updated_at,
             )
         )
@@ -1414,6 +1421,7 @@ async def get_lesson(
                 id=ue_node.id,
                 titel=ue_node.title,
                 farbe=(ue_node.metadata_ or {}).get("farbe", 0),
+                kapitel_ersetzt=(await _kapitel_felder(db, ue_node.id))["kapitel_archiviert"],
             )
 
     # Slot-Kontext
@@ -2029,6 +2037,7 @@ class ArchivEinheitRead(BaseModel):
     schuljahr: str | None
     archiviert: bool
     stunden: list[ArchivStundeRead]
+    kapitel_ersetzt: bool = False  # Kapitel aus einem ersetzten Curriculum (0.45)
 
 
 class ArchivInhaltRead(BaseModel):
@@ -2114,6 +2123,7 @@ def _inhalt_read(inhalt: archiv.ArchivInhalt) -> ArchivInhaltRead:
             ArchivEinheitRead(
                 id=e.id, titel=e.titel, farbe=e.farbe, schuljahr=e.schuljahr,
                 archiviert=e.archiviert, stunden=[stunde(s) for s in e.stunden],
+                kapitel_ersetzt=e.kapitel_ersetzt,
             )
             for e in inhalt.einheiten
         ],

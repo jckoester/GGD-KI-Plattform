@@ -318,7 +318,7 @@ async def _children(db: AsyncSession, parent_id, content_type: str) -> list[Cont
 
 
 async def duplicate_curriculum(
-    db: AsyncSession, curriculum_id: UUID, *, owner: str | None = None,
+    db: AsyncSession, curriculum_id: UUID, *, owner: str | None = None, titel: str | None = None,
 ) -> tuple[UUID, dict[str, str]]:
     """Tiefe Kopie des Curriculum-Baums (Curriculum + Kapitel + Lernsequenzen + Kanten).
 
@@ -336,10 +336,15 @@ async def duplicate_curriculum(
         neu = _clone_node(src, status=ENTWURF, **extra)
         if owner is not None:
             neu.owner_pseudonym = owner
+        # Gleicher Inhalt, gleicher Vektor: Sonst fehlte er nach dem Veröffentlichen bis zur
+        # nächsten Nachholung (die fasst Entwürfe nicht an).
+        neu.embedding = src.embedding
         return neu
 
     cur = await db.get(ContextNode, curriculum_id)
-    new_cur = kopie(cur, title=f"{cur.title or ''} (Kopie)")
+    # „Als Entwurf kopieren“ behält den Titel (die Kopie ersetzt das Original); der
+    # Relink-Weg legt eine zweite, eigenständige Fassung an und heißt „(Kopie)“.
+    new_cur = kopie(cur, title=titel if titel is not None else f"{cur.title or ''} (Kopie)")
     new_cur.metadata_ = {**(new_cur.metadata_ or {}), "kopie_von": str(cur.id)}
     db.add(new_cur)
     await db.flush()

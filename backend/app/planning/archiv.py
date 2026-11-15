@@ -77,6 +77,8 @@ class ArchivEinheit:
     schuljahr: str | None
     archiviert: bool
     stunden: list[ArchivStunde] = field(default_factory=list)
+    #: Das Curriculum-Kapitel der Einheit ist archiviert — sein Curriculum wurde ersetzt (0.45, E15).
+    kapitel_ersetzt: bool = False
 
 
 @dataclass
@@ -309,6 +311,13 @@ async def archiv_inhalt(
         daten = [termine[s][0] for s in je_einheit[eid] if s in termine]
         return min(daten) if daten else einheiten[eid].created_at.date()
 
+    ersetzt = set((await db.execute(
+        sa.select(ContextEdge.from_node_id)
+        .join(ContextNode, ContextNode.id == ContextEdge.to_node_id)
+        .where(ContextEdge.from_node_id.in_(list(einheiten)), ContextEdge.relation == "references",
+               ContextNode.content_type == "kapitel", ContextNode.status == "archived")
+    )).scalars()) if einheiten else set()
+
     liste = [
         ArchivEinheit(
             id=e.id,
@@ -317,6 +326,7 @@ async def archiv_inhalt(
             schuljahr=(e.metadata_ or {}).get("schuljahr"),
             archiviert=e.status == "archived",
             stunden=[stunde(s) for s in _ordne(je_einheit[e.id], folgt)],
+            kapitel_ersetzt=e.id in ersetzt,
         )
         for e in sorted(einheiten.values(), key=lambda e: (erstes_datum(e.id), e.title))
     ]

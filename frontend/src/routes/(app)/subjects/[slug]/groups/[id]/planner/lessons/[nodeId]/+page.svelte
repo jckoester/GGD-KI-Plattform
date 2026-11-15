@@ -27,6 +27,8 @@
     nachbereitungsVorbelegung,
   } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import WarningBanner from '$lib/components/WarningBanner.svelte'
+  import { ersetztHinweis } from '$lib/curriculum.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
@@ -434,6 +436,9 @@
         <span>›</span>
         <span>Stunde {lesson.nav.position} von {lesson.nav.total}</span>
       </nav>
+      {#if lesson.ue?.kapitel_ersetzt && !nurLesen}
+        <div class="mb-2"><WarningBanner message={ersetztHinweis([lesson.ue.titel])} /></div>
+      {/if}
 
       <!-- Titel + Slot-Info -->
       <div class="flex items-start gap-3 flex-wrap">

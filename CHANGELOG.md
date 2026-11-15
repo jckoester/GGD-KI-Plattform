@@ -18,11 +18,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Kompetenzen aus einem anderen Fach in den Spalten IK und PK stehen dort mit Warnung.
 - Skript `curriculum_kompetenzen_reparieren.py`: hängt solche Kompetenzen auf dieselbe Nummer im eigenen
   Fach um.
+- Curriculum: „Veröffentlichen“ mit Übersicht (Stunden, Abdeckung, veraltete Kompetenzen, fehlende Begriffe,
+  betroffene Einheiten). Ist der Rolle `fachvorsitz` eine Gruppe zugeordnet, veröffentlichen und ändern
+  veröffentlichte Curricula nur Fachvorsitzende der Fachschaft und Admins; sonst die Fachschaft. Jede
+  Veröffentlichung steht im Audit-Log.
+- Curriculum: „Als Entwurf kopieren“. Beim Veröffentlichen ersetzt die Kopie das Original: Es wird
+  archiviert, und die Einheiten des laufenden Schuljahrs wandern auf die neuen Kapitel.
+- Planung: Hinweis, wenn eine Einheit an einem Kapitel eines ersetzten Curriculums hängt — in Jahresübersicht,
+  Einheitenansicht und Stundenentwurf.
 
 ### Geändert
 
 - Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
 - Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
+- Die Marke „Bearbeitbar“ in der Curricula-Liste erscheint wieder.
+- Wer in einer zweiten Fachschaftsgruppe desselben Fachs ist, darf Titel und Band eines Curriculums ändern wie
+  Kapitel und Lernsequenzen.
 
 ### Nach dem Update
 

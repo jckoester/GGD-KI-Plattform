@@ -2002,6 +2002,43 @@ export async function getCurriculumFachmethoden(curriculumId, q = '') {
   return res.json()
 }
 
+/** Übersicht vor dem Veröffentlichen eines Entwurfs (0.45). */
+export async function getVeroeffentlichenUebersicht(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Übersicht konnte nicht geladen werden')
+  }
+  return res.json()
+}
+
+/** Veröffentlicht einen Entwurf; eine Kopie ersetzt ihren Vorgänger (0.45). */
+export async function veroeffentlicheCurriculum(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Veröffentlichen fehlgeschlagen')
+  }
+  return res.json()
+}
+
+/**
+ * „Als Entwurf kopieren“ (0.45). Gibt `{id}` zurück; gibt es schon einen Entwurf, `{id, schon: true}`.
+ */
+export async function kopiereCurriculumAlsEntwurf(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/copy`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  const data = await res.json().catch(() => ({}))
+  if (res.status === 409 && data.detail?.entwurf_id) return { id: data.detail.entwurf_id, schon: true }
+  if (!res.ok) throw new ApiError(res.status, data.detail?.message ?? data.detail ?? 'Kopieren fehlgeschlagen')
+  return data
+}
+
 /** Abdeckung der Kompetenzen des Bands (0.45): IK verknüpft/partiell/fehlt, PK-Nutzung. */
 export async function getCurriculumAbdeckung(curriculumId) {
   const res = await fetch(`${BASE}/context/curricula/${curriculumId}/coverage`, {

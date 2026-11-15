@@ -44,6 +44,73 @@ async def darf_entwurf(db: AsyncSession, subject_id: int | None, user) -> bool:
     return subject_id in await fachschafts_faecher(db, user.sub)
 
 
+# ── Schreiben und Veröffentlichen (Schritt 4, E9, E10, E13, E16) ──────────────
+
+
+def fachvorsitz_zugeordnet() -> bool:
+    """Ob der Rolle `fachvorsitz` eine SSO-Gruppe zugeordnet ist (E9).
+
+    Die Zuordnung schaltet die Freigabe ein: Mit ihr veröffentlichen und ändern veröffentlichte
+    Curricula nur Fachvorsitzende und Admins, ohne sie alle Mitglieder der Fachschaft. Gelesen
+    wird `auth.yaml` wie beim Login — bei jeder Prüfung frisch (wenige Zeilen YAML), damit
+    eine geänderte Zuordnung ohne Neustart greift und Tests sie umstellen können.
+    """
+    from app.auth.config import load_auth_config
+    from app.config import settings
+
+    try:
+        return "fachvorsitz" in load_auth_config(settings.auth_config_path).group_role_map_dict.values()
+    except Exception:  # keine oder kaputte auth.yaml: die offene Regel, wie vor 0.45
+        return False
+
+
+def schreibrecht(status: str, subject_id: int | None, roles, fachschaften: set[int],
+                 zugeordnet: bool) -> bool:
+    """**Die** Regel für Curriculum, Kapitel und Lernsequenz — ohne Datenbank.
+
+    - Admin: immer.
+    - Sonst nur Lehrkräfte in einer Fachschaft des Fachs (E8; `fachschafts_faecher`, jede
+      Fachschaftsgruppe des Fachs — bis 0.45 prüfte `_require_curriculum_write` nur **die**
+      Gruppe am Knoten und wich damit vom allgemeinen Schreibrecht ab).
+    - Entwurf: diese Lehrkräfte (E7, E8).
+    - Veröffentlicht oder archiviert (ändern, archivieren, reaktivieren, veröffentlichen):
+      mit zugeordneter Fachvorsitz-Gruppe nur, wer die Rolle hat (E13, E16), sonst alle.
+    """
+    roles = roles or ()
+    if "admin" in roles:
+        return True
+    if "teacher" not in roles or subject_id is None or subject_id not in fachschaften:
+        return False
+    if status == ENTWURF:
+        return True
+    return not zugeordnet or "fachvorsitz" in roles
+
+
+async def _fachschaften(db: AsyncSession, user) -> set[int]:
+    from app.context.service import fachschafts_faecher
+
+    return await fachschafts_faecher(db, user.sub)
+
+
+async def darf_schreiben(db: AsyncSession, status: str, subject_id: int | None, user) -> bool:
+    roles = getattr(user, "roles", None) or ()
+    if "admin" in roles:
+        return True
+    return schreibrecht(status, subject_id, roles, await _fachschaften(db, user), fachvorsitz_zugeordnet())
+
+
+async def darf_veroeffentlichen(db: AsyncSession, subject_id: int | None, user) -> bool:
+    """Veröffentlichen ist das Recht am veröffentlichten Curriculum (E9)."""
+    return await darf_schreiben(db, "active", subject_id, user)
+
+
+def wer_veroeffentlicht() -> str:
+    """Für die Oberfläche, statt des Knopfs (Punkt 7)."""
+    if fachvorsitz_zugeordnet():
+        return "Fachvorsitzende dieser Fachschaft und Admins"
+    return "Mitglieder der Fachschaft und Admins"
+
+
 async def pruefe_entwurf(db: AsyncSession, subject_id: int | None, user) -> None:
     """404, wenn die Person den Entwurf nicht sehen darf.
 

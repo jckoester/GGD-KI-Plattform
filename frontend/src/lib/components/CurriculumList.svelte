@@ -118,8 +118,10 @@
                         </span>
                     {/if}
                     <!-- Badge wenn bearbeitbar -->
-                    {#if canEditSubject && curr.write_scope_group_id && 
-                        $myTeachingGroups.some(g => g.id === curr.write_scope_group_id)}
+                    <!-- Seit 0.45 vom Backend (`darf_schreiben`, Curriculum-Regel samt Fachvorsitz).
+                         Bis dahin verglich die Marke die Fachschaft mit den Unterrichtsgruppen und
+                         erschien deshalb nie. -->
+                    {#if curr.darf_schreiben}
                         <span 
                             class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium 
                                    bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl"

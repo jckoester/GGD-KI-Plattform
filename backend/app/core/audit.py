@@ -67,6 +67,9 @@ EREIGNISSE: dict[str, frozenset[str]] = {
         "user_sessions_revoked",
         "feedback_status_changed",
         "feedback_public_changed",
+        # Curriculum-Entwurf veröffentlicht (0.45, AP E9) — Akteur ist Fachvorsitz, Fachschaft
+        # oder Admin; daran lässt sich ablesen, ob die Unschärfe beim Fachvorsitz (E10) stört.
+        "curriculum_published",
     }),
     "access": frozenset(),
     "moderation": frozenset({

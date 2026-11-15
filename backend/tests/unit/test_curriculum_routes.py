@@ -60,6 +60,11 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         ("GET", "/context/curricula/{curriculum_id}/begriffe/fehlend"),
         # 0.45 (AP Teil A): Abdeckung der Kompetenzen, lesend; Aufrufer `CurriculumTable.svelte`.
         ("GET", "/context/curricula/{curriculum_id}/coverage"),
+        # Veröffentlichen (Übersicht lesend, POST schreibt und committet) und „Als Entwurf
+        # kopieren“; Aufrufer Ansicht und Editor des Curriculums.
+        ("GET", "/context/curricula/{curriculum_id}/publish"),
+        ("POST", "/context/curricula/{curriculum_id}/publish"),
+        ("POST", "/context/curricula/{curriculum_id}/copy"),
     }
 
 
@@ -72,9 +77,15 @@ def test_schreibende_endpunkte_committen():
     """
     import inspect
 
-    from app.context.router import create_curriculum_node, update_curriculum_meta
+    from app.context.router import (
+        create_curriculum_node,
+        curriculum_als_entwurf_kopieren,
+        curriculum_veroeffentlichen,
+        update_curriculum_meta,
+    )
 
-    for funktion in (create_curriculum_node, update_curriculum_meta):
+    for funktion in (create_curriculum_node, update_curriculum_meta, curriculum_veroeffentlichen,
+                     curriculum_als_entwurf_kopieren):
         quelle = inspect.getsource(funktion)
         assert "db.commit()" in quelle, (
             f"{funktion.__name__} schreibt, committet aber nicht — die Änderung ginge "

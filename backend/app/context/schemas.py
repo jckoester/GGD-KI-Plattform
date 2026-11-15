@@ -530,6 +530,12 @@ class CurriculumRead(BaseModel):
     status: str = "active"
     kapitel: list[KapitelRead]
     can_edit: bool
+    # 0.45 (AP Teil A, Schritt 4): Veröffentlichen und „Als Entwurf kopieren“.
+    darf_veroeffentlichen: bool = False
+    wer_veroeffentlicht: str = ""
+    darf_kopieren: bool = False
+    offener_entwurf: dict | None = None
+    kopie_von: dict | None = None
     #: Auflösung der Begriffe aller Einträge für die lesende Person (0.44, AQ) — neben dem
     #: Baum, nicht in ihm (`app/context/curriculum_begriffe.py`).
     begriffe: list[dict] = Field(default_factory=list)

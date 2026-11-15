@@ -12,6 +12,7 @@
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import { ArrowLeft, FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
 
     let curriculum = $state(null);
@@ -185,6 +186,10 @@
                     </p>
                 </div>
                 <div bind:this={topActionsEl} class="flex flex-wrap justify-end gap-2">
+                    <CurriculumFreigabe
+                        {curriculum}
+                        onveroeffentlicht={async () => (curriculum = await getCurriculum(curriculum.id))}
+                    />
                     {#if curriculum.can_edit}
                         <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"
@@ -263,6 +268,12 @@
 
             {#if curriculum.status === "draft"}
                 <div class="mb-4"><InfoBanner message={ENTWURF_HINWEIS} /></div>
+                {#if curriculum.kopie_von}
+                    <p class="-mt-2 mb-4 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Beim Veröffentlichen ersetzt dieser Entwurf
+                        <a href="/knowledge/curriculum/{curriculum.kopie_von.id}" class="text-light-bl dark:text-dark-bl hover:underline">„{curriculum.kopie_von.title}“</a>.
+                    </p>
+                {/if}
             {/if}
 
             {#if exportError}

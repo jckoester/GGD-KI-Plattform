@@ -64,9 +64,14 @@ from app.context.schemas import (
     ZielZaehlung,
 )
 from app.context.curriculum_entwurf import (
-    ENTWURF, LESBARE_STATUS, erbe_entwurf, pruefe_anlegen, pruefe_entwurf, pruefe_kante,
-    pruefe_statuswechsel,
+    CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf, darf_schreiben,
+    darf_veroeffentlichen, erbe_entwurf, fachvorsitz_zugeordnet, pruefe_anlegen, pruefe_entwurf,
+    pruefe_kante, pruefe_statuswechsel, schreibrecht, wer_veroeffentlicht,
 )
+
+#: 403 am Curriculum (0.45): Mit Fachvorsitz-Gruppe ändern Veröffentlichtes nur Vorsitz und Admins.
+_NUR_VORSITZ = ("Keine Berechtigung zum Bearbeiten dieses Curriculums. Für Änderungen an einem "
+                "veröffentlichten Curriculum: „Als Entwurf kopieren“.")
 from app.context import aliase as aliase_modul
 from app.context import fachbegriffe_kollision
 from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
@@ -140,10 +145,14 @@ async def _check_write_permission(
     Fachschaftsgut `write_scope = subject`; geprüft wurde aber nur `group`. Ändern konnten
     die Begriffe einer Fachschaft damit nur Admins — wer selbst Admin ist, bemerkte es nie.
     """
-    # Entwürfe (0.45): Fachschaft und Admins, sonst niemand — auch nicht die Eigentümerin, die
-    # die Fachschaft verlassen hat. Vor allen anderen Zweigen.
-    if node.status == ENTWURF:
-        await pruefe_entwurf(db, node.subject_id, user)
+    # Curriculum, Kapitel, Lernsequenz (0.45): eine eigene Regel (`curriculum_entwurf.schreibrecht`)
+    # — Entwurf für die Fachschaft, Veröffentlichtes mit Fachvorsitz-Gruppe nur für den Vorsitz.
+    # Vor allen anderen Zweigen: Weder Eigentum noch der allgemeine Fachschaftszweig umgehen sie.
+    if node.content_type in CURRICULUM_TYPEN:
+        if node.status == ENTWURF:
+            await pruefe_entwurf(db, node.subject_id, user)  # 404: verrät den Entwurf nicht
+        if not await darf_schreiben(db, node.status, node.subject_id, user):
+            raise HTTPException(status_code=403, detail=_NUR_VORSITZ)
         return
     if "admin" in user.roles:
         return
@@ -265,25 +274,10 @@ async def _require_curriculum_write(
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
     if node.status == ENTWURF:
         await pruefe_entwurf(db, node.subject_id, user)
-
-    if "admin" in user.roles:
-        return node
-
-    allowed = False
-    if node.write_scope_group_id is not None:
-        r = await db.execute(
-            sa.select(1).where(
-                sa.exists().where(
-                    GroupMembership.group_id == node.write_scope_group_id,
-                    mitglied(user.sub),
-                )
-            )
-        )
-        allowed = r.scalar_one_or_none() is not None
-    if not allowed:
-        raise HTTPException(
-            status_code=403, detail="Keine Berechtigung zum Bearbeiten dieses Curriculums"
-        )
+    # Dieselbe Regel wie für Kapitel und Lernsequenzen (0.45). Bis dahin zählte hier nur die
+    # eine Fachschaftsgruppe am Knoten, im allgemeinen Schreibrecht jede des Fachs.
+    if not await darf_schreiben(db, node.status, node.subject_id, user):
+        raise HTTPException(status_code=403, detail=_NUR_VORSITZ)
     return node
 
 
@@ -365,8 +359,19 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
 
         eigene_fachschaften = await fachschafts_faecher(db, user.sub)
 
+    # Curriculum-Typen: dieselbe Regel wie `_check_write_permission` (0.45).
+    curriculum_knoten = [n for n in nodes if n.content_type in CURRICULUM_TYPEN]
+    if curriculum_knoten:
+        from app.context.service import fachschafts_faecher
+
+        fs = set() if ist_admin else await fachschafts_faecher(db, user.sub)
+        zugeordnet = fachvorsitz_zugeordnet()
+
     eigenes = eigenes_zaehlt(user.sub)
     for node in nodes:
+        if node.content_type in CURRICULUM_TYPEN:
+            node.darf_schreiben = schreibrecht(node.status, node.subject_id, user.roles, fs, zugeordnet)
+            continue
         node.darf_schreiben = (
             ist_admin
             or (eigenes and node.owner_pseudonym == user.sub)
@@ -1717,6 +1722,42 @@ async def export_curriculum(
         )
 
 
+async def _curriculum_rechte(db: AsyncSession, tree: dict, user: JwtPayload) -> dict:
+    """Was die Person am Curriculum darf — für Knöpfe und Hinweise (0.45, Schritt 4).
+
+    `can_edit` nach `schreibrecht`; `darf_veroeffentlichen` nur bei Entwürfen, sonst `wer`;
+    `darf_kopieren` („Als Entwurf kopieren“) für die Fachschaft an veröffentlichten Curricula;
+    `offener_entwurf`: die schon begonnene Kopie (höchstens eine je Curriculum); `kopie_von`:
+    das Curriculum, das ein Entwurf beim Veröffentlichen ersetzt.
+    """
+    status, fach = tree.get("status"), tree.get("subject_id")
+    entwurf_recht = await darf_entwurf(db, fach, user)
+    aus = {
+        "can_edit": await darf_schreiben(db, status, fach, user),
+        "darf_veroeffentlichen": status == ENTWURF and await darf_veroeffentlichen(db, fach, user),
+        "wer_veroeffentlicht": wer_veroeffentlicht(),
+        "darf_kopieren": status == "active" and entwurf_recht,
+        "offener_entwurf": None,
+        "kopie_von": None,
+    }
+    if status == "active" and entwurf_recht:
+        offen = await _offener_entwurf(db, tree["id"])
+        aus["offener_entwurf"] = {"id": offen.id, "title": offen.title} if offen else None
+    vorgaenger_id = (tree.get("metadata") or {}).get("kopie_von")
+    if status == ENTWURF and vorgaenger_id:
+        vorgaenger = await db.get(ContextNode, UUID(vorgaenger_id))
+        if vorgaenger is not None and vorgaenger.status == "active":
+            aus["kopie_von"] = {"id": vorgaenger.id, "title": vorgaenger.title}
+    return aus
+
+
+async def _offener_entwurf(db: AsyncSession, curriculum_id) -> ContextNode | None:
+    return (await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == "curriculum", ContextNode.status == ENTWURF,
+        ContextNode.metadata_["kopie_von"].astext == str(curriculum_id),
+    ).limit(1))).scalar_one_or_none()
+
+
 async def _curriculum_lesen(db: AsyncSession, tree: dict, user: JwtPayload) -> None:
     """Lesen eines Curriculums prüfen — Scope und, bei Entwürfen, die Fachschaft (0.45).
 
@@ -1828,6 +1869,79 @@ async def fachmethoden_vorschlaege(
     return await fachmethoden_des_fachs(db, user, node.subject_id, q)
 
 
+async def _entwurfsbaum(db: AsyncSession, curriculum_id: UUID, user: JwtPayload, status: str) -> dict:
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    await _curriculum_lesen(db, tree, user)
+    if tree["status"] != status:
+        raise HTTPException(status_code=409, detail=(
+            "Das Curriculum ist kein Entwurf." if status == ENTWURF else "Das Curriculum ist nicht veröffentlicht."))
+    return tree
+
+
+@router.get("/curricula/{curriculum_id}/publish")
+async def veroeffentlichen_uebersicht(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Übersicht vor dem Veröffentlichen eines Entwurfs (0.45, Punkt 7) — warnt, sperrt nicht."""
+    from app.context.curriculum_veroeffentlichen import uebersicht
+
+    tree = await _entwurfsbaum(db, curriculum_id, user, ENTWURF)
+    return {**await uebersicht(db, tree, user),
+            "darf_veroeffentlichen": await darf_veroeffentlichen(db, tree["subject_id"], user),
+            "wer_veroeffentlicht": wer_veroeffentlicht()}
+
+
+@router.post("/curricula/{curriculum_id}/publish")
+async def curriculum_veroeffentlichen(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Veröffentlicht einen Entwurf (E9); eine Kopie ersetzt ihren Vorgänger (E15).
+
+    Der einzige Weg aus dem Status `draft` — die allgemeinen PATCH-Wege weisen ihn ab.
+    """
+    from app.context.curriculum_veroeffentlichen import veroeffentlichen
+
+    tree = await _entwurfsbaum(db, curriculum_id, user, ENTWURF)
+    if not await darf_veroeffentlichen(db, tree["subject_id"], user):
+        raise HTTPException(status_code=403, detail=f"Veröffentlichen dürfen: {wer_veroeffentlicht()}.")
+    ergebnis = await veroeffentlichen(db, tree, user)
+    await db.commit()
+    return ergebnis
+
+
+@router.post("/curricula/{curriculum_id}/copy", status_code=201)
+async def curriculum_als_entwurf_kopieren(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """„Als Entwurf kopieren“ (E13): der Weg für Änderungen an einem veröffentlichten Curriculum.
+
+    Für die Fachschaft und Admins. Die Kopie behält den Titel, gehört der kopierenden Person und
+    ersetzt beim Veröffentlichen das Original. Höchstens ein offener Entwurf je Curriculum —
+    sonst 409 mit dessen Kennung (`entwurf_id`), damit die Oberfläche dorthin führt.
+    """
+    from app.context.relink import duplicate_curriculum
+
+    tree = await _entwurfsbaum(db, curriculum_id, user, "active")
+    if not await darf_entwurf(db, tree["subject_id"], user):
+        raise HTTPException(status_code=403, detail="Kopieren darf die Fachschaft des Fachs.")
+    if (offen := await _offener_entwurf(db, curriculum_id)) is not None:
+        raise HTTPException(status_code=409, detail={
+            "message": "Zu diesem Curriculum gibt es schon einen Entwurf.", "entwurf_id": str(offen.id)})
+    neu_id, _ = await duplicate_curriculum(db, curriculum_id, owner=user.sub, titel=tree["title"])
+    await db.commit()
+    return {"id": neu_id}
+
+
 @router.get("/curricula/{curriculum_id}/coverage")
 async def curriculum_abdeckung(
     curriculum_id: UUID,
@@ -1869,22 +1983,8 @@ async def get_curriculum(
 
     await _curriculum_lesen(db, tree, user)
 
-    # Prüfe ob User editieren darf
-    can_edit = False
-    if "admin" in user.roles:
-        can_edit = True
-    elif tree.get("write_scope_group_id"):
-        result = await db.execute(
-            sa.select(1).where(
-                sa.exists().where(
-                    GroupMembership.group_id == tree["write_scope_group_id"],
-                    mitglied(user.sub),
-                )
-            )
-        )
-        can_edit = result.scalar_one_or_none() is not None
-
     return {
+        **await _curriculum_rechte(db, tree, user),
         "id": tree["id"],
         "title": tree["title"],
         "metadata": tree["metadata"],
@@ -1892,7 +1992,6 @@ async def get_curriculum(
         "write_scope_group_id": tree["write_scope_group_id"],
         "status": tree["status"],
         "kapitel": tree["kapitel"],
-        "can_edit": can_edit,
         "begriffe": await begriffe_aufloesen(db, tree, user),
     }
 
@@ -1945,7 +2044,7 @@ async def update_curriculum_meta(
         "write_scope_group_id": tree["write_scope_group_id"],
         "status": tree["status"],
         "kapitel": tree["kapitel"],
-        "can_edit": True,
+        **await _curriculum_rechte(db, tree, user),
         "begriffe": await begriffe_aufloesen(db, tree, user),
     }
 
@@ -2062,6 +2161,8 @@ async def list_curricula_by_subject(
         ).order_by(ContextNode.metadata_["jahrgangsstufe"])
     )
     curricula = result.scalars().all()
+    # `darf_schreiben` nach der Curriculum-Regel (0.45) — die Marke „Bearbeitbar“ in der Liste.
+    await _schreibrechte_setzen(curricula, user, db)
     return curricula
 
 

@@ -380,3 +380,167 @@ async def test_kopie_ist_entwurf_der_kopierenden_person(db, welt):
     assert (ls_neu.status, ls_neu.owner_pseudonym) == ("draft", ZWEITES)
     await _abgewiesen(get_curriculum(neu_id, db=db, user=FREMDE))
     assert aktiv.status == "active"
+
+
+# ── Veröffentlichen, Kopieren, Ersetzen (Schritt 4) ──────────────────────────
+
+from app.context import curriculum_entwurf as entwurf_modul  # noqa: E402
+from app.context import router as router_modul  # noqa: E402
+from app.context.router import (  # noqa: E402
+    curriculum_als_entwurf_kopieren,
+    curriculum_veroeffentlichen,
+    reaktiviere_node,
+    veroeffentlichen_uebersicht,
+)
+from app.db.models import AuditLog  # noqa: E402
+from app.planning.calendar import load_school_year  # noqa: E402
+from app.planning.router import list_units  # noqa: E402
+
+VORSITZ = _user(MITGLIED, "teacher", "fachvorsitz")
+
+
+@pytest.fixture
+def mit_vorsitz(monkeypatch):
+    """Der Rolle `fachvorsitz` ist eine Gruppe zugeordnet (E9)."""
+    for modul in (entwurf_modul, router_modul):
+        monkeypatch.setattr(modul, "fachvorsitz_zugeordnet", lambda: True)
+
+
+@pytest.fixture
+def ohne_vorsitz(monkeypatch):
+    for modul in (entwurf_modul, router_modul):
+        monkeypatch.setattr(modul, "fachvorsitz_zugeordnet", lambda: False)
+
+
+async def test_ohne_vorsitz_veroeffentlicht_die_fachschaft(db, welt, ohne_vorsitz):
+    cur, kap, ls = welt["entwurf"]
+    rechte = await get_curriculum(cur.id, db=db, user=KOLLEGIN)
+    assert rechte["darf_veroeffentlichen"] and rechte["wer_veroeffentlicht"] == "Mitglieder der Fachschaft und Admins"
+    await curriculum_veroeffentlichen(cur.id, db=db, user=KOLLEGIN)
+    for n in (cur, kap, ls):
+        await db.refresh(n)
+        assert n.status == "active"
+    assert (await get_curriculum(cur.id, db=db, user=FREMDE))["id"] == cur.id
+    eintrag = (await db.execute(sa.select(AuditLog).where(
+        AuditLog.event_type == "curriculum_published", AuditLog.target_id == str(cur.id)))).scalar_one()
+    assert eintrag.actor_pseudonym == ZWEITES
+    await _abgewiesen(curriculum_veroeffentlichen(cur.id, db=db, user=KOLLEGIN), 409)  # schon veröffentlicht
+
+
+async def test_mit_vorsitz_nur_der_vorsitz(db, welt, mit_vorsitz):
+    cur, _, _ = welt["entwurf"]
+    aktiv, kap_aktiv, ls_aktiv = welt["aktiv"]
+    # Entwurf: die ganze Fachschaft bearbeitet, nur der Vorsitz veröffentlicht.
+    assert (await get_curriculum(cur.id, db=db, user=KOLLEGIN))["can_edit"]
+    assert not (await get_curriculum(cur.id, db=db, user=KOLLEGIN))["darf_veroeffentlichen"]
+    await _abgewiesen(curriculum_veroeffentlichen(cur.id, db=db, user=KOLLEGIN), 403)
+    # Veröffentlichtes ändern: nur Vorsitz und Admin — über alle Wege (E13).
+    assert not (await get_curriculum(aktiv.id, db=db, user=KOLLEGIN))["can_edit"]
+    await _abgewiesen(update_curriculum_meta(aktiv.id, CurriculumMetaUpdate(title="x"), db=db, user=KOLLEGIN), 403)
+    await _abgewiesen(update_node(ls_aktiv.id, ContextNodeUpdate(title="x"), db=db, user=KOLLEGIN), 403)
+    await _abgewiesen(create_edge(ContextEdgeCreate(from_node_id=ls_aktiv.id, to_node_id=welt["ik"].id,
+                                                    relation="references"), db=db, user=KOLLEGIN), 403)
+    await update_node(ls_aktiv.id, ContextNodeUpdate(title="LS vom Vorsitz"), db=db, user=VORSITZ)
+    await update_curriculum_meta(aktiv.id, CurriculumMetaUpdate(title=f"Admin{TOKEN}"), db=db, user=ADMIN)
+    liste = {c.id: c.darf_schreiben for c in await list_curricula_by_subject(welt["fach"].id, db=db, user=KOLLEGIN)}
+    assert liste == {aktiv.id: False, cur.id: True}  # Marke „Bearbeitbar“
+    # Die Rolle gilt nur in eigenen Fachschaften (E10: kein Fach an der Gruppe, aber Mitgliedschaft).
+    fremder_vorsitz = _user(FREMD, "teacher", "fachvorsitz")
+    await _abgewiesen(update_node(ls_aktiv.id, ContextNodeUpdate(title="x"), db=db, user=fremder_vorsitz), 403)
+
+    await curriculum_veroeffentlichen(cur.id, db=db, user=VORSITZ)
+    await db.refresh(cur)
+    assert cur.status == "active"
+
+
+async def test_vorschau_veroeffentlicht_nicht(db, welt):
+    cur, _, _ = welt["entwurf"]
+    user = in_vorschau(_vorschau_von(MITGLIED))
+    await _abgewiesen(curriculum_veroeffentlichen(cur.id, db=db, user=user))
+
+
+async def test_als_entwurf_kopieren(db, welt, mit_vorsitz):
+    aktiv, _, _ = welt["aktiv"]
+    rechte = await get_curriculum(aktiv.id, db=db, user=KOLLEGIN)
+    assert rechte["darf_kopieren"] and rechte["offener_entwurf"] is None
+    neu = (await curriculum_als_entwurf_kopieren(aktiv.id, db=db, user=KOLLEGIN))["id"]
+    kopie = await get_curriculum(neu, db=db, user=KOLLEGIN)
+    assert (kopie["status"], kopie["title"], kopie["can_edit"]) == ("draft", aktiv.title, True)
+    assert kopie["kopie_von"] == {"id": aktiv.id, "title": aktiv.title}
+    assert (await get_curriculum(aktiv.id, db=db, user=LEHRKRAFT))["offener_entwurf"]["id"] == neu
+    fehler = await _abgewiesen(curriculum_als_entwurf_kopieren(aktiv.id, db=db, user=LEHRKRAFT), 409)
+    assert fehler.detail["entwurf_id"] == str(neu)  # höchstens ein offener Entwurf
+    await _abgewiesen(curriculum_als_entwurf_kopieren(aktiv.id, db=db, user=FREMDE), 403)
+    await _abgewiesen(curriculum_als_entwurf_kopieren(neu, db=db, user=KOLLEGIN), 409)  # Entwurf: nicht kopieren
+
+
+async def _einheit(db, welt, kapitel, schuljahr=None):
+    kurs = await _kurs(db, welt)
+    ue = await create_unit_node(db, kurs.id, welt["fach"].id, LEHRKRAFT, f"UE {uuid.uuid4().hex[:4]}",
+                                kapitel_node_id=kapitel.id)
+    if schuljahr:
+        ue.metadata_ = {**ue.metadata_, "schuljahr": schuljahr}
+        await db.flush()
+    return kurs, ue
+
+
+async def _kapitel_der(db, ue):
+    return (await db.execute(sa.select(ContextEdge.to_node_id).join(
+        ContextNode, ContextNode.id == ContextEdge.to_node_id).where(
+        ContextEdge.from_node_id == ue.id, ContextNode.content_type == "kapitel"))).scalar_one()
+
+
+async def test_kopie_ersetzt_den_vorgaenger(db, welt, ohne_vorsitz):
+    """E15: Vorgänger archiviert; Einheiten dieses Schuljahrs wandern; fehlt das Kapitel in der
+    Kopie, bleibt die Einheit am alten — die Planung meldet es."""
+    aktiv, kap_alt, ls_alt = welt["aktiv"]
+    weg = ContextNode(category="knowledge", content_type="kapitel", title="Fällt weg", status="active",
+                      read_scope="school", write_scope="subject", write_scope_group_id=welt["fs"].id,
+                      subject_id=welt["fach"].id, owner_pseudonym=MITGLIED)
+    db.add(weg)
+    await db.flush()
+    db.add(ContextEdge(from_node_id=weg.id, to_node_id=aktiv.id, relation="part_of"))
+    await db.flush()
+    kurs, ue_jetzt = await _einheit(db, welt, kap_alt)
+    _, ue_alt = await _einheit(db, welt, kap_alt, schuljahr="2019/20")
+    kurs_weg, ue_weg = await _einheit(db, welt, weg)
+
+    neu = (await curriculum_als_entwurf_kopieren(aktiv.id, db=db, user=KOLLEGIN))["id"]
+    baum = await get_curriculum(neu, db=db, user=KOLLEGIN)
+    kap_neu = next(k for k in baum["kapitel"] if k["title"] == kap_alt.title)
+    # In der Kopie das Kapitel „Fällt weg“ entfernen (wie im Editor: Kante weg, Knoten gelöscht).
+    weg_kopie = next(k for k in baum["kapitel"] if k["title"] == "Fällt weg")
+    (await db.get(ContextNode, weg_kopie["id"])).status = "deleted"
+    await db.flush()
+
+    u = await veroeffentlichen_uebersicht(neu, db=db, user=KOLLEGIN)
+    assert u["vorgaenger"]["id"] == aktiv.id and u["einheiten_umgehaengt"] == 1
+    assert u["einheiten_ohne_kapitel"] == [{"gruppe": kurs_weg.name, "kapitel": "Fällt weg"}]
+    assert u["darf_veroeffentlichen"]
+
+    ergebnis = await curriculum_veroeffentlichen(neu, db=db, user=KOLLEGIN)
+    assert ergebnis["einheiten_umgehaengt"] == 1
+    for n in (aktiv, kap_alt, ls_alt, weg):
+        await db.refresh(n)
+        assert n.status == "archived" and n.archived_at is not None
+    assert await _kapitel_der(db, ue_jetzt) == kap_neu["id"]
+    assert await _kapitel_der(db, ue_alt) == kap_alt.id      # früheres Schuljahr bleibt
+    assert await _kapitel_der(db, ue_weg) == weg.id           # ohne Entsprechung bleibt
+
+    einheiten = {e.id: e for e in await list_units(kurs_weg.id, db=db, user=LEHRKRAFT)}
+    assert einheiten[ue_weg.id].kapitel_archiviert           # Banner in der Jahresübersicht
+    assert not {e.id: e for e in await list_units(kurs.id, db=db, user=LEHRKRAFT)}[ue_jetzt.id].kapitel_archiviert
+
+    from app.planning import archiv
+    inhalt = await archiv.archiv_inhalt(db, kurs_weg, welt["fach"], archiv.MITGLIED, LEHRKRAFT, stati=("active",))
+    assert [e.kapitel_ersetzt for e in inhalt.einheiten] == [True]  # Banner in der Einheitenansicht
+
+
+async def test_reaktivieren_nur_mit_recht(db, welt, mit_vorsitz):
+    """E16: Ein ersetzter Vorgänger kommt nur mit dem Recht aus E13 zurück."""
+    aktiv, _, _ = welt["aktiv"]
+    aktiv.status = "archived"
+    await db.flush()
+    await _abgewiesen(reaktiviere_node(aktiv.id, db=db, user=KOLLEGIN), 403)
+    await reaktiviere_node(aktiv.id, db=db, user=VORSITZ)
+    assert aktiv.status == "active"

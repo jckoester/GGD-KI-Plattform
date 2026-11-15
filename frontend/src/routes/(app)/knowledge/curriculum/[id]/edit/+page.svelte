@@ -17,6 +17,7 @@
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { ArrowLeft, Check, Save, X } from "lucide-svelte";
 
@@ -564,6 +565,9 @@
                     </div>
                 </div>
                 <div bind:this={topActionsEl} class="flex gap-2 items-center">
+                    {#if curriculum?.status === "draft"}
+                        <CurriculumFreigabe {curriculum} gesperrt={dirty} />
+                    {/if}
                     {#if dirty}
                         <span class="text-sm text-light-ye dark:text-dark-ye">
                             Ungespeicherte Änderungen

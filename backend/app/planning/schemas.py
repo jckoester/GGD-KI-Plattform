@@ -164,6 +164,8 @@ class UnitRead(BaseModel):
     metadata_: dict = Field(alias="metadata_")
     kapitel_node_id: Optional[UUID] = None
     kapitel_std: Optional[int] = None
+    #: Das Kapitel gehört zu einem ersetzten (archivierten) Curriculum — Banner in der Planung (0.45).
+    kapitel_archiviert: bool = False
     # Änderungssignal für Clients außerhalb des Browsers (Unterrichtsplanungs-Sync).
     updated_at: datetime
 
@@ -295,6 +297,8 @@ class LessonUeContext(BaseModel):
     id: UUID
     titel: str
     farbe: int
+    #: Kapitel aus einem ersetzten Curriculum (0.45) — Banner im Stundenentwurf.
+    kapitel_ersetzt: bool = False
 
 
 class LessonNav(BaseModel):

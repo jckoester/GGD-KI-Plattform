@@ -23,6 +23,8 @@
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import WarningBanner from '$lib/components/WarningBanner.svelte'
+  import { ersetztHinweis } from '$lib/curriculum.js'
   import StufenHinweis from '$lib/components/StufenHinweis.svelte'
   import TimetableSyncButton from '$lib/components/TimetableSyncButton.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -109,6 +111,9 @@
 
   // ── Planungs-Daten ───────────────────────────────────────────────────────────
   let overview = $state(null)
+  // Banner (0.45, E15): Einheiten am Kapitel eines ersetzten Curriculums.
+  const ersetztJahr = $derived(ersetztHinweis((overview?.units ?? []).filter((u) => u.kapitel_archiviert).map((u) => u.title)))
+  const ersetztEinheiten = $derived(ersetztHinweis((inhalt?.einheiten ?? []).filter((e) => e.kapitel_ersetzt).map((e) => e.titel)))
   let slots = $state([])        // eigene Liste für optimistische Updates
   let loading = $state(true)
   let error = $state(null)
@@ -760,6 +765,9 @@
       {:else if !inhalt}
         <LoadingBanner message="Einheiten werden geladen …" />
       {:else}
+        {#if ersetztEinheiten}
+          <div class="mb-3"><WarningBanner message={ersetztEinheiten} /></div>
+        {/if}
         <EinheitenAnsicht
           {inhalt}
           ansicht={darstellung}
@@ -790,6 +798,9 @@
     <ErrorBanner message={error} />
   </div>
 {:else if overview}
+  {#if ersetztJahr}
+    <div class="px-4 pt-3"><WarningBanner message={ersetztJahr} /></div>
+  {/if}
   <!-- UE-Legende -->
   <UnitLegend
     units={overview.units}

@@ -171,6 +171,11 @@
                    text-light-tx dark:text-dark-tx outline-none focus:border-primary dark:focus:border-primary-dark transition-colors"
           >
             <option value="">— Kein Kapitel —</option>
+            {#if unit?.kapitel_archiviert && unit?.kapitel_node_id}
+              <!-- 0.45: Kapitel eines ersetzten Curriculums — bleibt wählbar, sonst ginge die
+                   Verknüpfung beim Speichern von Titel oder Farbe verloren. -->
+              <option value={unit.kapitel_node_id}>Bisheriges Kapitel (Curriculum ersetzt)</option>
+            {/if}
             {#if curricula.length === 1}
               {#each curricula[0].kapitel as k}
                 <option value={k.id}>{kapitelLabel(k)}</option>
@@ -187,6 +192,11 @@
               {/each}
             {/if}
           </select>
+          {#if unit?.kapitel_archiviert && selectedKapitelId === unit.kapitel_node_id}
+            <p class="mt-1 text-xs text-light-ye dark:text-dark-ye">
+              Das Curriculum dieses Kapitels wurde ersetzt. Wähle ein Kapitel des neuen Curriculums.
+            </p>
+          {/if}
           {#if lage}
             <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
               {lage.text}{#if lage.tun}&nbsp;{lage.tun}{/if}

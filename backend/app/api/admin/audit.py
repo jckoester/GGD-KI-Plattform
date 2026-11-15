@@ -56,6 +56,7 @@ BEZEICHNUNG: dict[str, str] = {
     "user_sessions_revoked": "Sitzungen beendet",
     "feedback_status_changed": "Feedback-Status geändert",
     "feedback_public_changed": "Bekanntes Problem gezeigt oder zurückgenommen",
+    "curriculum_published": "Curriculum veröffentlicht",
     "crisis_flag_created": "Krisen-Flag angelegt",
     "crisis_flag_resolved": "Krisen-Flag erledigt",
     "accounts_cleaned": "Konten gelöscht (Löschlauf)",
