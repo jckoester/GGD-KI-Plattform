@@ -84,3 +84,26 @@ export function mehrdeutigeFassungen(nodes) {
     }
     return markiert
 }
+
+/** 2027 → „2027/28". Der Fahrplan rechnet in Anfangsjahren, gelesen wird anders. */
+export function schuljahrText(start) {
+    return `${start}/${String(start + 1).slice(2)}`
+}
+
+/**
+ * Kommende Fassung (`status = 'upcoming'`, 0.46): Bildungsplan, der laut Fahrplan erst in
+ * einem späteren Schuljahr gilt. Curricula lassen sich dafür schon schreiben; Suche und
+ * Assistenten sehen ihn erst, wenn er gilt.
+ *
+ * @param {number|null|undefined} giltAb Startjahr des Schuljahrs (`gilt_ab` vom Backend)
+ * @returns {string} kurzer Zusatz für Auswahllisten, z. B. „gilt ab 2027/28"
+ */
+export function kuenftigZusatz(giltAb) {
+    return giltAb ? `gilt ab ${schuljahrText(giltAb)}` : 'kommende Fassung'
+}
+
+/** Hinweis über einem Baustein oder Bildungsplan einer kommenden Fassung. */
+export function kuenftigHinweis(giltAb) {
+    const ab = giltAb ? ` ab dem Schuljahr ${schuljahrText(giltAb)}` : ' erst später'
+    return `Diese Fassung des Bildungsplans gilt${ab}. Curricula kannst du dafür schon schreiben; in Suche und Assistenten erscheint sie erst, wenn sie gilt.`
+}

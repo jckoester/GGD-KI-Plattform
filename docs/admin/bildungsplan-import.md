@@ -449,9 +449,16 @@ Was daraus folgt:
 - **Die Archivierung richtet sich nach dem Fahrplan.** Stillgelegt wird nur, was *keine*
   Klassenstufe mehr braucht. Die Meldung nennt das ausdrücklich:
   `Edition(en) 2016 werden von keiner Klassenstufe mehr gebraucht`.
-- **Ein Fach kann seinen neuen Plan sofort wieder archiviert bekommen.** Chemie beginnt in
-  Klasse 8; solange V3 nur für 5–7 gilt, braucht ihn dort niemand. Der Plan bleibt
-  importiert und wird beim Import des Folgejahres automatisch reaktiviert.
+- **Eine Fassung, die erst später gilt, wird als „künftig“ abgelegt** (`status = 'upcoming'`,
+  seit 0.46). Chemie beginnt in Klasse 8; solange V3 nur für 5–7 gilt, braucht ihn dort im
+  Unterricht noch niemand. Die Meldung lautet dann
+  `Edition(en) 2016.V3 gelten erst später, … Knoten als künftig ablegen`. Eine künftige
+  Fassung erscheint nicht in Suche und Chat, steht aber im Curriculum-Editor und in der
+  Bildungsplan-Ansicht („gilt ab 2027/28“) bereit — Fachschaften schreiben ihr Curriculum
+  vor dem Wechsel. Anders als archivierte Bausteine löscht der Löschlauf sie nicht. Sobald
+  sie gilt, macht der nächste Import (eines beliebigen Fachs) sie wieder aktiv.
+- **Vor 0.46** archivierte der Import eine kommende Fassung. Nach dem Update auf 0.46 einmal
+  vollständig importieren (Schritt 2–3), dann steht sie als „künftig“ bereit.
 - **In Auswahllisten ohne Jahrgangsbezug** (Chat-Kontext, Knotensuche) stehen dann zwei
   Kompetenzen mit gleicher Nummer und verschiedenem Text nebeneinander. Dort blendet die
   Oberfläche die Fassung ein — aber nur bei tatsächlicher Mehrdeutigkeit, nicht an jedem

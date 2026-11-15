@@ -31,6 +31,8 @@
     import { ArrowLeft, Pencil, Check, X, Download } from "lucide-svelte";
     import { IMPORTIERBARE_TYPEN } from "$lib/fachbegriffe_import.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import { kuenftigHinweis, schuljahrText } from "$lib/bp_fassung.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
@@ -301,11 +303,6 @@
             });
     });
 
-    /** 2027 → „2027/28". Der Fahrplan rechnet in Anfangsjahren, gelesen wird anders. */
-    function schuljahrText(start) {
-        return `${start}/${String(start + 1).slice(2)}`;
-    }
-
     function formatDate(dateString) {
         if (!dateString) return "";
         return new Date(dateString).toLocaleDateString("de-DE", {
@@ -489,6 +486,9 @@
              oder „Edition gilt für dieses Fach noch nicht". Jetzt steht da die
              **Wirkung**, die in jedem Fall zutrifft, und ein Grund nur dort, wo der
              Editionsfahrplan ihn hergibt. -->
+        {#if node.status === "upcoming"}
+            <div class="mb-4"><InfoBanner message={kuenftigHinweis(node.gilt_ab)} /></div>
+        {/if}
         {#if archivedRefs.length > 0}
             <div
                 class="mb-4 px-4 py-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3

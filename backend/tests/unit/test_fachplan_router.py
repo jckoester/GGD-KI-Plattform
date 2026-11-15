@@ -145,11 +145,10 @@ def _band_row(min_grade: int, max_grade: int, niveau: str = "regulär") -> Magic
     return row
 
 
-def _version_row(version: str) -> MagicMock:
-    """Simuliert eine SQLAlchemy-Row für bp_version-Distinct-Query (r[0] Zugriff)."""
-    row = MagicMock()
-    row.__getitem__ = MagicMock(return_value=version)
-    return row
+def _version_row(version: str, status: str = "active") -> tuple[str, str]:
+    """Zeile der Distinct-Abfrage nach Fassungen: (bp_version, status) — seit 0.46 mit Status,
+    weil kommende Fassungen (`upcoming`) zur Auswahl stehen, aber nicht als Vorgabe."""
+    return (version, status)
 
 
 # Query-Reihenfolge im Endpoint (pro Fachplan-Aufruf):

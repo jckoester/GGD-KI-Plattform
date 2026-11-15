@@ -105,6 +105,9 @@ class ContextNodeRead(BaseModel):
     darf_schreiben: bool | None = None
     #: Nur in der Curricula-Liste, nur bei Entwürfen (0.45, E12): jüngste Änderung im Baum.
     zuletzt_geaendert: datetime | None = None
+    #: Nur an Knoten einer kommenden Bildungsplan-Fassung (`upcoming`, 0.46): Startjahr des
+    #: Schuljahrs, ab dem sie für die Stufen des Knotens gilt.
+    gilt_ab: int | None = None
 
     @field_validator("title_locked", mode="before")
     @classmethod
@@ -633,6 +636,9 @@ class FachplanTreeRead(BaseModel):
     selected_band: BandRead | None = None
     bp_version: str = ""
     available_versions: list[str] = Field(default_factory=list)
+    #: Kommende Fassungen (`upcoming`, 0.46) → Startjahr des Schuljahrs, ab dem sie für das Fach
+    #: gelten (`None`, wenn der Fahrplan es nicht hergibt).
+    kuenftige_versionen: dict[str, int | None] = Field(default_factory=dict)
 
 
 # ── „Meine Bausteine" (AP7) ──────────────────────────────────────────────────

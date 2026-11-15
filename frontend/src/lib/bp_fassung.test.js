@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fassungsLabel, mehrdeutigeFassungen } from './bp_fassung.js'
+import { fassungsLabel, kuenftigHinweis, kuenftigZusatz, mehrdeutigeFassungen, schuljahrText } from './bp_fassung.js'
 
 const knoten = (id, nr, bpVersion, subjectId = 1) => ({
     id,
@@ -183,5 +183,18 @@ describe('Knoten ohne Kompetenznummer (Operatoren)', () => {
             { node_id: 'b', title: 'Merkblatt', subject_id: 7 },
         ])
         expect(markiert.size).toBe(0)
+    })
+})
+
+describe('kommende Fassung (0.46)', () => {
+    it('schreibt das Schuljahr aus', () => {
+        expect(schuljahrText(2027)).toBe('2027/28')
+        expect(schuljahrText(2099)).toBe('2099/00')
+    })
+    it('nennt das Schuljahr, wenn der Fahrplan es hergibt', () => {
+        expect(kuenftigZusatz(2027)).toBe('gilt ab 2027/28')
+        expect(kuenftigZusatz(null)).toBe('kommende Fassung')
+        expect(kuenftigHinweis(2027)).toContain('ab dem Schuljahr 2027/28')
+        expect(kuenftigHinweis(null)).toContain('erst später')
     })
 })

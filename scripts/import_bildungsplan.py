@@ -675,7 +675,7 @@ def archive_removed_nodes(
         FROM context_nodes
         WHERE category = 'knowledge'
           AND content_type = ANY(%s)
-          AND status = 'active'
+          AND status IN ('active', 'upcoming')
           AND metadata->>'bp_id' NOT IN ({placeholders})
           AND (subject_id = ANY(%s) OR (subject_id IS NULL AND %s))
     """,
@@ -898,16 +898,21 @@ def _archive_subject_edition(
 
     Sicherheitsnetz wie bisher: Ohne aktive Knoten der aktuellen Edition passiert nichts —
     sonst würde ein Teil-Import das gerade Importierte sofort wieder ablegen.
+
+    **Künftige Fassung (0.46):** Eine Edition, die laut Fahrplan erst in einem späteren
+    Schuljahr eine Stufe des Fachs erreicht, wird nicht archiviert, sondern `upcoming` — für
+    Curricula lesbar, für Suche und Chat unsichtbar, vom Löschlauf ausgenommen. Gilt sie, macht
+    der nächste Import sie wieder aktiv. Rückgabe: Zahl der **archivierten** Knoten.
     """
     marker = fach_code + subject_suffix
 
-    # Guard: ist die neue Edition überhaupt vorhanden?
+    # Guard: ist die neue Edition überhaupt vorhanden (aktiv oder schon als künftig abgelegt)?
     cur.execute(
         """
         SELECT count(*)
         FROM context_nodes
         WHERE subject_id = %s
-          AND status = 'active'
+          AND status IN ('active', 'upcoming')
           AND category = 'knowledge'
           AND content_type = ANY(%s)
           AND metadata->>'bp_id' LIKE %s
@@ -921,12 +926,12 @@ def _archive_subject_edition(
         )
         return 0
 
-    # Welche Editionen liegen für dieses Fach überhaupt aktiv vor?
+    # Welche Editionen liegen für dieses Fach vor — aktiv oder als künftige Fassung?
     cur.execute(
         """
         SELECT DISTINCT metadata->>'bp_version'
         FROM context_nodes
-        WHERE subject_id = %s AND status = 'active' AND category = 'knowledge'
+        WHERE subject_id = %s AND status IN ('active', 'upcoming') AND category = 'knowledge'
           AND content_type = ANY(%s) AND metadata->>'bp_version' IS NOT NULL
         """,
         (subject_id, list(BP_CONTENT_TYPES)),
@@ -941,48 +946,64 @@ def _archive_subject_edition(
         )
         return 0
 
+    from app.context.editions import kommt_ab, load_edition_schedule
+
     benoetigt = benoetigte_editionen(cfg, fach, schuljahr_start, verfuegbar)
-    ueberzaehlig = verfuegbar - benoetigt
-    if not ueberzaehlig:
+    editionen = load_edition_schedule(cfg)
+    von, bis = int(fach.get("min_grade") or 5), int(fach.get("max_grade") or 13)
+    # Kommende Fassung (0.46): gilt laut Fahrplan erst später für eine Stufe des Fachs.
+    kuenftig = {v for v in verfuegbar - benoetigt
+                if kommt_ab(editionen, v, von, bis, schuljahr_start) is not None}
+    veraltet = verfuegbar - benoetigt - kuenftig
+
+    def setze(versionen: set[str], von_status: tuple[str, ...], neu: str) -> int:
+        if not versionen:
+            return 0
+        cur.execute(
+            """
+            SELECT count(*) FROM context_nodes
+            WHERE subject_id = %s AND status = ANY(%s) AND category = 'knowledge'
+              AND content_type = ANY(%s) AND metadata->>'bp_version' = ANY(%s)
+            """,
+            (subject_id, list(von_status), list(BP_CONTENT_TYPES), list(versionen)),
+        )
+        anzahl = cur.fetchone()[0]
+        if anzahl and not dry_run:
+            cur.execute(
+                """
+                UPDATE context_nodes
+                SET status = %s,
+                    archived_at = CASE WHEN %s = 'archived' THEN now() ELSE NULL END
+                WHERE subject_id = %s AND status = ANY(%s) AND category = 'knowledge'
+                  AND content_type = ANY(%s) AND metadata->>'bp_version' = ANY(%s)
+                """,
+                (neu, neu, subject_id, list(von_status), list(BP_CONTENT_TYPES), list(versionen)),
+            )
+        return anzahl
+
+    dry = "[DRY RUN] " if dry_run else ""
+    # Eine künftige Fassung, die jetzt gilt (Schuljahreswechsel), wird wieder aktiv — auch
+    # ohne dass dieses Fach neu importiert wird.
+    if n := setze(benoetigt, ("upcoming",), "active"):
+        logger.info(f"{dry}archive_superseded: {fach_slug} — {n} Knoten der Edition(en) "
+                    f"{', '.join(sorted(benoetigt))} gelten jetzt, wieder aktiv")
+    if n := setze(kuenftig, ("active",), "upcoming"):
+        logger.info(f"{dry}archive_superseded: {fach_slug} — Edition(en) "
+                    f"{', '.join(sorted(kuenftig))} gelten erst später, {n} Knoten als künftig ablegen")
+    archiviert = setze(veraltet, ("active", "upcoming"), "archived")
+    if archiviert:
+        logger.info(
+            f"{dry}archive_superseded: {fach_slug} — Edition(en) {', '.join(sorted(veraltet))} "
+            f"werden von keiner Klassenstufe mehr gebraucht, {archiviert} Knoten archivieren "
+            f"(weiter aktiv: {', '.join(sorted(benoetigt))})"
+        )
+    elif not kuenftig:
         logger.info(
             f"archive_superseded: {fach_slug} (Edition {subject_suffix}) — "
             f"alle vorhandenen Editionen werden noch gebraucht "
             f"({', '.join(sorted(benoetigt)) or '—'}), nichts archiviert"
         )
-        return 0
-
-    cur.execute(
-        """
-        SELECT id, metadata->>'bp_id' AS bp_id
-        FROM context_nodes
-        WHERE subject_id = %s
-          AND status = 'active'
-          AND category = 'knowledge'
-          AND content_type = ANY(%s)
-          AND metadata->>'bp_version' = ANY(%s)
-        """,
-        (subject_id, list(BP_CONTENT_TYPES), list(ueberzaehlig)),
-    )
-    rows = cur.fetchall()
-    if not rows:
-        return 0
-
-    logger.info(
-        f"{'[DRY RUN] ' if dry_run else ''}"
-        f"archive_superseded: {fach_slug} — Edition(en) {', '.join(sorted(ueberzaehlig))} "
-        f"werden von keiner Klassenstufe mehr gebraucht, {len(rows)} Knoten archivieren "
-        f"(weiter aktiv: {', '.join(sorted(benoetigt))})"
-    )
-    if not dry_run:
-        cur.execute(
-            """
-            UPDATE context_nodes
-            SET status = 'archived', archived_at = now()
-            WHERE id = ANY(%s)
-            """,
-            ([row[0] for row in rows],),
-        )
-    return len(rows)
+    return archiviert
 
 
 # -- Hauptfunktion ---------------------------------------------------------------

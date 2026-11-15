@@ -2201,7 +2201,8 @@ export async function createCurriculum(payload) {
 
 export async function getFachplaene() {
     const res = await fetch(
-        `${BASE}/context/nodes?content_type=fachplan&status=active`,
+        // Auch kommende Fassungen (0.46): Curricula entstehen vor dem Wechsel.
+        `${BASE}/context/nodes?content_type=fachplan&status=active&status=upcoming`,
         { credentials: 'include' }
     )
     if (!res.ok) throw new ApiError(res.status, 'Fehler beim Laden der Bildungspläne')

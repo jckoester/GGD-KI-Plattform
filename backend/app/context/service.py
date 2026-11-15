@@ -21,6 +21,7 @@ from sqlalchemy.orm import aliased
 from app.context.bausteine import VORAB, Angebot, Baustein, Kontext, aus_treffern
 from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
+from app.context.editions import BP_STATUS_CURRICULUM
 from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context
 from app.context.modellsicht import fuer_modell, mit_lesehinweis
@@ -611,7 +612,7 @@ async def get_fachplan_node(db: AsyncSession, fachplan_id: str) -> ContextNode |
         sa.select(ContextNode).where(
             ContextNode.content_type == "fachplan",
             ContextNode.metadata_["fachplan_id"].astext == fachplan_id,
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),  # auch kommende Fassung (0.46)
         )
     )
     return result.scalars().first()
@@ -653,7 +654,7 @@ async def resolve_fachplan(
             sa.select(ContextNode).where(
                 ContextNode.content_type == "fachplan",
                 ContextNode.metadata_["bp_id"].astext == bp_id,
-                ContextNode.status == "active",
+                ContextNode.status.in_(BP_STATUS_CURRICULUM),  # auch kommende Fassung (0.46)
             )
         )
         node = result.scalars().first()
@@ -666,7 +667,7 @@ async def resolve_fachplan(
                 ContextNode.content_type == "fachplan",
                 ContextNode.subject_id == subject_id,
                 ContextNode.metadata_["bp_version"].astext == bp_version,
-                ContextNode.status == "active",
+                ContextNode.status.in_(BP_STATUS_CURRICULUM),  # auch kommende Fassung (0.46)
             )
         )
         treffer = result.scalars().all()
@@ -903,9 +904,9 @@ async def resolve_ik_node(
                 ContextNode.metadata_["nr"].astext == nr,
                 ContextNode.metadata_["kompetenz_nr"].astext == nr,
             ),
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
             _editions_filter(bp_version),
-        )
+        ).order_by(ContextNode.status != "active")  # ohne Fassung: die geltende zuerst
     )
     row = result.fetchone()
     if row:
@@ -916,9 +917,9 @@ async def resolve_ik_node(
         sa.select(ContextNode).where(
             ContextNode.content_type == "ik_kompetenz",
             ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
             _editions_filter(bp_version),
-        )
+        ).order_by(ContextNode.status != "active")
     )
     for (node,) in result.fetchall():
         meta = node.metadata_ or {}
@@ -965,10 +966,10 @@ async def resolve_pk_node(
                 ContextNode.metadata_["pk_id"].astext == pk_id,
                 ContextNode.metadata_["kompetenz_nr"].astext == pk_id,
             ),
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
             _fach_filter(subject_id),
             _editions_filter(bp_version),
-        )
+        ).order_by(ContextNode.status != "active")  # ohne Fassung: die geltende zuerst
     )
     row = result.fetchone()
     if row:
@@ -978,10 +979,10 @@ async def resolve_pk_node(
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "pk_kompetenz",
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
             _fach_filter(subject_id),
             _editions_filter(bp_version),
-        )
+        ).order_by(ContextNode.status != "active")
     )
     for (node,) in result.fetchall():
         meta = node.metadata_ or {}

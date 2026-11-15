@@ -32,6 +32,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.context.editions import BP_STATUS_CURRICULUM
 from app.db.models import ContextEdge, ContextNode, Subject
 
 VERKNUEPFT, PARTIELL, FEHLT = "verknuepft", "partiell", "fehlt"
@@ -83,8 +84,15 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
     if cur.subject_id is None or not bp:
         return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
 
-    im_fach = sa.and_(ContextNode.subject_id == cur.subject_id, ContextNode.bp_version == bp,
-                      ContextNode.status != "deleted")
+    # Geltende oder kommende Fassung (0.46): nur deren Knoten — archivierte daneben sind
+    # abgelöste Doppel (alte `bp_id`-Schreibweise). Ein Curriculum auf einer abgelösten
+    # Fassung hat nur archivierte; dann zählen die.
+    fassung = sa.and_(ContextNode.subject_id == cur.subject_id, ContextNode.bp_version == bp)
+    lebt = (await db.execute(sa.select(sa.exists().where(
+        fassung, ContextNode.status.in_(BP_STATUS_CURRICULUM),
+        ContextNode.content_type.in_(("ik_kompetenz", "pk_kompetenz")))))).scalar()
+    im_fach = sa.and_(fassung, ContextNode.status.in_(BP_STATUS_CURRICULUM) if lebt
+                      else ContextNode.status != "deleted")
     band = sa.true()
     if cur.min_grade is not None and cur.max_grade is not None:
         band = sa.and_(sa.or_(ContextNode.min_grade.is_(None), ContextNode.min_grade <= cur.max_grade),

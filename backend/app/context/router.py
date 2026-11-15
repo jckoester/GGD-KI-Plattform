@@ -74,7 +74,7 @@ _NUR_VORSITZ = ("Keine Berechtigung zum Bearbeiten dieses Curriculums. Für Änd
                 "veröffentlichten Curriculum: „Als Entwurf kopieren“.")
 from app.context import aliase as aliase_modul
 from app.context import fachbegriffe_kollision
-from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
+from app.context.editions import BP_STATUS_CURRICULUM, KUENFTIG, aktive_bp_version, gilt_ab_schuljahr
 from app.context.embedding import (
     eingabe_mit_aliasen,
     enqueue_embedding_job,
@@ -281,10 +281,13 @@ async def _require_curriculum_write(
     return node
 
 
-def _visibility_filter(query, user: JwtPayload, status_override: str | None = None):
-    """Sichtbarkeitsfilter; status_override überschreibt den active-Default."""
+def _visibility_filter(query, user: JwtPayload, status_override=None):
+    """Sichtbarkeitsfilter; status_override (ein Status oder mehrere) überschreibt den
+    active-Default."""
     q = query.where(_read_scope_clause(user))
-    if status_override is not None:
+    if isinstance(status_override, (list, tuple)):
+        q = q.where(ContextNode.status.in_(status_override))
+    elif status_override is not None:
         q = q.where(ContextNode.status == status_override)
     else:
         q = q.where(ContextNode.status == "active")
@@ -308,6 +311,23 @@ async def _aliase_setzen(nodes, db: AsyncSession) -> None:
     je_knoten = await aliase_modul.lade_viele(db, [n.id for n in nodes])
     for node in nodes:
         node.aliase = je_knoten.get(node.id, [])
+
+
+async def _gilt_ab_setzen(nodes, db: AsyncSession) -> None:
+    """``gilt_ab`` an Knoten einer kommenden Fassung (0.46): ab welchem Schuljahr sie für ihre
+    Stufen gilt — ohne eigene Stufen (Fachplan) für die des Fachs."""
+    kuenftige = [n for n in nodes if n.status == KUENFTIG and n.bp_version]
+    if not kuenftige:
+        return
+    faecher = {n.subject_id for n in kuenftige if n.min_grade is None and n.subject_id}
+    stufen = {}
+    if faecher:
+        stufen = {sid: (lo, hi) for sid, lo, hi in (await db.execute(
+            sa.select(Subject.id, Subject.min_grade, Subject.max_grade).where(Subject.id.in_(faecher))
+        )).all()}
+    for n in kuenftige:
+        lo, hi = (n.min_grade, n.max_grade) if n.min_grade is not None else stufen.get(n.subject_id, (None, None))
+        n.gilt_ab = gilt_ab_schuljahr(n.bp_version, lo, hi)
 
 
 async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> None:
@@ -406,7 +426,11 @@ async def list_nodes(
     q: str | None = Query(default=None),
     category: str | None = Query(default=None),
     content_type: list[str] | None = Query(default=None),
-    status: str | None = Query(default=None),
+    status: list[str] | None = Query(
+        default=None,
+        description="Status, auch mehrfach. Ohne Angabe `active` — mit `bp_version` zusätzlich "
+                    "`upcoming` (kommende Fassung, 0.46): Wer eine Fassung nennt, arbeitet an ihr.",
+    ),
     subject_slug: str | None = Query(default=None),
     subject_id: int | None = Query(default=None, description="Direkte Subject-ID-Filterung"),
     mit_bezugsfaechern: bool = Query(
@@ -447,7 +471,11 @@ async def list_nodes(
         subject_ids = (subject_id, *await bezugsfaecher_von(db, subject_id))
         subject_id = None
 
-    query = _visibility_filter(select(ContextNode), user, status_override=status)
+    if status:
+        status_filter = status[0] if len(status) == 1 else tuple(status)
+    else:
+        status_filter = BP_STATUS_CURRICULUM if bp_version else None
+    query = _visibility_filter(select(ContextNode), user, status_override=status_filter)
     query = wende_an(query, Knotenfilter(
         q=q,
         category=category,
@@ -477,6 +505,7 @@ async def list_nodes(
     # Die Sammlungen von `methode` und `sozialform` zeigen die Spalte „Andere
     # Bezeichnungen"; seit Migration 0057 kommt sie nicht mehr aus den Metadaten.
     await _aliase_setzen(nodes, db)
+    await _gilt_ab_setzen(nodes, db)
     return nodes
 
 
@@ -586,7 +615,7 @@ async def get_archived_references(
           JOIN context_nodes n ON n.id = e.to_node_id
           LEFT JOIN subjects s ON s.id = n.subject_id
          WHERE e.from_node_id = :node_id
-           AND n.status = 'archived'
+           AND n.status IN ('archived', 'upcoming')  -- auch kommende Fassung (0.46)
     """)
     result = await db.execute(sql, {"node_id": str(node_id)})
 
@@ -777,6 +806,7 @@ async def get_node(
     await _check_read_permission(node, user, db)
     await _schreibrechte_setzen([node], user, db)
     await _aliase_setzen([node], db)
+    await _gilt_ab_setzen([node], db)
     return node
 
 
@@ -2232,7 +2262,9 @@ async def create_edge(
     # Entwürfe (0.45) zählen mit — ihre Regel steht in den beiden Prüfungen darunter.
     if not from_node or from_node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail=f"Ausgangsbaustein {payload.from_node_id} nicht gefunden")
-    if not to_node or to_node.status not in LESBARE_STATUS:
+    # Ziel auch eine Kompetenz der kommenden Fassung (0.46) — ein Curriculum für V3 entsteht,
+    # bevor V3 gilt.
+    if not to_node or to_node.status not in (*LESBARE_STATUS, KUENFTIG):
         raise HTTPException(status_code=404, detail=f"Zielbaustein {payload.to_node_id} nicht gefunden")
 
     await _check_write_permission(from_node, user, db)
@@ -2296,7 +2328,7 @@ async def get_node_edges(
     """Gibt alle ausgehenden Kanten eines Knotens zurück."""
     # Prüfe ob Knoten existiert und sichtbar ist
     node = await db.get(ContextNode, node_id)
-    if not node or node.status not in LESBARE_STATUS:  # Entwurf: Regel in _check_read_permission
+    if not node or node.status not in (*LESBARE_STATUS, KUENFTIG):  # Entwurf: Regel in _check_read_permission
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     
     # Sichtbarkeitsprüfung (privat/fremd-gruppen ausgeschlossen, Audit #1)
@@ -2335,7 +2367,8 @@ async def create_curriculum_node(
     except ValueError:
         raise HTTPException(status_code=422, detail="fachplan_node_id ist keine gültige UUID")
     fachplan_node = await db.get(ContextNode, fachplan_uuid)
-    if not fachplan_node or fachplan_node.content_type != "fachplan" or fachplan_node.status != "active":
+    if (not fachplan_node or fachplan_node.content_type != "fachplan"
+            or fachplan_node.status not in BP_STATUS_CURRICULUM):  # auch kommende Fassung (0.46)
         raise HTTPException(
             status_code=422,
             detail=f"Für Fach {payload.fach_code} / BP-Version {payload.bp_version} ist kein Bildungsplan importiert",
@@ -2513,25 +2546,29 @@ async def get_fachplan_by_subject(
     Filtert Leitideen/IK/PK nach Band (min_grade, max_grade, niveau).
     """
     # ── Verfügbare (aktive) BP-Versionen für dieses Fach ──────────────────────
+    # Kommende Fassungen (`upcoming`, 0.46) stehen zur Auswahl, gewählt werden sie nur ausdrücklich.
     _bp_ver_col = ContextNode.metadata_["bp_version"].astext.label("bp_version")
     vers_result = await db.execute(
-        sa.select(_bp_ver_col)
+        sa.select(_bp_ver_col, ContextNode.status)
         .where(
             ContextNode.content_type == "fachplan",
             ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
         )
         .distinct()
         .order_by(_bp_ver_col)
     )
-    available_versions = [r[0] for r in vers_result.all() if r[0]]
+    vers_rows = [(v, st) for v, st in vers_result.all() if v]
+    available_versions = sorted({v for v, _ in vers_rows})
+    aktive_versionen = {v for v, st in vers_rows if st == "active"}
+    kuenftige_versionen = {v for v, st in vers_rows if st == KUENFTIG} - aktive_versionen
 
     # ── Default-Edition aus Fahrplan + Schuljahr berechnen ────────────────────
     # Ohne explizite bp_version und mit Stufenbezug (min_grade) wählt die
     # schuljahresabhängige Frontier die geltende Edition; sonst bleibt es bei der
     # neuesten aktiven (Verhalten wie bisher). Vor V3 ein No-Op (Frontier = V2).
-    if not bp_version and min_grade is not None and available_versions:
-        bp_version = aktive_bp_version(min_grade, set(available_versions)) or bp_version
+    if not bp_version and min_grade is not None and aktive_versionen:
+        bp_version = aktive_bp_version(min_grade, aktive_versionen) or bp_version
 
     # ── Fachplan laden (mehr-versionsfest) ────────────────────────────────────
     q = (
@@ -2539,7 +2576,8 @@ async def get_fachplan_by_subject(
         .where(
             ContextNode.content_type == "fachplan",
             ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
+            # Ohne Angabe nur geltende Fassungen; eine kommende nur, wenn sie genannt ist.
+            ContextNode.status.in_(BP_STATUS_CURRICULUM) if bp_version else ContextNode.status.in_(BP_STATUS_CURRICULUM),
         )
         .order_by(ContextNode.updated_at.desc())
     )
@@ -2560,7 +2598,7 @@ async def get_fachplan_by_subject(
             ContextEdge.to_node_id == fachplan_node.id,
             ContextEdge.relation == "part_of",
             ContextNode.content_type == "leitidee",
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
             ContextNode.min_grade.isnot(None),
         )
         .distinct()
@@ -2601,7 +2639,7 @@ async def get_fachplan_by_subject(
                 ContextEdge.to_node_id == parent_node.id,
                 ContextEdge.relation == "part_of",
                 ContextNode.content_type == "ik_kompetenz",
-                ContextNode.status == "active",
+                ContextNode.status.in_(BP_STATUS_CURRICULUM),
             )
             .order_by(
                 sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
@@ -2637,7 +2675,7 @@ async def get_fachplan_by_subject(
                 ContextEdge.to_node_id == parent_node.id,
                 ContextEdge.relation == "part_of",
                 ContextNode.content_type == "leitidee",
-                ContextNode.status == "active",
+                ContextNode.status.in_(BP_STATUS_CURRICULUM),
             )
             .order_by(ContextNode.title)
         )
@@ -2672,7 +2710,7 @@ async def get_fachplan_by_subject(
             ContextEdge.to_node_id == fachplan_node.id,
             ContextEdge.relation == "part_of",
             ContextNode.content_type == "leitidee",
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
         )
         .order_by(ContextNode.title)
     )
@@ -2695,7 +2733,7 @@ async def get_fachplan_by_subject(
             ContextEdge.to_node_id == fachplan_node.id,
             ContextEdge.relation == "part_of",
             ContextNode.content_type == "pk_gruppe",
-            ContextNode.status == "active",
+            ContextNode.status.in_(BP_STATUS_CURRICULUM),
         )
         .order_by(ContextNode.title)
     )
@@ -2711,7 +2749,7 @@ async def get_fachplan_by_subject(
                 ContextEdge.to_node_id == pg_node.id,
                 ContextEdge.relation == "part_of",
                 ContextNode.content_type == "pk_kompetenz",
-                ContextNode.status == "active",
+                ContextNode.status.in_(BP_STATUS_CURRICULUM),
             )
             .order_by(
                 sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
@@ -2732,6 +2770,12 @@ async def get_fachplan_by_subject(
             )
         )
 
+    await _gilt_ab_setzen([fachplan_node], db)
+    kuenftig_ab = {}
+    if kuenftige_versionen:
+        fach = await db.get(Subject, subject_id)
+        lo, hi = (fach.min_grade, fach.max_grade) if fach else (None, None)
+        kuenftig_ab = {v: gilt_ab_schuljahr(v, lo, hi) for v in sorted(kuenftige_versionen)}
     return FachplanTreeRead(
         fachplan=ContextNodeRead.model_validate(fachplan_node),
         leitideen=leitideen_list,
@@ -2741,6 +2785,7 @@ async def get_fachplan_by_subject(
         selected_band=selected,
         bp_version=fachplan_node.metadata_.get("bp_version", ""),
         available_versions=available_versions,
+        kuenftige_versionen=kuenftig_ab,
     )
 
 

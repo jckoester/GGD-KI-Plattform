@@ -11,6 +11,7 @@
     import LoadingBanner from "./LoadingBanner.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import InfoBanner from "./InfoBanner.svelte";
+    import { kuenftigHinweis, kuenftigZusatz } from "$lib/bp_fassung.js";
     import { ChevronDown, ChevronRight, ExternalLink } from "lucide-svelte";
 
     let { subjectId, initialBpVersion = null } = $props();
@@ -233,10 +234,15 @@
                                    ? 'border-primary dark:border-primary-dark bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark font-medium'
                                    : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:border-primary dark:hover:border-primary-dark'}"
                     >
-                        BP {version}
+                        BP {version}{#if data.kuenftige_versionen?.[version] !== undefined}
+                            · {kuenftigZusatz(data.kuenftige_versionen[version])}{/if}
                     </button>
                 {/each}
             </div>
+        {/if}
+
+        {#if data.fachplan?.status === "upcoming"}
+            <InfoBanner message={kuenftigHinweis(data.fachplan.gilt_ab)} />
         {/if}
 
         <!-- Band-Leiste + PK-Button -->

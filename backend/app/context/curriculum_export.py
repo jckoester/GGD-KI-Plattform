@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.curriculum_begriffe import FELDER, namen_fuer_export, namen_fuer_yaml
+from app.context.editions import BP_STATUS_CURRICULUM
 from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ async def _resolve_node_meta(db: AsyncSession, node_id: str, *fields: str) -> di
     except ValueError:
         return None
     result = await db.execute(
-        sa.select(ContextNode).where(ContextNode.id == uid, ContextNode.status == "active")
+        sa.select(ContextNode).where(ContextNode.id == uid, ContextNode.status.in_(BP_STATUS_CURRICULUM))
     )
     node = result.scalar_one_or_none()
     if not node:
@@ -77,7 +78,7 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
         label, uid = m.group(1), m.group(2)
         result = await db.execute(
             sa.select(ContextNode).where(
-                ContextNode.id == UUID(uid), ContextNode.status == "active"
+                ContextNode.id == UUID(uid), ContextNode.status.in_(BP_STATUS_CURRICULUM)
             )
         )
         node = result.scalar_one_or_none()

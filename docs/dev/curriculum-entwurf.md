@@ -92,6 +92,29 @@ Stundenassistent liest archivierte Kapitel nicht und fällt auf die passenden Cu
 
 Teil B (Assistent) nutzt denselben Dienst als Funktion.
 
+## Kommende Fassung (`upcoming`, seit 0.46)
+
+Eine Bildungsplan-Fassung, die laut Fahrplan erst später gilt, legt der Import als
+`status = 'upcoming'` ab statt als `archived` (`_archive_subject_edition` in
+`scripts/import_bildungsplan.py`, `kommt_ab` in `app/context/editions.py`, Alembic 0107 mit
+`check_context_nodes_upcoming_typ`: nur Bildungsplan-Typen). Gilt sie, setzt der nächste Import
+sie wieder `active` — auch der eines anderen Fachs. Der Löschlauf fasst nur `archived` an.
+
+- **Unsichtbar** für alles, was `active` liest: Suche, Retrieval, Chat, Embedding-Nachholung,
+  `GET /context/subjects/{id}/active-bp-version`.
+- **Lesbar** über `BP_STATUS_CURRICULUM` (`editions.py`) für die Curriculum-Wege:
+  `GET /context/nodes` **mit `bp_version`** (Auswahllisten für IK und PK) oder mit
+  `status=active&status=upcoming` (Fachplan-Auswahl beim Anlegen), `POST /curricula/new`,
+  `GET /fachplan/by-subject` (nur ausdrücklich gewählt; `kuenftige_versionen`), Kanten auf
+  das Ziel, Abdeckung, Export, `resolve_ik_node`/`resolve_pk_node`/`resolve_fachplan`
+  (ohne Fassung gewinnt die geltende).
+- `ContextNodeRead.gilt_ab` (Startjahr) an `upcoming`-Knoten, ohne eigene Stufen nach den
+  Stufen des Fachs; `archived-references` meldet `upcoming`-Ziele mit „gilt ab“.
+- Die Abdeckung zählt nur `active`/`upcoming` der Fassung; archivierte Doppel derselben Fassung
+  (alte `bp_id`-Schreibweise) fallen heraus. Hat die Fassung nur archivierte Knoten (abgelöste
+  Fassung), zählen die.
+- „Bildungsplan aktualisieren“ (`relink.py`) zielt weiter auf die geltende Fassung.
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

@@ -1381,8 +1381,15 @@ class ContextNode(Base):
             name="check_context_nodes_write_scope",
         ),
         CheckConstraint(
-            "status IN ('active','archived','deleted','draft')",
+            "status IN ('active','archived','deleted','draft','upcoming')",
             name="check_context_nodes_status",
+        ),
+        # Kommende Bildungsplan-Fassung (0.46, Alembic 0107) — nur an Bildungsplan-Typen.
+        CheckConstraint(
+            "status <> 'upcoming' OR content_type IN ('fachplan','leitidee','ik_kompetenz',"
+            "'pk_gruppe','pk_kompetenz','leitperspektive','leitperspektive_aspekt','operator',"
+            "'lfdb_baustein','lfdb_themenblock','lfdb_kompetenz')",
+            name="check_context_nodes_upcoming_typ",
         ),
         # Entwürfe nur im Curriculum-Baum (0.45, Alembic 0106) — nur dort verbirgt eine Regel sie.
         CheckConstraint(

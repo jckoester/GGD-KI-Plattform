@@ -7,6 +7,7 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
     import PageBody from '$lib/components/PageBody.svelte'
+    import { kuenftigHinweis, kuenftigZusatz } from '$lib/bp_fassung.js'
 
     // Auth-Guard
     $effect(() => {
@@ -76,7 +77,8 @@
     const enrichedFachplaene = $derived(
         fachplaene.map(fp => {
             const meta = parseBpMetadata(fp)
-            const label = fp.metadata?.breadcrumb?.slice(1).join(' › ') || fp.title
+            const basis = fp.metadata?.breadcrumb?.slice(1).join(' › ') || fp.title
+            const label = fp.status === 'upcoming' ? `${basis} (${kuenftigZusatz(fp.gilt_ab)})` : basis
             return { ...fp, _meta: meta, _label: label }
         })
     )
@@ -204,6 +206,9 @@
                     <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
                         {selectedFachplan._meta.schulart} · BP {selectedFachplan._meta.bp_version} · Fach-Code: {selectedFachplan._meta.fach_code}
                     </p>
+                {/if}
+                {#if selectedFachplan?.status === 'upcoming'}
+                    <div class="mt-2"><InfoBanner message={kuenftigHinweis(selectedFachplan.gilt_ab)} /></div>
                 {/if}
             </div>
 

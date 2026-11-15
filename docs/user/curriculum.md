@@ -50,6 +50,11 @@ veröffentlichtes Curriculum überarbeitest du ohne Fachvorsitz über **„Als E
 Den Rest baust du im Editor auf. Das neue Curriculum ist ein **Entwurf** — siehe nächster
 Abschnitt.
 
+**Für eine Fassung, die erst später gilt:** Steht neben dem Bildungsplan „gilt ab 2027/28“,
+ist das die kommende Fassung. Du kannst dein Curriculum dafür schon jetzt schreiben —
+Kompetenzen, Abdeckung und Export arbeiten mit ihr wie mit der geltenden. In Suche und
+Assistenten erscheint die kommende Fassung erst, wenn sie gilt.
+
 > Erscheint dein Fach nicht in der Auswahl, ist sein Bildungsplan in dieser Installation
 > noch nicht eingelesen. Das ist eine Aufgabe der Administration, keine Einstellung, die
 > du ändern kannst.
@@ -259,6 +264,10 @@ In der Ansicht gibt es dafür **„Bildungsplan aktualisieren"**. Du bekommst zu
 
 Die Markierung ist eine Bitte um Prüfung, kein Fehler: Du musst entscheiden, wodurch die
 Kompetenz zu ersetzen ist. Nichts wird stillschweigend gelöscht.
+
+„Bildungsplan aktualisieren“ stellt auf die Fassung um, die **jetzt** gilt. Für eine Fassung,
+die erst später gilt, legst du ein neues Curriculum an (siehe [Ein Curriculum
+anlegen](#ein-curriculum-anlegen)).
 
 ---
 

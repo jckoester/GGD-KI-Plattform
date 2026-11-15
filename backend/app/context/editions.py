@@ -21,6 +21,15 @@ import yaml
 from app.core.paths import aufloesen
 
 
+#: Status einer Bildungsplan-Fassung, die laut Fahrplan erst in einem späteren Schuljahr gilt
+#: (0.46, F10). Der Import setzt ihn statt `archived`; Suche, Chat und Retrieval lesen nur
+#: `active` und lassen ihn damit aus. Die Curriculum-Wege lesen ihn mit (`BP_STATUS_CURRICULUM`),
+#: damit eine Fachschaft ihr Curriculum vor dem Wechsel schreiben kann. Anders als `archived`
+#: erfasst ihn der Löschlauf nach 1095 Tagen nicht.
+KUENFTIG = "upcoming"
+BP_STATUS_CURRICULUM = ("active", KUENFTIG)
+
+
 @dataclass(frozen=True)
 class Edition:
     """Eine Bildungsplan-Edition aus dem Fahrplan.
@@ -219,16 +228,31 @@ def gilt_ab_schuljahr(
     """
     if min_grade is None and max_grade is None:
         return None
-    editions = load_edition_schedule(load_subjects_config())
+    jahr = (
+        schuljahr_start if schuljahr_start is not None else aktuelles_schuljahr_start()
+    )
+    return kommt_ab(load_edition_schedule(load_subjects_config()), bp_version,
+                    min_grade, max_grade, jahr)
+
+
+def kommt_ab(
+    editions: list[Edition],
+    bp_version: str,
+    min_grade: int | None,
+    max_grade: int | None,
+    schuljahr_start: int,
+) -> int | None:
+    """Kern von :func:`gilt_ab_schuljahr` mit übergebenem Fahrplan — für den Import, der
+    seine `subjects.yaml` selbst lädt. Ein Jahr heißt: Die Edition gilt für diese Stufen
+    noch nicht, aber ab dann; ``None``: Sie gilt schon, steht nicht im Fahrplan oder
+    erreicht die Stufen nie."""
     edition = next((e for e in editions if e.bp_version == bp_version), None)
     if edition is None:
         return None
 
     unten = min_grade if min_grade is not None else 1
     oben = max_grade if max_grade is not None else 13
-    jahr = (
-        schuljahr_start if schuljahr_start is not None else aktuelles_schuljahr_start()
-    )
+    jahr = schuljahr_start
 
     def deckt(im_jahr: int) -> bool:
         return any(_deckt_ab(edition, stufe, im_jahr) for stufe in range(unten, oben + 1))
