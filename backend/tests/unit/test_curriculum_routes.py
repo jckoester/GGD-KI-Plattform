@@ -58,6 +58,8 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         ("GET", "/context/curricula/{curriculum_id}/fachmethoden"),
         # Übersicht und Downloads der fehlenden Begriffe (lesend), Aufrufer `CurriculumTable.svelte`.
         ("GET", "/context/curricula/{curriculum_id}/begriffe/fehlend"),
+        # 0.45 (AP Teil A): Abdeckung der Kompetenzen, lesend; Aufrufer `CurriculumTable.svelte`.
+        ("GET", "/context/curricula/{curriculum_id}/coverage"),
     }
 
 

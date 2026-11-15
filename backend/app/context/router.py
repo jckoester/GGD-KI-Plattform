@@ -1828,6 +1828,28 @@ async def fachmethoden_vorschlaege(
     return await fachmethoden_des_fachs(db, user, node.subject_id, q)
 
 
+@router.get("/curricula/{curriculum_id}/coverage")
+async def curriculum_abdeckung(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Abdeckung der Kompetenzen des Bands (0.45, Päckchen AP Teil A, Punkt 6).
+
+    Je IK: `verknuepft`, `partiell` oder `fehlt` (bei fehlenden und partiellen mit den anderen
+    veröffentlichten Curricula des Bands, die sie verknüpfen); je PK die Zahl der Lernsequenzen.
+    Gespeicherter Stand — der Editor lädt nach dem Speichern neu.
+    """
+    from app.context.curriculum_abdeckung import abdeckung
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    await _curriculum_lesen(db, tree, user)
+    return await abdeckung(db, tree)
+
+
 @router.get("/curricula/{curriculum_id}", response_model=CurriculumRead)
 async def get_curriculum(
     curriculum_id: UUID,

@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Neue Curricula entstehen als Entwurf, ebenso Kopien beim Aktualisieren auf eine neue Bildungsplan-Fassung.
   Entwürfe tragen in der Curricula-Liste die Marke „Entwurf“, in Ansicht und Editor einen Hinweis und im
   Export (PDF, DOCX, ODT) den Vermerk „Entwurf, Stand …“.
+- Curriculum: aufklappbare Abdeckung der Kompetenzen des Bands — je IK verknüpft, partiell oder fehlend, mit
+  Hinweis auf andere Curricula desselben Bands; je PK, in wie vielen Lernsequenzen sie gefördert wird.
 
 ### Geändert
 

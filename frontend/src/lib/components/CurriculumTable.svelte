@@ -17,6 +17,7 @@
     import { parseMaterial } from "$lib/material.js";
     import MaterialEditor from "./MaterialEditor.svelte";
     import NamenChips from "./NamenChips.svelte";
+    import CurriculumAbdeckung from "./CurriculumAbdeckung.svelte";
     import { untrack } from "svelte";
     import { page } from "$app/stores";
     import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl } from "$lib/api.js";
@@ -553,6 +554,8 @@
 
 <!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
 <svelte:document onvisibilitychange={beiRueckkehr} />
+
+<CurriculumAbdeckung curriculumId={curriculum?.id} stand={curriculum} {editMode} />
 
 {#if fehlListe.fehlend.length || fehlListe.mehrdeutig.length}
     <details

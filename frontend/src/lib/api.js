@@ -2002,6 +2002,18 @@ export async function getCurriculumFachmethoden(curriculumId, q = '') {
   return res.json()
 }
 
+/** Abdeckung der Kompetenzen des Bands (0.45): IK verknüpft/partiell/fehlt, PK-Nutzung. */
+export async function getCurriculumAbdeckung(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/coverage`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Abdeckung konnte nicht geladen werden')
+  }
+  return res.json()
+}
+
 export async function updateCurriculumMeta(curriculumId, { title, jahrgangsstufe } = {}) {
   // Titel und Jahrgangsband ändern. Bewusst NICHT über updateContextNode: Das Band steht
   // auch in min_grade/max_grade und in den import_keys des ganzen Baums — der eigene
