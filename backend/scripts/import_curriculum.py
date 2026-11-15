@@ -96,6 +96,8 @@ def convert_yaml_to_draft(data: dict, bp_version_override: str | None = None) ->
                     hinweise=entry_data.get("hinweise"),
                     lp=entry_data.get("lp", []),
                     material=entry_data.get("material"),
+                    begriffe=entry_data.get("begriffe") or [],
+                    fachmethoden=entry_data.get("fachmethoden") or [],
                 )
                 eintraege.append(entry)
 

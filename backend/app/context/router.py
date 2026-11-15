@@ -1670,7 +1670,11 @@ async def get_curriculum(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(get_current_user),
 ):
-    """Gibt das vollständige Curriculum als verschachteltes Objekt zurück."""
+    """Gibt das vollständige Curriculum als verschachteltes Objekt zurück.
+
+    `begriffe`: die Begriffe der Einträge, aufgelöst für die lesende Person (0.44, AQ).
+    """
+    from app.context.curriculum_begriffe import begriffe_aufloesen
     from app.context.service import load_curriculum_tree
 
     tree = await load_curriculum_tree(db, curriculum_id)
@@ -1702,6 +1706,7 @@ async def get_curriculum(
         "write_scope_group_id": tree["write_scope_group_id"],
         "kapitel": tree["kapitel"],
         "can_edit": can_edit,
+        "begriffe": await begriffe_aufloesen(db, tree, user),
     }
 
 
@@ -1741,6 +1746,7 @@ async def update_curriculum_meta(
     if aenderungen:
         await db.commit()
 
+    from app.context.curriculum_begriffe import begriffe_aufloesen
     from app.context.service import load_curriculum_tree
 
     tree = await load_curriculum_tree(db, curriculum_id)
@@ -1752,6 +1758,7 @@ async def update_curriculum_meta(
         "write_scope_group_id": tree["write_scope_group_id"],
         "kapitel": tree["kapitel"],
         "can_edit": True,
+        "begriffe": await begriffe_aufloesen(db, tree, user),
     }
 
 

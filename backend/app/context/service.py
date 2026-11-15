@@ -1485,6 +1485,7 @@ async def import_curriculum_from_draft(
     
     Rückgabe: (curriculum_id, stats)
     """
+    from app.context.curriculum_begriffe import eintrag_felder
     stats = ImportStats()
     
     # Validieren
@@ -1719,6 +1720,7 @@ async def import_curriculum_from_draft(
                     "konkretisierung": entry.konkretisierung or "",
                     "hinweise": hinweise_uuid,
                     "material": material_text,
+                    **eintrag_felder(entry.begriffe, entry.fachmethoden),
                 })
 
             # Lernsequenz-Knoten (metadata mit editor-kompatiblen eintraege)

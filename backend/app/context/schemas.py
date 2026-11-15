@@ -402,6 +402,9 @@ class CurriculumDraftEntry(BaseModel):
     hinweise: str | None = None
     lp: list[str] = Field(default_factory=list)
     material: str | None = None
+    # 0.44 (AQ): Namen, kein Verweis — Text oder {name, fassung}; `curriculum_begriffe`.
+    begriffe: list[str | dict] = Field(default_factory=list)
+    fachmethoden: list[str | dict] = Field(default_factory=list)
     confidence: float = Field(default=1.0, description="Konfidenz der Extraktion (0.0-1.0)")
     warnings: list[str] = Field(default_factory=list, description="Warnungen für diesen Eintrag")
 
@@ -512,6 +515,9 @@ class CurriculumRead(BaseModel):
     write_scope_group_id: int | None
     kapitel: list[KapitelRead]
     can_edit: bool
+    #: Auflösung der Begriffe aller Einträge für die lesende Person (0.44, AQ) — neben dem
+    #: Baum, nicht in ihm (`app/context/curriculum_begriffe.py`).
+    begriffe: list[dict] = Field(default_factory=list)
 
 
 # ── Bildungsplan Hierarchie Schemas ────────────────────────────────────────
