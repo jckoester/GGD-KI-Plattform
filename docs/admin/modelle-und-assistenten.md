@@ -491,7 +491,7 @@ es im Wissensspeicher nicht gibt, trägt das Werkzeug nicht ein; der Assistent v
 die Fachschaft. Ohne `BEGRIFFE_MODEL` gibt es keine Vorschläge; der Assistent trägt Begriffe
 weiter auf Zuruf ein.
 
-⚠️ **Nach jedem Update mit Änderung am Prompt (zuletzt 0.18) den Prompt im Editor nachziehen.** Ein bestehender schulweiter
+⚠️ **Nach jedem Update mit Änderung am Prompt (zuletzt 0.44: Begriffe des Curriculums) den Prompt im Editor nachziehen.** Ein bestehender schulweiter
 Stundenassistent behält seinen alten Prompt. Übernehmen Sie den Inhalt von
 `config/prompts/stundenentwurf_assistent.md` in den System-Prompt. Eigene Stundenassistenten
 der Lehrkräfte folgen nicht; die Startseite weist Lehrkräfte darauf hin, und die Hilfe

@@ -265,6 +265,22 @@ Datei ein.
 Erlaubt sind Kleinbuchstaben, Ziffern und Bindestriche. Eine Kennung, die davon
 abweicht, wird verworfen und gemeldet; die Datei wird trotzdem gelesen.
 
+**Der alte Name bleibt als Alias.** Änderst du bei gleicher Kennung den `titel:`, übernimmt
+die Plattform den bisherigen Titel als Alias — ebenso beim Umbenennen in der Bibliothek.
+So finden Curricula und Stundenentwürfe, die den Begriff unter dem alten Namen nennen, ihn
+weiter. Der Export schreibt ihn unter `aliase:` in die Datei.
+
+## Gerüste aus dem Curriculum
+
+Ein Curriculum zeigt über der Tabelle, welche Begriffe es nennt, die es in der Bibliothek
+noch nicht gibt; **Gerüste (Zip)** lädt sie als Dateien in diesem Format herunter
+([Schulcurriculum](curriculum.md)). Jede Datei hat schon Titel und Fach und im Kopf die
+Zeile `geruest: true`. Schreib die Definition darunter und spiel das Bündel wie gewohnt ein.
+
+Ein Gerüst **ohne Definition** spielt der Import nicht ein — es steht in der Vorschau unter
+„Nicht eingespielt" mit dem Grund. Sonst landete ein leerer Begriff in der Sammlung, die
+auch Schüler:innen sehen. Ausgefüllte Gerüste werden ganz normale Einträge.
+
 ## Herausholen: Export
 
 „Als Zip" gibt dir den Bestand des Fachs als Dateien — dasselbe Format, das der Import
@@ -291,6 +307,7 @@ liest. Ein einzelner Eintrag geht über „Als Markdown" in seiner Detailansicht
 | „keine `id` ableitbar" | Der Dateiname besteht nur aus Sonderzeichen. Datei umbenennen oder `id:` setzen |
 | „Kennung … gehört schon zu …" | Zwei Dateien beanspruchen dieselbe Kennung |
 | „Abbildung abgelehnt" | Die SVG enthält Skripte oder Verweise nach außen |
+| „Gerüst ohne Definition" | Ein Gerüst aus dem Curriculum ist noch leer. Definition eintragen und erneut einspielen |
 | „größer als …" / „entpackt … MB" | Das Paket ist zu groß. In mehreren Läufen einspielen |
 
 ## Verwandte Seiten

@@ -391,3 +391,18 @@
     nachträglich durchgehen — etwa wenn dir noch Gruppen fehlen: Kasten „Einrichtung“ unter
     „Unterricht“ oder oben im Profil.
   link: /help/erste-schritte#die-einrichtung-lehrkräfte
+
+- id: "0.44-curriculum-begriffe"
+  version: "0.44.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-15
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Begriffe und Fachmethoden im Curriculum"
+  text: >-
+    Einträge eines Curriculums nennen jetzt Begriffe und Fachmethoden. Begriffe, die es in der
+    Bibliothek gibt, sind verlinkt; fehlende erscheinen gestrichelt und lassen sich direkt oder
+    gesammelt als Gerüste anlegen. Die Planung nutzt sie: Die Leiste im Stundenentwurf schlägt die
+    Begriffe des Kapitels vor. Hast du einen eigenen Stundenassistenten, leg ihn neu an — die Hilfe
+    erklärt, wie.
+  link: /help/curriculum#begriffe-und-fachmethoden

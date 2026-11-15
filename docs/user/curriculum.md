@@ -50,7 +50,7 @@ Den Rest baust du im Editor auf.
 Curriculum  (Fach + Jahrgangsband)
 └── Kapitel            z. B. „Kreise und Körper"        · Stundenansatz
     └── Lernsequenz    z. B. „Satz des Pythagoras"      · Stundenansatz
-        └── Eintrag    Kompetenzen + Konkretisierung + Hinweise + Material
+        └── Eintrag    Kompetenzen + Konkretisierung + Begriffe + Fachmethoden + Hinweise + Material
 ```
 
 **Kapitel** gliedern das Schuljahr, **Lernsequenzen** die Kapitel. Ein Kapitel lässt sich
@@ -90,6 +90,69 @@ und fachliche Konzepte.
 
 Bildungsplan-Kompetenzen erscheinen hier bewusst **nicht** — dafür gibt es die IK- und
 PK-Felder. Zwei Wege für dieselbe Verknüpfung wären nur verwirrend.
+
+---
+
+## Begriffe und Fachmethoden
+
+Unter der **Konkretisierung** jedes Eintrags stehen zwei Zeilen: **Begriffe** — die
+Fachbegriffe, die die Einheit tragen soll — und **Fachmethoden** — die fachspezifischen
+Verfahren, etwa „Titration" oder „Gedichtanalyse". Beides trägst du als Namen ein: tippen,
+mit **Enter** übernehmen. Ein Begriff muss dafür noch nicht in der Bibliothek stehen.
+
+### Begriffe
+
+Beim Tippen schlägt die Plattform passende Begriffe aus der Bibliothek deines Fachs und
+seiner Bezugsfächer vor. **Enter** übernimmt einen Vorschlag, der genau so heißt, oder den
+mit den Pfeiltasten gewählten — sonst den Namen, wie du ihn getippt hast.
+
+Die Farbe zeigt, ob es den Begriff gibt:
+
+| Darstellung | Bedeutung |
+|---|---|
+| violett, verlinkt | Den Begriff gibt es in der Bibliothek (auch über einen anderen Namen). Aus einem Bezugsfach steht dessen Name dabei. |
+| gestrichelt | Platzhalter: Den Begriff gibt es noch nicht. |
+| gelb | Es gibt mehrere Begriffe dieses Namens (verschiedene Fassungen). Im Bearbeitungsmodus klickst du darauf und wählst die gemeinte. |
+
+Gespeichert wird der **Name**, keine feste Verknüpfung. Legt die Fachschaft einen
+fehlenden Begriff später an, erscheint er von selbst violett — am Curriculum musst du
+nichts ändern. Wird ein Begriff in der Bibliothek umbenannt, bleibt der alte Name als
+Alias erhalten; das Curriculum findet ihn weiter.
+
+### Fehlende Begriffe anlegen
+
+Zwei Wege, die sich ergänzen:
+
+- **Einzeln:** Am gestrichelten Begriff steht **anlegen** — der Link öffnet das Formular für
+  einen neuen Begriff mit dem Namen schon eingetragen. Im Bearbeitungsmodus geht er in einem
+  neuen Tab auf, damit nichts Ungespeichertes verloren geht; zurück im Curriculum ist der
+  Begriff dann violett. Den Link sehen Mitglieder der Fachschaft des Fachs; alle anderen
+  sehen, dass die Fachschaft ihn anlegen kann.
+- **Gesammelt:** Über der Tabelle zeigt **„… Begriffe fehlen in der Bibliothek"** aufgeklappt
+  jeden fehlenden Begriff mit Anzahl und Kapiteln. Darunter zwei Downloads: die **Liste** zum
+  Verteilen in der Fachschaft und **Gerüste (Zip)** — je Begriff eine Datei im Format der
+  Fachbegriffe. Definition eintragen, dann das Bündel unter Fachbegriffe einspielen
+  ([Fachbegriffe pflegen](fachbegriffe-pflegen.md)). Ein Gerüst ohne Definition weist der
+  Import ab, damit kein leerer Begriff in der Sammlung landet.
+
+### Fachmethoden
+
+Fachmethoden sind vorerst nur Namen — es gibt dafür noch keine eigenen Bausteine. Beim
+Tippen schlägt die Plattform vor, was in den Curricula deines Fachs schon als Fachmethode
+steht, mit der Zahl der Nennungen. So entsteht nicht „Titration", „Titrieren" und
+„Säure-Base-Titration" nebeneinander. Ein Name darf auch in beiden Zeilen stehen: als
+Begriff (kennen) und als Fachmethode (beherrschen).
+
+### In der Unterrichtsplanung
+
+Ist eine Unterrichtseinheit einem Kapitel zugeordnet, nutzen beide Wege der Planung die
+Begriffe dieses Kapitels: Die Leiste **„Kompetenzen und Fachbegriffe"** im Stundenentwurf
+schlägt die vor, die die Stunde behandelt, und der Stundenassistent stützt sich darauf,
+wenn du ihn nach den Begriffen der Stunde fragst.
+
+Hast du einen **eigenen Stundenassistenten**, kennt er die Anleitung dazu noch nicht: Leg ihn
+neu an, damit er den aktuellen schulweiten Prompt übernimmt
+([Ein eigener Stundenassistent](unterrichtsplanung.md#ein-eigener-stundenassistent)).
 
 ---
 
@@ -135,10 +198,12 @@ Kompetenz zu ersetzen ist. Nichts wird stillschweigend gelöscht.
 
 Über **Export** erhältst du das Curriculum als:
 
-- **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte
+- **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte; Begriffe und
+  Fachmethoden stehen als eigene Zeilen unter der Konkretisierung
 - **DOCX** (Word) oder **ODT** (LibreOffice) — zum Weiterbearbeiten außerhalb der Plattform,
   im Querformat und mit Formeln als bearbeitbare Formeln
-- **YAML** — die maschinenlesbare Fassung
+- **YAML** — die maschinenlesbare Fassung; Begriffe und Fachmethoden gehen als Namen mit
+  und werden in einer anderen Plattform gegen deren Bibliothek abgeglichen
 
 Das YAML ist die einzige Form, die sich wieder einlesen lässt. Änderungen in Word oder
 LibreOffice kommen nicht zurück in die Plattform — etwa um ein Curriculum in
@@ -166,6 +231,11 @@ täte das nicht.
 **Ich habe versehentlich etwas gelöscht.**
 Änderungen werden beim Speichern übernommen; eine Rücknahme gibt es im Curriculum-Editor
 nicht. Bei größeren Umbauten lohnt sich vorher ein YAML-Export als Sicherung.
+
+**Warum ist ein Begriff gestrichelt, obwohl es ihn gibt?**
+Entweder heißt er in der Bibliothek anders — dann lohnt ein Alias am Begriff —, oder er
+gehört zu einem Fach, das weder dein Fach noch eines seiner Bezugsfächer ist. Bei gelben
+Begriffen gibt es mehrere Fassungen; wähle die gemeinte.
 
 **Wer sieht mein Curriculum?**
 Alle Lehrkräfte der Schule. Es ist ein Fachschaftsdokument, kein persönlicher Entwurf.

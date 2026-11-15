@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.44.0] – 2026-11-15
+
 ### Neu
 
 - Curriculum: Begriffe und Fachmethoden am Eintrag, als Chips unter der Konkretisierung. Begriffe, die es
@@ -19,6 +21,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Wird ein Begriff umbenannt, bleibt der alte Name als Alias erhalten — im Editor, in „Meine Bausteine“ und
   beim Import.
 - Curriculum-Export: Begriffe und Fachmethoden in PDF, DOCX/ODT (als Zeilen unter der Konkretisierung) und YAML.
+- Planung: Die Leiste „Kompetenzen und Fachbegriffe“ schlägt die Begriffe des Curriculum-Kapitels der Einheit vor;
+  der Stundenassistent kennt sie und nennt fehlende mit Hinweis auf die Fachschaft.
 
 ### Geändert
 
@@ -30,6 +34,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Planung fanden ihn danach nicht mehr.
 - Einstellungen → Fachbegriffe listete auch Jahresplanung, Unterrichtseinheiten und -stunden.
 - Curriculum-Export: Formeln in „Hinweise & Material“ erschienen in PDF und DOCX/ODT als TeX-Quelltext.
+
+### Nach dem Update
+
+- Neu bauen und starten; keine Migration.
+- Den Prompt des schulweiten Stundenassistenten im Editor durch `config/prompts/stundenentwurf_assistent.md`
+  ersetzen.
 
 ## [0.43.0] – 2026-11-14
 

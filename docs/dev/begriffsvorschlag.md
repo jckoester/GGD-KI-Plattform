@@ -14,11 +14,19 @@ Frontend `BegriffVorschlag.svelte`.
    `phase_kurz`), die Begriffe früherer Stunden der Gruppe (`fruehere_begriffe`: Termine vor
    diesem, je Knoten einmal) und 5 Kandidaten nach Vektor (nur Lesbares). Anleitung
    `ANLEITUNG` — **wörtlich die des Vorlaufs**; ein Test hält ihre Prüfsumme fest.
+   **Seit 0.44:** Hängt die Einheit der Stunde an einem Curriculum-Kapitel mit Begriffen
+   (`begriffe_aus_dem_curriculum`), steht in der Nachricht zusätzlich eine Zeile
+   `CURRICULUM_ZEILE` mit ihren Namen, und die gefundenen kommen zu den Kandidaten
+   (`mit_curriculum_kandidaten`). Die Anleitung bleibt unverändert, und ohne Kapitel ist die
+   Nachricht wortgleich zum Vorlauf (`test_nachricht_ohne_curriculum_wortgleich_zum_vorlauf`).
+   Die Prüfsumme bleibt die des Entwurfs: Ein geändertes Curriculum löst keinen neuen Vorschlag
+   aus. Gemessen in `scripts/szenarien/curriculum_begriffe.yaml`.
 3. **Aufruf:** `einzelaufruf` über den virtuellen Schlüssel der Lehrkraft (Budget, Abrechnung),
    JSON-Modus, Zeitlimit 45 s. Fehlerarten statt Ausnahmen: `kein_modell`, `kein_schluessel`,
    `budget`, `zeit`, `abgelehnt`.
 4. **Abgleich:** wie das Werkzeug (`begriff_zum_titel`: Titel, Alias, Einzahl; Fach und
-   Bezugsfächer). Einteilung in `eintraege` (neu), `frueher` (getrennt, nicht verworfen) und
+   Bezugsfächer; seit 0.44 auf `app/context/begriffe_abgleich.py`, siehe
+   [Begriffe im Curriculum](curriculum-begriffe.md)). Einteilung in `eintraege` (neu), `frueher` (getrennt, nicht verworfen) und
    `ohne_knoten`; was in `refs` oder `refs_dismissed` steht, fehlt.
 5. **Ablage:** `metadata.begriffe_vorschlag` per `jsonb_set` mit `ohne_aenderungsstempel()`.
 
