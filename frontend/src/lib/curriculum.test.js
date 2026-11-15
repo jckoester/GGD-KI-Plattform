@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lernsequenzStd, kapitelStd, curriculumStd } from './curriculum.js'
+import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen } from './curriculum.js'
 
 describe('lernsequenzStd', () => {
     it('liest eine Zahl', () => {
@@ -49,4 +49,25 @@ describe('curriculumStd', () => {
         expect(curriculumStd({ kapitel: [] })).toBe(0)
         expect(curriculumStd(null)).toBe(0)
     })
+})
+
+
+describe('toteVerweiseBeschriftungen (0.45)', () => {
+  const tot = '14b8e715-b655-487c-bcdd-f4c81ea9c02a'
+  const spalte = '4289d004-9362-4758-8184-2a84a1660b41'
+  const curr = { kapitel: [{ lernsequenzen: [{ metadata: { eintraege: [
+    { hinweise: `Siehe #[PH 3.4.3](ik:${tot}) und mehr`, ik: [{ node_id: spalte, nr: '3.1(2)' }] },
+  ] } }] }] }
+  it('nimmt die Beschriftung aus dem Hinweis, sonst die Nummer, sonst die Kennung', () => {
+    expect(toteVerweiseBeschriftungen(curr, [tot, spalte, 'x'])).toEqual(['PH 3.4.3', '3.1(2)', 'x'])
+    expect(toteVerweiseBeschriftungen(curr, [])).toEqual([])
+  })
+})
+
+describe('ersetztHinweis (0.45)', () => {
+  it('eine und mehrere Einheiten', () => {
+    expect(ersetztHinweis([])).toBe('')
+    expect(ersetztHinweis(['Trigonometrie'])).toMatch(/^Die Einheit „Trigonometrie“ hängt an einem Kapitel/)
+    expect(ersetztHinweis(['A', 'B'])).toMatch(/^2 Einheiten \(„A“, „B“\) hängen/)
+  })
 })

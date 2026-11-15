@@ -32,6 +32,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
 - Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
 - Die Marke „Bearbeitbar“ in der Curricula-Liste erscheint wieder.
+- Curriculum-Editor: Ein Verweis in Hinweisen oder Material auf einen Baustein, den es nicht mehr gibt, bricht
+  das Speichern nicht mehr ab; der Editor speichert und nennt den Verweis.
 - Wer in einer zweiten Fachschaftsgruppe desselben Fachs ist, darf Titel und Band eines Curriculums ändern wie
   Kapitel und Lernsequenzen.
 

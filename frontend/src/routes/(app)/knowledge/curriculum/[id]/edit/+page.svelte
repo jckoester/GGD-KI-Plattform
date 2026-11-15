@@ -11,12 +11,13 @@
         deleteEdge,
         getNodeEdges,
     } from "$lib/api.js";
-    import { kapitelStd, curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
+    import { kapitelStd, curriculumStd, ENTWURF_HINWEIS, toteVerweiseBeschriftungen } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { ArrowLeft, Check, Save, X } from "lucide-svelte";
@@ -100,8 +101,10 @@
         saveError = null;
         saveSuccess = false;
 
+        toteIds = new Set();
         try {
             await flushDraftToApi(draft, curriculum);
+            toteVerweise = toteVerweiseBeschriftungen(draft, [...toteIds]);
             // Aktualisiere Original nach dem Speichern
             curriculum = await getCurriculum($page.params.id);
             draft = $state.snapshot(curriculum);
@@ -357,6 +360,22 @@
     // Aktualisiert Kanten für eine Lernsequenz.
     // Soll-Menge wird aus den Einträgen abgeleitet, nicht aus LS-Top-Level-Feldern.
     // Nur 'references'- und 'develops'-Kanten werden verwaltet; 'part_of' bleibt unangetastet.
+    // Tote Verweise (0.45): Ein Hinweis kann auf einen Baustein zeigen, den es nicht mehr gibt
+    // (etwa ein Bildungsplan-Abschnitt, den ein späterer Import ersetzt hat). Bis 0.45 brach das
+    // Speichern daran ab — für das ganze Curriculum, weil jede Lernsequenz abgeglichen wird.
+    // Jetzt wird der Rest gespeichert und der Verweis danach genannt.
+    let toteVerweise = $state([]);
+    let toteIds = new Set();
+
+    async function kanteAnlegen(kante) {
+        try {
+            return await createEdge(kante);
+        } catch (e) {
+            if (e?.status !== 404) throw e;
+            toteIds.add(kante.to_node_id);
+        }
+    }
+
     async function updateEdgesForLernsequenz(draftLs, _origLs) {
         const lsId = draftLs.id;
 
@@ -383,7 +402,7 @@
             if (existing) {
                 if (existing.metadata?.partiell !== String(ikRef.partiell)) {
                     await deleteEdge(existing.id);
-                    await createEdge({
+                    await kanteAnlegen({
                         from_node_id: lsId,
                         to_node_id: ikRef.node_id,
                         relation: "references",
@@ -393,7 +412,7 @@
                     processedEdgeIds.add(existing.id);
                 }
             } else {
-                await createEdge({
+                await kanteAnlegen({
                     from_node_id: lsId,
                     to_node_id: ikRef.node_id,
                     relation: "references",
@@ -411,7 +430,7 @@
             if (existing) {
                 processedEdgeIds.add(existing.id);
             } else {
-                await createEdge({
+                await kanteAnlegen({
                     from_node_id: lsId,
                     to_node_id: pkRef.node_id,
                     relation: "develops",
@@ -429,7 +448,7 @@
             if (existing) {
                 processedEdgeIds.add(existing.id);
             } else {
-                await createEdge({
+                await kanteAnlegen({
                     from_node_id: lsId,
                     to_node_id: ref.node_id,
                     relation: "references",
@@ -449,7 +468,7 @@
             if (existing) {
                 processedEdgeIds.add(existing.id);
             } else {
-                await createEdge({
+                await kanteAnlegen({
                     from_node_id: lsId,
                     to_node_id: ref.node_id,
                     relation: "used_with",
@@ -604,6 +623,11 @@
             <!-- Fehler/Erfolg -->
             {#if saveError}
                 <ErrorBanner message={saveError} />
+            {/if}
+            {#if toteVerweise.length}
+                <WarningBanner
+                    message={`Gespeichert — aber diese Verweise zeigen auf Bausteine, die es nicht mehr gibt: ${toteVerweise.join(", ")}. Bitte im Hinweis ersetzen oder entfernen.`}
+                />
             {/if}
             {#if saveSuccess}
                 <SuccessBanner message="Curriculum erfolgreich gespeichert." />
