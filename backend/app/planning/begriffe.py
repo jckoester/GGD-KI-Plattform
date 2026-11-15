@@ -28,17 +28,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.context import aliase as aliase_modul
+# BINDESTRICHE liegt seit 0.44 beim gemeinsamen Abgleich und bleibt hier erreichbar.
+from app.context.begriffe_abgleich import BINDESTRICHE, begriffe_abgleichen  # noqa: F401
 from app.db.models import ContextNode, LessonSlot, NodeAlias, Subject, ohne_aenderungsstempel
 from app.planning.schemas import BEGRIFF_TYPEN, LessonRefItem
 
 logger = logging.getLogger(__name__)
 
-#: Bindestriche, die ein Modell statt „-" schreibt. `gpt-oss-120b` setzt durchweg den
-#: geschützten Bindestrich U+2011 („Arenium‑Ion") — in Messung 3 (0.17) scheiterten daran
-#: alle Begriffe zweier Läufe, obwohl sie als Alias bestanden. Nur auf der Seite des Modells
-#: ersetzt: Die Normalisierung der Datenbankseite ist die des Index (`titel_normalisiert_sql`)
-#: und muss es bleiben. Das weiche Trennzeichen U+00AD fällt weg.
-BINDESTRICHE = str.maketrans({"‐": "-", "‑": "-", "­": None})
 
 
 # ── Abgleich ─────────────────────────────────────────────────────────────────
@@ -48,59 +44,20 @@ async def begriff_zum_titel(db: AsyncSession, user, titel: str, fassung: str | N
                             stunde: ContextNode) -> tuple[ContextNode | None, str | None]:
     """Ein Begriff der Stunde über seinen Titel oder Alias. → (Knoten, Grund, warum keiner)
 
-    Gesucht wird im Fach der Stunde und seinen Bezugsfächern, normalisiert wie die
-    Namenssuche (`normalisiere_titel`, derselbe Ausdruck wie ihr Index), nur unter dem, was
-    `user` lesen darf. Gibt es den Namen in beiden, gilt das eigene Fach; gibt es ihn in
-    mehreren Fassungen, entscheidet `fassung`.
-
-    Trifft der Name nichts, gilt eine Einzahlform (`einzahlformen`: „Blattfarbstoffe" →
-    Alias „Blattfarbstoff") — aber nur, wenn sie genau einen Begriff trifft.
+    Gesucht wird im Fach der Stunde und seinen Bezugsfächern; die Regeln (Fassung, eigenes
+    Fach vor Bezugsfach, Einzahlform nur bei genau einem Treffer) stehen in
+    :func:`app.context.begriffe_abgleich.begriffe_abgleichen` (seit 0.44, gemeinsam mit dem
+    Curriculum). Hier nur die Gründe in der Sprache des Modells.
     """
-    from app.context.aliase import ALIAS_NORMALISIERT
-    from app.context.filters import TITEL_NORMALISIERT
-    from app.context.lookup import einzahlformen, normalisiere_titel
-    from app.context.service import bezugsfaecher_von
-    from app.context.visibility import read_scope_clause
-
     if stunde.subject_id is None:
         return None, f"„{titel}“: Die Stunde hat kein Fach."
-    faecher = (stunde.subject_id, *await bezugsfaecher_von(db, stunde.subject_id))
-
-    async def suche(schluessel: list[str]) -> list[ContextNode]:
-        treffer = list((await db.execute(
-            sa.select(ContextNode).where(
-                ContextNode.content_type.in_(BEGRIFF_TYPEN),
-                ContextNode.status == "active",
-                read_scope_clause(user.sub, getattr(user, "roles", None) or ()),
-                ContextNode.subject_id.in_(faecher),
-                sa.or_(
-                    TITEL_NORMALISIERT.in_(schluessel),
-                    ContextNode.id.in_(sa.select(NodeAlias.node_id).where(ALIAS_NORMALISIERT.in_(schluessel))),
-                ),
-            ).order_by(ContextNode.id)
-        )).scalars())
-        if fassung:
-            gewuenscht = fassung.translate(BINDESTRICHE).strip().casefold()
-            treffer = [t for t in treffer
-                       if str((t.metadata_ or {}).get("fassung") or "").strip().casefold() == gewuenscht]
-        if len(treffer) > 1:
-            eigene = [t for t in treffer if t.subject_id == stunde.subject_id]
-            if len(eigene) == 1:
-                treffer = eigene
-        return treffer
-
-    schluessel = normalisiere_titel(titel.translate(BINDESTRICHE))
-    treffer = await suche([schluessel])
-    if not treffer and (formen := einzahlformen(schluessel)):
-        einzahl = await suche(formen)
-        if len(einzahl) == 1:
-            return einzahl[0], None
-    if len(treffer) == 1:
-        return treffer[0], None
-    if not treffer:
+    (a,) = await begriffe_abgleichen(db, user, stunde.subject_id, [(titel, fassung)])
+    if a.zustand == "gefunden":
+        return a.knoten, None
+    if a.zustand == "fehlt":
         return None, (f"„{titel}“ gibt es im Wissensspeicher des Fachs nicht — nicht eingetragen. "
                       "Die Fachschaft kann den Begriff anlegen.")
-    fassungen = ", ".join(sorted({str((t.metadata_ or {}).get("fassung") or "ohne Fassung") for t in treffer}))
+    fassungen = ", ".join(sorted({str((t.metadata_ or {}).get("fassung") or "ohne Fassung") for t in a.kandidaten}))
     return None, f"„{titel}“ gibt es mehrfach ({fassungen}) — mit fassung angeben, welcher gemeint ist."
 
 
