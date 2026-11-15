@@ -10,7 +10,11 @@
         createEdge,
         deleteEdge,
         getNodeEdges,
+        getCurriculumVerlauf,
+        sichereCurriculum,
+        nimmCurriculumZurueck,
     } from "$lib/api.js";
+    import { kannZuruecknehmen, rueckgaengigTitel, zurueckgenommenMeldung } from "$lib/curriculum_verlauf.js";
     import { kapitelStd, curriculumStd, ENTWURF_HINWEIS, toteVerweiseBeschriftungen } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
@@ -20,7 +24,7 @@
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
-    import { ArrowLeft, Check, Save, X } from "lucide-svelte";
+    import { ArrowLeft, Check, Save, Undo2, X } from "lucide-svelte";
 
     let curriculum = $state(null);
     let draft = $state(null);
@@ -30,6 +34,10 @@
     let saveError = $state(null);
     let saveSuccess = $state(false);
     let canEdit = $state(false);
+    // Rückgängig (0.46): Verlauf aus dem Backend, gesichert vor jedem Speichern.
+    let verlauf = $state(null);
+    let zuruecknehmend = $state(false);
+    let undoMeldung = $state(null);
     const totalStd = $derived(curriculumStd(draft));
 
     // Repräsentative Jahrgangsstufe (Int) aus der jahrgangsstufe-Angabe des
@@ -81,6 +89,9 @@
                 }
                 canEdit = true;
                 draft = $state.snapshot(curriculum);
+                getCurriculumVerlauf(id)
+                    .then((v) => { if (!cancelled) verlauf = v; })
+                    .catch(() => {});
             } catch (e) {
                 if (!cancelled) saveError = e.message;
             } finally {
@@ -102,7 +113,10 @@
         saveSuccess = false;
 
         toteIds = new Set();
+        undoMeldung = null;
         try {
+            // Erst den Stand sichern — scheitert das, wird nichts gespeichert.
+            verlauf = await sichereCurriculum(draft.id);
             await flushDraftToApi(draft, curriculum);
             toteVerweise = toteVerweiseBeschriftungen(draft, [...toteIds]);
             // Aktualisiere Original nach dem Speichern
@@ -117,6 +131,26 @@
             saveError = e.message;
         } finally {
             saving = false;
+        }
+    }
+
+    // Letzte Speicherung zurücknehmen (0.46) — nur ohne ungespeicherte Änderungen.
+    async function zuruecknehmen() {
+        if (dirty || saving || zuruecknehmend || !kannZuruecknehmen(verlauf)) return;
+        zuruecknehmend = true;
+        saveError = null;
+        saveSuccess = false;
+        toteVerweise = [];
+        try {
+            const antwort = await nimmCurriculumZurueck(draft.id);
+            verlauf = { anzahl: antwort.anzahl, letzter: antwort.letzter };
+            curriculum = await getCurriculum($page.params.id);
+            draft = $state.snapshot(curriculum);
+            undoMeldung = zurueckgenommenMeldung(antwort);
+        } catch (e) {
+            saveError = e.message;
+        } finally {
+            zuruecknehmend = false;
         }
     }
 
@@ -604,6 +638,19 @@
                         {closeLabel}
                     </button>
                     <button
+                        onclick={zuruecknehmen}
+                        disabled={dirty || saving || zuruecknehmend || !kannZuruecknehmen(verlauf)}
+                        title={rueckgaengigTitel(verlauf, dirty)}
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md
+                           border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Undo2 class="w-4 h-4" />
+                        {zuruecknehmend ? "Wird zurückgenommen…" : "Rückgängig"}
+                    </button>
+                    <button
                         onclick={save}
                         disabled={saving || !dirty}
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
@@ -631,6 +678,9 @@
             {/if}
             {#if saveSuccess}
                 <SuccessBanner message="Curriculum erfolgreich gespeichert." />
+            {/if}
+            {#if undoMeldung}
+                <SuccessBanner message={undoMeldung} />
             {/if}
 
             <!-- Curriculum-Tabelle im Edit-Mode -->

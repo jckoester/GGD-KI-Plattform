@@ -11,6 +11,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   der Import als „künftig“ ab statt sie zu archivieren. Curricula lassen sich dafür schon
   anlegen und bearbeiten; Bildungsplan-Ansicht und Auswahl zeigen „gilt ab …“. In Suche und Chat
   erscheint sie erst, wenn sie gilt.
+- Rückgängig im Curriculum-Editor: Vor jedem Speichern wird der Stand gesichert; „Rückgängig“
+  stellt ihn wieder her, Speicherung für Speicherung (bis zu 30).
 
 ### Geändert
 
@@ -23,7 +25,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0107), danach den Bildungsplan einmal vollständig importieren
+- `alembic upgrade head` (0107, 0108), danach den Bildungsplan einmal vollständig importieren
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus

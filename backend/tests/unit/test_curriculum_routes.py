@@ -65,6 +65,11 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         ("GET", "/context/curricula/{curriculum_id}/publish"),
         ("POST", "/context/curricula/{curriculum_id}/publish"),
         ("POST", "/context/curricula/{curriculum_id}/copy"),
+        # 0.46 (AP Teil B): Rückgängig — Verlauf lesen, Stand sichern (Editor vor dem Speichern),
+        # zurücknehmen; Aufrufer der Curriculum-Editor.
+        ("GET", "/context/curricula/{curriculum_id}/history"),
+        ("POST", "/context/curricula/{curriculum_id}/history"),
+        ("POST", "/context/curricula/{curriculum_id}/undo"),
     }
 
 
@@ -80,12 +85,14 @@ def test_schreibende_endpunkte_committen():
     from app.context.router import (
         create_curriculum_node,
         curriculum_als_entwurf_kopieren,
+        curriculum_sichern,
         curriculum_veroeffentlichen,
+        curriculum_zuruecknehmen,
         update_curriculum_meta,
     )
 
     for funktion in (create_curriculum_node, update_curriculum_meta, curriculum_veroeffentlichen,
-                     curriculum_als_entwurf_kopieren):
+                     curriculum_als_entwurf_kopieren, curriculum_sichern, curriculum_zuruecknehmen):
         quelle = inspect.getsource(funktion)
         assert "db.commit()" in quelle, (
             f"{funktion.__name__} schreibt, committet aber nicht — die Änderung ginge "

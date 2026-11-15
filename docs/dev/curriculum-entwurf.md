@@ -115,6 +115,23 @@ sie wieder `active` — auch der eines anderen Fachs. Der Löschlauf fasst nur `
   Fassung), zählen die.
 - „Bildungsplan aktualisieren“ (`relink.py`) zielt weiter auf die geltende Fassung.
 
+## Rückgängig (seit 0.46)
+
+`app/context/curriculum_verlauf.py`, Tabelle `curriculum_snapshots` (Alembic 0108, CASCADE mit dem
+Curriculum, höchstens `VERLAUF_LIMIT` = 30 je Curriculum). Routen: `GET`/`POST
+/curricula/{id}/history` (Verlauf lesen; Stand sichern — der Editor ruft das vor dem Speichern und
+speichert nicht, wenn es scheitert), `POST /curricula/{id}/undo`. Rechte: `_require_curriculum_write`.
+
+- `sichern(db, id, grund=, von=)`: Knoten (Felder aus `FELDER`, ohne Status und Vektor) und alle
+  Kanten, die einen Baumknoten berühren. `grund` `editor` oder `assistant` (Teil B, vor jedem Stapel).
+  `created_at` aus Python, damit zwei Stände in einer Transaktion eine Reihenfolge haben.
+- `zuruecknehmen(db, curriculum)`: jüngsten Stand anwenden und löschen — neue Teile löschen,
+  gesicherte mit derselben Kennung zurückschreiben bzw. neu anlegen (der Editor löscht hart),
+  Kanten **aus** dem Baum ersetzen, Kanten **in** den Baum nur ergänzen (eine Einheit, die seitdem
+  an ein Kapitel gehängt wurde, bleibt). **Der Status bleibt der heutige.** Geänderte Knoten
+  verlieren den Vektor (Nachholung nur für `active`).
+- Kein Wiederholen (Redo).
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

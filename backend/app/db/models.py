@@ -1855,6 +1855,37 @@ class SlotPlanSnapshot(Base):
     )
 
 
+# 15a. curriculum_snapshots (0.46, Päckchen AP Teil B, Schritt 3)
+class CurriculumSnapshot(Base):
+    """Ein Stand eines Curriculum-Baums vor dem Speichern — für „Rückgängig“.
+
+    Angelegt vor jedem Speichern im Editor (`editor`) und vor jedem Schreibstapel des
+    Assistenten (`assistant`). `payload`: Knoten (Curriculum, Kapitel, Lernsequenzen) und alle
+    Kanten, die einen von ihnen berühren (`app/context/curriculum_verlauf.py`). Verschwindet mit
+    dem Curriculum; je Curriculum höchstens `VERLAUF_LIMIT`.
+    """
+
+    __tablename__ = "curriculum_snapshots"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    curriculum_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("reason IN ('editor','assistant')", name="check_cs_reason"),
+        Index("idx_curriculum_snapshots_cur", "curriculum_id", "created_at"),
+    )
+
+
 # 15b. chat_artifacts (0.41, Päckchen AN, Schritt 10)
 class ChatArtifact(Base):
     """Ein Produkt aus der eigenen Werkstatt, das an einer Konversation hängt (`@`).

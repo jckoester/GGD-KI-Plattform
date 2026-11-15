@@ -1952,6 +1952,49 @@ async def curriculum_veroeffentlichen(
     return ergebnis
 
 
+@router.get("/curricula/{curriculum_id}/history")
+async def curriculum_verlauf_lesen(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Verlauf für „Rückgängig“ (0.46): Zahl der Stände und Zeit des jüngsten."""
+    from app.context.curriculum_verlauf import verlauf
+
+    await _require_curriculum_write(db, curriculum_id, user)
+    return await verlauf(db, curriculum_id, user.sub)
+
+
+@router.post("/curricula/{curriculum_id}/history", status_code=201)
+async def curriculum_sichern(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Hält den Stand fest — der Editor ruft das vor jedem Speichern (0.46)."""
+    from app.context.curriculum_verlauf import sichern, verlauf
+
+    await _require_curriculum_write(db, curriculum_id, user)
+    await sichern(db, curriculum_id, grund="editor", von=user.sub)
+    await db.commit()
+    return await verlauf(db, curriculum_id, user.sub)
+
+
+@router.post("/curricula/{curriculum_id}/undo")
+async def curriculum_zuruecknehmen(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Nimmt die letzte Speicherung zurück (Editor oder Assistent, 0.46)."""
+    from app.context.curriculum_verlauf import verlauf, zuruecknehmen
+
+    node = await _require_curriculum_write(db, curriculum_id, user)
+    ergebnis = await zuruecknehmen(db, node)
+    await db.commit()
+    return {"zurueckgenommen": ergebnis, **await verlauf(db, curriculum_id, user.sub)}
+
+
 @router.post("/curricula/{curriculum_id}/copy", status_code=201)
 async def curriculum_als_entwurf_kopieren(
     curriculum_id: UUID,

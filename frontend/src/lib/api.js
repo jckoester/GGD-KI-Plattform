@@ -2025,6 +2025,42 @@ export async function veroeffentlicheCurriculum(curriculumId) {
   return res.json()
 }
 
+/** Rückgängig im Curriculum-Editor (0.46): `{ anzahl, letzter: { zeit, grund, von_mir } | null }`. */
+export async function getCurriculumVerlauf(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/history`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Verlauf konnte nicht geladen werden')
+  }
+  return res.json()
+}
+
+/** Hält den Stand vor dem Speichern fest; gibt den neuen Verlauf zurück. */
+export async function sichereCurriculum(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/history`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Stand konnte nicht gesichert werden — nichts gespeichert')
+  }
+  return res.json()
+}
+
+/** Nimmt die letzte Speicherung zurück; gibt `{ zurueckgenommen, anzahl, letzter }` zurück. */
+export async function nimmCurriculumZurueck(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/undo`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Zurücknehmen fehlgeschlagen')
+  }
+  return res.json()
+}
+
 /**
  * „Als Entwurf kopieren“ (0.45). Gibt `{id}` zurück; gibt es schon einen Entwurf, `{id, schon: true}`.
  */

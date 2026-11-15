@@ -98,6 +98,20 @@ Einen Entwurf löschen die Person, die ihn angelegt hat, der Fachvorsitz und Adm
 jedes Mitglied der Fachschaft. Kapitel und Lernsequenzen im Entwurf löscht jedes Mitglied
 im Editor wie gewohnt.
 
+### Rückgängig
+
+Vor jedem Speichern merkt sich der Editor den Stand. **Rückgängig** im Kopf des Editors stellt
+den Stand vor der letzten Speicherung wieder her — Texte, Einträge, Kompetenzen, gelöschte und
+neu angelegte Kapitel und Lernsequenzen. Mehrmals geklickt, geht es Speicherung für Speicherung
+zurück, bis zu 30 Mal. Der Tooltip zeigt, von wann die letzte Speicherung ist und ob sie von
+dir, jemand anderem aus der Fachschaft oder dem Assistenten stammt.
+
+- Rückgängig geht nur ohne ungespeicherte Änderungen — erst speichern oder abbrechen.
+- Es nimmt die **ganze** letzte Speicherung zurück, auch wenn sie jemand anderes gemacht hat.
+- Zurückgenommen wird der Inhalt, nicht das Veröffentlichen: Ein veröffentlichtes Curriculum
+  bleibt veröffentlicht.
+- Ein Zurücknehmen lässt sich nicht wiederum zurücknehmen.
+
 ---
 
 ## Aufbau: Kapitel, Lernsequenzen, Einträge
@@ -316,8 +330,8 @@ vergleicht jede Kompetenz einzeln und markiert, was nicht passt — das Umstelle
 täte das nicht.
 
 **Ich habe versehentlich etwas gelöscht.**
-Änderungen werden beim Speichern übernommen; eine Rücknahme gibt es im Curriculum-Editor
-nicht. Bei größeren Umbauten lohnt sich vorher ein YAML-Export als Sicherung.
+Noch nicht gespeichert: **Abbrechen** schließt den Editor ohne Änderungen. Schon gespeichert:
+**Rückgängig** im Editor (siehe [Rückgängig](#rückgängig)).
 
 **Warum ist ein Begriff gestrichelt, obwohl es ihn gibt?**
 Entweder heißt er in der Bibliothek anders — dann lohnt ein Alias am Begriff —, oder er
