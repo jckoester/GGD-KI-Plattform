@@ -26,10 +26,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   archiviert, und die Einheiten des laufenden Schuljahrs wandern auf die neuen Kapitel.
 - Planung: Hinweis, wenn eine Einheit an einem Kapitel eines ersetzten Curriculums hängt — in Jahresübersicht,
   Einheitenansicht und Stundenentwurf.
+- Curricula-Liste: Entwürfe nennen ihre letzte Änderung.
 
 ### Geändert
 
 - Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
+- Einen Curriculum-Entwurf löschen die Person, die ihn angelegt hat, Fachvorsitzende und Admins.
 - Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
 - Die Marke „Bearbeitbar“ in der Curricula-Liste erscheint wieder.
 - Curriculum-Editor: Ein Verweis in Hinweisen oder Material auf einen Baustein, den es nicht mehr gibt, bricht

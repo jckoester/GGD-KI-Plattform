@@ -370,3 +370,14 @@ def _keine_vorschau():
     marke = vorschau._AKTIV.set(None)
     yield
     vorschau._AKTIV.reset(marke)
+
+
+@pytest.fixture(autouse=True)
+def _fachvorsitz_nicht_zugeordnet(monkeypatch):
+    """Ob der Rolle `fachvorsitz` eine Gruppe zugeordnet ist, liest die Plattform aus
+    `auth.yaml` (0.45). Tests hängen nicht von der lokalen Konfiguration ab: ohne Zuordnung,
+    wer sie braucht, stellt sie im Test um (`test_curriculum_entwurf.py`, `mit_vorsitz`)."""
+    from app.context import curriculum_entwurf, router
+
+    for modul in (curriculum_entwurf, router):
+        monkeypatch.setattr(modul, "fachvorsitz_zugeordnet", lambda: False)

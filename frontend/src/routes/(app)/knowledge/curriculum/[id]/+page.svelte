@@ -209,6 +209,9 @@
                         >
                             <RefreshCw class="w-4 h-4" /> Bildungsplan aktualisieren
                         </button>
+                    {/if}
+                    <!-- Löschen (0.45, E12): eigenes Recht — einen Entwurf löscht nicht jedes Mitglied. -->
+                    {#if curriculum.darf_loeschen}
                         <button
                             onclick={() => {
                                 deleteError = null;

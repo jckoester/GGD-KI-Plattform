@@ -64,7 +64,7 @@ from app.context.schemas import (
     ZielZaehlung,
 )
 from app.context.curriculum_entwurf import (
-    CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf, darf_schreiben,
+    CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf, darf_loeschen, darf_schreiben,
     darf_veroeffentlichen, erbe_entwurf, fachvorsitz_zugeordnet, pruefe_anlegen, pruefe_entwurf,
     pruefe_kante, pruefe_statuswechsel, schreibrecht, wer_veroeffentlicht,
 )
@@ -1248,6 +1248,10 @@ async def delete_node(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
+    # Ein Curriculum-Entwurf als Ganzes (0.45, E12): nicht jedes Mitglied der Fachschaft.
+    if node.content_type == "curriculum" and not await darf_loeschen(db, node, user):
+        raise HTTPException(status_code=403, detail=(
+            "Einen Entwurf löschen die Person, die ihn angelegt hat, Fachvorsitzende und Admins."))
 
     # Planung hat ihren eigenen Weg (0.42.4), wie beim Kopieren: Dieser hier kennt weder die
     # Sperre für nachbereitete Stunden noch Termin und Reihenfolge der Einheit. Auch nicht mit
@@ -1737,6 +1741,7 @@ async def _curriculum_rechte(db: AsyncSession, tree: dict, user: JwtPayload) -> 
         "darf_veroeffentlichen": status == ENTWURF and await darf_veroeffentlichen(db, fach, user),
         "wer_veroeffentlicht": wer_veroeffentlicht(),
         "darf_kopieren": status == "active" and entwurf_recht,
+        "darf_loeschen": await darf_loeschen(db, await db.get(ContextNode, tree["id"]), user),
         "offener_entwurf": None,
         "kopie_von": None,
     }
@@ -2163,6 +2168,15 @@ async def list_curricula_by_subject(
     curricula = result.scalars().all()
     # `darf_schreiben` nach der Curriculum-Regel (0.45) — die Marke „Bearbeitbar“ in der Liste.
     await _schreibrechte_setzen(curricula, user, db)
+    # Entwürfe: letzte Änderung im ganzen Baum (E12) — ein Entwurf läuft nicht ab; wer die Liste
+    # durchsieht (Fachschaft, Admins für alle Fächer), sieht, welcher liegen geblieben ist.
+    entwuerfe = [c for c in curricula if c.status == ENTWURF]
+    if entwuerfe:
+        from app.context.curriculum_entwurf import letzte_aenderung
+
+        stand = await letzte_aenderung(db, [c.id for c in entwuerfe])
+        for c in entwuerfe:
+            c.zuletzt_geaendert = stand.get(c.id, c.updated_at)
     return curricula
 
 

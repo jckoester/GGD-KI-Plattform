@@ -544,3 +544,72 @@ async def test_reaktivieren_nur_mit_recht(db, welt, mit_vorsitz):
     await _abgewiesen(reaktiviere_node(aktiv.id, db=db, user=KOLLEGIN), 403)
     await reaktiviere_node(aktiv.id, db=db, user=VORSITZ)
     assert aktiv.status == "active"
+
+
+# ── Löschen und Lebenszyklus (Schritt 5) ─────────────────────────────────────
+
+from datetime import date, datetime, timedelta, timezone  # noqa: E402
+
+from app.context.router import delete_node  # noqa: E402
+from app.crons.node_lifecycle_service import archiviere_abgelaufene, loesche_alte_archivierte  # noqa: E402
+
+KOLLEGIN_VORSITZ = _user(ZWEITES, "teacher", "fachvorsitz")
+
+
+async def _geloescht(db, *knoten):
+    for n in knoten:
+        assert await db.get(ContextNode, n.id, populate_existing=True) is None
+
+
+async def test_entwurf_loeschen_mit_vorsitz(db, welt, mit_vorsitz):
+    """E12: wer angelegt hat, Fachvorsitz, Admin — nicht jedes Mitglied der Fachschaft."""
+    cur, kap, ls = welt["entwurf"]
+    assert not (await get_curriculum(cur.id, db=db, user=KOLLEGIN))["darf_loeschen"]
+    assert (await get_curriculum(cur.id, db=db, user=LEHRKRAFT))["darf_loeschen"]  # angelegt
+    await _abgewiesen(delete_node(cur.id, force=False, db=db, user=KOLLEGIN), 403)
+    # Teile eines Entwurfs löscht der Editor — Bearbeitungsrecht genügt.
+    await delete_node(ls.id, force=False, db=db, user=KOLLEGIN)
+    await delete_node(cur.id, force=False, db=db, user=KOLLEGIN_VORSITZ)
+    await _geloescht(db, cur, kap, ls)
+
+
+async def test_entwurf_loescht_die_person_die_ihn_angelegt_hat(db, welt, mit_vorsitz):
+    cur, kap, ls = welt["entwurf"]
+    await delete_node(cur.id, force=False, db=db, user=LEHRKRAFT)
+    await _geloescht(db, cur, kap, ls)
+
+
+async def test_ohne_vorsitz_loescht_die_fachschaft(db, welt):
+    cur, _, _ = welt["entwurf"]
+    assert (await get_curriculum(cur.id, db=db, user=KOLLEGIN))["darf_loeschen"]
+    await delete_node(cur.id, force=False, db=db, user=KOLLEGIN)
+    await _geloescht(db, cur)
+
+
+async def test_veroeffentlichtes_loeschen_wie_aendern(db, welt, mit_vorsitz):
+    aktiv, _, _ = welt["aktiv"]
+    await _abgewiesen(delete_node(aktiv.id, force=False, db=db, user=KOLLEGIN), 403)
+    assert (await get_curriculum(aktiv.id, db=db, user=KOLLEGIN_VORSITZ))["darf_loeschen"]
+
+
+async def test_liste_nennt_letzte_aenderung_des_entwurfs(db, welt):
+    cur, _, ls = welt["entwurf"]
+    spaeter = datetime.now(timezone.utc) + timedelta(days=3)
+    await db.execute(sa.update(ContextNode).where(ContextNode.id == ls.id).values(updated_at=spaeter))
+    liste = {c.id: c for c in await list_curricula_by_subject(welt["fach"].id, db=db, user=LEHRKRAFT)}
+    assert liste[cur.id].zuletzt_geaendert == spaeter      # Änderung tief im Baum zählt
+    assert getattr(liste[welt["aktiv"][0].id], "zuletzt_geaendert", None) is None
+
+
+async def test_entwurf_laeuft_nicht_ab(db, welt):
+    """F5/E12: Ablauf und Löschlauf fassen Entwürfe nicht an — auch mit Ablaufdatum."""
+    cur, kap, ls = welt["entwurf"]
+    for n in (cur, kap, ls):
+        n.valid_until = date(2020, 1, 1)
+        n.archived_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    await db.flush()
+    await archiviere_abgelaufene(db, heute=date.today())
+    await loesche_alte_archivierte(db, jetzt=datetime.now(timezone.utc))
+    for n in (cur, kap, ls):
+        await db.refresh(n)
+        assert n.status == "draft"

@@ -104,6 +104,9 @@
                             {#if curr.metadata?.bp_version}
                                 · BP {curr.metadata?.bp_version}
                             {/if}
+                            {#if curr.status === 'draft' && curr.zuletzt_geaendert}
+                                · zuletzt geändert {new Date(curr.zuletzt_geaendert).toLocaleDateString('de-DE')}
+                            {/if}
                         </p>
                     </div>
                     

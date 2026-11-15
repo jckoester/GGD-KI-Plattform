@@ -104,6 +104,26 @@ async def darf_veroeffentlichen(db: AsyncSession, subject_id: int | None, user) 
     return await darf_schreiben(db, "active", subject_id, user)
 
 
+async def darf_loeschen(db: AsyncSession, node, user) -> bool:
+    """Ein Curriculum als Ganzes löschen (E12).
+
+    Entwurf: wer ihn angelegt hat (solange sie ihn noch bearbeiten darf, also in der Fachschaft
+    ist), Fachvorsitzende und Admins — nicht jedes Mitglied der Fachschaft. „Fachvorsitzende“
+    heißt wie beim Veröffentlichen: ohne zugeordnete Gruppe die Fachschaft (E9).
+    Veröffentlicht: wer es ändern darf (E13). Teile eines Entwurfs (Kapitel, Lernsequenzen)
+    löscht der Editor — dafür gilt das Bearbeitungsrecht, nicht diese Regel.
+    """
+    from app.auth.vorschau import eigenes_zaehlt
+
+    if node.status != ENTWURF:
+        return await darf_schreiben(db, node.status, node.subject_id, user)
+    if not await darf_entwurf(db, node.subject_id, user):
+        return False
+    if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
+        return True
+    return await darf_veroeffentlichen(db, node.subject_id, user)
+
+
 def wer_veroeffentlicht() -> str:
     """Für die Oberfläche, statt des Knopfs (Punkt 7)."""
     if fachvorsitz_zugeordnet():
@@ -171,3 +191,26 @@ async def erbe_entwurf(db: AsyncSession, kind, eltern, relation: str) -> None:
         ContextEdge.from_node_id == kind.id, ContextEdge.to_node_id == kind.id))))).scalar()
     if not hat_kanten:
         kind.status = ENTWURF
+
+
+async def letzte_aenderung(db: AsyncSession, curriculum_ids) -> dict:
+    """Je Curriculum die jüngste Änderung an ihm, seinen Kapiteln und Lernsequenzen."""
+    from sqlalchemy.orm import aliased
+
+    from app.db.models import ContextEdge, ContextNode
+
+    kap, ls = aliased(ContextNode), aliased(ContextNode)
+    e1, e2 = aliased(ContextEdge), aliased(ContextEdge)
+    cur = aliased(ContextNode)
+    zeilen = (await db.execute(
+        sa.select(cur.id, sa.func.greatest(
+            sa.func.max(cur.updated_at), sa.func.max(kap.updated_at), sa.func.max(ls.updated_at)))
+        .select_from(cur)
+        .outerjoin(e1, sa.and_(e1.to_node_id == cur.id, e1.relation == "part_of"))
+        .outerjoin(kap, sa.and_(kap.id == e1.from_node_id, kap.content_type == "kapitel"))
+        .outerjoin(e2, sa.and_(e2.to_node_id == kap.id, e2.relation == "part_of"))
+        .outerjoin(ls, sa.and_(ls.id == e2.from_node_id, ls.content_type == "lernsequenz"))
+        .where(cur.id.in_(list(curriculum_ids)))
+        .group_by(cur.id)
+    )).all()
+    return {cid: zeit for cid, zeit in zeilen}

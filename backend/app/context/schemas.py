@@ -103,6 +103,8 @@ class ContextNodeRead(BaseModel):
     # Aktion und meldet einen abgelehnten Versuch — das ist der ehrlichere Zustand als
     # eine Rechteauskunft, die niemand berechnet hat.
     darf_schreiben: bool | None = None
+    #: Nur in der Curricula-Liste, nur bei Entwürfen (0.45, E12): jüngste Änderung im Baum.
+    zuletzt_geaendert: datetime | None = None
 
     @field_validator("title_locked", mode="before")
     @classmethod
@@ -534,6 +536,7 @@ class CurriculumRead(BaseModel):
     darf_veroeffentlichen: bool = False
     wer_veroeffentlicht: str = ""
     darf_kopieren: bool = False
+    darf_loeschen: bool = False
     offener_entwurf: dict | None = None
     kopie_von: dict | None = None
     #: Auflösung der Begriffe aller Einträge für die lesende Person (0.44, AQ) — neben dem
