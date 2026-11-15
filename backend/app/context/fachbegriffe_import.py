@@ -125,6 +125,12 @@ SEED_HASH = "seed_hash"
 SEED_ID = "seed_id"
 #: Alles, was der Import an Verwaltungsangaben an den Knoten schreibt.
 SEED_SCHLUESSEL = (SEED_QUELLE, SEED_HASH, SEED_ID)
+
+#: Frühere Titel eines Begriffs, die als Alias erhalten bleiben (0.44, AQ, E12). Ein
+#: umbenannter Begriff hieße im Curriculum sonst „fehlt“. Am Knoten gemerkt, damit **jeder**
+#: Lauf sie zu den Aliasen der Datei nimmt — sonst sähe der zweite Lauf den Alias als
+#: Handänderung an oder entfernte ihn wieder.
+ALTE_TITEL = "alte_titel"
 #: Was die Plattform selbst an den Knoten schreibt, ohne dass jemand ihn bearbeitet hätte.
 #:
 #: ⚠️ `embedding_error` setzt die Einbettung im Hintergrund, wenn der Proxy nicht antwortet —
@@ -225,6 +231,10 @@ class Quelldatei:
     id_angabe: str = ""
     #: `pruefstatus:` im Wortlaut der Datei. Wird nicht geschrieben, nur berichtet.
     pruefstatus: str = ""
+    #: `geruest: true` — ein Gerüst aus der Liste fehlender Begriffe eines Curriculums
+    #: (0.44, AQ, E7 b). Ohne Definition weist der Import es ab; mit Definition ist es eine
+    #: gewöhnliche Datei, die Kennzeichnung wird nicht gespeichert.
+    geruest: bool = False
 
 
 def _ziel(wikilink: str) -> str:
@@ -506,6 +516,7 @@ def lies_datei(dateiname: str, roh: str) -> Quelldatei | None:
         warnungen=warnungen,
         id_angabe=id_angabe,
         pruefstatus=str(kopf_daten.get("pruefstatus") or "").strip(),
+        geruest=kopf_daten.get("geruest") is True,
     )
 
 
@@ -1026,10 +1037,21 @@ async def _schreibe_knoten(
     bilanz.warnungen += [
         f"{quelle.datei}: {w}" for w in bereinige_metadata(quelle.knotentyp, metadata)
     ]
+    # Umbenannt im Vault (dieselbe Kennung, anderer Titel): alter Titel bleibt Alias (E12).
+    alte = list((vorhanden.metadata_ or {}).get(ALTE_TITEL) or []) if vorhanden is not None else []
+    if vorhanden is not None and vorhanden.title:
+        alte.append(vorhanden.title)
+    neu_k = alias_dienst.normalisiere(quelle.titel)
+    alte = [a for a in alias_dienst.bereinige(alte) if alias_dienst.normalisiere(a) != neu_k]
+    if alte:
+        metadata[ALTE_TITEL] = alte
+    # Nur die alten Titel kommen dazu; die Aliase der Datei bleiben, wie sie dastehen.
+    aliase = alias_dienst.bereinige([*quelle.aliase, *alte])
+
     # Der Hash **nach** der Bereinigung: Er soll den Stand beschreiben, der wirklich
     # geschrieben wird — sonst gälte der Knoten beim nächsten Lauf als von Hand geändert.
     metadata[SEED_HASH] = stand_hash(
-        quelle.titel, quelle.content, metadata, quelle.aliase
+        quelle.titel, quelle.content, metadata, aliase
     )
 
     if vorhanden is None:
@@ -1049,7 +1071,7 @@ async def _schreibe_knoten(
         )
         db.add(knoten)
         await db.flush()
-        await alias_dienst.setze(db, knoten.id, quelle.aliase)
+        await alias_dienst.setze(db, knoten.id, aliase)
         bilanz.neu += 1
         return knoten.id, "neu"
 
@@ -1075,7 +1097,7 @@ async def _schreibe_knoten(
     vorhanden.read_scope = "school"
     vorhanden.write_scope = _schreibbereich(gruppe_id)
     vorhanden.write_scope_group_id = gruppe_id
-    await alias_dienst.setze(db, vorhanden.id, quelle.aliase)
+    await alias_dienst.setze(db, vorhanden.id, aliase)
     if ist["embedding_vorhanden"] and quelle.knotentyp in EMBEDDING_CONTENT_TYPES:
         vorhanden.embedding = None
         bilanz.neu_einzubetten += 1
@@ -1307,6 +1329,11 @@ async def seed_in_session(
                 fach=fach.name if fach is not None else quelle.fach,
             ))
 
+        if quelle.geruest and not quelle.content:
+            # Gerüst aus dem Curriculum, noch leer (0.44, AQ, E7 b): kein leerer Begriff in
+            # der Sammlung. Andere Dateien ohne Definition bleiben, wie sie sind (A8).
+            uebergangen("Gerüst ohne Definition — erst ausfüllen, dann einspielen")
+            continue
         if not quelle.fach:
             # Nur möglich, wenn der Lauf das Fach aus den Dateien nimmt und keines
             # vorgibt (Admin-Seite). Fachlose Begriffe entstehen nicht.

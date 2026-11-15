@@ -19,13 +19,15 @@
     import NamenChips from "./NamenChips.svelte";
     import { untrack } from "svelte";
     import { page } from "$app/stores";
-    import { aufloesenCurriculumBegriffe } from "$lib/api.js";
+    import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl } from "$lib/api.js";
     import { myFachschaften } from "$lib/stores/myGroups.js";
     import {
         aufloesungsMap,
         aufloesungVon,
         begriffeImCurriculum,
         fachmethodenImCurriculum,
+        fehlendeListe,
+        fehlendUeberschrift,
         kannAnlegen,
         ungeprueft,
     } from "$lib/curriculum_begriffe.js";
@@ -34,6 +36,7 @@
         MoreVertical,
         Move,
         ChevronRight,
+        FileDown,
         Plus,
     } from "lucide-svelte";
 
@@ -66,11 +69,8 @@
             aufloesung = aufloesungsMap(liste, aufloesung);
         });
     });
-    const fehlendeBegriffe = $derived(
-        begriffeImCurriculum(curriculum).some(
-            (b) => aufloesungVon(aufloesung, b)?.zustand === "fehlt",
-        ),
-    );
+    // Übersicht der fehlenden Begriffe (Schritt 4) — aus derselben Auflösung wie die Chips.
+    const fehlListe = $derived(fehlendeListe(curriculum, aufloesung));
 
     /** Namen beim Server prüfen — nur ungeprüfte, mit `alle` auch schon geprüfte. */
     async function pruefeBegriffe(namen, alle = false) {
@@ -554,13 +554,67 @@
 <!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
 <svelte:document onvisibilitychange={beiRueckkehr} />
 
-{#if fehlendeBegriffe}
-    <p class="mb-2 text-xs text-light-tx-2 dark:text-dark-tx-2" data-legende="begriffe">
-        Gestrichelte Begriffe gibt es in der Bibliothek noch nicht.
-        {darfAnlegen
-            ? "Mit „anlegen“ legst du sie für die Fachschaft an."
-            : "Anlegen kann die Fachschaft des Fachs."}
-    </p>
+{#if fehlListe.fehlend.length || fehlListe.mehrdeutig.length}
+    <details
+        class="mb-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
+        data-uebersicht="begriffe"
+    >
+        <summary class="cursor-pointer text-light-tx dark:text-dark-tx">
+            {fehlendUeberschrift(fehlListe)}
+        </summary>
+        <div class="mt-2 space-y-2">
+            {#if fehlListe.fehlend.length}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2" data-legende="begriffe">
+                    Gestrichelte Begriffe gibt es in der Bibliothek noch nicht.
+                    {darfAnlegen
+                        ? "Mit „anlegen“ legst du sie für die Fachschaft an — einzeln am Begriff oder gesammelt über die Gerüste."
+                        : "Anlegen kann die Fachschaft des Fachs."}
+                </p>
+                <ul class="text-xs space-y-0.5">
+                    {#each fehlListe.fehlend as b (`${b.name}\u0000${b.fassung ?? ""}`)}
+                        <li class="text-light-tx dark:text-dark-tx">
+                            {b.name}{b.fassung ? ` (${b.fassung})` : ""}
+                            <span class="text-light-tx-2 dark:text-dark-tx-2">
+                                — {b.anzahl}× — {b.kapitel.join("; ")}
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+            {#if fehlListe.mehrdeutig.length}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    Mehrdeutig — im Editor am gelben Begriff die Fassung wählen:
+                    {fehlListe.mehrdeutig.map((b) => b.name).join(", ")}
+                </p>
+            {/if}
+            {#if fehlListe.fehlend.length && curriculum?.id}
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <a
+                        href={fehlendeBegriffeUrl(curriculum.id, "txt")}
+                        download
+                        class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                    >
+                        <FileDown class="w-4 h-4" /> Liste
+                    </a>
+                    <a
+                        href={fehlendeBegriffeUrl(curriculum.id, "zip")}
+                        download
+                        title="Je Begriff eine Datei im Format der Fachbegriffe — Definition eintragen und unter Fachbegriffe einspielen"
+                        class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                    >
+                        <FileDown class="w-4 h-4" /> Gerüste (Zip)
+                    </a>
+                    {#if editMode}
+                        <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Die Downloads zeigen den gespeicherten Stand.
+                        </span>
+                    {/if}
+                </div>
+            {/if}
+        </div>
+    </details>
 {/if}
 
 <div class="overflow-x-auto" role="presentation" onclick={hideMenu}>

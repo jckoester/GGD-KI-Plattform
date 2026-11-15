@@ -199,3 +199,37 @@ export function fachmethodenVorschlaege(server, lokal, q) {
     return vorn(a) - vorn(b) || b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de')
   })
 }
+
+/**
+ * Übersicht der fehlenden und mehrdeutigen Begriffe (Schritt 4) — aus derselben Auflösung
+ * wie die Chips, damit Liste und Markierungen übereinstimmen, auch vor dem Speichern.
+ * Gegenstück zu `fehlende_begriffe` im Backend (die Downloads).
+ */
+export function fehlendeListe(curriculum, map) {
+  const gruppen = { fehlt: new Map(), mehrdeutig: new Map() }
+  for (const kap of curriculum?.kapitel ?? []) {
+    for (const ls of kap.lernsequenzen ?? []) {
+      for (const e of ls.metadata?.eintraege ?? []) {
+        for (const b of e.begriffe ?? []) {
+          const z = aufloesungVon(map, b)?.zustand
+          if (!(z in gruppen)) continue
+          const k = `${nameSchluessel(b.name)}\u0000${(b.fassung ?? '').toLocaleLowerCase('de')}`
+          const g = gruppen[z].get(k) ?? { name: b.name, fassung: b.fassung ?? null, anzahl: 0, kapitel: [] }
+          g.anzahl += 1
+          if (kap.title && !g.kapitel.includes(kap.title)) g.kapitel.push(kap.title)
+          gruppen[z].set(k, g)
+        }
+      }
+    }
+  }
+  const sortiert = (m) => [...m.values()].sort((a, b) => b.anzahl - a.anzahl || a.name.localeCompare(b.name, 'de'))
+  return { fehlend: sortiert(gruppen.fehlt), mehrdeutig: sortiert(gruppen.mehrdeutig) }
+}
+
+/** Kopfzeile der Übersicht. */
+export function fehlendUeberschrift({ fehlend, mehrdeutig }) {
+  const teile = []
+  if (fehlend.length) teile.push(fehlend.length === 1 ? '1 Begriff fehlt in der Bibliothek' : `${fehlend.length} Begriffe fehlen in der Bibliothek`)
+  if (mehrdeutig.length) teile.push(`${mehrdeutig.length} mehrdeutig`)
+  return teile.join(' · ')
+}

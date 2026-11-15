@@ -12,10 +12,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Fassung. Mitglieder der Fachschaft legen fehlende Begriffe direkt aus dem Curriculum an.
 - Fachmethoden schlagen beim Tippen vor, was in den Curricula des Fachs schon steht.
 - Neuer Baustein: Der Titel lässt sich über die Adresse vorgeben (`?titel=`).
+- Curriculum: Übersicht der fehlenden und mehrdeutigen Begriffe mit Anzahl und Kapiteln; Download als Liste
+  oder als Zip mit Gerüsten zum Ausfüllen und Einspielen unter Fachbegriffe.
+- Fachbegriffe-Import: Gerüste aus dem Curriculum ohne Definition werden abgewiesen, statt als leerer Begriff
+  anzukommen.
+- Wird ein Begriff umbenannt, bleibt der alte Name als Alias erhalten — im Editor, in „Meine Bausteine“ und
+  beim Import.
 
 ### Geändert
 
 - Curriculum-Editor und -Ansicht: volle Fensterbreite; Knöpfe mit Icons.
+
+### Behoben
+
+- Bearbeiten eines Fachbegriffs ohne eigene Fachschaft (etwa als Admin) entfernte sein Fach; Curricula und
+  Planung fanden ihn danach nicht mehr.
+- Einstellungen → Fachbegriffe listete auch Jahresplanung, Unterrichtseinheiten und -stunden.
 
 ## [0.43.0] – 2026-11-14
 

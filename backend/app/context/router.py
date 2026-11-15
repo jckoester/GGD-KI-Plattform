@@ -88,6 +88,7 @@ from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.context.filters import Knotenfilter, wende_an
 from app.context.visibility import read_scope_clause
 from app.preferences.service import anzeige_limit
+from app.planning.schemas import BEGRIFF_TYPEN
 from app.db.models import (
     Assistant,
     AssistantContextAnchor,
@@ -1006,6 +1007,21 @@ async def update_node(
             abgrenzung_zu=abgrenzung_zu, user=user, node=node,
         )
 
+    # Ein Fachbegriff ohne Fach findet weder das Curriculum noch die Planung (0.44): Wer das
+    # Fach leeren will, meint es nicht — der Baustein-Editor schickte `null`, wenn keine
+    # eigene Fachschaft gewählt war.
+    if (typ_danach in BEGRIFF_TYPEN and "subject_id" in update_data
+            and update_data["subject_id"] is None and node.subject_id is not None):
+        raise HTTPException(status_code=422, detail="Ein Fachbegriff braucht ein Fach.")
+
+    # Umbenennen eines Begriffs: Der alte Titel bleibt als Alias (0.44, AQ, E12) — nach der
+    # Kollisionsprüfung, die nur neue Namen prüfen soll; den alten trug der Begriff schon.
+    if typ_danach in BEGRIFF_TYPEN and "title" in update_data:
+        basis = neue_aliase if neue_aliase is not None else await aliase_modul.lade(db, node.id)
+        nachher = aliase_modul.mit_altem_titel(basis, node.title, update_data["title"])
+        if nachher != aliase_modul.bereinige(basis) or neue_aliase is not None:
+            neue_aliase = nachher
+
     # Felder, aus denen der Eingabetext des Vektors entsteht (`_build_embedding_input`); ein
     # geänderter Scope oder ein neues `valid_until` gehören nicht dazu. `aliase` schon: Bei
     # `methode` und `operator` stehen sie im Eingabetext. Ebenso der Typ.
@@ -1063,6 +1079,8 @@ async def update_node_title(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     vektor_vorher = await eingabe_mit_aliasen(db, node)
+    if node.content_type in BEGRIFF_TYPEN:
+        await aliase_modul.behalte_alten_titel(db, node, payload.title)  # E12
     node.title = payload.title
     node.title_locked = True
     # Bei vielen Typen steht der Titel im Vektor (bis 0.17 zog dieser Weg ihn nicht nach).
@@ -1146,6 +1164,8 @@ async def verwalte_node(
 
     vektor_vorher = await eingabe_mit_aliasen(db, node)
     if payload.title is not None:
+        if node.content_type in BEGRIFF_TYPEN:
+            await aliase_modul.behalte_alten_titel(db, node, payload.title)  # E12
         node.title = payload.title
         # Wie im generischen Editor: Ein von Hand gesetzter Titel wird gegen den
         # BP-Re-Import gesperrt (C1).
@@ -1701,6 +1721,55 @@ async def begriffe_im_curriculum_aufloesen(
     paare = list(dict.fromkeys(
         (e["name"], e.get("fassung")) for n in payload.namen for e in namen_normalisieren([n.model_dump()])))
     return await namen_aufloesen(db, user, node.subject_id, paare)
+
+
+@router.get("/curricula/{curriculum_id}/begriffe/fehlend")
+async def fehlende_begriffe_im_curriculum(
+    curriculum_id: UUID,
+    format: str = Query("json", pattern="^(json|txt|zip)$"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Begriffe, die das Curriculum nennt und die Bibliothek nicht kennt (0.44, AQ, Weg 2).
+
+    `json`: `{fehlend: [{name, fassung, anzahl, kapitel}], mehrdeutig: [...]}` — dieselbe
+    Auflösung wie `CurriculumRead.begriffe`, also für die lesende Person. `txt`: die schlichte
+    Liste. `zip`: Markdown-Gerüste im Vault-Format für den Fachbegriffe-Upload (E7).
+    """
+    from datetime import date
+
+    from fastapi.responses import Response
+
+    from app.context.curriculum_begriffe import (
+        begriffe_aufloesen, fehlende_begriffe, fehlliste_text, gerueste_zip,
+    )
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    _check_curriculum_read_permission(tree, user)
+    liste = fehlende_begriffe(tree, await begriffe_aufloesen(db, tree, user))
+    if format == "json":
+        return liste
+
+    stand = date.today().isoformat()
+    meta = tree.get("metadata") or {}
+    basis = f"begriffe_fehlend_{meta.get('fach_code', 'curriculum')}_{meta.get('jahrgangsstufe', '')}_{stand}"
+    basis = re.sub(r"[^A-Za-z0-9_.-]+", "_", basis)
+    titel = tree.get("title") or ""
+    if format == "txt":
+        return Response(
+            content=fehlliste_text(titel, liste, stand).encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{basis}.txt"'},
+        )
+    fach = await db.get(Subject, tree["subject_id"]) if tree.get("subject_id") else None
+    return Response(
+        content=gerueste_zip(titel, fach.name if fach else "", liste, stand),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{basis}.zip"'},
+    )
 
 
 @router.get("/curricula/{curriculum_id}/fachmethoden", response_model=list[dict])

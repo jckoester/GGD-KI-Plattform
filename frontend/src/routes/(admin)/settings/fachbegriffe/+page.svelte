@@ -21,7 +21,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import { subjects, refreshSubjects } from "$lib/stores/subjects.js";
     import { exportiereFachbegriffe } from "$lib/api.js";
-    import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
+    import { BEGRIFF_TYPEN } from "$lib/begriffe_der_stunde.js";
 
     let slug = $state("");
     const fach = $derived($subjects.find((s) => s.slug === slug) ?? null);
@@ -124,7 +124,7 @@
                     fixedSubjectSlug={fach.slug}
                     showSubjectFilter={false}
                     showNewButton={false}
-                    excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
+                    nurContentTypes={BEGRIFF_TYPEN}
                 />
             </div>
         {/key}

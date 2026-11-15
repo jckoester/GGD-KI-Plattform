@@ -1984,6 +1984,11 @@ export async function aufloesenCurriculumBegriffe(curriculumId, namen) {
   return res.json()
 }
 
+/** Download der fehlenden Begriffe: `txt` (Liste) oder `zip` (Gerüste) — gespeicherter Stand (0.44, AQ). */
+export function fehlendeBegriffeUrl(curriculumId, format) {
+  return `${BASE}/context/curricula/${curriculumId}/begriffe/fehlend?format=${format}`
+}
+
 /** Fachmethoden, die in den Curricula des Fachs schon stehen: `[{name, anzahl}]` (0.44, AQ). */
 export async function getCurriculumFachmethoden(curriculumId, q = '') {
   const res = await fetch(

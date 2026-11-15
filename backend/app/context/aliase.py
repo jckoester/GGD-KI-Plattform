@@ -102,6 +102,26 @@ def bereinige(aliase: list[str] | None) -> list[str]:
     return sauber
 
 
+def mit_altem_titel(aliase: list[str] | None, alt: str | None, neu: str | None) -> list[str]:
+    """Aliase nach einem Umbenennen: der alte Titel kommt dazu (0.44, AQ, E12).
+
+    Curricula nennen Begriffe beim Namen; ohne den alten Namen als Alias gälte der Begriff
+    dort nach dem Umbenennen als fehlend. Ändert sich nur die Schreibweise (gleich
+    normalisiert), bleibt alles, wie es ist. Ein Alias, der jetzt Titel ist, fällt weg.
+    """
+    if not alt or normalisiere(alt) == normalisiere(neu or ""):
+        return bereinige(aliase)
+    rest = [a for a in aliase or [] if normalisiere(a) != normalisiere(neu or "")]
+    return bereinige([*rest, alt])
+
+
+async def behalte_alten_titel(db: AsyncSession, node, neu: str | None) -> None:
+    """Für Wege ohne eigene Alias-Liste: alten Titel als Alias, bevor `node.title` wechselt."""
+    if not node.title or normalisiere(node.title) == normalisiere(neu or ""):
+        return
+    await setze(db, node.id, mit_altem_titel(await lade(db, node.id), node.title, neu))
+
+
 async def setze(db: AsyncSession, node_id: UUID, aliase: list[str] | None) -> list[str]:
     """Ersetzt die Aliase eines Knotens vollständig. Committet nicht.
 

@@ -130,7 +130,10 @@
                 content: content.trim() || null,
                 metadata: metadatenAusFormular(typ, felder, node?.metadata ?? {}),
                 aliase,
-                subject_id: gewaehlteFachschaft?.subject_id ?? null,
+                // Ohne gewählte eigene Fachschaft (etwa als Admin ohne Mitgliedschaft) bleibt
+                // das Fach des Bausteins — `null` nahm ihm das Fach, und Curriculum und
+                // Planung fanden ihn nicht mehr (Abnahme 0.44, 15.11.2026).
+                subject_id: gewaehlteFachschaft?.subject_id ?? node?.subject_id ?? null,
             };
             const gespeichert = node
                 ? await updateContextNode(node.id, payload)

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   CHIP_KLASSEN, NAME_LAENGE, anlegenPfad, ausTreffer, aufloesungVon, aufloesungsMap, begriffeImCurriculum,
-  chipHinweis, chipText, chipZustand, enterWahl, fachmethodenImCurriculum, fachmethodenVorschlaege, kannAnlegen, mitFassung, mitName, nameSchluessel,
+  chipHinweis, chipText, chipZustand, enterWahl, fachmethodenImCurriculum, fachmethodenVorschlaege, fehlendUeberschrift,
+  fehlendeListe, kannAnlegen, mitFassung, mitName, nameSchluessel,
   namensEintrag, ohneName, ungeprueft,
 } from './curriculum_begriffe.js'
 
@@ -197,5 +198,56 @@ describe('Leseansicht (Jan, 15.11.2026)', () => {
     expect(knoepfe).toHaveLength(17)
     expect(icons).toHaveLength(17)
     expect(seite).not.toMatch(/class="px-4 py-/)
+  })
+})
+
+describe('Übersicht fehlender Begriffe (Schritt 4)', () => {
+  const c = { kapitel: [
+    { title: 'Redox', lernsequenzen: [{ metadata: { eintraege: [
+      { begriffe: [{ name: 'Fehlt' }, { name: 'Da' }, { name: 'Oxidation' }] },
+      { begriffe: [{ name: 'fehlt' }, { name: 'Selten' }] },
+    ] } }] },
+    { title: 'Säuren', lernsequenzen: [{ metadata: { eintraege: [{ begriffe: [{ name: 'Fehlt' }] }] } }] },
+  ] }
+  const map = aufloesungsMap([
+    { name: 'Fehlt', fassung: null, zustand: 'fehlt' }, { name: 'fehlt', fassung: null, zustand: 'fehlt' },
+    { name: 'Selten', fassung: null, zustand: 'fehlt' }, { name: 'Da', fassung: null, zustand: 'gefunden' },
+    { name: 'Oxidation', fassung: null, zustand: 'mehrdeutig', kandidaten: [] },
+  ])
+
+  it('je Name einmal, mit Anzahl und Kapiteln, häufigste zuerst', () => {
+    const l = fehlendeListe(c, map)
+    expect(l.fehlend).toEqual([
+      { name: 'Fehlt', fassung: null, anzahl: 3, kapitel: ['Redox', 'Säuren'] },
+      { name: 'Selten', fassung: null, anzahl: 1, kapitel: ['Redox'] },
+    ])
+    expect(l.mehrdeutig.map((b) => b.name)).toEqual(['Oxidation'])
+  })
+
+  it('Überschrift', () => {
+    expect(fehlendUeberschrift(fehlendeListe(c, map))).toBe('2 Begriffe fehlen in der Bibliothek · 1 mehrdeutig')
+    expect(fehlendUeberschrift({ fehlend: [{}], mehrdeutig: [] })).toBe('1 Begriff fehlt in der Bibliothek')
+  })
+
+  it('Tabelle: Übersicht mit beiden Downloads', () => {
+    const t = quelle('lib/components/CurriculumTable.svelte')
+    expect(t).toContain('data-uebersicht="begriffe"')
+    expect(t).toContain('fehlendeBegriffeUrl(curriculum.id, "txt")')
+    expect(t).toContain('fehlendeBegriffeUrl(curriculum.id, "zip")')
+  })
+})
+
+describe('Abnahme Schritt 4 (15.11.2026)', () => {
+  it('Baustein-Editor behält das Fach, wenn keine eigene Fachschaft gewählt ist', () => {
+    expect(quelle('lib/components/CollectionEditor.svelte'))
+      .toContain('subject_id: gewaehlteFachschaft?.subject_id ?? node?.subject_id ?? null')
+  })
+
+  it('/settings/fachbegriffe listet nur Begriffe und Stoffsteckbriefe', () => {
+    const seite = quelle('routes/(admin)/settings/fachbegriffe/+page.svelte')
+    expect(seite).toContain('nurContentTypes={BEGRIFF_TYPEN}')
+    expect(seite).not.toContain('excludeContentTypes')
+    const liste = quelle('lib/components/KnowledgeNodeList.svelte')
+    expect(liste).toContain('else if (nurContentTypes.length) params.content_type = [...nurContentTypes]')
   })
 })

@@ -200,3 +200,109 @@ async def fachmethoden_des_fachs(db: AsyncSession, user, subject_id: int | None,
         aus.append({"name": name, "anzahl": sum(schreibweisen.values()), "_vorn": bool(gesucht) and k.startswith(gesucht)})
     aus.sort(key=lambda m: (not m["_vorn"], -m["anzahl"], m["name"].casefold()))
     return [{"name": m["name"], "anzahl": m["anzahl"]} for m in aus[:FACHMETHODEN_VORSCHLAEGE]]
+
+
+# ── Fehlende Begriffe: Übersicht und Downloads (Schritt 4, Jans Weg 2) ─────────
+
+
+def fehlende_begriffe(tree: dict, aufloesung: list[dict]) -> dict:
+    """Was im Curriculum als Begriff genannt ist, die Bibliothek aber nicht kennt.
+
+    `fehlend`: je Name (Schlüssel wie beim Abgleich, plus Fassung) einmal, in der
+    Schreibweise des ersten Vorkommens, mit `anzahl` (Einträge, die ihn nennen) und den
+    `kapitel`, in denen er steht. Sortiert nach Häufigkeit, dann alphabetisch — die
+    Arbeitsliste der Fachschaft. `mehrdeutig`: dasselbe für Namen mit mehreren Treffern; sie
+    fehlen nicht, brauchen aber eine Wahl.
+    """
+    zustand = {(a["name"], a.get("fassung")): a["zustand"] for a in aufloesung}
+    gruppen: dict[str, dict[tuple[str, str], dict]] = {"fehlt": {}, "mehrdeutig": {}}
+    for kap in tree.get("kapitel") or []:
+        for ls in kap.get("lernsequenzen") or []:
+            for e in (ls.get("metadata") or {}).get("eintraege") or []:
+                if not isinstance(e, dict):
+                    continue
+                for b in namen_normalisieren(e.get("begriffe")):
+                    z = zustand.get((b["name"], b.get("fassung")))
+                    if z not in gruppen:
+                        continue
+                    k = (schluessel(b["name"]), (b.get("fassung") or "").casefold())
+                    eintrag = gruppen[z].setdefault(k, {"name": b["name"], "fassung": b.get("fassung"),
+                                                        "anzahl": 0, "kapitel": []})
+                    eintrag["anzahl"] += 1
+                    titel = kap.get("title") or ""
+                    if titel and titel not in eintrag["kapitel"]:
+                        eintrag["kapitel"].append(titel)
+
+    def sortiert(g):
+        return sorted(g.values(), key=lambda b: (-b["anzahl"], b["name"].casefold()))
+
+    return {"fehlend": sortiert(gruppen["fehlt"]), "mehrdeutig": sortiert(gruppen["mehrdeutig"])}
+
+
+def _name_mit_fassung(b: dict) -> str:
+    return f"{b['name']} ({b['fassung']})" if b.get("fassung") else b["name"]
+
+
+def fehlliste_text(titel: str, liste: dict, stand: str) -> str:
+    """Die schlichte Liste (E7) — zum Verteilen in der Fachschaft."""
+    zeilen = [f"Fehlende Begriffe — {titel}", f"Stand: {stand}", ""]
+    if not liste["fehlend"]:
+        zeilen.append("Alle genannten Begriffe stehen in der Bibliothek.")
+    for b in liste["fehlend"]:
+        zeilen.append(f"- {_name_mit_fassung(b)} — {b['anzahl']}× — {'; '.join(b['kapitel'])}")
+    if liste["mehrdeutig"]:
+        zeilen += ["", "Mehrdeutig (im Curriculum eine Fassung wählen):", ""]
+        zeilen += [f"- {_name_mit_fassung(b)} — {b['anzahl']}×" for b in liste["mehrdeutig"]]
+    return "\n".join(zeilen) + "\n"
+
+
+#: Kennzeichnung im Frontmatter: Diese Datei ist ein Gerüst aus dem Curriculum (E7 b). Der
+#: Fachbegriffe-Import weist sie ab, solange die Definition fehlt — sonst entstünde ein
+#: leerer Begriff in der Sammlung, den Schüler:innen sehen.
+GERUEST = "geruest"
+
+GERUEST_HINWEISE = "_Hinweise.txt"
+
+
+def _geruest_datei(b: dict, fach_name: str) -> str:
+    import yaml
+
+    kopf: dict[str, Any] = {"knotentyp": "begriff", "titel": b["name"], "fach": fach_name}
+    if b.get("fassung"):
+        kopf["fassung"] = b["fassung"]
+    kopf[GERUEST] = True
+    text = yaml.safe_dump(kopf, allow_unicode=True, sort_keys=False, width=10_000).strip()
+    return f"---\n{text}\n---\n\n## Definition\n\n"
+
+
+def gerueste_zip(titel: str, fach_name: str, liste: dict, stand: str) -> bytes:
+    """Markdown-Gerüste im Vault-Format, eins je fehlendem Begriff, als Zip (E7).
+
+    Die Fachschaft schreibt die Definition und spielt das Bündel über den vorhandenen
+    Upload ein. `_Hinweise.txt` (Unterstrich: der Import übergeht sie) sagt, wo die Begriffe
+    genannt sind und was zu tun ist.
+    """
+    from app.context.fachbegriffe_export import Ausgabedatei, als_zip
+
+    dateien: list[Ausgabedatei] = []
+    vergeben: set[str] = set()
+    for b in liste["fehlend"]:
+        basis = _name_mit_fassung(b).replace("/", "-").lstrip("_").strip() or "Begriff"
+        name, i = basis, 2
+        while name.casefold() in vergeben:
+            name, i = f"{basis} {i}", i + 1
+        vergeben.add(name.casefold())
+        dateien.append(Ausgabedatei(f"{name}.md", _geruest_datei(b, fach_name).encode("utf-8")))
+    hinweis = (
+        f"Gerüste für die fehlenden Begriffe — {titel}\nStand: {stand}\n\n"
+        "Je Begriff eine Datei. Unter „## Definition“ den Text eintragen, gern auch Aliase\n"
+        "(`aliase: [...]`) und weitere Felder wie in der Vorlage. Dann das Bündel unter\n"
+        "Fachbegriffe einspielen. Ein Gerüst ohne Definition weist der Import ab\n"
+        "(Kennzeichnung `geruest: true`) — es entsteht kein leerer Begriff.\n\n"
+        "Wo die Begriffe im Curriculum stehen:\n\n"
+        + "\n".join(f"- {_name_mit_fassung(b)} — {b['anzahl']}× — {'; '.join(b['kapitel'])}"
+                    for b in liste["fehlend"])
+        + "\n"
+    )
+    dateien.append(Ausgabedatei(GERUEST_HINWEISE, hinweis.encode("utf-8")))
+    return als_zip(dateien)

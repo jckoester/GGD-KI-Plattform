@@ -35,6 +35,9 @@
         onNodeClick = null, // optional: callback statt goto
         initialGrade = null, // voreingestellte Jahrgangsstufe
         excludeContentTypes = [], // Content-Typen, die ausgeblendet werden sollen
+        // Nur diese Content-Typen zeigen (z. B. `/settings/fachbegriffe`: Begriffe und
+        // Stoffsteckbriefe). Leer heißt: alle außer `excludeContentTypes`.
+        nurContentTypes = [],
         /**
          * Das Fach, in das Fachbegriffe eingespielt werden dürfen — oder `null`.
          *
@@ -91,9 +94,11 @@
 
     const sortedNodes = $derived.by(() => {
         // Filter ausgeschlossen Content-Typen heraus
-        const visible = excludeContentTypes.length
-            ? nodes.filter(n => !excludeContentTypes.includes(n.content_type))
-            : nodes;
+        const visible = nodes.filter(
+            (n) =>
+                !excludeContentTypes.includes(n.content_type) &&
+                (!nurContentTypes.length || nurContentTypes.includes(n.content_type)),
+        );
         const arr = [...visible];
         arr.sort((a, b) => {
             let av, bv;
@@ -159,7 +164,9 @@
     const contentTypeOptions = $derived(
         auswaehlbareTypOptionen(
             (selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : []).filter(
-                (ct) => !excludeContentTypes.includes(ct),
+                (ct) =>
+                    !excludeContentTypes.includes(ct) &&
+                    (!nurContentTypes.length || nurContentTypes.includes(ct)),
             ),
             selectedContentType,
         ),
@@ -180,6 +187,7 @@
         } else {
             if (selectedCategory) params.category = selectedCategory;
             if (selectedContentType) params.content_type = selectedContentType;
+            else if (nurContentTypes.length) params.content_type = [...nurContentTypes];
         }
         // BP-Curriculum-Typen serverseitig ausblenden (C2) — nicht nur clientseitig.
         if (excludeContentTypes.length) params.exclude_content_type = excludeContentTypes;

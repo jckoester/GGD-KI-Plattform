@@ -56,6 +56,8 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         # POST nur, weil Namen mit Fassung im Körper stehen — geschrieben wird nichts.
         ("POST", "/context/curricula/{curriculum_id}/begriffe/aufloesen"),
         ("GET", "/context/curricula/{curriculum_id}/fachmethoden"),
+        # Übersicht und Downloads der fehlenden Begriffe (lesend), Aufrufer `CurriculumTable.svelte`.
+        ("GET", "/context/curricula/{curriculum_id}/begriffe/fehlend"),
     }
 
 

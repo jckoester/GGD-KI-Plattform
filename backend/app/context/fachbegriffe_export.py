@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context import aliase as alias_dienst
 from app.context.fachbegriffe_import import (
     ABSCHNITT_KANTEN,
+    ALTE_TITEL,
     ABSCHNITT_METADATA,
     DEFINITION,
     FREIE_METADATEN,
@@ -64,7 +65,8 @@ ABB = "_Abb"
 #: Metadatenschlüssel, die nicht ins Frontmatter gehören, ohne dass etwas fehlte:
 #: Verwaltungsangaben des Imports und die Stub-Markierung, die der Schreibteil aus dem
 #: leeren `content` ohnehin neu setzt.
-OHNE_ENTSPRECHUNG = frozenset({*SEED_SCHLUESSEL, STUB_MARKIERUNG})
+#: `alte_titel` (E12) steht im Export schon als Alias in `aliase:`.
+OHNE_ENTSPRECHUNG = frozenset({*SEED_SCHLUESSEL, STUB_MARKIERUNG, ALTE_TITEL})
 
 
 @dataclass
