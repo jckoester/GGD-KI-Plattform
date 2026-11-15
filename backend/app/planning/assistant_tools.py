@@ -601,6 +601,26 @@ async def _kapitel(ctx: ToolContext, kapitel_id: UUID) -> dict | None:
                 eintrag["partiell"] = True
             kompetenzen.setdefault(ls_id, []).append(eintrag)
 
+    # Begriffe der Einträge (0.44, AQ, E10): gefundene in der Form von `refs`, die übrigen als
+    # Namen. Ein Abgleich für alle Lernsequenzen; ohne Begriffe bleibt die Lernsequenz, wie sie war.
+    from app.context.curriculum_begriffe import begriffe_der_lernsequenzen
+
+    begriffe = await begriffe_der_lernsequenzen(
+        db, ctx.user, (curriculum.subject_id if curriculum else None) or kap.subject_id, list(sequenzen))
+
+    def lernsequenz(s: ContextNode) -> dict:
+        aus = {
+            "titel": s.title,
+            "std": als_stundenzahl((s.metadata_ or {}).get("std")),
+            "kompetenzen": kompetenzen.get(s.id, []),
+        }
+        if b := begriffe.get(s.id):
+            if b["gefunden"]:
+                aus["begriffe_im_curriculum"] = b["gefunden"]
+            if b["ohne_baustein"]:
+                aus["begriffe_im_curriculum_ohne_baustein"] = b["ohne_baustein"]
+        return aus
+
     cur_meta = (curriculum.metadata_ or {}) if curriculum else {}
     return {
         "id": str(kap.id),
@@ -609,14 +629,7 @@ async def _kapitel(ctx: ToolContext, kapitel_id: UUID) -> dict | None:
         "curriculum": curriculum.title if curriculum else None,
         "bildungsplan": cur_meta.get("bp_version"),
         "jahrgangsstufe": cur_meta.get("jahrgangsstufe"),
-        "lernsequenzen": [
-            {
-                "titel": s.title,
-                "std": als_stundenzahl((s.metadata_ or {}).get("std")),
-                "kompetenzen": kompetenzen.get(s.id, []),
-            }
-            for s in sequenzen
-        ],
+        "lernsequenzen": [lernsequenz(s) for s in sequenzen],
     }
 
 

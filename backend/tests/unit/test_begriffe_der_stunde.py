@@ -87,3 +87,23 @@ def test_frontend_kennt_dieselben_typen():
     liste = re.search(r"export const BEGRIFF_TYPEN = \[([^\]]*)\]", js)
     assert liste, "BEGRIFF_TYPEN nicht gefunden"
     assert tuple(re.findall(r"'([a-z_]+)'", liste.group(1))) == BEGRIFF_TYPEN
+
+
+def test_nachricht_ohne_curriculum_wortgleich_zum_vorlauf():
+    """0.44 (AQ, E10): Die Begriffe des Curriculums kommen nur dazu, wenn es welche gibt —
+    sonst ist die Nachricht dieselbe wie im gemessenen Vorlauf."""
+    from app.planning.begriffe import CURRICULUM_ZEILE, mit_curriculum_kandidaten, nachricht
+
+    kand = [{"titel": "Benzol", "aliase": ["Benzen"]}]
+    alt = ("Fach: Chemie\nBegriffe früherer Stunden dieser Gruppe: Alkan\n\n"
+           "Kandidaten aus dem Wissensspeicher (Schreibhilfe, keine Auswahl):\n- Benzol (Aliase: Benzen)\n\nENTWURF")
+    assert nachricht("Fach: Chemie", ["Alkan"], kand, "ENTWURF") == alt
+    assert nachricht("Fach: Chemie", ["Alkan"], kand, "ENTWURF", []) == alt
+    neu = nachricht("Fach: Chemie", ["Alkan"], kand, "ENTWURF", ["Aromat", "Hückel-Regel"])
+    assert neu.splitlines()[2] == CURRICULUM_ZEILE + "Aromat, Hückel-Regel"
+    assert neu.replace(CURRICULUM_ZEILE + "Aromat, Hückel-Regel\n", "") == alt
+
+    assert mit_curriculum_kandidaten(kand, None) is kand
+    zus = mit_curriculum_kandidaten(kand, {"gefunden": [{"titel": "Benzol"}, {"titel": "Aromat", "aliase": ["b", "a"]}],
+                                           "ohne_baustein": ["X"]})
+    assert zus == kand + [{"titel": "Aromat", "aliase": ["a", "b"]}]

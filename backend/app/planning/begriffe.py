@@ -207,9 +207,20 @@ def pruefsumme(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
-def nachricht(kontext: str, frueher: list[str], kandidaten: list[dict], text: str) -> str:
-    """Die Nachricht an das Modell — dasselbe Format wie im Vorlauf."""
+#: Der Satz, mit dem die Begriffe des Curriculums in die Nachricht kommen (0.44, AQ, E10).
+#: Er steht **nur** dort, wo die Einheit ein Kapitel mit Begriffen hat — ohne Kapitel bleibt
+#: die Nachricht wortgleich zum gemessenen Vorlauf, und die Anleitung (System) unverändert.
+CURRICULUM_ZEILE = ("Begriffe, die das Schulcurriculum für diese Einheit nennt (Grundlage: Nenne die, "
+                    "die diese Stunde einführt oder anspricht, in dieser Schreibweise): ")
+
+
+def nachricht(kontext: str, frueher: list[str], kandidaten: list[dict], text: str,
+              curriculum: list[str] | None = None) -> str:
+    """Die Nachricht an das Modell — dasselbe Format wie im Vorlauf; mit Kapitel zusätzlich die
+    Begriffe des Curriculums (`curriculum`, Namen)."""
     teile = [kontext, f"Begriffe früherer Stunden dieser Gruppe: {', '.join(frueher) or 'keine eingetragen'}", ""]
+    if curriculum:
+        teile[2:2] = [CURRICULUM_ZEILE + ", ".join(curriculum)]
     if kandidaten:
         teile += ["Kandidaten aus dem Wissensspeicher (Schreibhilfe, keine Auswahl):",
                   *(f"- {k['titel']}" + (f" (Aliase: {', '.join(k['aliase'])})" if k["aliase"] else "")
@@ -250,6 +261,36 @@ async def kandidaten(db: AsyncSession, user, text: str, faecher: tuple[int, ...]
     )).all()
     je_knoten = await aliase_modul.lade_viele(db, [t[0] for t in treffer])
     return [{"titel": t, "aliase": sorted(je_knoten.get(i, []))} for i, t in treffer]
+
+
+async def begriffe_aus_dem_curriculum(db: AsyncSession, user, stunde: ContextNode) -> dict | None:
+    """Die Begriffe, die das Curriculum-Kapitel der Einheit dieser Stunde nennt (E10) — oder
+    `None`, wenn die Stunde keine Einheit mit Kapitel hat oder das Kapitel keine Begriffe."""
+    from app.context.curriculum_begriffe import begriffe_des_kapitels
+    from app.db.models import ContextEdge
+    from app.planning.assistant_tools import _kapitel_der_einheit
+
+    einheit_id = (await db.execute(
+        sa.select(ContextNode.id)
+        .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+        .where(ContextEdge.from_node_id == stunde.id, ContextEdge.relation == "part_of",
+               ContextNode.content_type == "unterrichtseinheit", ContextNode.status == "active")
+    )).scalars().first()
+    kapitel_id = await _kapitel_der_einheit(db, einheit_id) if einheit_id else None
+    if kapitel_id is None:
+        return None
+    b = await begriffe_des_kapitels(db, user, kapitel_id)
+    return b if b["gefunden"] or b["ohne_baustein"] else None
+
+
+def mit_curriculum_kandidaten(kandidaten_liste: list[dict], curriculum: dict | None) -> list[dict]:
+    """Die gefundenen Begriffe des Curriculums zusätzlich als Kandidaten (Schreibhilfe mit
+    Aliasen) — sofern die Vektorsuche sie nicht ohnehin brachte."""
+    if not curriculum:
+        return kandidaten_liste
+    da = {k["titel"] for k in kandidaten_liste}
+    return kandidaten_liste + [{"titel": g["titel"], "aliase": sorted(g.get("aliase") or [])}
+                               for g in curriculum["gefunden"] if g["titel"] not in da]
 
 
 async def _kontext(db: AsyncSession, stunde: ContextNode) -> str:
@@ -322,11 +363,16 @@ async def begriffe_vorschlagen(db: AsyncSession, stunde_id: UUID, user, *, erzwi
 
         faecher = (stunde.subject_id, *await bezugsfaecher_von(db, stunde.subject_id))
         frueher = await fruehere_begriffe(db, stunde)
+        curriculum = await begriffe_aus_dem_curriculum(db, user, stunde)
+        curriculum_namen = ([g["titel"] for g in curriculum["gefunden"]] + curriculum["ohne_baustein"]
+                            if curriculum else None)
         antwort = await einzelaufruf(
             await schluessel_fuer(db, user.sub), user.sub, settings.begriffe_model,
             [{"role": "system", "content": ANLEITUNG},
-             {"role": "user", "content": nachricht(await _kontext(db, stunde), [f["titel"] for f in frueher],
-                                                    await kandidaten(db, user, text, faecher), text)}],
+             {"role": "user", "content": nachricht(
+                 await _kontext(db, stunde), [f["titel"] for f in frueher],
+                 mit_curriculum_kandidaten(await kandidaten(db, user, text, faecher), curriculum),
+                 text, curriculum_namen)}],
             json_antwort=True, max_tokens=2000, zeitlimit=45.0,
         )
         if not antwort.ok:

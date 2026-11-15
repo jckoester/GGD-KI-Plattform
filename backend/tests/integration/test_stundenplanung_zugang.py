@@ -572,3 +572,54 @@ async def test_uebertragene_phase_darf_weg(test_client, auth_headers, gruppen, a
         {"id": ids["Einstieg"], "name": "Einstieg", "dauer_min": 10}]}, TEACHER1_PSEUDO)
     assert aus.get("ok") is True, aus
     assert await _phasennamen(test_client, auth_headers, stunde) == ["Einstieg"]
+
+
+@pytest.mark.asyncio
+async def test_kapitel_bringt_die_begriffe_des_curriculums_mit(
+    test_client, auth_headers, gruppen, async_engine,
+):
+    """0.44 (AQ, E10): Je Lernsequenz die Begriffe der Einträge — gefundene in der Form von
+    `refs`, die übrigen als Namen. Der Begriffsvorschlag der Stunde bekommt dieselben."""
+    from app.context import aliase as aliase_modul
+    from app.db.models import ContextNode
+    from app.planning.begriffe import begriffe_aus_dem_curriculum, nachricht, CURRICULUM_ZEILE
+
+    ue, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Potenzen")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            kap, _, _ = await _curriculum_mit_kapitel(db)
+            potenz = ContextNode(category="concept", content_type="begriff", title=PRAEFIX + "Potenz",
+                                 status="active", subject_id=EIGENE, read_scope="school",
+                                 write_scope="school", content="x", metadata_={})
+            db.add(potenz)
+            await db.flush()
+            await aliase_modul.setze(db, potenz.id, [PRAEFIX + "Hochzahl"])
+            for ls in (await db.execute(sa.select(ContextNode).where(
+                    ContextNode.content_type == "lernsequenz",
+                    ContextNode.title.like(PRAEFIX + "%")))).scalars():
+                ls.metadata_ = {**ls.metadata_, "eintraege": [
+                    {"konkretisierung": "K", "begriffe": [{"name": PRAEFIX + "Hochzahl"}, {"name": "Basis"}]}
+                ] if ls.title.endswith("Normdarstellung") else [{"konkretisierung": "ohne"}]}
+            await db.commit()
+        await _verknuepfe(async_engine, ue, kap.id)
+
+        k = (await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde},
+                         TEACHER1_PSEUDO))["zusammenhang"]["kapitel"]
+        mit, ohne = k["lernsequenzen"]
+        assert mit["begriffe_im_curriculum"] == [{
+            "node_id": str(potenz.id), "typ": "concept", "titel": PRAEFIX + "Potenz",
+            "content_type": "begriff", "aliase": [PRAEFIX + "Hochzahl"],
+        }]
+        assert mit["begriffe_im_curriculum_ohne_baustein"] == ["Basis"]
+        # Ohne Begriffe bleibt die Lernsequenz, wie sie vor 0.44 war.
+        assert set(ohne) == {"titel", "std", "kompetenzen"}
+
+        async with _sitzungen(async_engine)() as db:
+            st = await db.get(ContextNode, UUID(stunde))
+            b = await begriffe_aus_dem_curriculum(db, SimpleNamespace(sub=TEACHER1_PSEUDO, roles=["teacher"]), st)
+        assert [g["titel"] for g in b["gefunden"]] == [PRAEFIX + "Potenz"]
+        assert b["ohne_baustein"] == ["Basis"]
+        text = nachricht("Fach: M", [], [], "Stunde: X", [PRAEFIX + "Potenz", "Basis"])
+        assert CURRICULUM_ZEILE + f"{PRAEFIX}Potenz, Basis" in text
+    finally:
+        _aufraeumen(gruppen)

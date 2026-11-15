@@ -19,6 +19,7 @@ Auflösung in den Einträgen landete sonst in der Datenbank.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -327,3 +328,90 @@ def namen_fuer_yaml(eintrag: dict, feld: str) -> list:
         return []
     return [n if n.get("fassung") else n["name"]
             for n in namen_normalisieren(eintrag.get(feld), mit_fassung=feld == "begriffe")]
+
+
+# ── Planung (Schritt 6, E10) ─────────────────────────────────────────────────
+
+
+async def begriffe_der_lernsequenzen(db: AsyncSession, user, subject_id: int | None,
+                                     sequenzen: list) -> dict:
+    """Die Begriffe der Einträge je Lernsequenz, aufgelöst für `user` — ein Abgleich für alle.
+
+    → ``{ls_id: {"gefunden": [{node_id, typ: "concept", titel, content_type, aliase?}],
+    "ohne_baustein": [Name, …]}}``. *Gefunden* in der Form von `refs` am Stundenentwurf (so
+    lassen sie sich unverändert übernehmen); *mehrdeutig* zählt wie *fehlt* als Name — ohne
+    gewählte Fassung ist kein Baustein gemeint. Lernsequenzen ohne Begriffe fehlen.
+    """
+    je_ls: dict = {}
+    paare: dict[tuple[str, str | None], None] = {}
+    for ls in sequenzen:
+        namen = []
+        for e in (ls.metadata_ or {}).get("eintraege") or []:
+            if isinstance(e, dict):
+                for b in namen_normalisieren(e.get("begriffe")):
+                    paar = (b["name"], b.get("fassung"))
+                    if paar not in namen:
+                        namen.append(paar)
+                    paare.setdefault(paar, None)
+        if namen:
+            je_ls[ls.id] = namen
+    if not paare:
+        return {}
+    aufl = {(a["name"], a.get("fassung")): a for a in await namen_aufloesen(db, user, subject_id, list(paare))}
+    from app.context import aliase as aliase_modul
+
+    ids = list({a["node_id"] for a in aufl.values() if a["zustand"] == "gefunden"})
+    aliase = await aliase_modul.lade_viele(db, [UUID(i) for i in ids]) if ids else {}
+    typen = dict((await db.execute(
+        sa.select(ContextNode.id, ContextNode.content_type).where(ContextNode.id.in_([UUID(i) for i in ids]))
+    )).all()) if ids else {}
+
+    aus = {}
+    for ls_id, namen in je_ls.items():
+        gefunden: dict[str, dict] = {}
+        ohne: list[str] = []
+        for paar in namen:
+            a = aufl[paar]
+            if a["zustand"] == "gefunden":
+                k = UUID(a["node_id"])
+                eintrag = gefunden.setdefault(a["node_id"], {
+                    "node_id": a["node_id"], "typ": "concept", "titel": a["titel"],
+                    "content_type": typen.get(k, "begriff"),
+                })
+                if aliase.get(k):
+                    eintrag["aliase"] = aliase[k]
+            elif paar[0] not in ohne:
+                ohne.append(paar[0])
+        aus[ls_id] = {"gefunden": list(gefunden.values()), "ohne_baustein": ohne}
+    return aus
+
+
+async def begriffe_des_kapitels(db: AsyncSession, user, kapitel_id) -> dict:
+    """Alle Begriffe eines Kapitels über seine Lernsequenzen: ``{"gefunden": […], "ohne_baustein": […]}``.
+
+    Für den Begriffsvorschlag der Stunde (E10): Er kennt nur das Kapitel ihrer Einheit.
+    """
+    from app.db.models import ContextEdge
+
+    kap = await db.get(ContextNode, kapitel_id)
+    if kap is None or kap.status != "active":
+        return {"gefunden": [], "ohne_baustein": []}
+    sequenzen = list((await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(ContextEdge.to_node_id == kap.id, ContextEdge.relation == "part_of",
+               ContextNode.content_type == "lernsequenz", ContextNode.status == "active")
+        .order_by(ContextNode.metadata_["reihenfolge"].as_integer().nullslast(), ContextNode.title)
+    )).scalars())
+    subject_id = kap.subject_id or next((s.subject_id for s in sequenzen if s.subject_id), None)
+    je_ls = await begriffe_der_lernsequenzen(db, user, subject_id, sequenzen)
+    gefunden: dict[str, dict] = {}
+    ohne: list[str] = []
+    for ls in sequenzen:
+        teil = je_ls.get(ls.id) or {}
+        for g in teil.get("gefunden", []):
+            gefunden.setdefault(g["node_id"], g)
+        for n in teil.get("ohne_baustein", []):
+            if n not in ohne:
+                ohne.append(n)
+    return {"gefunden": list(gefunden.values()), "ohne_baustein": ohne}
