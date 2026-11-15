@@ -13,7 +13,13 @@ from app.core.paths import aufloesen
 #: `test_users.yaml` sie vergibt. Im Dev funktionierten sie also; in Produktion kommen
 #: Rollen aber nur über diese Liste, und dort konnte sie niemand bekommen. Zwei
 #: Delegationsrollen, überall vorgesehen außer an der Stelle, die sie vergibt.
-VergebbareRolle = Literal["student", "teacher", "admin", "review", "budget", "statistics"]
+#:
+#: `fachvorsitz` (0.45, Päckchen AP, E9): veröffentlicht Curriculum-Entwürfe und ändert
+#: veröffentlichte Curricula der eigenen Fachschaft. Ist ihr keine Gruppe zugeordnet, tun das
+#: die Mitglieder der Fachschaft — die Zuordnung selbst schaltet die Freigabe ein.
+VergebbareRolle = Literal[
+    "student", "teacher", "admin", "review", "budget", "statistics", "fachvorsitz",
+]
 
 
 class GroupRoleMapping(BaseModel):

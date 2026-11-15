@@ -1337,20 +1337,28 @@ async def archive_orphaned_curriculum_nodes(
 async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | None:
     """Lädt das vollständige Curriculum als verschachtelten Dict (ohne Berechtigungsprüfung).
 
-    Gibt None zurück wenn das Curriculum nicht existiert oder inaktiv ist.
-    Der zurückgegebene Dict enthält `read_scope` und `owner_pseudonym` für die
+    Gibt None zurück wenn das Curriculum nicht existiert oder weder aktiv noch Entwurf ist.
+    Der zurückgegebene Dict enthält `read_scope`, `owner_pseudonym` und `status` für die
     Berechtigungsprüfung im Router.
+
+    ⚠️ **Entwürfe eingeschlossen** (0.45): Wer den Baum ausliefert, prüft ihn mit
+    `_curriculum_lesen` im Router — dort steht die Regel für Entwürfe. Kapitel und
+    Lernsequenzen gelten mit dem Status des Curriculums; ein Entwurfsteil in einem
+    veröffentlichten Curriculum bleibt so unsichtbar.
     """
+    from app.context.curriculum_entwurf import LESBARE_STATUS
+
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.id == curriculum_id,
-            ContextNode.status == "active",
+            ContextNode.status.in_(LESBARE_STATUS),
             ContextNode.content_type == "curriculum",
         )
     )
     curriculum = result.scalar_one_or_none()
     if not curriculum:
         return None
+    status = curriculum.status
 
     # Kapitel laden
     result = await db.execute(
@@ -1360,7 +1368,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
             ContextEdge.to_node_id == curriculum_id,
             ContextEdge.relation == "part_of",
             ContextNode.content_type == "kapitel",
-            ContextNode.status == "active",
+            ContextNode.status == status,
         )
         .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
     )
@@ -1375,7 +1383,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
                 ContextEdge.to_node_id == kap_node.id,
                 ContextEdge.relation == "part_of",
                 ContextNode.content_type == "lernsequenz",
-                ContextNode.status == "active",
+                ContextNode.status == status,
             )
             .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
         )
@@ -1469,6 +1477,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
         "write_scope_group_id": curriculum.write_scope_group_id,
         "read_scope": curriculum.read_scope,
         "owner_pseudonym": curriculum.owner_pseudonym,
+        "status": status,
         "kapitel": kapitel_list,
     }
 

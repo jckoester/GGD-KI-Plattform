@@ -59,6 +59,33 @@ async def _get_or_create_jahresplan(
     return node
 
 
+async def pruefe_kapitel(db: AsyncSession, kapitel_node_id: UUID) -> None:
+    """422, wenn die Kennung kein veröffentlichtes Kapitel ist (0.45).
+
+    Die Planung liest das Kapitel einer Einheit später ohne Statusprüfung (Soll-Stunden,
+    Bilanz) — ein Entwurfskapitel hinge sonst sichtbar in der Jahresplanung, bevor das
+    Curriculum veröffentlicht ist. Archivierte Kapitel sind ebenfalls ausgeschlossen: Neu
+    verknüpft wird nur mit dem gültigen Curriculum.
+    """
+    kap = await db.get(ContextNode, kapitel_node_id)
+    if kap is None or kap.content_type != "kapitel" or kap.status != "active":
+        raise HTTPException(
+            status_code=422, detail="Das Kapitel gehört zu keinem veröffentlichten Curriculum.")
+
+
+async def _kapitel_id(db: AsyncSession, ue_id: UUID) -> UUID | None:
+    """Das Kapitel, mit dem die Einheit jetzt verknüpft ist."""
+    return (await db.execute(
+        sa.select(ContextEdge.to_node_id)
+        .join(ContextNode, ContextNode.id == ContextEdge.to_node_id)
+        .where(
+            ContextEdge.from_node_id == ue_id,
+            ContextEdge.relation == "references",
+            ContextNode.content_type == "kapitel",
+        )
+    )).scalars().first()
+
+
 async def create_unit_node(
     db: AsyncSession,
     group_id: int,
@@ -77,6 +104,8 @@ async def create_unit_node(
     """
     from app.planning.calendar import load_school_year
 
+    if kapitel_node_id:  # vor jedem Anlegen — eine Ablehnung hinterlässt nichts in der Sitzung
+        await pruefe_kapitel(db, kapitel_node_id)
     cfg = load_school_year()
     jahresplan = await _get_or_create_jahresplan(db, group_id, group_subject_id, user)
 
@@ -161,6 +190,10 @@ async def update_unit_node(
         node.metadata_ = {**(node.metadata_ or {}), "farbe": farbe}
 
     if update_kapitel:
+        # Nur ein **neues** Kapitel wird geprüft: Eine Einheit, deren Kapitel archiviert ist
+        # (Curriculum ersetzt, 0.45), behält es, wenn die Lehrkraft nur Titel oder Farbe ändert.
+        if kapitel_node_id and kapitel_node_id != await _kapitel_id(db, node.id):
+            await pruefe_kapitel(db, kapitel_node_id)
         # Bestehende Kapitel-Verknüpfung(en) entfernen …
         edges = await db.execute(
             sa.select(ContextEdge).where(

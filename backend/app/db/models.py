@@ -1381,8 +1381,13 @@ class ContextNode(Base):
             name="check_context_nodes_write_scope",
         ),
         CheckConstraint(
-            "status IN ('active','archived','deleted')",
+            "status IN ('active','archived','deleted','draft')",
             name="check_context_nodes_status",
+        ),
+        # Entwürfe nur im Curriculum-Baum (0.45, Alembic 0106) — nur dort verbirgt eine Regel sie.
+        CheckConstraint(
+            "status <> 'draft' OR content_type IN ('curriculum','kapitel','lernsequenz')",
+            name="check_context_nodes_draft_typ",
         ),
         CheckConstraint(
             "read_scope NOT IN ('subject','group','group_teachers') OR read_scope_group_id IS NOT NULL",

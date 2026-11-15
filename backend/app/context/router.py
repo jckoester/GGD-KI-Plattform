@@ -63,6 +63,9 @@ from app.context.schemas import (
     KollisionsZeileRead,
     ZielZaehlung,
 )
+from app.context.curriculum_entwurf import (
+    ENTWURF, LESBARE_STATUS, pruefe_entwurf, pruefe_kante, pruefe_statuswechsel,
+)
 from app.context import aliase as aliase_modul
 from app.context import fachbegriffe_kollision
 from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
@@ -136,6 +139,11 @@ async def _check_write_permission(
     Fachschaftsgut `write_scope = subject`; geprüft wurde aber nur `group`. Ändern konnten
     die Begriffe einer Fachschaft damit nur Admins — wer selbst Admin ist, bemerkte es nie.
     """
+    # Entwürfe (0.45): Fachschaft und Admins, sonst niemand — auch nicht die Eigentümerin, die
+    # die Fachschaft verlassen hat. Vor allen anderen Zweigen.
+    if node.status == ENTWURF:
+        await pruefe_entwurf(db, node.subject_id, user)
+        return
     if "admin" in user.roles:
         return
     if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
@@ -175,6 +183,11 @@ async def _check_read_permission(
     `subject`/`school`/`global` → für alle eingeloggten Nutzer:innen lesbar. (Vorher prüfte der
     Lesepfad **nur** `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Audit #1.)
     """
+    # Entwürfe (0.45) sieht nur die Fachschaft und Admins — vor dem Eigentum: Die direkte
+    # Adresse, die Umgebung und das Kopieren eines Knotens gehen alle hier durch.
+    if node.status == ENTWURF:
+        await pruefe_entwurf(db, node.subject_id, user)
+        return
     # Eigentum zählt in der Vorschau nicht (0.29) — wie in `read_scope_clause`.
     if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
         return
@@ -247,8 +260,10 @@ async def _require_curriculum_write(
         raise HTTPException(status_code=403, detail="Nur für Lehrkräfte/Admins")
 
     node = await db.get(ContextNode, curriculum_id)
-    if node is None or node.content_type != "curriculum" or node.status != "active":
+    if node is None or node.content_type != "curriculum" or node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
+    if node.status == ENTWURF:
+        await pruefe_entwurf(db, node.subject_id, user)
 
     if "admin" in user.roles:
         return node
@@ -606,6 +621,10 @@ async def copy_node(
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     # Nur lesbare Quellknoten dürfen kopiert werden (sonst Exfiltration per UUID, Audit #1).
     await _check_read_permission(source, user, db)
+    # Ein Entwurf wird nicht einzeln kopiert (0.45): Die Kopie wäre `active` und machte seinen
+    # Inhalt vor dem Veröffentlichen für alle sichtbar.
+    if source.status == ENTWURF:
+        raise HTTPException(status_code=422, detail="Teile eines Entwurfs lassen sich nicht einzeln kopieren.")
     # Planung hat ihren eigenen Weg (0.42, F8): Diese Kopie nähme Gruppe, Termine und
     # Nachbereitung unverändert mit und hängte die Stunde in keine Einheit.
     from app.context.taxonomy import PLANUNG_CONTENT_TYPES
@@ -980,6 +999,7 @@ async def update_node(
     # Mitführen blieb die Spalte beim Archivieren **leer**: Die Archivansicht zeigte kein
     # Datum, und der Löschfrist-Lauf (ADR-013) hätte nie eine Frist berechnen können —
     # ein Knoten ohne `archived_at` wird von ihm bewusst nie angefasst.
+    pruefe_statuswechsel(node.status, update_data.get("status"))  # 0.45: Entwurf nur über „Veröffentlichen“
     if "status" in update_data and update_data["status"] != node.status:
         if update_data["status"] == "archived":
             node.archived_at = datetime.now(timezone.utc)
@@ -1171,6 +1191,7 @@ async def verwalte_node(
         # BP-Re-Import gesperrt (C1).
         node.title_locked = True
 
+    pruefe_statuswechsel(node.status, payload.status)  # 0.45: auch nicht als Eigentümerin
     if payload.status is not None and payload.status != node.status:
         node.status = payload.status
         # `archived_at` trägt die Aufbewahrungsfrist (ADR-013). Ohne das Mitführen
@@ -1641,7 +1662,7 @@ async def export_curriculum(
     if not tree:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
 
-    _check_curriculum_read_permission(tree, user)
+    await _curriculum_lesen(db, tree, user)
 
     meta = tree.get("metadata", {})
     fach_code = meta.get("fach_code", "curriculum")
@@ -1691,13 +1712,25 @@ async def export_curriculum(
         )
 
 
+async def _curriculum_lesen(db: AsyncSession, tree: dict, user: JwtPayload) -> None:
+    """Lesen eines Curriculums prüfen — Scope und, bei Entwürfen, die Fachschaft (0.45).
+
+    Jeder Weg, der einen Baum aus `load_curriculum_tree` ausliefert, geht hier durch; die
+    Funktion lädt Entwürfe mit.
+    """
+    if tree.get("status") == ENTWURF:
+        await pruefe_entwurf(db, tree.get("subject_id"), user)
+    _check_curriculum_read_permission(tree, user)
+
+
 async def _lesbares_curriculum(db: AsyncSession, curriculum_id: UUID, user: JwtPayload) -> ContextNode:
     """Den Curriculum-Knoten holen und das Lesen prüfen — ohne den ganzen Baum."""
     node = await db.get(ContextNode, curriculum_id)
-    if node is None or node.content_type != "curriculum" or node.status != "active":
+    if node is None or node.content_type != "curriculum" or node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
-    _check_curriculum_read_permission(
-        {"read_scope": node.read_scope, "owner_pseudonym": node.owner_pseudonym}, user)
+    await _curriculum_lesen(db, {
+        "read_scope": node.read_scope, "owner_pseudonym": node.owner_pseudonym,
+        "status": node.status, "subject_id": node.subject_id}, user)
     return node
 
 
@@ -1748,7 +1781,7 @@ async def fehlende_begriffe_im_curriculum(
     tree = await load_curriculum_tree(db, curriculum_id)
     if not tree:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
-    _check_curriculum_read_permission(tree, user)
+    await _curriculum_lesen(db, tree, user)
     liste = fehlende_begriffe(tree, await begriffe_aufloesen(db, tree, user))
     if format == "json":
         return liste
@@ -1807,7 +1840,7 @@ async def get_curriculum(
     if not tree:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
 
-    _check_curriculum_read_permission(tree, user)
+    await _curriculum_lesen(db, tree, user)
 
     # Prüfe ob User editieren darf
     can_edit = False
@@ -2045,13 +2078,15 @@ async def create_edge(
     from_node = await db.get(ContextNode, payload.from_node_id)
     to_node = await db.get(ContextNode, payload.to_node_id)
 
-    if not from_node or from_node.status != "active":
+    # Entwürfe (0.45) zählen mit — ihre Regel steht in den beiden Prüfungen darunter.
+    if not from_node or from_node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail=f"Ausgangsbaustein {payload.from_node_id} nicht gefunden")
-    if not to_node or to_node.status != "active":
+    if not to_node or to_node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail=f"Zielbaustein {payload.to_node_id} nicht gefunden")
 
     await _check_write_permission(from_node, user, db)
     await _check_read_permission(to_node, user, db)
+    pruefe_kante(from_node.status, to_node.status)
 
     # Prüfe ob Kante bereits existiert (idempotent)
     existing = await db.execute(
@@ -2090,7 +2125,7 @@ async def delete_edge(
         raise HTTPException(status_code=404, detail="Kante nicht gefunden")
 
     from_node = await db.get(ContextNode, edge.from_node_id)
-    if not from_node or from_node.status != "active":
+    if not from_node or from_node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail="Ausgangsbaustein nicht gefunden")
 
     await _check_write_permission(from_node, user, db)
@@ -2109,7 +2144,7 @@ async def get_node_edges(
     """Gibt alle ausgehenden Kanten eines Knotens zurück."""
     # Prüfe ob Knoten existiert und sichtbar ist
     node = await db.get(ContextNode, node_id)
-    if not node or node.status != "active":
+    if not node or node.status not in LESBARE_STATUS:  # Entwurf: Regel in _check_read_permission
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     
     # Sichtbarkeitsprüfung (privat/fremd-gruppen ausgeschlossen, Audit #1)

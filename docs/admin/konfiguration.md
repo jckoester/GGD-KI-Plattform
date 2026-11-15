@@ -398,6 +398,7 @@ sso:
 | `review` | Krisen-Einsicht zu zweit (Schulsozialarbeit) | **ja** — muss keine Lehrkraft sein |
 | `budget` | Budget verwalten: Stufenbeträge, Zuschläge von Hand *(seit 0.12)* | nein — zusätzlich zu `teacher` oder `admin` |
 | `statistics` | Nutzungs- und Kostenstatistik einsehen *(seit 0.12)* | nein — zusätzlich zu `teacher` oder `admin` |
+| `fachvorsitz` | Curriculum-Entwürfe der eigenen Fachschaften veröffentlichen, veröffentlichte Curricula ändern *(seit 0.45)* | nein — zusätzlich zu `teacher` |
 
 ⚠️ **`budget` und `statistics` waren bis 0.12 nicht vergebbar**, obwohl die Plattform sie
 überall prüfte — die Konfiguration ließ sie schlicht nicht zu. Wer beide Aufgaben bisher
@@ -406,6 +407,14 @@ sso:
 ⚠️ **Nur zusätzlich, nicht allein.** Wer *ausschließlich* in einer `budget`- oder
 `statistics`-Gruppe ist (etwa das Sekretariat), kann sich nicht anmelden — beide Rollen
 sind wie `admin` eine Erweiterung, keine eigene Art Konto.
+
+**Fachvorsitz: die Zuordnung schaltet die Freigabe ein.** Ordnen Sie der Rolle `fachvorsitz`
+keine Gruppe zu, veröffentlichen alle Mitglieder einer Fachschaft deren Curriculum-Entwürfe
+und ändern die veröffentlichten Curricula direkt. Sobald eine Gruppe zugeordnet ist, dürfen
+das nur noch Fachvorsitzende — und zwar in jeder Fachschaft, der sie angehören — sowie
+Admins; alle anderen arbeiten an einer Kopie als Entwurf. Die Gruppe nennt kein Fach: Wer
+in Chemie den Vorsitz hat und zugleich der Fachschaft Physik angehört, kann auch dort
+veröffentlichen. Jede Veröffentlichung steht im Audit-Log.
 
 #### Wenn die Gruppennamen aus dem Stundenplan kommen
 

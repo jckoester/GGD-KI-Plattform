@@ -76,6 +76,13 @@ group_role_map:
   #   role: budget
   # - group: ki-statistik
   #   role: statistics
+  # Fachvorsitz (seit 0.45): veröffentlicht Curriculum-Entwürfe und ändert veröffentlichte
+  # Curricula — nur in Fachschaften, denen die Person angehört. Ist der Rolle eine Gruppe
+  # zugeordnet, dürfen das **nur noch** Fachvorsitzende und Admins; ohne Zuordnung alle
+  # Mitglieder der Fachschaft. Die Gruppe nennt kein Fach: Wer einen Vorsitz hat, kann in
+  # jeder eigenen Fachschaft veröffentlichen. Wie `budget` nur zusätzlich zu `teacher`.
+  # - group: ki-fachvorsitz
+  #   role: fachvorsitz
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).

@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Curricula können Entwürfe sein: Sie sehen und bearbeiten nur die Mitglieder der Fachschaft und Admins;
+  in Suche, Chat und Jahresplanung erscheinen sie nicht.
+- Neue Rolle `fachvorsitz`, über `group_role_map` einer SSO-Gruppe zuzuordnen.
+
+### Geändert
+
+- Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
+
+### Nach dem Update
+
+- Migration `0106` (`alembic upgrade head`).
+
 ## [0.44.0] – 2026-11-15
 
 ### Neu

@@ -286,15 +286,20 @@ async def _handle_create_teaching_unit(args: dict, ctx: ToolContext) -> dict:
     if group is None:
         return {"error": "Gruppe nicht gefunden"}
 
-    ue = await create_unit_node(
-        db=db,
-        group_id=group_id,
-        group_subject_id=group.subject_id,
-        user=ctx.user,
-        titel=titel,
-        farbe=farbe,
-        kapitel_node_id=kapitel_id,
-    )
+    from fastapi import HTTPException
+
+    try:
+        ue = await create_unit_node(
+            db=db,
+            group_id=group_id,
+            group_subject_id=group.subject_id,
+            user=ctx.user,
+            titel=titel,
+            farbe=farbe,
+            kapitel_node_id=kapitel_id,
+        )
+    except HTTPException as exc:  # Kapitel ohne veröffentlichtes Curriculum (0.45)
+        return {"error": exc.detail}
     balance = await _build_compact_balance(db, group_id)
     return {"ue_node_id": str(ue.id), "titel": ue.title, "balance": balance}
 
