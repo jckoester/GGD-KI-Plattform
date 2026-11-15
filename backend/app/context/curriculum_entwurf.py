@@ -17,6 +17,7 @@ veröffentlichte, wer schreiben darf, ohne das Recht dazu.
 """
 from __future__ import annotations
 
+import sqlalchemy as sa
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,3 +75,32 @@ def pruefe_kante(von_status: str, zu_status: str) -> None:
             status_code=422,
             detail="Auf einen Entwurf verweisen nur Teile desselben Entwurfs.",
         )
+
+
+TEILE = frozenset({"kapitel", "lernsequenz"})
+
+
+def pruefe_anlegen(content_type: str | None, status: str) -> None:
+    """Als Entwurf neu anlegen lassen sich nur Teile — ein Curriculum entsteht über
+    `POST /context/curricula/new` (immer als Entwurf) oder als Kopie."""
+    if status == ENTWURF and content_type not in TEILE:
+        raise HTTPException(
+            status_code=422, detail="Als Entwurf lassen sich nur Kapitel und Lernsequenzen anlegen.")
+
+
+async def erbe_entwurf(db: AsyncSession, kind, eltern, relation: str) -> None:
+    """Ein frisch angelegter Teil, der in einen Entwurf gehängt wird, wird selbst Entwurf.
+
+    Frisch heißt: noch ohne jede Kante. Ein Kapitel, das schon irgendwo hängt — in einem
+    veröffentlichten Curriculum, an einer Einheit —, verschwände sonst für alle anderen; diese
+    Kante weist :func:`pruefe_kante` danach ab.
+    """
+    if (relation != "part_of" or eltern.status != ENTWURF or kind.status != "active"
+            or kind.content_type not in TEILE):
+        return
+    from app.db.models import ContextEdge
+
+    hat_kanten = (await db.execute(sa.select(sa.exists().where(sa.or_(
+        ContextEdge.from_node_id == kind.id, ContextEdge.to_node_id == kind.id))))).scalar()
+    if not hat_kanten:
+        kind.status = ENTWURF

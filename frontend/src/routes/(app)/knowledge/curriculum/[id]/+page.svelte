@@ -7,10 +7,11 @@
         exportCurriculum,
         relinkCurriculum,
     } from "$lib/api.js";
-    import { curriculumStd } from "$lib/curriculum.js";
+    import { curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
     import { ArrowLeft, FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
 
     let curriculum = $state(null);
@@ -259,6 +260,10 @@
                     </button>
                 </div>
             </div>
+
+            {#if curriculum.status === "draft"}
+                <div class="mb-4"><InfoBanner message={ENTWURF_HINWEIS} /></div>
+            {/if}
 
             {#if exportError}
                 <div

@@ -2,6 +2,7 @@
 
 import re
 import logging
+from datetime import date
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -384,6 +385,16 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
     return kapitel_out
 
 
+def entwurf_vermerk(tree: dict, heute: date | None = None) -> str | None:
+    """„Entwurf, Stand 15.11.2026“ für Entwürfe (0.45), sonst None — PDF und DOCX/ODT.
+
+    Stand ist der Tag des Exports: Ein ausgedruckter Entwurf soll zeigen, wie alt er ist.
+    """
+    if tree.get("status") != "draft":
+        return None
+    return f"Entwurf, Stand {(heute or date.today()):%d.%m.%Y}"
+
+
 async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
     """Rendert das Curriculum als PDF via weasyprint + Jinja2."""
     try:
@@ -411,6 +422,7 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
         title=tree.get("title", ""),
         school_name=school_name,
         meta=meta,
+        entwurf=entwurf_vermerk(tree),
         kapitel=await _build_pdf_kapitel(tree),
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
@@ -537,6 +549,8 @@ async def render_curriculum_office(
     if schule:
         dok.append(o.absatz(o.text(schule)))
     dok.append(o.ueberschrift(1, o.text(tree.get("title", ""))))
+    if vermerk := entwurf_vermerk(tree):
+        dok.append(o.absatz([o.fett(o.text(vermerk))]))
     dok.append(o.absatz(o.text(
         f"{meta.get('schulart', '')} | Kl. {meta.get('jahrgangsstufe', '')} | BP {meta.get('bp_version', '')}"
     )))

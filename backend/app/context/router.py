@@ -64,7 +64,8 @@ from app.context.schemas import (
     ZielZaehlung,
 )
 from app.context.curriculum_entwurf import (
-    ENTWURF, LESBARE_STATUS, pruefe_entwurf, pruefe_kante, pruefe_statuswechsel,
+    ENTWURF, LESBARE_STATUS, erbe_entwurf, pruefe_anlegen, pruefe_entwurf, pruefe_kante,
+    pruefe_statuswechsel,
 )
 from app.context import aliase as aliase_modul
 from app.context import fachbegriffe_kollision
@@ -788,6 +789,9 @@ async def create_node(
         validate_node_content(payload.content_type, payload.content, payload.metadata_)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    if payload.status == ENTWURF:  # Teil eines Curriculum-Entwurfs (0.45)
+        pruefe_anlegen(payload.content_type, payload.status)
+        await pruefe_entwurf(db, payload.subject_id, user)
 
     # Scope und Trägergruppe müssen zusammenpassen — Pflicht **und** Art. Die Regel
     # steht in `scope_gruppen.py`, weil sie hier und beim Ändern gilt; bis 09/2026
@@ -826,6 +830,7 @@ async def create_node(
         max_grade=payload.max_grade,
         valid_until=payload.valid_until,
         schuljahr=payload.schuljahr,
+        status=payload.status,
     )
     db.add(node)
     await db.flush()
@@ -1863,6 +1868,7 @@ async def get_curriculum(
         "metadata": tree["metadata"],
         "subject_id": tree["subject_id"],
         "write_scope_group_id": tree["write_scope_group_id"],
+        "status": tree["status"],
         "kapitel": tree["kapitel"],
         "can_edit": can_edit,
         "begriffe": await begriffe_aufloesen(db, tree, user),
@@ -1915,6 +1921,7 @@ async def update_curriculum_meta(
         "metadata": tree["metadata"],
         "subject_id": tree["subject_id"],
         "write_scope_group_id": tree["write_scope_group_id"],
+        "status": tree["status"],
         "kapitel": tree["kapitel"],
         "can_edit": True,
         "begriffe": await begriffe_aufloesen(db, tree, user),
@@ -1998,7 +2005,7 @@ async def relink_curriculum_endpoint(
 
     await _require_curriculum_write(db, curriculum_id, user)
 
-    result = await relink_curriculum(db, curriculum_id, apply)
+    result = await relink_curriculum(db, curriculum_id, apply, owner=user.sub)
     if result is None:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
     return result
@@ -2010,12 +2017,19 @@ async def list_curricula_by_subject(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(get_current_user),
 ):
-    """Gibt alle Curriculum-Knoten eines Fachs zurück."""
+    """Gibt alle Curriculum-Knoten eines Fachs zurück.
+
+    Entwürfe (0.45) nur für die Fachschaft und Admins — die Oberfläche markiert sie über
+    `status`.
+    """
+    from app.context.curriculum_entwurf import darf_entwurf
+
+    status = ["active", ENTWURF] if await darf_entwurf(db, subject_id, user) else ["active"]
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "curriculum",
             ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
+            ContextNode.status.in_(status),
             sa.or_(
                 ContextNode.read_scope.in_(["global", "school", "subject"]),
                 sa.and_(
@@ -2086,6 +2100,7 @@ async def create_edge(
 
     await _check_write_permission(from_node, user, db)
     await _check_read_permission(to_node, user, db)
+    await erbe_entwurf(db, from_node, to_node, payload.relation)  # frisches Kapitel → Entwurf
     pruefe_kante(from_node.status, to_node.status)
 
     # Prüfe ob Kante bereits existiert (idempotent)
@@ -2256,7 +2271,9 @@ async def create_curriculum_node(
             "jahrgangsstufe": payload.jahrgangsstufe,
             "import_key": import_key,
         },
-        status="active",
+        # Jedes neue Curriculum ist ein Entwurf (0.45, F2/E11): Ein leeres Curriculum ist nie
+        # fertig. Sichtbar für alle wird es erst über „Veröffentlichen“.
+        status=ENTWURF,
     )
     db.add(curriculum)
     await db.commit()

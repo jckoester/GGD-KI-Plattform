@@ -36,6 +36,12 @@
     font-weight: bold;
     margin-bottom: 2mm;
   }
+  .doc-entwurf {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #a15c00;
+    margin-bottom: 2mm;
+  }
   .doc-meta {
     font-size: 8pt;
     color: #555;
@@ -130,6 +136,9 @@
 {% endif %}
 
 <div class="doc-title">{{ title }}</div>
+{% if entwurf %}
+<div class="doc-entwurf">{{ entwurf }}</div>
+{% endif %}
 <div class="doc-meta">
   {{ meta.get('schulart', '') }} &nbsp;|&nbsp; Kl. {{ meta.get('jahrgangsstufe', '') }}
   &nbsp;|&nbsp; BP {{ meta.get('bp_version', '') }}

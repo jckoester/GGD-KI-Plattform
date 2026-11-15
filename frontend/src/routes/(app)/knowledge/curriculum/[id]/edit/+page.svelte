@@ -11,11 +11,12 @@
         deleteEdge,
         getNodeEdges,
     } from "$lib/api.js";
-    import { kapitelStd, curriculumStd } from "$lib/curriculum.js";
+    import { kapitelStd, curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { ArrowLeft, Check, Save, X } from "lucide-svelte";
 
@@ -173,6 +174,9 @@
                     title: draftKap.title,
                     content: draftKap.metadata?.einleitung || "",
                     read_scope: "school",
+                    // Teil eines Entwurfs ist selbst Entwurf (0.45) — gleich beim Anlegen,
+                    // damit ein abgebrochenes Speichern nichts Sichtbares hinterlässt.
+                    ...(draft.status === "draft" ? { status: "draft" } : {}),
                     write_scope: "subject",
                     write_scope_group_id: original.write_scope_group_id,
                     subject_id: original.subject_id,
@@ -233,6 +237,7 @@
                         title: draftLs.title || "",
                         content: null,
                         read_scope: "school",
+                        ...(draft.status === "draft" ? { status: "draft" } : {}),
                         write_scope: "subject",
                         write_scope_group_id: original.write_scope_group_id,
                         subject_id: original.subject_id,
@@ -587,6 +592,10 @@
                     </button>
                 </div>
             </div>
+
+            {#if draft?.status === "draft"}
+                <div class="mb-4"><InfoBanner message={ENTWURF_HINWEIS} /></div>
+            {/if}
 
             <!-- Fehler/Erfolg -->
             {#if saveError}

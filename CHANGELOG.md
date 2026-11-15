@@ -10,10 +10,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Curricula können Entwürfe sein: Sie sehen und bearbeiten nur die Mitglieder der Fachschaft und Admins;
   in Suche, Chat und Jahresplanung erscheinen sie nicht.
 - Neue Rolle `fachvorsitz`, über `group_role_map` einer SSO-Gruppe zuzuordnen.
+- Neue Curricula entstehen als Entwurf, ebenso Kopien beim Aktualisieren auf eine neue Bildungsplan-Fassung.
+  Entwürfe tragen in der Curricula-Liste die Marke „Entwurf“, in Ansicht und Editor einen Hinweis und im
+  Export (PDF, DOCX, ODT) den Vermerk „Entwurf, Stand …“.
 
 ### Geändert
 
 - Eine Unterrichtseinheit lässt sich nur noch mit Kapiteln veröffentlichter Curricula verknüpfen.
+- Kopien eines Curriculums übernehmen keine gelöschten oder archivierten Kapitel mehr.
 
 ### Nach dem Update
 

@@ -309,31 +309,50 @@ async def _children(db: AsyncSession, parent_id, content_type: str) -> list[Cont
         JOIN context_edges e ON e.from_node_id = n.id
         WHERE e.to_node_id = CAST(:pid AS uuid) AND e.relation = 'part_of'
           AND n.content_type = :ct
+          -- Archivierte und gelöschte Teile kamen bis 0.45 mit in die Kopie.
+          AND n.status IN ('active', 'draft')
         ORDER BY (n.metadata->>'reihenfolge')::int NULLS LAST
     """), {"pid": str(parent_id), "ct": content_type})
     ids = [r[0] for r in rows.all()]
     return [await db.get(ContextNode, nid) for nid in ids]
 
 
-async def duplicate_curriculum(db: AsyncSession, curriculum_id: UUID) -> tuple[UUID, dict[str, str]]:
+async def duplicate_curriculum(
+    db: AsyncSession, curriculum_id: UUID, *, owner: str | None = None,
+) -> tuple[UUID, dict[str, str]]:
     """Tiefe Kopie des Curriculum-Baums (Curriculum + Kapitel + Lernsequenzen + Kanten).
 
     Kompetenz-/LP-Knoten werden **nicht** kopiert (geteilt) — nur die Kanten auf sie.
     Gibt ``(neue_curriculum_id, {alte_ls_id: neue_ls_id})`` zurück. Kein Commit.
+
+    **Die Kopie ist ein Entwurf** (0.45, F13/E11) — ungeprüft wie ein neues Curriculum. Sie
+    gehört ``owner`` (wer kopiert; E12: darf den Entwurf löschen) und merkt sich am Curriculum
+    und an jedem Kapitel das Original (`kopie_von`): Beim Veröffentlichen ersetzt sie den
+    Vorgänger, und die Einheiten wandern auf das entsprechende Kapitel (E15).
     """
+    from app.context.curriculum_entwurf import ENTWURF
+
+    def kopie(src: ContextNode, **extra) -> ContextNode:
+        neu = _clone_node(src, status=ENTWURF, **extra)
+        if owner is not None:
+            neu.owner_pseudonym = owner
+        return neu
+
     cur = await db.get(ContextNode, curriculum_id)
-    new_cur = _clone_node(cur, title=f"{cur.title or ''} (Kopie)")
+    new_cur = kopie(cur, title=f"{cur.title or ''} (Kopie)")
+    new_cur.metadata_ = {**(new_cur.metadata_ or {}), "kopie_von": str(cur.id)}
     db.add(new_cur)
     await db.flush()
 
     ls_map: dict[str, str] = {}
     for kap in await _children(db, curriculum_id, "kapitel"):
-        new_kap = _clone_node(kap)
+        new_kap = kopie(kap)
+        new_kap.metadata_ = {**(new_kap.metadata_ or {}), "kopie_von": str(kap.id)}
         db.add(new_kap)
         await db.flush()
         db.add(ContextEdge(from_node_id=new_kap.id, to_node_id=new_cur.id, relation="part_of", metadata_={}))
         for ls in await _children(db, kap.id, "lernsequenz"):
-            new_ls = _clone_node(ls)
+            new_ls = kopie(ls)
             db.add(new_ls)
             await db.flush()
             ls_map[str(ls.id)] = str(new_ls.id)
@@ -352,7 +371,9 @@ async def duplicate_curriculum(db: AsyncSession, curriculum_id: UUID) -> tuple[U
 
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
-async def relink_curriculum(db: AsyncSession, curriculum_id: UUID, apply: bool) -> dict | None:
+async def relink_curriculum(
+    db: AsyncSession, curriculum_id: UUID, apply: bool, *, owner: str | None = None,
+) -> dict | None:
     """Vorschau (``apply=False``) oder Anwenden. Bei ``mode='duplicate'`` wird eine
     migrierte Kopie erzeugt (Original bleibt); sonst In-Place-Migration."""
     plan = await plan_relink(db, curriculum_id)
@@ -366,7 +387,7 @@ async def relink_curriculum(db: AsyncSession, curriculum_id: UUID, apply: bool) 
         return {**plan, "applied": True, "result_curriculum_id": str(curriculum_id)}
 
     # duplicate: Kopie migrieren, Original unverändert
-    new_id, ls_map = await duplicate_curriculum(db, curriculum_id)
+    new_id, ls_map = await duplicate_curriculum(db, curriculum_id, owner=owner)
     copy_plan = deepcopy(plan)
     copy_plan["curriculum_id"] = str(new_id)
     for it in copy_plan["items"]:

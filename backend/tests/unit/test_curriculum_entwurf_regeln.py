@@ -42,3 +42,29 @@ def test_fachvorsitz_ist_vergebbar():
     so erging es `budget` und `statistics` bis 0.12."""
     cfg = AuthConfig(adapter="yaml_test", group_role_map=[{"group": "ki-fachvorsitz", "role": "fachvorsitz"}])
     assert cfg.group_role_map_dict == {"ki-fachvorsitz": "fachvorsitz"}
+
+
+def test_vermerk_im_export():
+    from datetime import date
+
+    from app.context.curriculum_export import entwurf_vermerk
+
+    assert entwurf_vermerk({"status": "draft"}, date(2026, 11, 15)) == "Entwurf, Stand 15.11.2026"
+    assert entwurf_vermerk({"status": "active"}) is None
+    assert entwurf_vermerk({}) is None
+
+
+def test_pdf_vorlage_zeigt_den_vermerk():
+    import os
+
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    import app.context.curriculum_export as export
+
+    env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(export.__file__), "templates")),
+                      autoescape=select_autoescape(["html"]))
+    vorlage = env.get_template("curriculum_pdf.html")
+    mit = vorlage.render(title="T", school_name="", meta={}, entwurf="Entwurf, Stand 15.11.2026", kapitel=[])
+    ohne = vorlage.render(title="T", school_name="", meta={}, entwurf=None, kapitel=[])
+    assert '<div class="doc-entwurf">Entwurf, Stand 15.11.2026</div>' in mit
+    assert 'class="doc-entwurf"' not in ohne

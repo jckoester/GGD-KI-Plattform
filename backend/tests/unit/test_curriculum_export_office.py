@@ -126,3 +126,9 @@ async def test_ohne_formel_bleibt_der_hinweis_klartext():
     """Nur Stücke mit Formel gehen durch Pandoc — `*` bleibt sonst ein Stern."""
     text = _klartext(await _docx(_baum([{"hinweise": "Punkte *a* und *b*", "material": ""}])))
     assert "*a*" in text
+
+
+async def test_entwurf_mit_vermerk_veroeffentlichtes_ohne():
+    """0.45: Ein Entwurf trägt „Entwurf, Stand …“ unter dem Titel."""
+    assert "Entwurf, Stand" in _klartext(await _docx({**_baum(), "status": "draft"}))
+    assert "Entwurf" not in _klartext(await _docx({**_baum(), "status": "active"}))

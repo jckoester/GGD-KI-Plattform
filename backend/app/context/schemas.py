@@ -30,6 +30,9 @@ class ContextNodeCreate(BaseModel):
     #: Ohne sie lehnt das Anlegen eines Begriffs ab, den ein anderes Fach schon führt; mit
     #: ihnen entsteht je Ziel eine Abgrenzungskante.
     abgrenzung_zu: list[UUID] = Field(default_factory=list)
+    #: `draft` nur für Kapitel und Lernsequenzen eines Entwurfs (0.45) — der Editor legt sie
+    #: gleich so an, damit ein abgebrochenes Speichern kein sichtbares Kapitel hinterlässt.
+    status: Literal["active", "draft"] = "active"
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -523,6 +526,8 @@ class CurriculumRead(BaseModel):
     )
     subject_id: int | None
     write_scope_group_id: int | None
+    #: `active` oder `draft` (0.45) — die Oberfläche zeigt bei Entwürfen einen Hinweis.
+    status: str = "active"
     kapitel: list[KapitelRead]
     can_edit: bool
     #: Auflösung der Begriffe aller Einträge für die lesende Person (0.44, AQ) — neben dem

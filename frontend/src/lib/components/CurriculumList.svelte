@@ -107,6 +107,16 @@
                         </p>
                     </div>
                     
+                    <!-- Entwurf (0.45): kommt nur für Fachschaft und Admins aus dem Backend -->
+                    {#if curr.status === 'draft'}
+                        <span
+                            class="inline-flex items-center px-2 py-1 mr-2 rounded-full text-xs font-medium
+                                   bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye"
+                            title="Nur für die Fachschaft sichtbar, bis es veröffentlicht ist"
+                        >
+                            Entwurf
+                        </span>
+                    {/if}
                     <!-- Badge wenn bearbeitbar -->
                     {#if canEditSubject && curr.write_scope_group_id && 
                         $myTeachingGroups.some(g => g.id === curr.write_scope_group_id)}

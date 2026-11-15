@@ -7,6 +7,7 @@ Jahresplanung. Den Status ändert nur „Veröffentlichen“; die allgemeinen We
 """
 import time
 import uuid
+from uuid import UUID
 
 import pytest
 import pytest_asyncio
@@ -15,9 +16,12 @@ from fastapi import HTTPException
 
 from app.auth import vorschau
 from app.auth.jwt import JwtPayload
+from app.context.relink import duplicate_curriculum
 from app.context.router import (
     copy_node,
+    create_curriculum_node,
     create_edge,
+    create_node,
     export_curriculum,
     fachmethoden_vorschlaege,
     fehlende_begriffe_im_curriculum,
@@ -33,7 +37,9 @@ from app.context.schemas import (
     BausteinVerwalten,
     ContextEdgeCreate,
     ContextNodeCopyRequest,
+    ContextNodeCreate,
     ContextNodeUpdate,
+    CurriculumCreate,
     CurriculumMetaUpdate,
 )
 from app.context.search import Suchprofil, suche
@@ -163,8 +169,11 @@ async def test_entwurf_nicht_in_liste_suche_und_jahresplanung(db, welt):
     """Auch für die Fachschaft: Ein Entwurf ist kein gültiges Curriculum."""
     cur, kap, _ = welt["entwurf"]
     aktiv, _, _ = welt["aktiv"]
+    # Die Liste zeigt den Entwurf der Fachschaft (mit `status`, Schritt 2) — sonst niemandem.
     liste = await list_curricula_by_subject(welt["fach"].id, db=db, user=LEHRKRAFT)
-    assert [c.id for c in liste] == [aktiv.id]
+    assert {(c.id, c.status) for c in liste} == {(aktiv.id, "active"), (cur.id, "draft")}
+    for wer in (FREMDE, SCHUELERIN):
+        assert [c.id for c in await list_curricula_by_subject(welt["fach"].id, db=db, user=wer)] == [aktiv.id]
 
     async def gefunden(titel):
         ergebnis = await suche(titel, Suchprofil(pseudonym=MITGLIED, rollen=("teacher",)), db,
@@ -288,3 +297,86 @@ async def test_archiviertes_kapitel_bleibt_beim_aendern_der_einheit(db, welt):
     await db.flush()
     await _abgewiesen(update_unit_node(db, ue.id, kurs.id, kapitel_node_id=anderes.id,
                                        update_kapitel=True), 422)
+
+
+# ── Anlegen und Kopieren (Schritt 2) ─────────────────────────────────────────
+
+
+async def test_neues_curriculum_ist_ein_entwurf(db, welt):
+    fachplan = ContextNode(category="knowledge", content_type="fachplan", title="BP", status="active",
+                           read_scope="global", write_scope="global", owner_pseudonym="system",
+                           subject_id=welt["fach"].id, metadata_={"fachplan_id": f"BP_{TOKEN}"})
+    db.add(fachplan)
+    await db.flush()
+    neu = await create_curriculum_node(CurriculumCreate(
+        fach_code=welt["fach"].fach_code, schulart="G8", jahrgangsstufe="7", bp_version="2016.V3",
+        schule="Test", fachplan_node_id=str(fachplan.id)), db=db, user=LEHRKRAFT)
+    assert neu.status == "draft"
+    assert neu.owner_pseudonym == MITGLIED
+    await _abgewiesen(get_curriculum(neu.id, db=db, user=FREMDE))
+
+
+def _kapitel(welt, **kw):
+    return ContextNodeCreate(category="knowledge", content_type="kapitel", title=f"Neu {uuid.uuid4().hex[:4]}",
+                             read_scope="school", write_scope="subject",
+                             write_scope_group_id=welt["fs"].id, subject_id=welt["fach"].id, **kw)
+
+
+async def test_teile_gleich_als_entwurf_anlegen(db, welt):
+    """So legt der Editor Kapitel und Lernsequenzen in einem Entwurf an."""
+    cur, _, _ = welt["entwurf"]
+    kap = await create_node(_kapitel(welt, status="draft"), db=db, user=LEHRKRAFT)
+    assert kap.status == "draft"
+    await create_edge(ContextEdgeCreate(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
+                      db=db, user=LEHRKRAFT)
+    baum = await get_curriculum(cur.id, db=db, user=KOLLEGIN)
+    assert kap.title in [k["title"] for k in baum["kapitel"]]
+
+    await _abgewiesen(create_node(_kapitel(welt, status="draft"), db=db, user=FREMDE))
+    begriff = ContextNodeCreate(category="concept", content_type="begriff", title="B", status="draft",
+                                subject_id=welt["fach"].id)
+    await _abgewiesen(create_node(begriff, db=db, user=LEHRKRAFT), 422)
+
+
+async def test_frisches_kapitel_erbt_den_entwurf(db, welt):
+    """Ein Editor ohne `status` (oder ein älterer Browser-Tab) legt `active` an — die Kante
+    in den Entwurf macht das frische Kapitel selbst zum Entwurf."""
+    cur, _, _ = welt["entwurf"]
+    kap = await create_node(_kapitel(welt), db=db, user=LEHRKRAFT)
+    assert kap.status == "active"
+    await create_edge(ContextEdgeCreate(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
+                      db=db, user=LEHRKRAFT)
+    assert kap.status == "draft"
+    await _abgewiesen(get_node(kap.id, db=db, user=FREMDE))
+
+
+async def test_haengendes_kapitel_erbt_nicht(db, welt):
+    """Ein Kapitel aus einem veröffentlichten Curriculum verschwindet nicht in einem Entwurf."""
+    cur, _, _ = welt["entwurf"]
+    _, kap_aktiv, _ = welt["aktiv"]
+    await _abgewiesen(create_edge(ContextEdgeCreate(from_node_id=kap_aktiv.id, to_node_id=cur.id,
+                                                    relation="part_of"), db=db, user=LEHRKRAFT), 422)
+    assert kap_aktiv.status == "active"
+
+
+async def test_kopie_ist_entwurf_der_kopierenden_person(db, welt):
+    aktiv, kap, ls = welt["aktiv"]
+    weg = ContextNode(category="knowledge", content_type="kapitel", title="Gelöscht", status="deleted",
+                      read_scope="school", write_scope="subject", write_scope_group_id=welt["fs"].id,
+                      subject_id=welt["fach"].id, owner_pseudonym=MITGLIED)
+    db.add(weg)
+    await db.flush()
+    db.add(ContextEdge(from_node_id=weg.id, to_node_id=aktiv.id, relation="part_of"))
+    await db.flush()
+
+    neu_id, ls_map = await duplicate_curriculum(db, aktiv.id, owner=ZWEITES)
+    neu = await db.get(ContextNode, neu_id)
+    assert (neu.status, neu.owner_pseudonym, neu.metadata_["kopie_von"]) == ("draft", ZWEITES, str(aktiv.id))
+    baum = await get_curriculum(neu_id, db=db, user=LEHRKRAFT)
+    assert [k["title"] for k in baum["kapitel"]] == [kap.title]  # das gelöschte kommt nicht mit
+    kap_neu = await db.get(ContextNode, baum["kapitel"][0]["id"])
+    ls_neu = await db.get(ContextNode, UUID(ls_map[str(ls.id)]))
+    assert (kap_neu.status, kap_neu.metadata_["kopie_von"]) == ("draft", str(kap.id))
+    assert (ls_neu.status, ls_neu.owner_pseudonym) == ("draft", ZWEITES)
+    await _abgewiesen(get_curriculum(neu_id, db=db, user=FREMDE))
+    assert aktiv.status == "active"
