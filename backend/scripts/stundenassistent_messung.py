@@ -219,6 +219,71 @@ def hat_kapitel(conn, stunde: str) -> bool:
         WHERE teil.from_node_id::text = %s AND teil.relation = 'part_of' LIMIT 1""", stunde))
 
 
+# ── Begriffe im Curriculum (0.44, Päckchen AQ, Schritt 6) ──────────────────
+
+
+def curriculum_aufbauen(conn, spec: dict) -> dict:
+    """`curriculum_vorher` der Szenariendatei: Stunden in eine Einheit hängen und den
+    Lernsequenzen ihres Kapitels Begriffe geben — vor der Messung, **vor** dem Ausgangsstand.
+
+    Gibt zurück, was :func:`curriculum_abbauen` zum Zurückbauen braucht: die angelegten Kanten
+    und die Metadaten der Lernsequenzen davor. Fehlt etwas (Einheit, Kapitel, Lernsequenz), bricht
+    die Messung ab, statt still den anderen Weg zu messen.
+    """
+    e = spec["einheit"]
+    einheit = _eins(conn, "SELECT id::text FROM context_nodes WHERE content_type = 'unterrichtseinheit' "
+                          "AND status = 'active' AND write_scope_group_id = %s AND title = %s", e["gruppe"], e["titel"])
+    if einheit is None:
+        raise SystemExit(f"curriculum_vorher: Einheit „{e['titel']}“ in Gruppe {e['gruppe']} fehlt.")
+    kapitel = _eins(conn, "SELECT r.to_node_id::text FROM context_edges r JOIN context_nodes k ON k.id = r.to_node_id "
+                          "WHERE r.from_node_id::text = %s AND r.relation = 'references' "
+                          "AND k.content_type = 'kapitel'", einheit)
+    if kapitel is None:
+        raise SystemExit(f"curriculum_vorher: Einheit „{e['titel']}“ hängt an keinem Kapitel.")
+    zurueck = {"kanten": [], "lernsequenzen": {}}
+    with conn.cursor() as cur:
+        for st in spec.get("stunden") or []:
+            stunde = stunde_am(conn, **st)
+            if stunde is None:
+                raise SystemExit(f"curriculum_vorher: keine Stunde am {st}.")
+            andere = _eins(conn, "SELECT 1 FROM context_edges t JOIN context_nodes u ON u.id = t.to_node_id "
+                                 "WHERE t.from_node_id::text = %s AND t.relation = 'part_of' "
+                                 "AND u.content_type = 'unterrichtseinheit'", stunde)
+            if andere:
+                raise SystemExit(f"curriculum_vorher: Die Stunde am {st} hängt schon an einer Einheit.")
+            cur.execute("INSERT INTO context_edges (from_node_id, to_node_id, relation, metadata) "
+                        "VALUES (%s, %s, 'part_of', '{}') RETURNING id::text", (stunde, einheit))
+            zurueck["kanten"].append(cur.fetchone()[0])
+        for titel, namen in (spec.get("lernsequenzen") or {}).items():
+            treffer = _alle(conn, "SELECT l.id::text, l.metadata FROM context_edges t JOIN context_nodes l "
+                                  "ON l.id = t.from_node_id WHERE t.to_node_id::text = %s AND t.relation = 'part_of' "
+                                  "AND l.content_type = 'lernsequenz' AND l.status = 'active' AND l.title = %s",
+                            kapitel, titel)
+            if len(treffer) != 1:
+                raise SystemExit(f"curriculum_vorher: Lernsequenz „{titel}“ im Kapitel {len(treffer)}× gefunden.")
+            ls, meta = treffer[0]
+            zurueck["lernsequenzen"][ls] = meta
+            neu = dict(meta or {})
+            eintraege = [dict(x) for x in (neu.get("eintraege") or [])] or [{"konkretisierung": ""}]
+            eintraege[0]["begriffe"] = [{"name": n} for n in namen]
+            neu["eintraege"] = eintraege
+            cur.execute("UPDATE context_nodes SET metadata = %s WHERE id = %s", (psycopg2.extras.Json(neu), ls))
+    conn.commit()
+    return zurueck
+
+
+def curriculum_abbauen(conn, zurueck: dict | None) -> None:
+    """Gegenstück zu :func:`curriculum_aufbauen` — auch nach einem Abbruch."""
+    if not zurueck:
+        return
+    with conn.cursor() as cur:
+        if zurueck["kanten"]:
+            cur.execute("DELETE FROM context_edges WHERE id::text = ANY(%s)", (zurueck["kanten"],))
+        for ls, meta in zurueck["lernsequenzen"].items():
+            cur.execute("UPDATE context_nodes SET metadata = %s WHERE id = %s", (psycopg2.extras.Json(meta), ls))
+    conn.commit()
+
+
 # ── Messgruppen und vorbelegte Einträge (0.17, Fachbegriffe der Stunde) ─────
 
 
@@ -714,6 +779,8 @@ def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde,
       über einen Alias.
     - ``nicht_eingefuehrt`` (seit M10): Titel, die nicht als eingeführt genannt sein dürfen —
       die Stunde wiederholt sie.
+    - ``vorschlag.nicht`` (0.44, AQ): Namen, die der Vorschlag weder als Knoten noch als Name
+      ohne Knoten bringen darf — Begriffe des Curriculums aus anderen Lernsequenzen.
     Dazu immer, wenn vorher Kompetenzen eingetragen waren und geschrieben wurde: Sie sind noch da.
     Mit ``absatz`` und ``geschrieben`` (seit M10, aus :func:`begriffs_zaehlung`):
     ``nichts_verloren`` — jeder genannte Begriff, den es gibt, steht danach in `refs`;
@@ -750,6 +817,12 @@ def _begriffs_kriterien(fall: dict, ausgang: dict, zuege: list[dict], *, stunde,
                 text = entwurfstext(nachher_e.get("titel") or "", nachher_e.get("metadata") or {})
                 k["vorschlag_deckt_ab"] = all(
                     _knoten_zum_namen(t, info) in vorgeschlagen for t in im_entwurf(b["vorschlag"]["deckt_ab"], text, info))
+            if b["vorschlag"].get("nicht"):
+                namen_ohne = {normalisiere_titel(str(o.get("name") or "").translate(_BINDESTRICHE))
+                              for o in v.get("ohne_knoten") or []}
+                k["vorschlag_ohne_fremde"] = not any(
+                    (_knoten_zum_namen(t, info) or "—") in vorgeschlagen or normalisiere_titel(t) in namen_ohne
+                    for t in b["vorschlag"]["nicht"])
             if b["vorschlag"].get("aus_bezugsfach"):
                 k["vorschlag_aus_bezugsfach"] = any(
                     knoten.get(e.get("node_id"), {}).get("subject_id") not in (None, (info or {}).get("fach"))
@@ -976,16 +1049,33 @@ def main() -> None:
     messgruppen = daten.get("messgruppen") or []
     for gruppe in messgruppen:
         messgruppe_aufbauen(conn, gruppe, pseudonym)
+    # Begriffe im Curriculum (0.44): ebenfalls vor dem Ausgangsstand — die Kante Stunde → Einheit
+    # gehört dann dazu und übersteht das Zurücksetzen zwischen den Läufen.
+    curriculum_zurueck = None
+    try:
+        if daten.get("curriculum_vorher"):
+            curriculum_zurueck = curriculum_aufbauen(conn, daten["curriculum_vorher"])
+    except SystemExit:
+        for gruppe in messgruppen:
+            messgruppe_abbauen(conn, gruppe)
+        raise
     gruppen = gruppen_der_lehrkraft(conn, pseudonym)
     assistent = args.assistent or stundenassistent(conn)
     vorbelegt: dict[str, list[dict]] = {}
-    for fall in faelle:
-        if "stunde" in fall and stunde_am(conn, **fall["stunde"]) is None:
-            raise SystemExit(f"{fall['id']}: kein Entwurf am {fall['stunde']} — falsche Instanz?")
-        if "stunde" in fall and (fehler := aufbau_fehler(fall, hat_kapitel(conn, stunde_am(conn, **fall["stunde"])))):
-            raise SystemExit(fehler)
-        if fall.get("refs_vorher"):
-            vorbelegt[fall["id"]] = refs_aufloesen(conn, stunde_am(conn, **fall["stunde"]), fall["refs_vorher"])
+    try:
+        for fall in faelle:
+            if "stunde" in fall and stunde_am(conn, **fall["stunde"]) is None:
+                raise SystemExit(f"{fall['id']}: kein Entwurf am {fall['stunde']} — falsche Instanz?")
+            if "stunde" in fall and (fehler := aufbau_fehler(fall, hat_kapitel(conn, stunde_am(conn, **fall["stunde"])))):
+                raise SystemExit(fehler)
+            if fall.get("refs_vorher"):
+                vorbelegt[fall["id"]] = refs_aufloesen(conn, stunde_am(conn, **fall["stunde"]), fall["refs_vorher"])
+    except SystemExit:
+        # Abbruch vor dem ersten Lauf: Aufgebautes wieder weg (0.44).
+        curriculum_abbauen(conn, curriculum_zurueck)
+        for gruppe in messgruppen:
+            messgruppe_abbauen(conn, gruppe)
+        raise
 
     ausgang = stand(conn, gruppen)
     ausgang_vektoren = vektoren(conn, ausgang["entwuerfe"])
@@ -1080,6 +1170,7 @@ def main() -> None:
             cur.execute("DELETE FROM conversations WHERE (id::text = ANY(%s)) OR (pseudonym = %s "
                         "AND assistant_id = %s AND created_at >= %s)",
                         (konversationen, pseudonym, assistent, beginn))
+        curriculum_abbauen(conn, curriculum_zurueck)
         for gruppe in messgruppen:
             messgruppe_abbauen(conn, gruppe)
         conn.close()

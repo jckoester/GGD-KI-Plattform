@@ -1,0 +1,68 @@
+# Messung zu 0.44 (Päckchen AQ, Plan „Begriffe und Fachmethoden im Curriculum", Schritt 6, E10).
+#
+#   cd backend && venv/bin/python scripts/stundenassistent_messung.py \
+#       --datei scripts/szenarien/curriculum_begriffe.yaml --laeufe 3 --json aq.json --verlauf aq.md
+#
+# Frage: Nutzen Stundenassistent und Leiste „Begriffe der Stunde“ die Begriffe, die das
+# Schulcurriculum für die Einheit nennt? Der Prompt des Stundenassistenten ist **nicht** geändert —
+# er bekommt die Begriffe nur in `zusammenhang.kapitel` (`begriffe_im_curriculum`,
+# `begriffe_im_curriculum_ohne_baustein`). Der Vorschlag bekommt eine eigene Zeile in der Nachricht.
+#
+# Aufbau (`curriculum_vorher`, vor der Messung, danach zurückgebaut): Die Stunde vom 13.10.
+# (Gruppe 33, elektrophile aromatische Substitution, sonst ohne Einheit) hängt für die Messung in
+# „2 Aromaten“, deren Kapitel „Aromaten“ vier Lernsequenzen hat. Der erste Eintrag jeder
+# Lernsequenz bekommt Begriffe. Auf Dev fehlen „Lewis-Säure“ und „Phenol“ in der Bibliothek.
+#
+# Kriterien mit Jan abgestimmt (15.11.2026), vor dem ersten Lauf.
+
+lehrkraft_der_gruppe: 33
+
+curriculum_vorher:
+  einheit: {gruppe: 33, titel: "2 Aromaten"}
+  stunden:
+    - {gruppe: 33, datum: 2026-10-13}
+  lernsequenzen:
+    "Benzol": [Benzol, Mesomerie, Aromaten]
+    "Orbitalmodell und Delokalisierung": [Hückel-Regel, delokalisiertes Elektronenringsystem]
+    "Die elektrophile aromatische Substitution":
+      [elektrophile Substitution, σ-Komplex, Elektrophil, Katalysator, Lewis-Säure, Reaktionsmechanismus]
+    "Weitere aromatische Verbindungen": [Phenol]
+
+faelle:
+  # Fall A — die Leiste schlägt nach dem Schreiben vor. Bestanden, wenn der Vorschlag die Begriffe
+  # des Curriculums deckt, die im geschriebenen Entwurf stehen (`deckt_ab` zählt nur, was im Text
+  # vorkommt), und keine aus anderen Lernsequenzen bringt, die die Stunde nicht behandelt.
+  - id: curriculum-vorschlag
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    zuege:
+      - "Arbeite die erste Erarbeitung (20 Minuten) aus: Wie erschließen die Schüler:innen den Mechanismus?"
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    begriffe:
+      absatz: false
+      keine_ungefragten: true
+      vorschlag:
+        deckt_ab: [elektrophile Substitution, Elektrophil, Reaktionsmechanismus, Katalysator]
+        nicht: [Hückel-Regel, Phenol]
+    erwartung: >-
+      Arbeitet die erste Erarbeitung konkret aus, ohne Begriffsabsatz und ohne Begriffe
+      einzutragen. Nach „Ja“ schlägt die Leiste die Begriffe des Curriculums vor, die die Stunde
+      behandelt (elektrophile Substitution/σ-Komplex, Elektrophil, Reaktionsmechanismus, je nach
+      Entwurf Katalysator und Lewis-Säure als fehlend) — nicht Hückel-Regel oder Phenol.
+
+  # Fall B — die Lehrkraft fragt nach Begriffen. Bestanden, wenn der Assistent die passenden
+  # Begriffe des Curriculums nennt, darunter Lewis-Säure mit dem Hinweis, dass sie in der Bibliothek
+  # fehlt und die Fachschaft sie anlegen kann. Nichts geschrieben.
+  - id: curriculum-fragen
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    zuege:
+      - "Welche Fachbegriffe führt diese Stunde ein?"
+    begriffe:
+      genannt: [elektrophile Substitution, Reaktionsmechanismus]
+      fehlt: "Lewis-Säure"
+    erwartung: >-
+      Nennt Phase für Phase die Begriffe, die die Stunde einführt oder anspricht, und stützt sich
+      dabei auf die Begriffe des Curriculums für die elektrophile Substitution (σ-Komplex,
+      Elektrophil, Katalysator, Reaktionsmechanismus). Sagt, dass „Lewis-Säure“ im Curriculum steht,
+      in der Bibliothek aber fehlt und die Fachschaft sie anlegen kann. Benzol nicht als neu.
+      Schreibt nichts und nennt keine Kennungen.

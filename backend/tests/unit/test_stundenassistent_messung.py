@@ -558,3 +558,17 @@ def test_kennungen_gezaehlt():
         {"antwort": "keine neuen (`suggested_refs` leer)"},
         {"antwort": "Gespeichert."},
     ]) == 2
+
+
+# ── 0.44 (AQ, Schritt 6): Begriffe aus anderen Lernsequenzen nicht vorschlagen ──
+
+
+@pytest.mark.parametrize("vorschlag, erwartet", [
+    ({"eintraege": [{"node_id": "b-sub"}], "frueher": [], "ohne_knoten": []}, True),
+    ({"eintraege": [{"node_id": "b-sub"}, {"node_id": "b-kat"}], "frueher": [], "ohne_knoten": []}, False),
+    ({"eintraege": [{"node_id": "b-sub"}], "frueher": [], "ohne_knoten": [{"name": "Phenol"}]}, False),
+    ({"eintraege": [], "frueher": [], "ohne_knoten": [{"name": "Lewis-Säure"}]}, True),
+])
+def test_vorschlag_ohne_fremde(vorschlag, erwartet):
+    k = _vorschlags_lauf({"vorschlag": {"nicht": ["Katalysator", "Phenol"]}}, nachher_refs=[IK], vorschlag=vorschlag)
+    assert k["vorschlag_ohne_fremde"] is erwartet, k
