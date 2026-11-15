@@ -15,6 +15,11 @@ describe('abdeckungUeberschrift', () => {
       'Abdeckung: 41 von 65 IK verknüpft · 2 partiell · 24 fehlen (3 davon in anderen Curricula des Bands) · PK 30 von 33 gefördert',
     )
   })
+  it('warnt vor Kompetenzen aus einem anderen Fach', () => {
+    expect(abdeckungUeberschrift({ ...a({}), fremdes_fach: [{}, {}] })).toBe(
+      'Abdeckung: 41 von 65 IK verknüpft · 24 fehlen · PK 30 von 33 gefördert · ⚠ 2 aus einem anderen Fach',
+    )
+  })
   it('ohne Kompetenzen und ohne Daten', () => {
     expect(abdeckungUeberschrift(a({ gesamt: 0 }))).toBe('Abdeckung: keine Kompetenzen des Bands gefunden')
     expect(abdeckungUeberschrift(null)).toBe('Abdeckung')

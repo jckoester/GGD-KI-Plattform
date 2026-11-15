@@ -441,6 +441,24 @@ Knoten bleiben unangetastet und kommen im nächsten Lauf wieder dran.
 docker compose exec backend python scripts/embedding_backfill.py --limit 200
 ```
 
+## Curricula: Kompetenzen aus einem fremden Fach *(seit 0.45)*
+
+Curricula, die vor dem 25.08.2026 importiert wurden, können an prozessbezogenen (selten auch
+inhaltsbezogenen) Kompetenzen eines **anderen Fachs** hängen: Der Import löste damals Nummern
+wie `2.1.1` ohne Fach auf. Die Fachschaft sieht das in der Abdeckung des Curriculums unter
+„aus einem anderen Fach“. Reparieren Sie es einmal mit:
+
+```bash
+docker compose exec backend python scripts/curriculum_kompetenzen_reparieren.py             # Probelauf
+docker compose exec backend python scripts/curriculum_kompetenzen_reparieren.py --anwenden
+```
+
+Das Skript sucht je Kompetenz dieselbe Nummer im Fach und in der Bildungsplan-Fassung des
+Curriculums und hängt Eintrag und Verknüpfung dorthin um. Findet es keinen oder mehrere
+Treffer, ändert es nichts und nennt den Fall — diese ersetzt die Fachschaft im Editor.
+Verweise in Hinweisen und Material bleiben unberührt; dort sind Kompetenzen anderer Fächer
+gewollt. Ein zweiter Lauf findet nichts mehr. Mit `--curriculum <id>` nur ein Curriculum.
+
 ## PII-NER-Modell aktualisieren
 
 Die PII-Erkennung (Datensparsamkeit) nutzt das deutsche spaCy-Modell `de_core_news_md`,

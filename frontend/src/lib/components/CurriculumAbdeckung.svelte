@@ -5,6 +5,7 @@
      * geladene Curriculum, ein neues Objekt (nach dem Speichern) lädt neu.
      */
     import { getCurriculumAbdeckung } from "$lib/api.js";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import { abdeckungUeberschrift, gefilterteGruppen, ZUSTAND } from "$lib/curriculum_abdeckung.js";
 
     let { curriculumId = null, stand = null, editMode = false } = $props();
@@ -92,6 +93,23 @@
                     <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">Alle Kompetenzen des Bands sind verknüpft.</p>
                 {/each}
             {/if}
+            {#if abdeckung.fremdes_fach.length}
+                <div data-abschnitt="fremdes-fach">
+                    <WarningBanner
+                        message="Diese Kompetenzen gehören zu einem anderen Fach — vermutlich beim Import falsch zugeordnet. Bitte im Editor ersetzen oder die Schul-IT um die Reparatur bitten."
+                    />
+                    <ul class="mt-1 text-xs space-y-0.5">
+                        {#each abdeckung.fremdes_fach as k (k.node_id)}
+                            <li class="text-light-tx dark:text-dark-tx">
+                                {k.typ.toUpperCase()} <span class="font-medium">{k.nr}</span> {k.titel}
+                                <span class="text-light-tx-2 dark:text-dark-tx-2">
+                                    — {k.fach}, BP {k.bp_version} — {k.lernsequenzen.join("; ")}
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            {/if}
             {#if abdeckung.ausserhalb.length}
                 <div>
                     <p class="text-xs font-medium text-light-tx dark:text-dark-tx">
@@ -100,7 +118,7 @@
                     <ul class="text-xs space-y-0.5">
                         {#each abdeckung.ausserhalb as k (k.node_id)}
                             <li class="text-light-tx-2 dark:text-dark-tx-2">
-                                <span class="font-medium">{k.nr}</span> {k.titel} (BP {k.bp_version})
+                                {k.typ.toUpperCase()} <span class="font-medium">{k.nr}</span> {k.titel} (BP {k.bp_version})
                             </li>
                         {/each}
                     </ul>

@@ -18,6 +18,7 @@ export function abdeckungUeberschrift(a) {
     )
   }
   teile.push(`PK ${a.pk.genutzt} von ${a.pk.gesamt} gefördert`)
+  if (a.fremdes_fach?.length) teile.push(`⚠ ${a.fremdes_fach.length} aus einem anderen Fach`)
   return teile.join(' · ')
 }
 

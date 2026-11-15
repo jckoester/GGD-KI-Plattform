@@ -11,9 +11,17 @@ Bands 9/10. Weil Schulen ein Band oft auf zwei Curricula aufteilen, steht bei je
 Kompetenz, welche **anderen** veröffentlichten Curricula desselben Bands sie verknüpfen
 (`anderswo`) — am Zustand ändert das nichts.
 
-**Was zählt.** Die Kanten der Lernsequenzen: `references` auf IK (mit `partiell` an der Kante)
-und `develops` auf PK, wie sie der Editor schreibt. Verknüpfte IK, die nicht zum Band oder zur
-Fassung gehören, stehen gesondert (`ausserhalb`) — etwa nach einem Fassungswechsel.
+**Was zählt.** Die Spalten IK und PK der Einträge (`eintraege[].ik`, `eintraege[].pk` mit
+`node_id`, bei IK `partiell`) — nicht die Kanten. Aus den Einträgen schreibt der Editor die
+Kanten, aber auch Verweise **in den Hinweisen** (Kompetenzen anderer Fächer) werden zu
+`references`-Kanten; an der Kante allein ist ein gewollter Fachbezug von einem Fehler nicht zu
+unterscheiden.
+
+**Was gesondert steht.** `ausserhalb`: verknüpfte Kompetenzen des eigenen Fachs aus anderem Band
+oder anderer Fassung (etwa nach einem Fassungswechsel). `fremdes_fach`: Kompetenzen eines
+**anderen Fachs** in den Spalten IK und PK — ein Fehler, kein Bezug: Bis 25.08.2026 löste der
+Import PK-Nummern ohne Fach auf (`resolve_pk_node`), ein Mathematik-Curriculum hing danach an
+den PK von Kunst, Geographie, Chemie … Reparatur: `scripts/curriculum_kompetenzen_reparieren.py`.
 """
 from __future__ import annotations
 
@@ -24,7 +32,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.db.models import ContextEdge, ContextNode
+from app.db.models import ContextEdge, ContextNode, Subject
 
 VERKNUEPFT, PARTIELL, FEHLT = "verknuepft", "partiell", "fehlt"
 _NR_PRAEFIX = re.compile(r"^\s*\d+(?:\.\d+)*\s*(?:\(\d+\))?\s*")
@@ -46,6 +54,19 @@ def _lernsequenzen(tree: dict) -> dict[str, str]:
             for ls in kap.get("lernsequenzen", [])}
 
 
+def _eintraege(tree: dict):
+    for kap in tree.get("kapitel", []):
+        for ls in kap.get("lernsequenzen", []):
+            yield str(ls["id"]), ((ls.get("metadata") or {}).get("eintraege") or [])
+
+
+def _uuid(ref) -> UUID | None:
+    try:
+        return UUID(str(ref.get("node_id"))) if isinstance(ref, dict) and ref.get("node_id") else None
+    except ValueError:
+        return None
+
+
 def _bp_version(cur: ContextNode) -> str | None:
     return (cur.metadata_ or {}).get("bp_version") or cur.bp_version
 
@@ -55,10 +76,10 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
     cur = await db.get(ContextNode, tree["id"])
     bp = _bp_version(cur)
     ls_titel = _lernsequenzen(tree)
-    ls_ids = [UUID(i) for i in ls_titel]
     leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
             "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
-            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "hinweis": None}
+            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
+            "hinweis": None}
     if cur.subject_id is None or not bp:
         return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
 
@@ -73,20 +94,18 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
     pks = (await db.execute(sa.select(ContextNode).where(
         ContextNode.content_type == "pk_kompetenz", im_fach))).scalars().all()
 
-    # Kanten dieses Curriculums: je Kompetenz die Lernsequenzen, bei IK mit `partiell`.
-    kanten = (await db.execute(sa.select(
-        ContextEdge.from_node_id, ContextEdge.to_node_id, ContextEdge.relation,
-        ContextEdge.metadata_["partiell"].as_string(),
-    ).where(ContextEdge.from_node_id.in_(ls_ids),
-            ContextEdge.relation.in_(("references", "develops"))))).all() if ls_ids else []
+    # Spalten IK und PK der Einträge: je Kompetenz die Lernsequenzen, bei IK mit `partiell`.
     voll: dict[UUID, set[str]] = {}
     teil: dict[UUID, set[str]] = {}
     gefoerdert: dict[UUID, set[str]] = {}
-    for ls_id, ziel, relation, partiell in kanten:
-        if relation == "develops":
-            gefoerdert.setdefault(ziel, set()).add(str(ls_id))
-        else:
-            (teil if partiell == "true" else voll).setdefault(ziel, set()).add(str(ls_id))
+    for ls_id, eintraege in _eintraege(tree):
+        for e in eintraege:
+            for ref in e.get("ik") or []:
+                if k_id := _uuid(ref):
+                    (teil if ref.get("partiell") is True else voll).setdefault(k_id, set()).add(ls_id)
+            for ref in e.get("pk") or []:
+                if k_id := _uuid(ref):
+                    gefoerdert.setdefault(k_id, set()).add(ls_id)
 
     anderswo = await _anderswo(db, cur, bp, [k.id for k in iks])
 
@@ -113,15 +132,25 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
             {"node_id": str(k.id), "nr": nr, "titel": _text(k.title, nr),
              "anzahl": len(gefoerdert.get(k.id, ()))})
 
-    im_band = {k.id for k in iks}
-    fremde_ids = [z for z in set(voll) | set(teil) if z not in im_band]
-    ausserhalb = []
-    if fremde_ids:
-        for k in (await db.execute(sa.select(ContextNode).where(ContextNode.id.in_(fremde_ids)))).scalars():
+    # Verknüpft, aber nicht unter den Kompetenzen des Bands: anderes Band, andere Fassung oder
+    # ein anderes Fach.
+    bekannt = {k.id for k in iks} | {k.id for k in pks}
+    rest = {z: lss for quelle in (voll, teil, gefoerdert) for z, lss in quelle.items() if z not in bekannt}
+    ausserhalb, fremdes_fach = [], []
+    if rest:
+        faecher = dict((await db.execute(sa.select(Subject.id, Subject.name))).all())
+        for k in (await db.execute(sa.select(ContextNode).where(ContextNode.id.in_(list(rest))))).scalars():
             nr = (k.metadata_ or {}).get("kompetenz_nr")
-            ausserhalb.append({"node_id": str(k.id), "nr": nr, "titel": _text(k.title, nr),
-                               "bp_version": k.bp_version, "min_grade": k.min_grade, "max_grade": k.max_grade})
-        ausserhalb.sort(key=lambda e: _sortschluessel(e["nr"]))
+            lss = set().union(*(q.get(k.id, set()) for q in (voll, teil, gefoerdert)))
+            zeile = {"node_id": str(k.id), "typ": "pk" if k.content_type == "pk_kompetenz" else "ik",
+                     "nr": nr, "titel": _text(k.title, nr), "bp_version": k.bp_version,
+                     "lernsequenzen": sorted(ls_titel[i] for i in lss)}
+            if k.subject_id != cur.subject_id:
+                fremdes_fach.append({**zeile, "fach": faecher.get(k.subject_id, "ohne Fach")})
+            else:
+                ausserhalb.append(zeile)
+        ausserhalb.sort(key=lambda e: (e["typ"], _sortschluessel(e["nr"])))
+        fremdes_fach.sort(key=lambda e: (e["fach"], e["typ"], _sortschluessel(e["nr"])))
 
     return {
         **leer,
@@ -130,6 +159,7 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
         "pk": {"gesamt": len(pks), "genutzt": sum(1 for k in pks if gefoerdert.get(k.id)),
                "gruppen": [{"titel": t, "kompetenzen": ks} for t, ks in pk_gruppen.items()]},
         "ausserhalb": ausserhalb,
+        "fremdes_fach": fremdes_fach,
         "hinweis": None if iks else "Für Fach, Fassung und Stufen dieses Curriculums sind keine "
                                     "inhaltsbezogenen Kompetenzen im Bildungsplan hinterlegt.",
     }

@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Export (PDF, DOCX, ODT) den Vermerk „Entwurf, Stand …“.
 - Curriculum: aufklappbare Abdeckung der Kompetenzen des Bands — je IK verknüpft, partiell oder fehlend, mit
   Hinweis auf andere Curricula desselben Bands; je PK, in wie vielen Lernsequenzen sie gefördert wird.
+  Kompetenzen aus einem anderen Fach in den Spalten IK und PK stehen dort mit Warnung.
+- Skript `curriculum_kompetenzen_reparieren.py`: hängt solche Kompetenzen auf dieselbe Nummer im eigenen
+  Fach um.
 
 ### Geändert
 
@@ -24,6 +27,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Nach dem Update
 
 - Migration `0106` (`alembic upgrade head`).
+- Curricula, die vor dem 25.08.2026 importiert wurden, prüfen und reparieren:
+  `scripts/curriculum_kompetenzen_reparieren.py` (erst Probelauf, dann `--anwenden`), siehe
+  `docs/admin/updates-und-wartung.md`.
 
 ## [0.44.0] – 2026-11-15
 

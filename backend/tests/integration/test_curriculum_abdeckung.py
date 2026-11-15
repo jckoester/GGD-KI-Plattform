@@ -73,7 +73,13 @@ async def welt(db):
         kap = await _knoten(db, "kapitel", f"{titel} K", **gemeinsam)
         db.add(ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"))
         for ls_titel, kanten in lernsequenzen.items():
-            ls = await _knoten(db, "lernsequenz", ls_titel, **gemeinsam)
+            # Gezählt werden die Spalten IK und PK der Einträge; die Kanten schreibt der Editor daraus.
+            eintrag = {
+                "ik": [{"node_id": str(z.id), "partiell": m.get("partiell") == "true"}
+                       for z, rel, m in kanten if rel == "references"],
+                "pk": [{"node_id": str(z.id)} for z, rel, _ in kanten if rel == "develops"],
+            }
+            ls = await _knoten(db, "lernsequenz", ls_titel, metadata_={"eintraege": [eintrag]}, **gemeinsam)
             db.add(ContextEdge(from_node_id=ls.id, to_node_id=kap.id, relation="part_of"))
             for ziel, relation, meta in kanten:
                 db.add(ContextEdge(from_node_id=ls.id, to_node_id=ziel.id, relation=relation, metadata_=meta))
