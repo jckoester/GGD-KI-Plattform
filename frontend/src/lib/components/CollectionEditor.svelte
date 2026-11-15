@@ -23,7 +23,7 @@
     import PageBody from '$lib/components/PageBody.svelte'
     import AliasFeld from "$lib/components/AliasFeld.svelte";
 
-    let { typ, node = null, vorgabeFachId = null, back = null } = $props();
+    let { typ, node = null, vorgabeFachId = null, vorgabeTitel = null, back = null } = $props();
 
     /**
      * Wohin „Abbrechen" und der Kopf-Link führen.
@@ -42,7 +42,7 @@
     // aus `typ` und `node` einmal zu übernehmen, ist hier richtig, nicht vergessen.
     const [defRead, defWrite] = untrack(() => SCOPE_DEFAULTS[typ] ?? ["school", "private"]);
 
-    let title = $state(untrack(() => node?.title ?? ""));
+    let title = $state(untrack(() => node?.title ?? vorgabeTitel ?? ""));
     let content = $state(untrack(() => node?.content ?? ""));
     // Gewählt wird die **Fachschaft**, nicht das Fach: Sie trägt `write_scope_group_id`,
     // das die Datenbank bei `write_scope = subject` verlangt. Das Fach ergibt sich daraus.

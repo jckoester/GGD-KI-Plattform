@@ -16,11 +16,25 @@
     import { renderMarkdown } from "$lib/markdown.js";
     import { parseMaterial } from "$lib/material.js";
     import MaterialEditor from "./MaterialEditor.svelte";
+    import NamenChips from "./NamenChips.svelte";
+    import { untrack } from "svelte";
+    import { page } from "$app/stores";
+    import { aufloesenCurriculumBegriffe } from "$lib/api.js";
+    import { myFachschaften } from "$lib/stores/myGroups.js";
+    import {
+        aufloesungsMap,
+        aufloesungVon,
+        begriffeImCurriculum,
+        fachmethodenImCurriculum,
+        kannAnlegen,
+        ungeprueft,
+    } from "$lib/curriculum_begriffe.js";
     import {
         Trash2,
         MoreVertical,
         Move,
         ChevronRight,
+        Plus,
     } from "lucide-svelte";
 
     // Tooltip für als „veraltet" markierte Kompetenzen (nach BP-Migration ohne Zwilling).
@@ -35,6 +49,61 @@
         bpVersion = null,
         onchange = () => {},
     } = $props();
+
+    // ── Begriffe und Fachmethoden am Eintrag (0.44, AQ) ──────────────────────
+    // Die Auflösung kommt mit dem Curriculum (`curriculum.begriffe`) und wird für neu
+    // eingetragene Namen nachgereicht. Sie steht neben dem Baum, nicht in den Einträgen.
+    const fachId = $derived(subjectId ?? curriculum?.subject_id ?? null);
+    const darfAnlegen = $derived(kannAnlegen($myFachschaften, fachId));
+    // Nach dem Anlegen zurück in die Leseansicht — im Editor öffnet der Link einen neuen Tab.
+    const rueckweg = $derived(
+        curriculum?.id ? `/knowledge/curriculum/${curriculum.id}` : $page.url.pathname,
+    );
+    let aufloesung = $state(new Map());
+    $effect(() => {
+        const liste = curriculum?.begriffe;
+        untrack(() => {
+            aufloesung = aufloesungsMap(liste, aufloesung);
+        });
+    });
+    const fehlendeBegriffe = $derived(
+        begriffeImCurriculum(curriculum).some(
+            (b) => aufloesungVon(aufloesung, b)?.zustand === "fehlt",
+        ),
+    );
+
+    /** Namen beim Server prüfen — nur ungeprüfte, mit `alle` auch schon geprüfte. */
+    async function pruefeBegriffe(namen, alle = false) {
+        const offen = alle ? namen : ungeprueft(namen, aufloesung);
+        if (!offen.length || !curriculum?.id) return;
+        try {
+            const neu = await aufloesenCurriculumBegriffe(
+                curriculum.id,
+                offen.map((b) => ({ name: b.name, fassung: b.fassung ?? null })),
+            );
+            aufloesung = aufloesungsMap(neu, aufloesung);
+        } catch {
+            // Ohne Prüfung bleibt der Chip „ungeprüft“ — der Name ist trotzdem gespeichert.
+        }
+    }
+
+    // Im Editor wird ein fehlender Begriff in einem neuen Tab angelegt. Zurück im Tab
+    // prüfen wir, was noch nicht gefunden war.
+    function beiRueckkehr() {
+        if (!editMode || document.visibilityState !== "visible") return;
+        const offen = begriffeImCurriculum(curriculum).filter(
+            (b) => aufloesungVon(aufloesung, b)?.zustand !== "gefunden",
+        );
+        pruefeBegriffe(offen, true);
+    }
+
+    function setzeNamen(eintrag, feld, neu) {
+        if (neu.length) eintrag[feld] = neu;
+        else delete eintrag[feld];
+        curriculum.kapitel = [...curriculum.kapitel];
+        onchange();
+        if (feld === "begriffe") pruefeBegriffe(neu);
+    }
 
     // Lokaler State für Edit-Mode
     let showContextMenu = $state(null); // { type: 'kapitel'|'ls'|'eintrag', id: string, x: number, y: number }
@@ -383,6 +452,29 @@
 </script>
 
 <!-- Kontextmenü -->
+{#snippet namenFelder(eintrag)}
+    <NamenChips
+        art="begriffe"
+        namen={eintrag.begriffe ?? []}
+        {aufloesung}
+        {editMode}
+        subjectId={fachId}
+        curriculumId={curriculum?.id}
+        {darfAnlegen}
+        back={rueckweg}
+        onchange={(neu) => setzeNamen(eintrag, "begriffe", neu)}
+    />
+    <NamenChips
+        art="fachmethoden"
+        namen={eintrag.fachmethoden ?? []}
+        lokal={fachmethodenImCurriculum(curriculum)}
+        {editMode}
+        subjectId={fachId}
+        curriculumId={curriculum?.id}
+        onchange={(neu) => setzeNamen(eintrag, "fachmethoden", neu)}
+    />
+{/snippet}
+
 {#if showContextMenu}
     <div role="presentation" class="fixed inset-0 z-50 bg-black/10" onclick={hideMenu}></div>
     <div
@@ -460,6 +552,17 @@
 {/if}
 
 <!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
+<svelte:document onvisibilitychange={beiRueckkehr} />
+
+{#if fehlendeBegriffe}
+    <p class="mb-2 text-xs text-light-tx-2 dark:text-dark-tx-2" data-legende="begriffe">
+        Gestrichelte Begriffe gibt es in der Bibliothek noch nicht.
+        {darfAnlegen
+            ? "Mit „anlegen“ legst du sie für die Fachschaft an."
+            : "Anlegen kann die Fachschaft des Fachs."}
+    </p>
+{/if}
+
 <div class="overflow-x-auto" role="presentation" onclick={hideMenu}>
     <table class="w-full text-left border-collapse text-sm">
         <thead>
@@ -875,6 +978,7 @@
                                         rows="8"
                                         placeholder="Konkretisierungstext"
 ></textarea>
+                                    {@render namenFelder(eintrag)}
                                 {:else}
                                     {#if eintrag.konkretisierung}
                                         <div
@@ -888,6 +992,7 @@
                                             )}
                                         </div>
                                     {/if}
+                                    {@render namenFelder(eintrag)}
                                 {/if}
                             </td>
 
@@ -1053,9 +1158,9 @@
                                 <button
                                     onclick={() =>
                                         addEintrag(kapIndex, lsIndex)}
-                                    class="text-sm text-primary dark:text-dark-bl underline"
+                                    class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                                 >
-                                    + Eintrag
+                                    <Plus class="w-4 h-4" /> Eintrag
                                 </button>
                             </td>
                         </tr>
@@ -1067,9 +1172,9 @@
                                 <button
                                     onclick={() =>
                                         addEintrag(kapIndex, lsIndex)}
-                                    class="text-sm text-primary dark:text-dark-bl underline"
+                                    class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                                 >
-                                    + Neuer Eintrag
+                                    <Plus class="w-4 h-4" /> Neuer Eintrag
                                 </button>
                             </td>
                             <td class="px-3 py-2"></td>
@@ -1091,9 +1196,9 @@
                         <td colspan="5" class="px-3 py-2">
                             <button
                                 onclick={() => addLernsequenz(kapIndex)}
-                                class="text-sm text-primary dark:text-dark-bl underline"
+                                class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                             >
-                                + Lernsequenz hinzufügen
+                                <Plus class="w-4 h-4" /> Lernsequenz hinzufügen
                             </button>
                         </td>
                     </tr>
@@ -1102,9 +1207,9 @@
                         <td colspan="5" class="px-3 py-2">
                             <button
                                 onclick={() => addLernsequenz(kapIndex)}
-                                class="text-sm text-primary dark:text-dark-bl underline"
+                                class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                             >
-                                + Lernsequenz hinzufügen
+                                <Plus class="w-4 h-4" /> Lernsequenz hinzufügen
                             </button>
                         </td>
                     </tr>
@@ -1123,9 +1228,9 @@
                         <p class="mb-2">Keine Kapitel vorhanden</p>
                         <button
                             onclick={addKapitel}
-                            class="text-sm text-primary dark:text-dark-bl underline"
+                            class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                         >
-                            + Erstes Kapitel hinzufügen
+                            <Plus class="w-4 h-4" /> Erstes Kapitel hinzufügen
                         </button>
                     </td>
                 </tr>
@@ -1134,9 +1239,9 @@
                     <td colspan="5" class="px-3 py-2">
                         <button
                             onclick={addKapitel}
-                            class="text-sm text-primary dark:text-dark-bl underline"
+                            class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
                         >
-                            + Kapitel hinzufügen
+                            <Plus class="w-4 h-4" /> Kapitel hinzufügen
                         </button>
                     </td>
                 </tr>

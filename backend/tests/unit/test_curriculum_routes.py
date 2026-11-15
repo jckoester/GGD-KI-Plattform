@@ -52,6 +52,10 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         ("PATCH", "/context/curricula/{curriculum_id}"),      # Titel + Jahrgangsband
         ("POST", "/context/curricula/{curriculum_id}/relink"),
         ("POST", "/context/curricula/new"),                    # leeres Curriculum
+        # 0.44 (AQ): beide lesend, Aufrufer `NamenChips.svelte` / `CurriculumTable.svelte`.
+        # POST nur, weil Namen mit Fassung im Körper stehen — geschrieben wird nichts.
+        ("POST", "/context/curricula/{curriculum_id}/begriffe/aufloesen"),
+        ("GET", "/context/curricula/{curriculum_id}/fachmethoden"),
     }
 
 

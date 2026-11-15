@@ -229,3 +229,96 @@ async def test_yaml_konverter_reicht_die_felder_durch():
     assert erster.begriffe == ["Oxidation", {"name": "Reduktion", "fassung": "Elektronen"}]
     assert erster.fachmethoden == ["Titration"]
     assert (zweiter.begriffe, zweiter.fachmethoden) == ([], [])
+
+
+# ── Schritt 3: Editor-Wege ───────────────────────────────────────────────────
+
+
+async def _lernsequenz(db, cid):
+    tree = await load_curriculum_tree(db, cid)
+    return await db.get(ContextNode, uuid.UUID(str(tree["kapitel"][0]["lernsequenzen"][0]["id"])))
+
+
+async def test_speichern_ueber_den_editor_normalisiert(db, faecher):
+    """Der Editor schreibt die Einträge als Ganzes über `PATCH /context/nodes/{id}`."""
+    from app.context.router import update_node
+    from app.context.schemas import ContextNodeUpdate
+
+    _, chemie = faecher
+    cid = await _curriculum(db, chemie, [CurriculumDraftEntry(konkretisierung="K")])
+    ls = await _lernsequenz(db, cid)
+    meta = dict(ls.metadata_)
+    meta["eintraege"] = [{**meta["eintraege"][0], "begriffe": [" Redox ", {"name": "redox"}, ""],
+                          "fachmethoden": []}]
+    await update_node(ls.id, ContextNodeUpdate(metadata=meta), db=db, user=_user("admin", "teacher"))
+    (eintrag,) = (await db.get(ContextNode, ls.id)).metadata_["eintraege"]
+    assert eintrag["begriffe"] == [{"name": "Redox"}]
+    assert "fachmethoden" not in eintrag
+    assert eintrag["konkretisierung"] == "K"  # alles andere bleibt
+
+
+async def test_endpunkt_loest_frisch_getippte_namen_auf(db, faecher):
+    from app.context.router import begriffe_im_curriculum_aufloesen
+    from app.context.schemas import BegriffeAufloesenAnfrage
+
+    _, chemie = faecher
+    redox = await _begriff(db, _n("Redox"), chemie)
+    cid = await _curriculum(db, chemie, [CurriculumDraftEntry(konkretisierung="K")])
+    anfrage = BegriffeAufloesenAnfrage(namen=[
+        {"name": f" {_n('Redox')} "}, {"name": _n("redox")}, {"name": _n("Neu"), "fassung": "X"}, {"name": "  "}])
+    aus = await begriffe_im_curriculum_aufloesen(cid, anfrage, db=db, user=_user("teacher"))
+    # Jede Schreibweise einzeln — der Editor ordnet die Antwort seinen Chips zu.
+    assert [(a["name"], a["fassung"], a["zustand"]) for a in aus] == [
+        (_n("Redox"), None, "gefunden"), (_n("redox"), None, "gefunden"), (_n("Neu"), "X", "fehlt")]
+    assert aus[0]["node_id"] == str(redox.id)
+
+
+async def test_endpunkte_pruefen_das_lesen(db, faecher):
+    from fastapi import HTTPException
+    from app.context.router import begriffe_im_curriculum_aufloesen, fachmethoden_vorschlaege
+    from app.context.schemas import BegriffeAufloesenAnfrage
+
+    _, chemie = faecher
+    cid = await _curriculum(db, chemie, [CurriculumDraftEntry(konkretisierung="K")])
+    node = await db.get(ContextNode, cid)
+    node.read_scope, node.write_scope, node.write_scope_group_id = "private", "private", None
+    await db.flush()
+    fremd = _user("teacher", sub="jemand-anderes")
+    with pytest.raises(HTTPException) as e:
+        await begriffe_im_curriculum_aufloesen(cid, BegriffeAufloesenAnfrage(namen=[]), db=db, user=fremd)
+    assert e.value.status_code == 403
+    with pytest.raises(HTTPException) as e:
+        await fachmethoden_vorschlaege(cid, q="", db=db, user=fremd)
+    assert e.value.status_code == 403
+    with pytest.raises(HTTPException) as e:
+        await fachmethoden_vorschlaege(uuid.uuid4(), q="", db=db, user=fremd)
+    assert e.value.status_code == 404
+
+
+async def test_fachmethoden_aus_den_curricula_des_fachs(db, faecher):
+    from app.context.router import fachmethoden_vorschlaege
+
+    bio, chemie = faecher
+    cid = await _curriculum(db, chemie, [
+        CurriculumDraftEntry(fachmethoden=["Titration", "Chromatographie"]),
+        CurriculumDraftEntry(fachmethoden=["titration", "Säure-Base-Titration"]),
+    ])
+    # Mehrere Lernsequenzen im Fach — mit nur einer fiel eine falsch geklammerte
+    # `IN`-Liste nicht auf (Abnahme 15.11.2026: `uuid = record`).
+    for i in range(3):
+        db.add(ContextNode(category="knowledge", content_type="lernsequenz", title=f"weitere {i}", status="active",
+                           subject_id=chemie.id, read_scope="school", write_scope="school",
+                           metadata_={"eintraege": [{"fachmethoden": [{"name": "Titration"}]}] if i == 0 else []}))
+    await db.flush()
+    # Eine fremde Lernsequenz eines anderen Fachs zählt nicht mit.
+    db.add(ContextNode(category="knowledge", content_type="lernsequenz", title="fremd", status="active",
+                       subject_id=bio.id, read_scope="school", write_scope="school",
+                       metadata_={"eintraege": [{"fachmethoden": [{"name": "Mikroskopieren"}]}, "kaputt"]}))
+    await db.flush()
+
+    alle = await fachmethoden_vorschlaege(cid, q="", db=db, user=_user("teacher"))
+    assert alle == [{"name": "Titration", "anzahl": 3}, {"name": "Chromatographie", "anzahl": 1},
+                    {"name": "Säure-Base-Titration", "anzahl": 1}]
+    gefiltert = await fachmethoden_vorschlaege(cid, q="tit", db=db, user=_user("teacher"))
+    # Wer mit dem Gesuchten beginnt, steht vorn.
+    assert [m["name"] for m in gefiltert] == ["Titration", "Säure-Base-Titration"]

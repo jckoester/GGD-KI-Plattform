@@ -11,7 +11,7 @@
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
-    import { ArrowLeft } from "lucide-svelte";
+    import { ArrowLeft, FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
 
     let curriculum = $state(null);
     const totalStd = $derived(curriculumStd(curriculum));
@@ -151,7 +151,7 @@
     <!-- Scrollbarer Inhaltsbereich -->
     <div
         bind:this={scrollEl}
-        class="flex-1 overflow-y-auto p-6 pb-16 max-w-4xl mx-auto w-full"
+        class="flex-1 overflow-y-auto p-6 pb-16 w-full"
     >
         {#if loading}
             <LoadingBanner />
@@ -183,79 +183,79 @@
                         {/if}
                     </p>
                 </div>
-                <div bind:this={topActionsEl} class="flex gap-2">
+                <div bind:this={topActionsEl} class="flex flex-wrap justify-end gap-2">
                     {#if curriculum.can_edit}
                         <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"
-                            class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
                                text-white font-medium hover:opacity-90 transition-opacity"
                         >
-                            Bearbeiten
+                            <Pencil class="w-4 h-4" /> Bearbeiten
                         </a>
                         <button
                             onclick={handleRelinkPreview}
                             disabled={relinkBusy}
                             title="Prüft, ob das Curriculum auf die aktuelle Bildungsplan-Fassung aktualisiert werden kann"
-                            class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Bildungsplan aktualisieren
+                            <RefreshCw class="w-4 h-4" /> Bildungsplan aktualisieren
                         </button>
                         <button
                             onclick={() => {
                                 deleteError = null;
                                 confirmDelete = true;
                             }}
-                            class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-re dark:text-dark-re font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                         >
-                            Löschen
+                            <Trash2 class="w-4 h-4" /> Löschen
                         </button>
                     {/if}
                     <button
                         onclick={() => handleExport("yaml")}
                         disabled={exporting}
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        YAML
+                        <FileDown class="w-4 h-4" /> YAML
                     </button>
                     <button
                         onclick={() => handleExport("pdf")}
                         disabled={exporting}
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        PDF
+                        <FileDown class="w-4 h-4" /> PDF
                     </button>
                     <button
                         onclick={() => handleExport("docx")}
                         disabled={exporting}
                         title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        DOCX
+                        <FileDown class="w-4 h-4" /> DOCX
                     </button>
                     <button
                         onclick={() => handleExport("odt")}
                         disabled={exporting}
                         title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx font-medium
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        ODT
+                        <FileDown class="w-4 h-4" /> ODT
                     </button>
                 </div>
             </div>
@@ -290,53 +290,53 @@
             {#if curriculum.can_edit}
                 <a
                     href="/knowledge/curriculum/{curriculum.id}/edit"
-                    class="px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
+                    class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
                            text-white font-medium hover:opacity-90 transition-opacity"
                 >
-                    Bearbeiten
+                    <Pencil class="w-4 h-4" /> Bearbeiten
                 </a>
             {/if}
             <button
                 onclick={() => handleExport("yaml")}
                 disabled={exporting}
-                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx font-medium
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                YAML
+                <FileDown class="w-4 h-4" /> YAML
             </button>
             <button
                 onclick={() => handleExport("pdf")}
                 disabled={exporting}
-                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx font-medium
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                PDF
+                <FileDown class="w-4 h-4" /> PDF
             </button>
             <button
                 onclick={() => handleExport("docx")}
                 disabled={exporting}
                 title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx font-medium
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                DOCX
+                <FileDown class="w-4 h-4" /> DOCX
             </button>
             <button
                 onclick={() => handleExport("odt")}
                 disabled={exporting}
                 title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx font-medium
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                ODT
+                <FileDown class="w-4 h-4" /> ODT
             </button>
         </div>
     {/if}
@@ -368,19 +368,19 @@
                 <button
                     onclick={() => (confirmDelete = false)}
                     disabled={deleting}
-                    class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                            text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
                            disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Abbrechen
+                    <X class="w-4 h-4" /> Abbrechen
                 </button>
                 <button
                     onclick={handleDelete}
                     disabled={deleting}
-                    class="px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-white
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-white
                            hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {deleting ? "Wird gelöscht…" : "Löschen"}
+                    <Trash2 class="w-4 h-4" /> {deleting ? "Wird gelöscht…" : "Löschen"}
                 </button>
             </div>
         </div>
@@ -404,9 +404,9 @@
                 <div class="flex justify-end">
                     <button
                         onclick={() => (relinkPreview = null)}
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
-                    >Schließen</button>
+                    ><X class="w-4 h-4" /> Schließen</button>
                 </div>
             {:else}
                 <p class="text-light-tx-2 dark:text-dark-tx-2 mb-2">
@@ -434,16 +434,16 @@
                     <button
                         onclick={() => (relinkPreview = null)}
                         disabled={relinkBusy}
-                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
                                disabled:opacity-50 disabled:cursor-not-allowed"
-                    >Abbrechen</button>
+                    ><X class="w-4 h-4" /> Abbrechen</button>
                     <button
                         onclick={handleRelinkApply}
                         disabled={relinkBusy}
-                        class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark text-white
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark text-white
                                hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >{relinkBusy ? "Wird angewendet…" : (relinkPreview.mode === "duplicate" ? "Kopie anlegen" : "Aktualisieren")}</button>
+                    ><RefreshCw class="w-4 h-4" /> {relinkBusy ? "Wird angewendet…" : (relinkPreview.mode === "duplicate" ? "Kopie anlegen" : "Aktualisieren")}</button>
                 </div>
             {/if}
         </div>

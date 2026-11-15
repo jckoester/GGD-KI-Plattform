@@ -48,6 +48,7 @@ from app.context.schemas import (
     SearchEnvelope,
     CurriculumRead,
     CurriculumMetaUpdate,
+    BegriffeAufloesenAnfrage,
     CurriculumDraftConfirmed,
     CurriculumCreate,
     FachplanTreeRead,
@@ -939,6 +940,12 @@ async def update_node(
             # den der Planner danach nicht mehr darstellen kann.
             if typ_danach == "unterrichtsstunde":
                 validate_unterrichtsstunde_metadata(update_data["metadata_"] or {})
+            # Begriffe und Fachmethoden am Eintrag (0.44, AQ): dasselbe Format wie im Import,
+            # gleich, ob der Editor oder ein anderer Weg schreibt.
+            if typ_danach == "lernsequenz" and update_data["metadata_"]:
+                from app.context.curriculum_begriffe import eintraege_normalisieren
+
+                update_data["metadata_"] = eintraege_normalisieren(update_data["metadata_"])
         if "content" in update_data:
             validate_node_content(
                 typ_danach,
@@ -1662,6 +1669,56 @@ async def export_curriculum(
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename_base}.pdf"'},
         )
+
+
+async def _lesbares_curriculum(db: AsyncSession, curriculum_id: UUID, user: JwtPayload) -> ContextNode:
+    """Den Curriculum-Knoten holen und das Lesen prüfen — ohne den ganzen Baum."""
+    node = await db.get(ContextNode, curriculum_id)
+    if node is None or node.content_type != "curriculum" or node.status != "active":
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    _check_curriculum_read_permission(
+        {"read_scope": node.read_scope, "owner_pseudonym": node.owner_pseudonym}, user)
+    return node
+
+
+@router.post("/curricula/{curriculum_id}/begriffe/aufloesen", response_model=list[dict])
+async def begriffe_im_curriculum_aufloesen(
+    curriculum_id: UUID,
+    payload: BegriffeAufloesenAnfrage,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Namen gegen die Begriffe des Fachs abgleichen, wie `CurriculumRead.begriffe` (0.44, AQ).
+
+    Für Namen, die im Editor neu dazukommen, und um nach dem Anlegen eines Begriffs neu zu
+    prüfen — der Baum muss dafür nicht neu geladen werden.
+    """
+    from app.context.curriculum_begriffe import namen_aufloesen, namen_normalisieren
+
+    node = await _lesbares_curriculum(db, curriculum_id, user)
+    # Jeder Name für sich normalisiert, nicht zusammengefasst: Der Editor ordnet die Antwort
+    # über Name und Fassung seinen Chips zu — auch „Oxidation“ und „oxidation“ aus zwei Einträgen.
+    paare = list(dict.fromkeys(
+        (e["name"], e.get("fassung")) for n in payload.namen for e in namen_normalisieren([n.model_dump()])))
+    return await namen_aufloesen(db, user, node.subject_id, paare)
+
+
+@router.get("/curricula/{curriculum_id}/fachmethoden", response_model=list[dict])
+async def fachmethoden_vorschlaege(
+    curriculum_id: UUID,
+    q: str = Query("", max_length=200),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Fachmethoden, die in den lesbaren Curricula des Fachs schon stehen (0.44, AQ, Punkt 10).
+
+    Gegen auseinanderlaufende Schreibweisen: `[{name, anzahl}]`, je Name die häufigste
+    Schreibweise, Treffer am Anfang zuerst, dann nach Häufigkeit.
+    """
+    from app.context.curriculum_begriffe import fachmethoden_des_fachs
+
+    node = await _lesbares_curriculum(db, curriculum_id, user)
+    return await fachmethoden_des_fachs(db, user, node.subject_id, q)
 
 
 @router.get("/curricula/{curriculum_id}", response_model=CurriculumRead)

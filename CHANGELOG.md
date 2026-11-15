@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Curriculum: Begriffe und Fachmethoden am Eintrag, als Chips unter der Konkretisierung. Begriffe, die es
+  in der Bibliothek gibt, sind verlinkt; fehlende erscheinen gestrichelt, mehrdeutige gelb mit Auswahl der
+  Fassung. Mitglieder der Fachschaft legen fehlende Begriffe direkt aus dem Curriculum an.
+- Fachmethoden schlagen beim Tippen vor, was in den Curricula des Fachs schon steht.
+- Neuer Baustein: Der Titel lässt sich über die Adresse vorgeben (`?titel=`).
+
+### Geändert
+
+- Curriculum-Editor und -Ansicht: volle Fensterbreite; Knöpfe mit Icons.
+
 ## [0.43.0] – 2026-11-14
 
 ### Neu

@@ -1966,6 +1966,37 @@ export async function getCurriculum(curriculumId) {
   return res.json()
 }
 
+/**
+ * Namen gegen die Begriffe des Curriculum-Fachs abgleichen (0.44, AQ) — Format wie
+ * `curriculum.begriffe`. `namen`: `[{name, fassung?}]`.
+ */
+export async function aufloesenCurriculumBegriffe(curriculumId, namen) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/begriffe/aufloesen`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ namen }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Begriffe konnten nicht geprüft werden')
+  }
+  return res.json()
+}
+
+/** Fachmethoden, die in den Curricula des Fachs schon stehen: `[{name, anzahl}]` (0.44, AQ). */
+export async function getCurriculumFachmethoden(curriculumId, q = '') {
+  const res = await fetch(
+    `${BASE}/context/curricula/${curriculumId}/fachmethoden?q=${encodeURIComponent(q)}`,
+    { credentials: 'include' },
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fachmethoden konnten nicht geladen werden')
+  }
+  return res.json()
+}
+
 export async function updateCurriculumMeta(curriculumId, { title, jahrgangsstufe } = {}) {
   // Titel und Jahrgangsband ändern. Bewusst NICHT über updateContextNode: Das Band steht
   // auch in min_grade/max_grade und in den import_keys des ganzen Baums — der eigene

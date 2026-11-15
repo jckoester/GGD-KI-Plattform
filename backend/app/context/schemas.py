@@ -502,6 +502,16 @@ class CurriculumMetaUpdate(BaseModel):
     jahrgangsstufe: str | None = Field(default=None, min_length=1, max_length=50)
 
 
+class BegriffName(BaseModel):
+    name: str = Field(max_length=500)
+    fassung: str | None = Field(default=None, max_length=500)
+
+
+class BegriffeAufloesenAnfrage(BaseModel):
+    """Namen zum Abgleich gegen die Begriffe eines Curriculum-Fachs (0.44, AQ)."""
+    namen: list[BegriffName] = Field(default_factory=list, max_length=200)
+
+
 class CurriculumRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -133,3 +133,70 @@ async def namen_aufloesen(db: AsyncSession, user, subject_id: int | None,
 async def begriffe_aufloesen(db: AsyncSession, tree: dict, user) -> list[dict]:
     """Die Begriffe aller Einträge eines Curriculums, aufgelöst für `user` — eine Abfrage."""
     return await namen_aufloesen(db, user, tree.get("subject_id"), _begriffe_im_baum(tree))
+
+
+def eintraege_normalisieren(metadata: dict) -> dict:
+    """`metadata` einer Lernsequenz mit normalisierten Feldern an jedem Eintrag (Kopie).
+
+    Für den allgemeinen Schreibweg (`PATCH /context/nodes/{id}`), über den der Editor die
+    Einträge als Ganzes schickt. Andere Schlüssel bleiben unberührt; leere Felder fallen weg.
+    """
+    eintraege = metadata.get("eintraege")
+    if not isinstance(eintraege, list):
+        return metadata
+    neu = []
+    for e in eintraege:
+        if isinstance(e, dict) and any(f in e for f in FELDER):
+            e = {k: v for k, v in e.items() if k not in FELDER} | eintrag_felder(e.get("begriffe"), e.get("fachmethoden"))
+        neu.append(e)
+    return {**metadata, "eintraege": neu}
+
+
+#: Wie viele Vorschläge die Eingabe der Fachmethoden höchstens bekommt.
+FACHMETHODEN_VORSCHLAEGE = 15
+
+_FACHMETHODEN_SQL = sa.text("""
+    SELECT f->>'name' AS name, count(*) AS anzahl
+    FROM context_nodes n
+    CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(n.metadata->'eintraege') = 'array' THEN n.metadata->'eintraege' ELSE '[]' END) e
+    CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(e->'fachmethoden') = 'array' THEN e->'fachmethoden' ELSE '[]' END) f
+    WHERE n.id IN :ids
+      AND jsonb_typeof(f) = 'object' AND coalesce(f->>'name', '') <> ''
+    GROUP BY 1
+""").bindparams(sa.bindparam("ids", expanding=True))
+
+
+async def fachmethoden_des_fachs(db: AsyncSession, user, subject_id: int | None, q: str = "") -> list[dict]:
+    """Fachmethoden aus den Einträgen der lesbaren Curricula eines Fachs, mit Häufigkeit.
+
+    Je Schlüssel (wie beim Abgleich) die häufigste Schreibweise. Gefiltert wird auf `q`
+    (enthält, ohne Groß-/Kleinschreibung); wer damit beginnt, steht vorn.
+    """
+    from app.context.visibility import read_scope_clause
+
+    if subject_id is None:
+        return []
+    ids = list((await db.execute(sa.select(ContextNode.id).where(
+        ContextNode.content_type == "lernsequenz",
+        ContextNode.status == "active",
+        ContextNode.subject_id == subject_id,
+        read_scope_clause(user.sub, getattr(user, "roles", None) or ()),
+    ))).scalars())
+    if not ids:
+        return []
+    zeilen = (await db.execute(_FACHMETHODEN_SQL, {"ids": ids})).all()
+
+    je_schluessel: dict[str, dict[str, int]] = {}
+    for name, anzahl in zeilen:
+        je_schluessel.setdefault(schluessel(name), {})[name] = int(anzahl)
+    gesucht = schluessel(q) if q.strip() else ""
+    aus = []
+    for k, schreibweisen in je_schluessel.items():
+        if gesucht and gesucht not in k:
+            continue
+        name = max(schreibweisen, key=lambda s: (schreibweisen[s], s))
+        aus.append({"name": name, "anzahl": sum(schreibweisen.values()), "_vorn": bool(gesucht) and k.startswith(gesucht)})
+    aus.sort(key=lambda m: (not m["_vorn"], -m["anzahl"], m["name"].casefold()))
+    return [{"name": m["name"], "anzahl": m["anzahl"]} for m in aus[:FACHMETHODEN_VORSCHLAEGE]]

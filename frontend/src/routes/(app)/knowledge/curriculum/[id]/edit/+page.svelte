@@ -17,7 +17,7 @@
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
-    import { ArrowLeft } from "lucide-svelte";
+    import { ArrowLeft, Check, Save, X } from "lucide-svelte";
 
     let curriculum = $state(null);
     let draft = $state(null);
@@ -482,7 +482,7 @@
     <!-- Scrollbarer Inhaltsbereich -->
     <div
         bind:this={scrollEl}
-        class="flex-1 overflow-y-auto p-6 pb-16 max-w-4xl mx-auto w-full"
+        class="flex-1 overflow-y-auto p-6 pb-16 w-full"
     >
         {#if loading}
             <LoadingBanner />
@@ -567,20 +567,22 @@
                     <button
                         onclick={goBack}
                         title={closeTitle}
-                        class="px-4 py-2 text-sm rounded-md
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md
                            border border-light-ui-3 dark:border-dark-ui-3
                            text-light-tx dark:text-dark-tx
                            hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                     >
+                        {#if dirty}<X class="w-4 h-4" />{:else}<Check class="w-4 h-4" />{/if}
                         {closeLabel}
                     </button>
                     <button
                         onclick={save}
                         disabled={saving || !dirty}
-                        class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
                                text-white font-medium hover:opacity-90 transition-opacity
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                        <Save class="w-4 h-4" />
                         {saving ? "Wird gespeichert…" : "Speichern"}
                     </button>
                 </div>
@@ -627,19 +629,21 @@
             <button
                 onclick={goBack}
                 title={closeTitle}
-                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
+                {#if dirty}<X class="w-4 h-4" />{:else}<Check class="w-4 h-4" />{/if}
                 {closeLabel}
             </button>
             <button
                 onclick={save}
                 disabled={saving || !dirty}
-                class="px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
                        text-white font-medium hover:opacity-90 transition-opacity
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
+                <Save class="w-4 h-4" />
                 {saving ? "Wird gespeichert…" : "Speichern"}
             </button>
         </div>
