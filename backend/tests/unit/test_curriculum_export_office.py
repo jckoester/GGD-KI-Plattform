@@ -91,3 +91,38 @@ async def test_querformat_mit_linien(fmt, eintrag, merkmal):
         assert m in xml
     linien = z.read("word/document.xml" if fmt == "docx" else "content.xml").decode()
     assert ("<w:tblBorders>" if fmt == "docx" else "0.5pt solid") in linien
+
+
+# ── 0.44 (AQ, Schritt 5) ─────────────────────────────────────────────────────
+
+
+def _mit_begriffen() -> dict:
+    return _baum([{
+        "konkretisierung": "Redoxreihe",
+        "begriffe": [{"name": "Oxidation", "fassung": "Elektronen"}, {"name": "Reduktion"}],
+        "fachmethoden": [{"name": "Titration"}],
+        "hinweise": f"Grenzwert $\\lim x$ siehe @[BNE](lp:{_U})",
+        "material": "Tabelle $\\vert x \\vert$",
+    }])
+
+
+async def test_begriffe_und_fachmethoden_als_zeilen():
+    text = _klartext(await _docx(_mit_begriffen()))
+    assert "Begriffe: Oxidation (Elektronen), Reduktion" in text
+    assert "Fachmethoden: Titration" in text
+
+
+async def test_formeln_in_hinweisen_und_material_als_word_formel():
+    """Nebenbefund aus Schritt 0: TeX stand als Quelltext in „Hinweise & Material“."""
+    data = await _docx(_mit_begriffen())
+    xml = zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode()
+    assert xml.count("<m:oMath>") == 2
+    text = _klartext(data)
+    assert "\\lim" not in text and "\\vert" not in text
+    assert "BNE" in text and "siehe" in text, "der Verweis hinter der Formel bleibt"
+
+
+async def test_ohne_formel_bleibt_der_hinweis_klartext():
+    """Nur Stücke mit Formel gehen durch Pandoc — `*` bleibt sonst ein Stern."""
+    text = _klartext(await _docx(_baum([{"hinweise": "Punkte *a* und *b*", "material": ""}])))
+    assert "*a*" in text

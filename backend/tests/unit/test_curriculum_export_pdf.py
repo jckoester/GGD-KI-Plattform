@@ -125,3 +125,52 @@ class TestFormelnImPdf:
         e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
         assert "<script>" not in e["ik_items"][0]["html"]
         assert e["ik_items"][0]["html"] == "alert(1)"
+
+
+class TestAQ:
+    """0.44 (Päckchen AQ, Schritt 5): Begriffe, Fachmethoden, Formeln in Hinweisen."""
+
+    @pytest.mark.asyncio
+    async def test_begriffe_und_fachmethoden(self):
+        tree = _tree_with_entry(entry={
+            "begriffe": [{"name": "Oxidation", "fassung": "Elektronen"}, {"name": " Reduktion "}, "x"],
+            "fachmethoden": [{"name": "Titration", "fassung": "fällt weg"}],
+        })
+        e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
+        assert e["begriffe"] == ["Oxidation (Elektronen)", "Reduktion", "x"]
+        assert e["fachmethoden"] == ["Titration"]
+
+    @pytest.mark.asyncio
+    async def test_formel_in_hinweisen_und_material(self):
+        tree = _tree_with_entry(entry={"hinweise": "Grenzwert $\\lim x$ beachten", "material": "Tabelle \\(x\\)"})
+        with patch("app.render.sidecar.render_math", new=AsyncMock(return_value=_MATH_SVG)):
+            e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
+        (h,) = e["hinweise_parts"]
+        (m,) = e["material_parts"]
+        assert "<svg" in h["html"] and "\\lim" not in h["html"] and "beachten" in h["html"]
+        assert "<svg" in m["html"]
+
+    @pytest.mark.asyncio
+    async def test_ohne_formel_kein_html(self):
+        tree = _tree_with_entry(entry={"hinweise": "Punkte *a* und *b*"})
+        e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
+        assert "html" not in e["hinweise_parts"][0]
+
+    @pytest.mark.asyncio
+    async def test_vorlage_gibt_zeilen_und_formeln_aus(self):
+        """Durch die Vorlage: die Zeilen stehen in der Konkretisierung, die Formel als SVG."""
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        import os
+
+        import app.context.curriculum_export as ce
+
+        tree = _tree_with_entry(entry={"konkretisierung": "K", "begriffe": [{"name": "A<b"}],
+                                       "fachmethoden": [{"name": "M"}], "hinweise": "$x$"})
+        with patch("app.render.sidecar.render_math", new=AsyncMock(return_value=_MATH_SVG)):
+            kapitel = await _build_pdf_kapitel(tree)
+        env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(ce.__file__), "templates")),
+                          autoescape=select_autoescape(["html"]))
+        html = env.get_template("curriculum_pdf.html").render(title="T", school_name="", meta={}, kapitel=kapitel)
+        assert "<strong>Begriffe:</strong> A&lt;b" in html
+        assert "<strong>Fachmethoden:</strong> M" in html
+        assert '<svg class="mathjax">' in html and "$x$" not in html

@@ -7,6 +7,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.curriculum_begriffe import FELDER, namen_fuer_export, namen_fuer_yaml
 from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,11 @@ async def build_curriculum_export_dict(db: AsyncSession, tree: dict) -> dict:
                     "hinweise": hinweise_coded,
                     "material": e.get("material") or "",
                 }
+                # Begriffe und Fachmethoden (0.44, AQ): Namen, keine Verweise — die Zielinstanz
+                # löst sie gegen ihre eigene Bibliothek auf. Nur, was belegt ist.
+                for feld in FELDER:
+                    if namen := namen_fuer_yaml(e, feld):
+                        eintrag_out[feld] = namen
                 eintraege_out.append(eintrag_out)
 
             lernsequenzen_out.append({
@@ -291,6 +297,22 @@ def _parse_material_for_pdf(text: str) -> list[dict]:
     return parts
 
 
+def _hat_formel(text: str) -> bool:
+    """Steht im Text eine Formel (`$…$`, `\\(…\\)`, `\\[…\\]`)? Nur solche Stücke laufen durch
+    den Prärenderer — der übrige Text der Hinweise bleibt, wie er im PDF immer stand."""
+    return "$" in text or "\\(" in text or "\\[" in text
+
+
+async def _formeln_in_teilen(teile: list[dict]) -> list[dict]:
+    """Textteile mit Formel bekommen `html` (Formel als SVG, 0.44): vorher stand TeX im PDF."""
+    from app.render.export import render_markdown_inline_for_pdf
+
+    for teil in teile:
+        if teil["kind"] == "text" and _hat_formel(teil["text"]):
+            teil["html"] = await render_markdown_inline_for_pdf(teil["text"])
+    return teile
+
+
 async def _build_pdf_kapitel(tree: dict) -> list[dict]:
     """Reichert die Curriculum-Struktur fürs PDF-Template an.
 
@@ -343,8 +365,10 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
                     "ik_items": ik_items,
                     "pk_items": pk_items,
                     "konkretisierung_html": await render_markdown_for_pdf(e.get("konkretisierung") or ""),
-                    "hinweise_parts": _parse_hinweise_for_pdf(e.get("hinweise") or ""),
-                    "material_parts": _parse_material_for_pdf(e.get("material") or ""),
+                    "begriffe": namen_fuer_export(e, "begriffe"),
+                    "fachmethoden": namen_fuer_export(e, "fachmethoden"),
+                    "hinweise_parts": await _formeln_in_teilen(_parse_hinweise_for_pdf(e.get("hinweise") or "")),
+                    "material_parts": await _formeln_in_teilen(_parse_material_for_pdf(e.get("material") or "")),
                 })
 
             ls_out.append({
@@ -424,16 +448,31 @@ def _liste(texte: list[str]) -> str:
     return "\n".join("- " + " ".join(t.split()) for t in texte)
 
 
-def _hinweise_bloecke(hinweise: str, material: str) -> list[dict]:
+def _formel_inlines(bloecke: list[dict], roh: str) -> list[dict]:
+    """Inlines aus den Pandoc-Blöcken eines Textstücks — Leerraum an den Rändern bleibt,
+    sonst klebte die Formel am folgenden Verweis."""
+    inlines: list[dict] = [{"t": "Space"}] if roh[:1].isspace() else []
+    for b in bloecke:
+        if b.get("t") in ("Para", "Plain"):
+            inlines += b["c"]
+    if roh[-1:].isspace():
+        inlines.append({"t": "Space"})
+    return inlines
+
+
+def _hinweise_bloecke(hinweise: str, material: str, formeln: dict | None = None) -> list[dict]:
     """Hinweise und Material als Klartext wie im PDF: Verweise mit ihrer Beschriftung —
-    Leitperspektive und Kompetenz fett, LP-Aspekt kursiv, Material fett. Kein Markdown."""
+    Leitperspektive und Kompetenz fett, LP-Aspekt kursiv, Material fett. Kein Markdown —
+    außer in Textstücken mit Formel (`formeln`: Text → Inlines, 0.44): Die gehen durch Pandoc,
+    damit die Formel als Formel ankommt statt als TeX."""
     from app.export import office as o
 
+    formeln = formeln or {}
     bloecke = []
     teile = []
     for teil in _parse_hinweise_for_pdf(hinweise):
         if teil["kind"] == "text":
-            teile += o.text(teil["text"])
+            teile += formeln.get(teil["text"]) or o.text(teil["text"])
         elif teil["kind"] == "lpa":
             teile.append({"t": "Emph", "c": o.text(teil["label"])})
         else:
@@ -442,7 +481,8 @@ def _hinweise_bloecke(hinweise: str, material: str) -> list[dict]:
         bloecke.append(o.schlicht(teile))
     teile = []
     for teil in _parse_material_for_pdf(material):
-        teile += o.text(teil["text"]) if teil["kind"] == "text" else [o.fett(o.text(teil["label"]))]
+        teile += ((formeln.get(teil["text"]) or o.text(teil["text"])) if teil["kind"] == "text"
+                  else [o.fett(o.text(teil["label"]))])
     if teile:
         bloecke.append(o.schlicht(teile))
     return bloecke
@@ -471,10 +511,25 @@ async def render_curriculum_office(
                 teile[f"pk{s}"] = _liste(pks)
                 teile[f"ik{s}"] = _liste(iks)
                 teile[f"ko{s}"] = e.get("konkretisierung") or ""
+                # Textstücke mit Formel aus Hinweisen und Material (0.44): mit durch Pandoc.
+                stuecke = [t["text"] for t in (*_parse_hinweise_for_pdf(e.get("hinweise") or ""),
+                                               *_parse_material_for_pdf(e.get("material") or ""))
+                           if t["kind"] == "text" and _hat_formel(t["text"])]
+                for j, stueck in enumerate(stuecke):
+                    teile[f"hf{s}.{j}"] = stueck
                 schluessel.append((s, e))
             lss.append((ls, schluessel))
         gerueste.append((kap, lss))
     bloecke, api = await o.markdown_zu_bloecken(db, teile)
+    formeln = {teile[k]: _formel_inlines(v, teile[k]) for k, v in bloecke.items() if k.startswith("hf")}
+
+    def konkretisierung(s: str, e: dict) -> list:
+        """Konkretisierung, darunter die Zeilen Begriffe und Fachmethoden (0.44, AQ, E5)."""
+        aus = list(bloecke[f"ko{s}"])
+        for feld, label in (("begriffe", "Begriffe:"), ("fachmethoden", "Fachmethoden:")):
+            if namen := namen_fuer_export(e, feld):
+                aus.append(o.schlicht([o.fett(o.text(label)), {"t": "Space"}, *o.text(", ".join(namen))]))
+        return aus
 
     meta = tree.get("metadata", {})
     dok = []
@@ -493,8 +548,8 @@ async def render_curriculum_office(
             dok.append(o.ueberschrift(3, o.text(f"{ls.get('title') or '–'}" + (f" ({std} Std.)" if std else ""))))
             if schluessel:
                 zeilen = [[
-                    bloecke[f"pk{s}"], bloecke[f"ik{s}"], bloecke[f"ko{s}"],
-                    _hinweise_bloecke(e.get("hinweise") or "", e.get("material") or ""),
+                    bloecke[f"pk{s}"], bloecke[f"ik{s}"], konkretisierung(s, e),
+                    _hinweise_bloecke(e.get("hinweise") or "", e.get("material") or "", formeln),
                 ] for s, e in schluessel]
             else:
                 zeilen = [[[o.schlicht(o.text("(keine Einträge)"))], [], [], []]]

@@ -101,6 +101,7 @@
   .konk ul, .konk ol { margin: 0 0 1mm 0; padding-left: 4mm; }
   .konk li { margin-bottom: 0.5mm; }
   .konk code { font-family: "Liberation Mono", monospace; font-size: 8pt; }
+  .konk p.namen { margin: 1mm 0 0 0; }
 
   /* ── Hinweis-/Material-Badges ───────────────────────────────────────────── */
   .badge {
@@ -182,14 +183,19 @@
     </td>
 
     {# ── Konkretisierung (Markdown) ── #}
-    <td class="konk">{{ e.konkretisierung_html | safe }}</td>
+    <td class="konk">{{ e.konkretisierung_html | safe }}
+      {# Begriffe und Fachmethoden (0.44, AQ, E5): Namen als Zeile, keine eigene Spalte. #}
+      {% if e.begriffe %}<p class="namen"><strong>Begriffe:</strong> {{ e.begriffe | join(', ') }}</p>{% endif %}
+      {% if e.fachmethoden %}<p class="namen"><strong>Fachmethoden:</strong> {{ e.fachmethoden | join(', ') }}</p>{% endif %}
+    </td>
 
     {# ── Hinweise & Material ── #}
     <td>
       {% if e.hinweise_parts %}
       <div>
         {% for part in e.hinweise_parts %}
-          {% if part.kind == 'text' %}<span>{{ part.text }}</span>
+          {% if part.kind == 'text' and part.html %}<span>{{ part.html | safe }}</span>
+          {% elif part.kind == 'text' %}<span>{{ part.text }}</span>
           {% elif part.kind == 'lp' %}<span class="badge badge-lp">{{ part.label }}</span>
           {% elif part.kind == 'lpa' %}<span class="lp-aspekt">{{ part.label }}</span>
           {% elif part.kind == 'ik' %}<span class="badge badge-ik">{{ part.label }}</span>
@@ -200,7 +206,8 @@
       {% if e.material_parts %}
       <div style="margin-top:1mm; border-top: 0.3pt solid #ccc; padding-top:1mm;">
         {% for part in e.material_parts %}
-          {% if part.kind == 'text' %}<span style="color:#555">{{ part.text }}</span>
+          {% if part.kind == 'text' and part.html %}<span style="color:#555">{{ part.html | safe }}</span>
+          {% elif part.kind == 'text' %}<span style="color:#555">{{ part.text }}</span>
           {% elif part.kind == 'node' %}<span class="badge badge-node">{{ part.label }}</span>
           {% endif %}
         {% endfor %}

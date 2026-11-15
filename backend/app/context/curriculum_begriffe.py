@@ -306,3 +306,24 @@ def gerueste_zip(titel: str, fach_name: str, liste: dict, stand: str) -> bytes:
     )
     dateien.append(Ausgabedatei(GERUEST_HINWEISE, hinweis.encode("utf-8")))
     return als_zip(dateien)
+
+
+# ── Export (Schritt 5, E5) ───────────────────────────────────────────────────
+
+
+def namen_fuer_export(eintrag: dict, feld: str) -> list[str]:
+    """Die Namen eines Feldes, lesbar: „Oxidation (Elektronen)“ mit gewählter Fassung."""
+    if not isinstance(eintrag, dict) or feld not in FELDER:
+        return []
+    return [_name_mit_fassung(n) for n in namen_normalisieren(eintrag.get(feld), mit_fassung=feld == "begriffe")]
+
+
+def namen_fuer_yaml(eintrag: dict, feld: str) -> list:
+    """Die Namen eines Feldes für den YAML-Austausch: Text, mit Fassung als Objekt.
+
+    Der Import nimmt beide Formen (`CurriculumDraftEntry`); Text hält die Datei lesbar.
+    """
+    if not isinstance(eintrag, dict) or feld not in FELDER:
+        return []
+    return [n if n.get("fassung") else n["name"]
+            for n in namen_normalisieren(eintrag.get(feld), mit_fassung=feld == "begriffe")]

@@ -18,6 +18,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   anzukommen.
 - Wird ein Begriff umbenannt, bleibt der alte Name als Alias erhalten — im Editor, in „Meine Bausteine“ und
   beim Import.
+- Curriculum-Export: Begriffe und Fachmethoden in PDF, DOCX/ODT (als Zeilen unter der Konkretisierung) und YAML.
 
 ### Geändert
 
@@ -28,6 +29,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Bearbeiten eines Fachbegriffs ohne eigene Fachschaft (etwa als Admin) entfernte sein Fach; Curricula und
   Planung fanden ihn danach nicht mehr.
 - Einstellungen → Fachbegriffe listete auch Jahresplanung, Unterrichtseinheiten und -stunden.
+- Curriculum-Export: Formeln in „Hinweise & Material“ erschienen in PDF und DOCX/ODT als TeX-Quelltext.
 
 ## [0.43.0] – 2026-11-14
 

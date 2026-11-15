@@ -322,3 +322,47 @@ async def test_fachmethoden_aus_den_curricula_des_fachs(db, faecher):
     gefiltert = await fachmethoden_vorschlaege(cid, q="tit", db=db, user=_user("teacher"))
     # Wer mit dem Gesuchten beginnt, steht vorn.
     assert [m["name"] for m in gefiltert] == ["Titration", "Säure-Base-Titration"]
+
+
+# ── Schritt 5: Export ────────────────────────────────────────────────────────
+
+
+async def test_yaml_rundreise_traegt_begriffe_und_fachmethoden(db, faecher):
+    """Export → YAML-Text → Konverter → Import: die Namen kommen an, die Zielinstanz löst sie
+    selbst auf (hier dieselbe Datenbank, anderes Band)."""
+    import yaml
+
+    from app.context.curriculum_export import build_curriculum_export_dict
+
+    _, chemie = faecher
+    gefunden = await _begriff(db, _n("Redox"), chemie)
+    cid = await _curriculum(db, chemie, [CurriculumDraftEntry(
+        konkretisierung="K", begriffe=[_n("Redox"), {"name": "Oxidation", "fassung": "Elektronen"}],
+        fachmethoden=["Titration"]), CurriculumDraftEntry(konkretisierung="leer")])
+
+    daten = await build_curriculum_export_dict(db, await load_curriculum_tree(db, cid))
+    erster, zweiter = daten["kapitel"][0]["lernsequenzen"][0]["eintraege"]
+    assert erster["begriffe"] == [_n("Redox"), {"name": "Oxidation", "fassung": "Elektronen"}]
+    assert erster["fachmethoden"] == ["Titration"]
+    assert "begriffe" not in zweiter and "fachmethoden" not in zweiter
+
+    import importlib.util
+    from pathlib import Path
+
+    pfad = Path(__file__).resolve().parents[2] / "scripts" / "import_curriculum.py"
+    spec = importlib.util.spec_from_file_location("_import_curriculum_aq5", pfad)
+    modul = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modul)
+    text = yaml.safe_dump(daten, allow_unicode=True, sort_keys=False)
+    neu = yaml.safe_load(text) | {"jahrgangsstufe": "10"}
+    draft = modul.convert_yaml_to_draft(neu)
+    cid2, _ = await import_curriculum_from_draft(db, draft, "lehrkraft-begriffe")
+    node = await db.get(ContextNode, cid2)
+    node.subject_id = chemie.id
+    await db.flush()
+
+    e = _eintraege(await load_curriculum_tree(db, cid2))[0]
+    assert e["begriffe"] == [{"name": _n("Redox")}, {"name": "Oxidation", "fassung": "Elektronen"}]
+    assert e["fachmethoden"] == [{"name": "Titration"}]
+    aufl = (await get_curriculum(cid2, db=db, user=_user("teacher")))["begriffe"]
+    assert aufl[0]["node_id"] == str(gefunden.id)
