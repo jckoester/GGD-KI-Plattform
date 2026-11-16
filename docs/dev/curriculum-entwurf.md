@@ -210,6 +210,14 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
   `editor`/`assistant` (Prüfbedingung `check_cs_reason`); `set_curriculum_frame` sichert also mit
   `assistant` wie ein Stapel. Der Editor-Weg (`POST /curricula/{id}/undo`) fragt nicht.
 - Kein Commit in den Funktionen; der Chat committet am Ende der Antwort.
+- **Messung:** `backend/scripts/curriculum_assistent_messung.py` mit
+  `scripts/szenarien/curriculum_assistent.yaml` (je Lauf ein Mess-Curriculum aus einer Vorlage,
+  danach gelöscht; `--selbsttest` ohne Schreiben, `--trocken` ohne Modellaufrufe). Argumente und
+  Ergebnisse der Funktionen liest sie aus dem Messkanal `vorab_debug` (Feld `curriculum`, nur
+  außerhalb der Produktion).
+- **Bereich einer Kompetenz** (`bereich_von` in `curriculum_abdeckung.py`): `thematische_gruppe`,
+  sonst die letzte Überschrift im `breadcrumb` („3.1.7 Optik“) — `thematische_gruppe` ist in den
+  meisten Fächern leer. Gilt für die Abdeckung und `get_bp_competences`.
 - **Funktionsantworten bleiben nicht im Verlauf.** Gespeichert wird nur der Antworttext
   (`messages.content`, dazu `werkzeuge_mit_wirkung`); Kennungen aus einem früheren Lesen kennt
   das Modell in der nächsten Nachricht nicht mehr. Wer nach einer Zustimmung schreibt, liest

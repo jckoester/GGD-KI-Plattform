@@ -30,7 +30,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.curriculum_abdeckung import (
-    FEHLT, PARTIELL, _sortschluessel, _text, abdeckung, kompetenzen_des_bands,
+    FEHLT, PARTIELL, _sortschluessel, _text, abdeckung, bereich_von, kompetenzen_des_bands,
 )
 from app.context.curriculum_begriffe import begriffe_aufloesen, eintrag_felder, namen_normalisieren
 from app.context.curriculum_entwurf import ENTWURF
@@ -73,7 +73,13 @@ def _nr(ref: dict, nr_feld: str) -> str | None:
     return ref.get(nr_feld) if isinstance(ref, dict) else (ref if isinstance(ref, str) else None)
 
 
-def _eintrag_kompakt(e: dict, i: int, zustand: dict) -> dict:
+def _fassungen(kandidaten: list[dict]) -> list[str]:
+    """Die wählbaren Fassungen eines mehrdeutigen Begriffs, zum Nennen (gewählt wird im Editor)."""
+    return [f"{k.get('fassung') or k.get('titel')}{f' ({k['fach']})' if k.get('fach') else ''}"
+            for k in kandidaten]
+
+
+def _eintrag_kompakt(e: dict, i: int, zustand: dict, kandidaten: dict | None = None) -> dict:
     ik = [r for r in (e.get("ik") or []) if isinstance(r, (dict, str))]
     aus: dict[str, Any] = {"eintrag": i}
     if voll := [n for r in ik if not (isinstance(r, dict) and r.get("partiell")) and (n := _nr(r, "nr"))]:
@@ -86,8 +92,14 @@ def _eintrag_kompakt(e: dict, i: int, zustand: dict) -> dict:
         if e.get(f):
             aus[f] = e[f]
     if b := namen_normalisieren(e.get("begriffe")):
-        aus["begriffe"] = [{"name": x["name"], **({"fassung": x["fassung"]} if x.get("fassung") else {}),
-                            "zustand": zustand.get((x["name"], x.get("fassung")), "fehlt")} for x in b]
+        aus["begriffe"] = []
+        for x in b:
+            schluessel = (x["name"], x.get("fassung"))
+            z = zustand.get(schluessel, "fehlt")
+            aus["begriffe"].append({
+                "name": x["name"], **({"fassung": x["fassung"]} if x.get("fassung") else {}), "zustand": z,
+                **({"fassungen": _fassungen(kandidaten[schluessel])}
+                   if z == "mehrdeutig" and (kandidaten or {}).get(schluessel) else {})})
     if f := namen_normalisieren(e.get("fachmethoden"), mit_fassung=False):
         aus["fachmethoden"] = [x["name"] for x in f]
     return aus
@@ -102,6 +114,7 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
     tree = await load_curriculum_tree(db, cur.id)
     aufl = await begriffe_aufloesen(db, tree, user)
     zustand = {(a["name"], a.get("fassung")): a["zustand"] for a in aufl}
+    kandidaten = {(a["name"], a.get("fassung")): a["kandidaten"] for a in aufl if a.get("kandidaten")}
     meta = tree.get("metadata") or {}
     kapitel = []
     for k_pos, k in enumerate(tree.get("kapitel") or [], 1):
@@ -110,7 +123,7 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
             lm = ls.get("metadata") or {}
             lss.append({"id": str(ls["id"]), "position": l_pos, "titel": ls.get("title") or "",
                         "std": als_stundenzahl(lm.get("std")),
-                        "eintraege": [_eintrag_kompakt(e, i, zustand)
+                        "eintraege": [_eintrag_kompakt(e, i, zustand, kandidaten)
                                       for i, e in enumerate(lm.get("eintraege") or [], 1) if isinstance(e, dict)]})
         km = k.get("metadata") or {}
         kapitel.append({"id": str(k["id"]), "position": k_pos, "titel": k.get("title") or "",
@@ -137,7 +150,7 @@ def _bereich_von_bis(nrs: list[str]) -> str:
 def _gruppen(knoten: list[ContextNode]) -> dict[str, list[ContextNode]]:
     gruppen: dict[str, list[ContextNode]] = {}
     for k in sorted(knoten, key=lambda k: _sortschluessel((k.metadata_ or {}).get("kompetenz_nr"))):
-        gruppen.setdefault((k.metadata_ or {}).get("thematische_gruppe") or "ohne Bereich", []).append(k)
+        gruppen.setdefault(bereich_von(k.metadata_ or {}) or "ohne Bereich", []).append(k)
     return gruppen
 
 

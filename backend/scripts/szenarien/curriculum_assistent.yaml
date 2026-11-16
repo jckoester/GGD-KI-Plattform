@@ -1,0 +1,269 @@
+# Messung des Curriculum-Assistenten (0.46, Päckchen AP Teil B, Schritt 7).
+#
+#   python scripts/curriculum_assistent_messung.py --datei scripts/szenarien/curriculum_assistent.yaml --selbsttest
+#   python scripts/curriculum_assistent_messung.py --datei scripts/szenarien/curriculum_assistent.yaml \
+#       --modell chat-komplex --laeufe 3 --verlauf <Vault>/Plaene/Messungen-Curriculum/lauf1-komplex.md
+#
+# Grundlage: Physik, Klasse 7/8, Bildungsplan 2016.V3 (43 IK in 3.1.1–3.1.8, PK 2.1–2.4). Die
+# V2-Fassung nummeriert dasselbe Band als 3.2.x — daran prüft „alte-folge-v2“, dass keine alte
+# Nummer übernommen wird.
+#
+# **Je Lauf ein eigenes Curriculum:** Das Skript legt es aus `vorlagen` an (über die Funktionen
+# des Assistenten, als Mess-Lehrkraft in der Fachschaft Physik), spielt die Züge in einer neuen
+# Konversation und löscht danach das Curriculum, Kopien davon und die Konversation.
+#
+# Felder je Zug (alle optional außer `text`):
+#   muss / nicht       Funktionen, die in diesem Zug aufgerufen bzw. nicht aufgerufen werden
+#   muss_eine          mindestens eine dieser Funktionen
+#   antwort / antwort_nicht   reguläre Ausdrücke (ohne Groß-/Kleinschreibung) für den Text
+#   inhalt / rahmen    `gleich` oder `geaendert` — Kapitel/Lernsequenzen/Einträge bzw.
+#                      Rahmenangaben nach dem Zug gegenüber vorher
+# Felder je Fall unter `ende` (Stand nach dem letzten Zug):
+#   rahmen_enthaelt    Teilmenge der Rahmenangaben
+#   kapitel_weg        kein Kapitel mit diesem Titel mehr
+#   kapitel_titel      {Position: Titel}
+#   nur_kapitel        nur dieses Kapitel (Titel vorher) hat sich geändert
+#   getauscht          [a, b]: Kapitel a und b des letzten Prüflaufs aus Zug 1 stehen vertauscht
+#   bezug              Die Konversation hängt am Mess-Curriculum
+#   kopie              Ein Entwurf als Kopie ist entstanden
+# `alte_nummern: true`: Kompetenznummern aus den Texten der Lehrkraft dürfen in keinem Aufruf
+# stehen (eingefügtes altes Curriculum).
+#
+# Automatisch für jeden Lauf: Prüflauf vor jedem Schreiben, frisch gelesen vor dem Ändern von
+# Bestehendem, keine Funktionsnamen und Kennungen im Text, Kompetenznummern im Text nur aus dem
+# Band (oder von der Lehrkraft genannt), Stundenzahlen im Text nur aus Funktionsantworten oder
+# von der Lehrkraft. `erwartung` beurteilt Jan im Verlauf (Kästchen).
+
+lehrkraft_der_gruppe: 33
+curriculum:
+  fach: Physik
+  jahrgangsstufe: "7/8"
+  bp_version: "2016.V3"
+
+assistent:
+  name: Curriculum-Entwurf (Messung)
+  prompt: config/prompts/curriculum_assistent.md
+  vorlage: Curriculum-Entwurf      # Beschreibung, Fähigkeit, Marke wie der geseedete
+
+vorlagen:
+  leer: {}
+
+  leer_mit_stunden:
+    rahmen: {wochenstunden: {"7": 2, "8": 2}}
+
+  bestehend: &bestehend
+    rahmen: {wochenstunden: {"7": 2, "8": 2}, lehrwerk: Impulse Physik 7/8}
+    operationen:
+      - {op: kapitel_anlegen, titel: "Einführung: Akustik", ref: k1}
+      - {op: lernsequenz_anlegen, kapitel_id: k1, titel: Schall erzeugen und ausbreiten, std: 8, ref: l11}
+      - {op: eintrag_anlegen, lernsequenz_id: l11, ik: ["3.1.2(1)", "3.1.2(2)"], pk: ["2.2(1)"],
+         konkretisierung: Stimmgabel, Saiten, Lautsprecher; Schall braucht ein Medium, begriffe: [Schall, Frequenz]}
+      - {op: lernsequenz_anlegen, kapitel_id: k1, titel: Lärm und Gehör, std: 4, ref: l12}
+      - {op: eintrag_anlegen, lernsequenz_id: l12, ik: ["3.1.2(5)"], pk: ["2.4(3)"], konkretisierung: Lärmmessung im Schulhaus}
+      - {op: kapitel_anlegen, titel: Messgeräte entwickeln, ref: k2}
+      - {op: lernsequenz_anlegen, kapitel_id: k2, titel: Ein Thermometer bauen, std: 8, ref: l21}
+      - {op: eintrag_anlegen, lernsequenz_id: l21, ik: ["3.1.3(1)", "3.1.3(2)", "3.1.3(3)"], konkretisierung: Celsiusskala festlegen}
+      - {op: lernsequenz_anlegen, kapitel_id: k2, titel: Messgeräte beurteilen, std: 4, ref: l22}
+      - {op: eintrag_anlegen, lernsequenz_id: l22, ik: ["3.1.3(4)"], pk: ["2.2(9)"]}
+      - {op: kapitel_anlegen, titel: Optik, ref: k3}
+      - {op: lernsequenz_anlegen, kapitel_id: k3, titel: Licht und Sehen, std: 6, ref: l31}
+      - {op: eintrag_anlegen, lernsequenz_id: l31, ik: ["3.1.7(1)", "3.1.7(2)"], begriffe: [Lichtquelle, Lichtstrahl]}
+      - {op: lernsequenz_anlegen, kapitel_id: k3, titel: Schatten und Finsternisse, std: 6, ref: l32}
+      - {op: eintrag_anlegen, lernsequenz_id: l32, ik: ["3.1.7(3)", "3.1.7(4)"]}
+      - {op: lernsequenz_anlegen, kapitel_id: k3, titel: Reflexion, std: 4, ref: l33}
+      - {op: eintrag_anlegen, lernsequenz_id: l33, ik: ["3.1.7(6)"], pk: ["2.1(4)"]}
+      - {op: kapitel_anlegen, titel: "Mechanik: Kinematik", ref: k4}
+      - {op: lernsequenz_anlegen, kapitel_id: k4, titel: Bewegungen beschreiben, std: 10, ref: l41}
+      - {op: eintrag_anlegen, lernsequenz_id: l41, ik: ["3.1.5(1)", "3.1.5(2)", "3.1.5(4)"], pk: ["2.1(8)"]}
+
+  veroeffentlicht:
+    <<: *bestehend
+    status: active
+
+  bestehend_editor:
+    <<: *bestehend
+    # Danach eine Speicherung „im Editor“ (Stand mit Grund `editor`): Kapitel 3 umbenannt.
+    editor_aenderung: {kapitel: 3, titel: Licht und Sehen im Alltag}
+
+faelle:
+  - id: leer-ohne-wochenstunden
+    vorlage: leer
+    zuege:
+      - text: Hilf mir, das Physik-Curriculum für Klasse 7/8 aufzubauen.
+        nicht: [check_curriculum_operations, apply_curriculum_operations]
+        antwort: [Wochenstunde]
+        inhalt: gleich
+      - text: >-
+          In Klasse 7 haben wir zwei, in Klasse 8 auch zwei Wochenstunden. Wir arbeiten mit
+          Impulse Physik. Beschlüsse und Absprachen später. Eine alte Kapitelfolge haben wir nicht.
+        muss: [set_curriculum_frame]
+        nicht: [apply_curriculum_operations]
+        rahmen: geaendert
+        inhalt: gleich
+      - text: Passt so, leg das Gerüst an.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      rahmen_enthaelt: {wochenstunden: {"7": 2, "8": 2}}
+    erwartung: >-
+      Fragt zuerst nach den Wochenstunden (dabei einmal nach Lehrwerk, Beschlüssen, alter
+      Kapitelfolge), schlägt noch kein Gerüst vor. Hält die Antwort ohne Rückfrage fest, sagt das
+      in einem Satz und schlägt dann ein Gerüst vor: Kapitel mit Lernsequenzen und Stunden als
+      Tabelle, mit Bereichen des Bildungsplans, verplant/verplanbar/rest aus dem Prüflauf
+      (120 verplanbar). Kein Gerüst aus dem Lehrwerk abgeleitet. Schreibt erst nach „leg an“.
+
+  - id: zustimmung-mit-aenderung
+    vorlage: leer_mit_stunden
+    zuege:
+      - text: >-
+          Schlag mir ein Gerüst für unser Curriculum vor. Eine alte Kapitelfolge gibt es nicht,
+          Lehrwerk und Beschlüsse trage ich später nach.
+        muss: [check_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Ja, aber tausch Kapitel 2 und 3.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      getauscht: [2, 3]
+    erwartung: >-
+      Zeigt ein Gerüst mit Stundenbilanz aus dem Prüflauf. Arbeitet „tausch 2 und 3“ ein und
+      schreibt ohne erneute Rückfrage (die Änderung ist eindeutig); nennt danach verplant und rest.
+
+  - id: ein-kapitel-ueberarbeiten
+    vorlage: bestehend
+    zuege:
+      - text: >-
+          Im Kapitel Optik fehlen mir die Brechung, Linsen und die Zerlegung von weißem Licht.
+          Ergänze das bitte.
+        muss: [check_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Ja, so übernehmen.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      nur_kapitel: Optik
+    erwartung: >-
+      Schlägt für das Kapitel Optik Ergänzungen mit 3.1.7(7), 3.1.7(8), 3.1.7(9) vor (Nummer und
+      kurzer Text), mit Stunden aus dem Prüflauf. Ändert nichts außerhalb von Optik. Liest vor dem
+      Schreiben frisch.
+
+  - id: kapitel-loeschen
+    vorlage: bestehend
+    zuege:
+      - text: Das Kapitel „Messgeräte entwickeln“ brauchen wir nicht mehr, lösch es bitte.
+        muss: [check_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        antwort: ["2 Lernsequenzen|zwei Lernsequenzen"]
+        inhalt: gleich
+      - text: Ja, löschen.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      kapitel_weg: Messgeräte entwickeln
+    erwartung: >-
+      Nennt vor dem Löschen, was mit verschwindet (2 Lernsequenzen, 2 Einträge, 12 Stunden), fragt
+      nach Zustimmung; danach neue Bilanz (rest steigt um 12). Bietet nicht an, die Stunden zu füllen.
+
+  - id: nach-dem-buch
+    vorlage: leer_mit_stunden
+    zuege:
+      - text: >-
+          Wir arbeiten mit Impulse Physik 7/8 und gehen einfach nach dem Buch vor. Mach daraus
+          bitte das Curriculum.
+        nicht: [check_curriculum_operations, apply_curriculum_operations]
+        antwort: [Kapitel]
+        inhalt: gleich
+      - text: >-
+          Die Kapitel im Buch sind: 1 Akustik, 2 Temperatur und Thermometer, 3 Energie,
+          4 Bewegungen, 5 Kräfte, 6 Licht und Schatten, 7 Spiegel und Linsen, 8 Magnetismus.
+        muss: [check_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+    erwartung: >-
+      Sagt, dass er den Inhalt des Buchs nicht kennt, und bittet um Kapitel und Reihenfolge —
+      plant nicht aus dem Titel. Danach ein Gerüst in der Reihenfolge des Buchs mit Stunden aus
+      dem Prüflauf und den Bereichen des Bildungsplans; wartet auf Zustimmung.
+
+  - id: alte-folge-v2
+    vorlage: leer_mit_stunden
+    alte_nummern: true
+    zuege:
+      - text: |-
+          Hier unser altes Curriculum (noch Bildungsplan V2). Bau bitte darauf auf:
+          1. Akustik – 10 Std. (3.2.2(1), 3.2.2(3))
+          2. Optik – 18 Std. (3.2.2(2), 3.2.2(4)–(9))
+          3. Energie – 12 Std. (3.2.3(1)–(5))
+          4. Magnetismus – 8 Std. (3.2.4(1)–(4))
+          5. Kinematik – 10 Std. (3.2.6(1)–(4))
+          6. Dynamik – 14 Std. (3.2.7(1)–(9))
+        muss: [check_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Ja, leg das Gerüst so an.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    erwartung: >-
+      Übernimmt Reihenfolge und Stunden (72 verplant), ordnet die Kapitel den Bereichen von V3
+      zu (3.1.x) und sagt, dass die alten Nummern nicht übernommen werden. Weist auf V3-Bereiche
+      hin, die im alten Plan fehlen (etwa Messgeräte entwickeln).
+
+  - id: abgewiesene-nummer
+    vorlage: bestehend
+    zuege:
+      - text: Ergänze in der Lernsequenz „Bewegungen beschreiben“ bitte noch die Kompetenz 3.1.9(2).
+        muss_eine: [check_curriculum_operations, get_bp_competences]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+    erwartung: >-
+      Stellt fest, dass es 3.1.9(2) in Physik 7/8 (V3) nicht gibt, sagt es und bietet passende
+      Nummern aus 3.1.5/3.1.6 an. Zeigt keinen Vorschlag mit der falschen Nummer.
+
+  - id: rueckgaengig-nach-editor
+    vorlage: bestehend_editor
+    zuege:
+      - text: Nimm bitte die letzte Änderung zurück.
+        nicht: [apply_curriculum_operations]
+        antwort: ["Editor"]
+        inhalt: gleich
+      - text: Ja, nimm sie zurück.
+        muss: [undo_last_curriculum_change]
+        inhalt: geaendert
+    ende:
+      kapitel_titel: {3: Optik}
+    erwartung: >-
+      Sagt vor dem Zurücknehmen, dass die letzte Änderung aus dem Editor stammt und von wann, und
+      fragt nach. Nach „ja“ zurückgenommen; nennt, was (Inhalte: der Titel von Kapitel 3).
+
+  - id: einstieg-ohne-bezug
+    vorlage: bestehend
+    bezug: false
+    zuege:
+      - text: Ich möchte am Physik-Curriculum für Klasse 7/8 weiterarbeiten.
+        muss: [finde_curriculum, waehle_curriculum]
+        nicht: [apply_curriculum_operations, lege_curriculum_an]
+        inhalt: gleich
+    ende:
+      bezug: true
+    erwartung: >-
+      Findet und wählt das Curriculum ohne Rückfrage (es gibt genau eines), liest es nicht ein
+      zweites Mal, nennt kurz den Stand (vier Kapitel mit Stunden, Abdeckung in Zahlen) und fragt,
+      woran gearbeitet werden soll.
+
+  - id: veroeffentlicht-kopieren
+    vorlage: veroeffentlicht
+    zuege:
+      - text: Im Kapitel Kinematik fehlt mir noch die Geschwindigkeit als Thema, ergänze das bitte.
+        nicht: [apply_curriculum_operations, waehle_curriculum]
+        antwort: [Entwurf]
+        inhalt: gleich
+      - text: Ja, leg eine Kopie als Entwurf an.
+        muss: [waehle_curriculum]
+        inhalt: gleich
+    ende:
+      kopie: true
+    erwartung: >-
+      Erklärt, dass das Curriculum veröffentlicht ist und nur über eine Kopie als Entwurf geändert
+      wird, und fragt. Legt die Kopie erst nach „ja“ an und arbeitet dann in der Kopie weiter
+      (Vorschlag mit Prüflauf, noch ohne Schreiben).

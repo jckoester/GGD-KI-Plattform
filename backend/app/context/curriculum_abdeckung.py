@@ -100,6 +100,17 @@ async def kompetenzen_des_bands(db: AsyncSession, cur: ContextNode) -> tuple[lis
     return list(iks), list(pks)
 
 
+def bereich_von(meta: dict) -> str:
+    """Der Bereich einer Kompetenz: `thematische_gruppe`, sonst die letzte Überschrift im
+    `breadcrumb` (etwa „3.1.7 Optik“). `thematische_gruppe` ist in den meisten Fächern leer
+    (Stand 16.11.2026 nur Mathematik V3 und einzelne V3-Fassungen); ohne Rückfall fiele dort
+    alles in einen Bereich ohne Namen."""
+    if gruppe := (meta.get("thematische_gruppe") or "").strip():
+        return gruppe
+    pfad = meta.get("breadcrumb")
+    return str(pfad[-1]).strip() if isinstance(pfad, list) and pfad else ""
+
+
 async def abdeckung(db: AsyncSession, tree: dict) -> dict:
     """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
     cur = await db.get(ContextNode, tree["id"])
@@ -141,13 +152,13 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
             eintrag["anderswo"] = andere
             if zustand == FEHLT:
                 zaehler["fehlt_anderswo"] += 1
-        gruppen.setdefault(meta.get("thematische_gruppe") or "", []).append(eintrag)
+        gruppen.setdefault(bereich_von(meta), []).append(eintrag)
 
     pk_gruppen: dict[str, list[dict]] = {}
     for k in sorted(pks, key=lambda k: _sortschluessel((k.metadata_ or {}).get("kompetenz_nr"))):
         meta = k.metadata_ or {}
         nr = meta.get("kompetenz_nr")
-        pk_gruppen.setdefault(meta.get("thematische_gruppe") or "", []).append(
+        pk_gruppen.setdefault(bereich_von(meta), []).append(
             {"node_id": str(k.id), "nr": nr, "titel": _text(k.title, nr),
              "anzahl": len(gefoerdert.get(k.id, ()))})
 

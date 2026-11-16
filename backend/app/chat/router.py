@@ -434,6 +434,7 @@ def _vorab_debug_ereignis(
     systemtext: Optional[dict] = None,
     druck: Optional[dict] = None,
     lehrkraft: Optional[dict] = None,
+    curriculum: Optional[list[dict]] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -479,8 +480,11 @@ def _vorab_debug_ereignis(
         "druck": druck,
         # Schritt 10 A: Lehrkraft-Behauptung — Treffer, Quelle, Abstände, Anweisung gesetzt.
         "lehrkraft": lehrkraft,
+        # 0.46: Aufrufe der Curriculum-Funktionen mit Argumenten und Ergebnis — der Strom trägt
+        # sonst nur Namen; die Messung prüft daran Prüflauf vor Schreiben und Abgewiesenes.
+        "curriculum": list(curriculum or []),
     }
-    return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
+    return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False, default=str)}\n\n"
 
 
 def _team_id_for_user(payload: JwtPayload) -> str | None:
@@ -2583,6 +2587,9 @@ async def chat(
         _suchanfragen: list[str] = []
         # … und die Aufrufe von `list_context_nodes` (Filter + Umfang), ebenso nur dort.
         _aufzaehlungen: list[dict] = []
+        # … und die Aufrufe der Curriculum-Funktionen mit Argumenten und Ergebnis (0.46,
+        # Messung des Curriculum-Assistenten), ebenso nur dort.
+        _curriculum_aufrufe: list[dict] = []
         cost_usd: Optional[float] = None
         # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
         # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
@@ -2792,6 +2799,13 @@ async def chat(
                     except Exception:
                         logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
                         tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
+                    if "curriculum_planning" in tool.groups and settings.environment != "production":
+                        try:
+                            _cargs = json.loads("".join(_tc_args) or "{}")
+                        except ValueError:
+                            _cargs = {"_roh": "".join(_tc_args)}
+                        _curriculum_aufrufe.append({"tool": _tc_name, "runde": _round + 1,
+                                                    "args": _cargs, "ergebnis": tool_result})
 
                     # Die Chatseite zeigt Fach und Gruppe über dem Eingabefeld — ohne dieses
                     # Ereignis stimmte die Anzeige nach `waehle_stunde` erst nach dem Neuladen.
@@ -3110,6 +3124,7 @@ async def chat(
              "andere_assistenten": andere_namen(_andere)},
             druck.debug() if druck is not None else None,
             lehrkraft.debug() if lehrkraft is not None else None,
+            _curriculum_aufrufe,
         )
         if _debug:
             yield _debug

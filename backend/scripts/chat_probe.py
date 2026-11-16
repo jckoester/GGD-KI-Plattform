@@ -41,7 +41,7 @@ def frage_stellen(
     client: httpx.Client, frage: str, *, assistent: int | None, gruppe: int | None,
     modell: str | None = None, stunde: str | None = None, fach: int | None = None,
     verlauf: list[dict] | None = None, konversation: str | None = None,
-    produkte: list[str] | None = None,
+    produkte: list[str] | None = None, curriculum: str | None = None,
 ) -> dict:
     """Eine Frage senden und den Rohstrom auswerten.
 
@@ -68,6 +68,9 @@ def frage_stellen(
     # dem Assistenten kommt.
     if fach is not None and gruppe is None and konversation is None:
         rumpf["subject_id"] = fach
+    # Curriculumbezug (0.46) — nur beim Anlegen, wie der Stundenbezug.
+    if curriculum is not None and konversation is None:
+        rumpf["curriculum_node_id"] = curriculum
     if modell is not None:
         rumpf["model_id"] = modell
     # Produkte aus der Werkstatt (0.41, Schritt 10) — nur beim Anlegen einer Konversation.

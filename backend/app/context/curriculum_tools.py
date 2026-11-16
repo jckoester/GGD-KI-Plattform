@@ -64,7 +64,8 @@ async def _get_curriculum_draft(args: dict, ctx: ToolContext) -> dict:
 _registriere(
     "get_curriculum_draft", _get_curriculum_draft,
     "Das Curriculum mit Rahmenangaben, Kapiteln, Lernsequenzen und Einträgen. Kompetenzen als "
-    "Nummern (ik, ik_teilweise, pk); Begriffe mit zustand (gefunden, fehlt, mehrdeutig). "
+    "Nummern (ik, ik_teilweise, pk); Begriffe mit zustand (gefunden, fehlt, mehrdeutig — dann "
+    "fassungen: die wählbaren; gewählt wird im Editor). "
     "Kennungen (id) und Eintragsnummern brauchst du für apply_curriculum_operations. "
     "status 'draft' = Entwurf; in andere schreibst du nicht.",
 )

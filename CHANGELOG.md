@@ -28,6 +28,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Behoben
 
 - Abdeckung eines Curriculums zählt keine abgelösten Doppel von Kompetenzen derselben Fassung mehr.
+- Abdeckung eines Curriculums gliedert die Kompetenzen auch in Fächern ohne thematische Gruppen nach
+  den Abschnitten des Bildungsplans (etwa „3.1.7 Optik“).
 
 ### Nach dem Update
 

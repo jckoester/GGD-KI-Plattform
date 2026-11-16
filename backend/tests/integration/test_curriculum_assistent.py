@@ -440,3 +440,28 @@ async def test_anlegen_nur_mit_fachplan_und_ohne_doppel(db, welt):
     fremd = await TOOL_REGISTRY["lege_curriculum_an"].handler(
         {"fach": "Physik", "jahrgangsstufe": "5"}, ToolContext(db=db, user=FREMDE, group_id=None, conversation_id=None))
     assert "error" in fremd
+
+
+async def test_mehrdeutiger_begriff_nennt_die_fassungen(db, welt):
+    for fassung in ("Mechanik", "Alltag"):
+        db.add(ContextNode(category="concept", content_type="begriff", title="Kraft", status="active",
+                           subject_id=welt["fach"].id, read_scope="school", write_scope="school",
+                           owner_pseudonym="system", metadata_={"fassung": fassung}))
+    await db.flush()
+    await _ruf("apply_curriculum_operations", db, welt, operations=[
+        {"op": "eintrag_aendern", "lernsequenz_id": str(welt["ls"].id), "eintrag": 1, "begriffe": ["Kraft"]}])
+    (b,) = (await _ruf("get_curriculum_draft", db, welt))["kapitel"][0]["lernsequenzen"][0]["eintraege"][0]["begriffe"]
+    assert b["zustand"] == "mehrdeutig"
+    assert sorted(b["fassungen"]) == [f"Alltag ({welt['fach'].name})", f"Mechanik ({welt['fach'].name})"]
+
+
+async def test_bereich_aus_dem_breadcrumb(db, welt):
+    """In den meisten Fächern ist `thematische_gruppe` leer — dann gilt die letzte Überschrift."""
+    k = _komp(welt["fach"], "ik_kompetenz", "3.2.3(1)", "", "Wärme leiten", min_grade=7, max_grade=8)
+    k.metadata_ = {**k.metadata_, "breadcrumb": ["BP", "3.2 Klassen 7/8", "3.2.3 Wärme"]}
+    db.add(k)
+    await db.flush()
+    ueber = await _ruf("get_bp_competences", db, welt)
+    assert {b["bereich"] for b in ueber["ik"]["bereiche"]} == {"Optik", "Mechanik", "3.2.3 Wärme"}
+    waerme = await _ruf("get_bp_competences", db, welt, bereich="wärme")
+    assert waerme["bereiche"][0]["kompetenzen"] == [{"nr": "3.2.3(1)", "text": "Wärme leiten"}]
