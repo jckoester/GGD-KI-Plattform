@@ -132,3 +132,24 @@ async def test_entwurf_mit_vermerk_veroeffentlichtes_ohne():
     """0.45: Ein Entwurf trägt „Entwurf, Stand …“ unter dem Titel."""
     assert "Entwurf, Stand" in _klartext(await _docx({**_baum(), "status": "draft"}))
     assert "Entwurf" not in _klartext(await _docx({**_baum(), "status": "active"}))
+
+
+# ── 0.46 (AP Teil B, Schritt 4): Rahmen ──────────────────────────────────────
+
+
+async def test_rahmen_vor_dem_ersten_kapitel():
+    baum = _baum()
+    baum["metadata"] = {**baum["metadata"], "rahmen": {
+        "wochenstunden": {"7": 2}, "lehrwerk": "Lambacher Schweizer", "beschluesse": "- Mathe-Känguru"}}
+    data = await _docx(baum)
+    text = _klartext(data)
+    assert text.index("Rahmen") < text.index("Rationale Zahlen")
+    assert "Wochenstunden: Kl. 7: 2 — verplanbar: 60 Std." in text
+    assert "Lambacher Schweizer" in text and "Mathe-Känguru" in text
+    ast = json.loads(subprocess.run(["pandoc", "-f", "docx", "-t", "json"], input=data,
+                                    capture_output=True, check=True).stdout)
+    assert any(b["t"] == "BulletList" for b in ast["blocks"]), "Textfelder sind Markdown"
+
+
+async def test_ohne_rahmen_kein_abschnitt():
+    assert "Rahmen" not in _klartext(await _docx(_baum()))

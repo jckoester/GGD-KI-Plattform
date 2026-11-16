@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.curriculum_begriffe import FELDER, namen_fuer_export, namen_fuer_yaml
+from app.context.curriculum_rahmen import rahmen_abschnitte
 from app.context.editions import BP_STATUS_CURRICULUM
 from app.db.models import ContextNode
 
@@ -233,6 +234,8 @@ async def build_curriculum_export_dict(db: AsyncSession, tree: dict) -> dict:
         "bp_id": await _fachplan_bp_id(db, tree),
         "bp_version": meta.get("bp_version", ""),
         "vorwort": tree.get("content") or "",
+        # Rahmenangaben (0.46, E20) — nur, wenn welche da sind.
+        **({"rahmen": meta["rahmen"]} if meta.get("rahmen") else {}),
         "kapitel": kapitel_out,
     }
 
@@ -386,6 +389,17 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
     return kapitel_out
 
 
+async def _build_pdf_rahmen(meta: dict) -> list[dict]:
+    """Abschnitt „Rahmen" (0.46, E20): Wochenstunden als Text, die übrigen Felder als Markdown."""
+    from app.render.export import render_markdown_for_pdf
+
+    aus = []
+    for label, text in rahmen_abschnitte(meta.get("rahmen"), meta.get("jahrgangsstufe")):
+        aus.append({"label": label, "text": text} if label == "Wochenstunden"
+                   else {"label": label, "html": await render_markdown_for_pdf(text)})
+    return aus
+
+
 def entwurf_vermerk(tree: dict, heute: date | None = None) -> str | None:
     """„Entwurf, Stand 15.11.2026“ für Entwürfe (0.45), sonst None — PDF und DOCX/ODT.
 
@@ -424,6 +438,7 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
         school_name=school_name,
         meta=meta,
         entwurf=entwurf_vermerk(tree),
+        rahmen=await _build_pdf_rahmen(meta),
         kapitel=await _build_pdf_kapitel(tree),
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
@@ -533,6 +548,12 @@ async def render_curriculum_office(
                 schluessel.append((s, e))
             lss.append((ls, schluessel))
         gerueste.append((kap, lss))
+    meta = tree.get("metadata", {})
+    # Rahmen (0.46, E20): die Textfelder als Markdown mit durch Pandoc.
+    rahmen = rahmen_abschnitte(meta.get("rahmen"), meta.get("jahrgangsstufe"))
+    for j, (label, text) in enumerate(rahmen):
+        if label != "Wochenstunden":
+            teile[f"ra{j}"] = text
     bloecke, api = await o.markdown_zu_bloecken(db, teile)
     formeln = {teile[k]: _formel_inlines(v, teile[k]) for k, v in bloecke.items() if k.startswith("hf")}
 
@@ -544,7 +565,6 @@ async def render_curriculum_office(
                 aus.append(o.schlicht([o.fett(o.text(label)), {"t": "Space"}, *o.text(", ".join(namen))]))
         return aus
 
-    meta = tree.get("metadata", {})
     dok = []
     schule = settings.export_school_name or meta.get("schule", "")
     if schule:
@@ -555,6 +575,14 @@ async def render_curriculum_office(
     dok.append(o.absatz(o.text(
         f"{meta.get('schulart', '')} | Kl. {meta.get('jahrgangsstufe', '')} | BP {meta.get('bp_version', '')}"
     )))
+    if rahmen:
+        dok.append(o.ueberschrift(2, o.text("Rahmen")))
+        for j, (label, text) in enumerate(rahmen):
+            if label == "Wochenstunden":
+                dok.append(o.absatz([o.fett(o.text(label + ":")), {"t": "Space"}, *o.text(text)]))
+            else:
+                dok.append(o.absatz([o.fett(o.text(label))]))
+                dok += bloecke[f"ra{j}"]
     for kap, lss in gerueste:
         std = (kap.get("metadata") or {}).get("std")
         dok.append(o.ueberschrift(2, o.text(f"{kap.get('title') or ''}" + (f" ({std} Std.)" if std else ""))))

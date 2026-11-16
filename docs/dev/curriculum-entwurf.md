@@ -132,6 +132,29 @@ speichert nicht, wenn es scheitert), `POST /curricula/{id}/undo`. Rechte: `_requ
   verlieren den Vektor (Nachholung nur für `active`).
 - Kein Wiederholen (Redo).
 
+## Rahmenangaben (seit 0.46)
+
+`app/context/curriculum_rahmen.py`, Spiegel im Frontend `lib/curriculum_rahmen.js`, Anzeige
+`CurriculumRahmen.svelte` (Editor und Leseansicht). Keine Migration: Die Angaben stehen als
+`metadata.rahmen` am Curriculum-Knoten.
+
+```json
+{"wochenstunden": {"7": 2, "8": 1.5},
+ "lehrwerk": "…", "beschluesse": "…", "schwerpunkte": "…", "absprachen": "…"}
+```
+
+- `rahmen_normalisieren` prüft und bereinigt (Wochenstunden 0–10 in halben Stunden, Schlüssel =
+  Klassenstufe, Textfelder getrimmt, leere fallen weg, unbekannte Schlüssel auch). Aufgerufen in
+  `PATCH /context/nodes/{id}` für `curriculum` (422 bei unbrauchbaren Werten) und im Zwischenformat
+  `CurriculumDraftConfirmed.rahmen` (Import, YAML-Konverter).
+- `verplanbar(rahmen, jahrgangsstufe)`: 30 × Wochenstunden über alle Stufen des Bands (E19);
+  `None`, solange eine Stufe fehlt. Grundlage für `get_hour_frame` des Assistenten.
+- Export: YAML-Feld `rahmen` (nur wenn belegt), PDF und DOCX/ODT mit Abschnitt „Rahmen“ vor dem
+  ersten Kapitel (`rahmen_abschnitte`; Textfelder als Markdown).
+- ⚠️ Der Import ersetzt die Metadaten des Curriculums: Ein YAML ohne `rahmen` über ein
+  vorhandenes Curriculum importiert, löscht dessen Rahmen.
+- Kopieren als Entwurf, Veröffentlichen und Rückgängig nehmen den Rahmen mit (Teil der Metadaten).
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

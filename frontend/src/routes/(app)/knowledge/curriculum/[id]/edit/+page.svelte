@@ -18,6 +18,7 @@
     import { kapitelStd, curriculumStd, ENTWURF_HINWEIS, toteVerweiseBeschriftungen } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
+    import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -681,6 +682,19 @@
             {/if}
             {#if undoMeldung}
                 <SuccessBanner message={undoMeldung} />
+            {/if}
+
+            {#if draft}
+                <CurriculumRahmen
+                    rahmen={draft.metadata?.rahmen ?? {}}
+                    jahrgangsstufe={draft.metadata?.jahrgangsstufe ?? ""}
+                    verplant={totalStd}
+                    editMode={true}
+                    onchange={(rahmen) => {
+                        draft.metadata = { ...draft.metadata, rahmen };
+                        dirty = true;
+                    }}
+                />
             {/if}
 
             <!-- Curriculum-Tabelle im Edit-Mode -->

@@ -1006,6 +1006,12 @@ async def update_node(
                 from app.context.curriculum_begriffe import eintraege_normalisieren
 
                 update_data["metadata_"] = eintraege_normalisieren(update_data["metadata_"])
+            # Rahmenangaben (0.46, E20): geprüft und bereinigt, gleich, wer schreibt.
+            if typ_danach == "curriculum" and update_data["metadata_"] and "rahmen" in update_data["metadata_"]:
+                from app.context.curriculum_rahmen import rahmen_normalisieren
+
+                update_data["metadata_"] = {**update_data["metadata_"],
+                                            "rahmen": rahmen_normalisieren(update_data["metadata_"]["rahmen"])}
         if "content" in update_data:
             validate_node_content(
                 typ_danach,

@@ -130,6 +130,26 @@ Curriculum  (Fach + Jahrgangsband)
 Die **Stundenansätze** addiert die Ansicht mit; oben siehst du die Gesamtsumme. So merkst
 du früh, wenn die Planung nicht ins Schuljahr passt.
 
+### Rahmen
+
+Über den Kapiteln steht der Abschnitt **Rahmen**. Dort hält die Fachschaft fest, was für das
+ganze Curriculum gilt:
+
+- **Wochenstunden** je Klassenstufe des Bands (halbe Stunden mit Komma, etwa „1,5“)
+- **Lehrwerk**
+- **Beschlüsse der Fachschaft**, etwa Lektüren, Pflichtversuche, Exkursionen
+- **Schwerpunkte**, für die die Fachschaft die freie Zeit nutzt
+- **Absprachen**, etwa zu Leistungsnachweisen oder zum Methoden- und Medienkonzept
+
+Die Textfelder verstehen Markdown, also auch Aufzählungen.
+
+Sobald jede Stufe ihre Wochenstunden hat, zeigt der Rahmen, wie viele Stunden **verplanbar**
+sind: 30 je Wochenstunde, bei einem zweistündigen Fach also 60 im Jahr. Den Rest des Schuljahres
+lässt das Curriculum bewusst frei. Daneben steht, wie viele Stunden die Kapitel schon verplanen.
+
+Im Editor ist der Rahmen aufgeklappt, solange er leer ist. In der Ansicht erscheint er nur, wenn
+etwas angegeben ist. Im Export steht er als Abschnitt „Rahmen“ vor dem ersten Kapitel.
+
 ---
 
 ## Kompetenzen verknüpfen
@@ -290,7 +310,7 @@ anlegen](#ein-curriculum-anlegen)).
 Über **Export** erhältst du das Curriculum als:
 
 - **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte; Begriffe und
-  Fachmethoden stehen als eigene Zeilen unter der Konkretisierung
+  Fachmethoden stehen als eigene Zeilen unter der Konkretisierung; der Rahmen steht vor dem ersten Kapitel
 - **DOCX** (Word) oder **ODT** (LibreOffice) — zum Weiterbearbeiten außerhalb der Plattform,
   im Querformat und mit Formeln als bearbeitbare Formeln
 - **YAML** — die maschinenlesbare Fassung; Begriffe und Fachmethoden gehen als Namen mit

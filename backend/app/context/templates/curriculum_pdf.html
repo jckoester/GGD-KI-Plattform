@@ -48,6 +48,18 @@
     margin-bottom: 6mm;
   }
 
+  /* ── Rahmen (0.46): vor dem ersten Kapitel ─────────────────────────────── */
+  .rahmen { margin-bottom: 4mm; }
+  .rahmen-heading {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    border-bottom: 0.5pt solid #1e3a5f;
+    margin-bottom: 1.5mm;
+  }
+  table.rahmen-tabelle { page-break-inside: auto; }
+  col.col-rahmen-label { width: 18%; }
+
   /* ── Kapitel- / Lernsequenz-Überschriften ──────────────────────────────── */
   .kapitel-heading {
     background: #1e3a5f;
@@ -143,6 +155,21 @@
   {{ meta.get('schulart', '') }} &nbsp;|&nbsp; Kl. {{ meta.get('jahrgangsstufe', '') }}
   &nbsp;|&nbsp; BP {{ meta.get('bp_version', '') }}
 </div>
+
+{% if rahmen %}
+<div class="rahmen">
+  <div class="rahmen-heading">Rahmen</div>
+  <table class="rahmen-tabelle">
+    <colgroup><col class="col-rahmen-label"><col></colgroup>
+    {% for r in rahmen %}
+    <tr>
+      <th>{{ r.label }}</th>
+      <td class="konk">{% if r.html %}{{ r.html | safe }}{% else %}{{ r.text }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
 
 {% for kap in kapitel %}
 <div class="kapitel-heading">

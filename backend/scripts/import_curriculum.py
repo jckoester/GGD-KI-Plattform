@@ -136,6 +136,7 @@ def convert_yaml_to_draft(data: dict, bp_version_override: str | None = None) ->
         bp_id=None if bp_version_override else (data.get("bp_id") or None),
         bp_version=bp_version_override or data["bp_version"],
         vorwort=data.get("vorwort"),
+        rahmen=data.get("rahmen"),  # 0.46, E20
         kapitel=kapitel_list,
     )
 

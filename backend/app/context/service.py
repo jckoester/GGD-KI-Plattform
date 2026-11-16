@@ -1496,6 +1496,7 @@ async def import_curriculum_from_draft(
     Rückgabe: (curriculum_id, stats)
     """
     from app.context.curriculum_begriffe import eintrag_felder
+    from app.context.curriculum_rahmen import rahmen_normalisieren
     stats = ImportStats()
     
     # Validieren
@@ -1568,6 +1569,7 @@ async def import_curriculum_from_draft(
             "schulart": payload.schulart,
             "jahrgangsstufe": payload.jahrgangsstufe,
             "import_key": curriculum_import_key,
+            **({"rahmen": rahmen} if (rahmen := rahmen_normalisieren(payload.rahmen)) else {}),
         }
     }
     curriculum_id, created = await get_or_create_node(

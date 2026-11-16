@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   erscheint sie erst, wenn sie gilt.
 - Rückgängig im Curriculum-Editor: Vor jedem Speichern wird der Stand gesichert; „Rückgängig“
   stellt ihn wieder her, Speicherung für Speicherung (bis zu 30).
+- Rahmen am Curriculum: Wochenstunden je Klassenstufe, Lehrwerk, Beschlüsse, Schwerpunkte und
+  Absprachen; dazu die verplanbaren Stunden (30 je Wochenstunde). Im Export vor dem ersten Kapitel.
 
 ### Geändert
 

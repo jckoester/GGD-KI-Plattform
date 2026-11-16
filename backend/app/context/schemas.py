@@ -462,7 +462,17 @@ class CurriculumDraftConfirmed(BaseModel):
     bp_id: str | None = None
     bp_version: str
     vorwort: str | None = None
+    #: Rahmenangaben (0.46, E20): Wochenstunden je Stufe, Lehrwerk, Beschlüsse, Schwerpunkte,
+    #: Absprachen — siehe `app/context/curriculum_rahmen.py`.
+    rahmen: dict | None = None
     kapitel: list[CurriculumDraftKapitel]
+
+    @field_validator("rahmen")
+    @classmethod
+    def _rahmen(cls, v):
+        from app.context.curriculum_rahmen import rahmen_normalisieren
+
+        return rahmen_normalisieren(v) if v is not None else None
 
 
 # -- KS-Phase-6 Curriculum Read Models -----------------------------------------

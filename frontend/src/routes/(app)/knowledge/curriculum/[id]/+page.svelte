@@ -9,6 +9,7 @@
     } from "$lib/api.js";
     import { curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
+    import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -287,6 +288,12 @@
                     {exportError}
                 </div>
             {/if}
+
+            <CurriculumRahmen
+                rahmen={curriculum.metadata?.rahmen ?? {}}
+                jahrgangsstufe={curriculum.metadata?.jahrgangsstufe ?? ""}
+                verplant={totalStd}
+            />
 
             <!-- Curriculum-Tabelle -->
             <div
