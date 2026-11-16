@@ -10,6 +10,7 @@
     import { curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
+    import CurriculumAssistentKnopf from "$lib/components/CurriculumAssistentKnopf.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -191,6 +192,9 @@
                         {curriculum}
                         onveroeffentlicht={async () => (curriculum = await getCurriculum(curriculum.id))}
                     />
+                    {#if curriculum.can_edit && curriculum.status === "draft"}
+                        <CurriculumAssistentKnopf {curriculum} />
+                    {/if}
                     {#if curriculum.can_edit}
                         <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"

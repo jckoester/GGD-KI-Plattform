@@ -219,3 +219,104 @@ async def test_fremde_und_ohne_bezug(db, welt):
     assert "curriculum_id erforderlich" in (await TOOL_REGISTRY["get_hour_frame"].handler({}, ctx))["error"]
     mit = await TOOL_REGISTRY["get_hour_frame"].handler({"curriculum_id": str(welt["cur"].id)}, ctx)
     assert mit["verplant"] == 4
+
+
+# ── Schritt 6: Bezug, Einstieg, Freischaltung ────────────────────────────────
+
+
+async def test_freigeschaltet_nur_fuer_lehrkraefte_mit_der_faehigkeit():
+    from types import SimpleNamespace
+
+    from app.chat.tools import tools_for
+
+    assistent = SimpleNamespace(tool_groups=["curriculum_planning"])
+    namen = {t.name for t in tools_for(assistent, None, False, rollen=["teacher"])}
+    assert {"apply_curriculum_operations", "finde_curriculum", "lege_curriculum_an"} <= namen
+    schueler = {t.name for t in tools_for(assistent, None, False, rollen=["student"])}
+    assert not {n for n, t in TOOL_REGISTRY.items() if "curriculum_planning" in t.groups} & schueler
+    ohne = {t.name for t in tools_for(SimpleNamespace(tool_groups=[]), None, False, rollen=["teacher"])}
+    assert "apply_curriculum_operations" not in ohne
+
+
+async def test_bezug_anzeige_und_systemzeile(db, welt):
+    from fastapi import HTTPException
+
+    from app.context import curriculum_bezug as cb
+
+    cur = await cb.curriculum_fuer_bezug(db, welt["cur"].id, LEHRKRAFT)
+    assert cur.id == welt["cur"].id
+    with pytest.raises(HTTPException):
+        await cb.curriculum_fuer_bezug(db, welt["cur"].id, FREMDE)
+    assert await cb.bezug_fuer_anzeige(db, welt["cur"].id, LEHRKRAFT) == {
+        "curriculum_id": str(welt["cur"].id), "titel": "Physik 7/8", "entwurf": True}
+    assert await cb.bezug_fuer_anzeige(db, welt["cur"].id, FREMDE) is None
+    zeile = await cb.bezugszeile(db, welt["cur"].id, LEHRKRAFT)
+    assert "„Physik 7/8“" in zeile and "Kl. 7/8" in zeile and "Entwurf" in zeile
+
+
+async def _konversation(db):
+    from app.db.models import Conversation
+
+    k = Conversation(pseudonym=MITGLIED, model_used="test")
+    db.add(k)
+    await db.flush()
+    return k
+
+
+async def test_finden_und_waehlen_setzt_den_bezug(db, welt):
+    k = await _konversation(db)
+    ctx = ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=k.id)
+    gefunden = await TOOL_REGISTRY["finde_curriculum"].handler({"fach": "physik", "jahrgangsstufe": "8"}, ctx)
+    assert [c["curriculum_id"] for c in gefunden["curricula"]] == [str(welt["cur"].id)]
+    assert gefunden["faecher"][0]["fassungen"] == []  # kein Fachplan in dieser Welt
+
+    gewaehlt = await TOOL_REGISTRY["waehle_curriculum"].handler({"curriculum_id": str(welt["cur"].id)}, ctx)
+    assert gewaehlt["bezug_gesetzt"] and gewaehlt["kapitel"][0]["titel"] == "Optik"
+    assert ctx.curriculum_node_id == welt["cur"].id
+    await db.refresh(k)
+    assert k.curriculum_node_id == welt["cur"].id
+
+    assert (await TOOL_REGISTRY["finde_curriculum"].handler({}, ToolContext(
+        db=db, user=FREMDE, group_id=None, conversation_id=None)))["curricula"] == []
+
+
+async def test_veroeffentlichtes_waehlen_und_als_entwurf_kopieren(db, welt):
+    for n in ("cur", "kap", "ls"):
+        welt[n].status = "active"
+    await db.flush()
+    k = await _konversation(db)
+    ctx = ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=k.id)
+    lesen = await TOOL_REGISTRY["waehle_curriculum"].handler({"curriculum_id": str(welt["cur"].id)}, ctx)
+    assert lesen["status"] == "active" and "nur lesen" in lesen["hinweis"]
+
+    kopie = await TOOL_REGISTRY["waehle_curriculum"].handler(
+        {"curriculum_id": str(welt["cur"].id), "als_entwurf_kopieren": True}, ctx)
+    assert kopie["status"] == "draft" and kopie["curriculum_id"] != str(welt["cur"].id)
+    assert ctx.curriculum_node_id == uuid.UUID(kopie["curriculum_id"])
+    # Ein zweites Mal: derselbe offene Entwurf, keine zweite Kopie.
+    wieder = await TOOL_REGISTRY["waehle_curriculum"].handler(
+        {"curriculum_id": str(welt["cur"].id), "als_entwurf_kopieren": True}, ctx)
+    assert wieder["curriculum_id"] == kopie["curriculum_id"]
+
+
+async def test_anlegen_nur_mit_fachplan_und_ohne_doppel(db, welt):
+    ctx = ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=None)
+    ohne = await TOOL_REGISTRY["lege_curriculum_an"].handler({"fach": "Physik", "jahrgangsstufe": "9/10"}, ctx)
+    assert "error" in ohne and "Fassung" in ohne["error"]
+
+    db.add(ContextNode(category="knowledge", content_type="fachplan", title="BP Physik", status="active",
+                       read_scope="global", write_scope="global", owner_pseudonym="system",
+                       subject_id=welt["fach"].id, bp_version=BP,
+                       metadata_={"bp_id": "BP2016BW_ALLG_GYM_PH.V3"}))
+    await db.flush()
+    neu = await TOOL_REGISTRY["lege_curriculum_an"].handler({"fach": "Physik", "jahrgangsstufe": "9/10"}, ctx)
+    assert neu["bezug_gesetzt"] and neu["status"] == "draft" and neu["kapitel"] == []
+    knoten = await db.get(ContextNode, uuid.UUID(neu["curriculum_id"]))
+    assert (knoten.min_grade, knoten.max_grade, knoten.metadata_["schulart"]) == (9, 10, "Gymnasium")
+    assert knoten.owner_pseudonym == MITGLIED and knoten.metadata_["bp_version"] == BP
+
+    doppel = await TOOL_REGISTRY["lege_curriculum_an"].handler({"fach": "Physik", "jahrgangsstufe": "7/8"}, ctx)
+    assert "schon ein Curriculum" in doppel["error"] and doppel["vorhanden"][0]["curriculum_id"] == str(welt["cur"].id)
+    fremd = await TOOL_REGISTRY["lege_curriculum_an"].handler(
+        {"fach": "Physik", "jahrgangsstufe": "5"}, ToolContext(db=db, user=FREMDE, group_id=None, conversation_id=None))
+    assert "error" in fremd

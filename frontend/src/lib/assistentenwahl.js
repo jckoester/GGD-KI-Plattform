@@ -26,6 +26,7 @@
 export const FAEHIGKEIT_NAMEN = {
   planning: "Unterrichtsplanung",
   lesson_planning: "Stundenplanung",
+  curriculum_planning: "Curriculum-Entwurf",
 };
 
 function stufe(assistent, pseudonym, fachId) {
@@ -58,7 +59,8 @@ export function passendeAssistenten(assistenten, faehigkeit, { pseudonym = null,
  * Verschiebe-Auslöser). Eine Gruppe allein sucht nichts — „Neuer Chat" auf der Gruppenseite
  * ist ein gewöhnlicher Chat mit Gruppenbezug (0.15; bis dahin hieß „nur Gruppe" Jahresplanung).
  */
-export function einstiegsFaehigkeit({ stundeId = null, faehigkeit = null } = {}) {
+export function einstiegsFaehigkeit({ stundeId = null, curriculumId = null, faehigkeit = null } = {}) {
   if (stundeId != null) return "lesson_planning";
+  if (curriculumId != null) return "curriculum_planning";
   return faehigkeit ?? null;
 }

@@ -27,7 +27,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0107, 0108), danach den Bildungsplan einmal vollständig importieren
+- `alembic upgrade head` (0107, 0108, 0109), danach den Bildungsplan einmal vollständig importieren
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus

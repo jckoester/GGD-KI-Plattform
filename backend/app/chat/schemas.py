@@ -51,6 +51,8 @@ class ChatRequest(BaseModel):
     group_id: Optional[int] = None
     # Stundenbezug (0.15) — wie `group_id` nur beim Anlegen einer Konversation ausgewertet.
     stunde_node_id: Optional[UUID] = None
+    # Curriculumbezug (0.46) — nur beim Anlegen; nicht zusammen mit `stunde_node_id`.
+    curriculum_node_id: Optional[UUID] = None
     # Produkte aus der eigenen Werkstatt (0.41, Schritt 10) — nur beim Anlegen einer Konversation.
     # Sie müssen schon in der **ersten** Antwort vorliegen; nachträglich angehängt (wie die
     # gepufferten Bausteine) sähe erst die zweite Antwort sie.

@@ -56,6 +56,7 @@ describe('chatVorgaben', () => {
       subjectId: 7,
       groupId: 3,
       stundeId: STUNDE,
+      curriculumId: null,
       faehigkeit: null,
     })
   })
@@ -64,16 +65,19 @@ describe('chatVorgaben', () => {
     for (const ziel of [
       { subjectId: 7 }, { groupId: 3 }, { subjectId: 7, groupId: 3 },
       { groupId: 3, stundeId: STUNDE }, { groupId: 3, faehigkeit: 'planning' },
+      { subjectId: 7, curriculumId: STUNDE }, { faehigkeit: 'curriculum_planning' },
     ]) {
       const pfad = neuerChatPfad(ziel)
       const gelesen = chatVorgaben(params(pfad.split('?')[1] ?? ''))
-      expect(gelesen).toEqual({ subjectId: null, groupId: null, stundeId: null, faehigkeit: null, ...ziel })
+      expect(gelesen).toEqual({
+        subjectId: null, groupId: null, stundeId: null, curriculumId: null, faehigkeit: null, ...ziel,
+      })
     }
   })
 
   it('ohne Parameter ist nichts vorbelegt', () => {
     expect(chatVorgaben(params(''))).toEqual({
-      subjectId: null, groupId: null, stundeId: null, faehigkeit: null,
+      subjectId: null, groupId: null, stundeId: null, curriculumId: null, faehigkeit: null,
     })
   })
 
@@ -84,6 +88,7 @@ describe('chatVorgaben', () => {
       subjectId: null,
       groupId: null,
       stundeId: null,
+      curriculumId: null,
       faehigkeit: null,
     })
   })
@@ -93,6 +98,12 @@ describe('chatVorgaben', () => {
     expect(chatVorgaben(params('faehigkeit=lesson_planning')).faehigkeit).toBe('lesson_planning')
     for (const roh of ['image_generation', 'admin', '']) {
       expect(chatVorgaben(params(`faehigkeit=${roh}`)).faehigkeit).toBeNull()
+    }
+  })
+
+  it('eine Curriculum-Kennung, die keine ist, wird zu null (0.46)', () => {
+    for (const roh of ['abc', '42', `${STUNDE}x`]) {
+      expect(chatVorgaben(params(`curriculum_id=${roh}`)).curriculumId).toBeNull()
     }
   })
 

@@ -207,3 +207,99 @@ _registriere(
     "(von: 'assistant' oder 'editor'). Nur auf Wunsch der Lehrkraft; danach get_curriculum_draft.",
     schreibt=True,
 )
+
+
+# ── Einstieg: finden, wählen, anlegen (0.46, Schritt 6, E18) ──────────────────
+
+
+async def _bezug_uebernehmen(ctx: ToolContext, cur) -> None:
+    """Gilt sofort für die folgenden Aufrufe dieser Anfrage (der Router übernimmt
+    `ctx.curriculum_node_id`) und bleibt an der Unterhaltung."""
+    from app.context.curriculum_bezug import bezug_setzen
+
+    await bezug_setzen(ctx.db, ctx.conversation_id, ctx.user, cur.id)
+    ctx.curriculum_node_id = cur.id
+    ctx.stunde_node_id = None
+
+
+async def _finde_curriculum(args: dict, ctx: ToolContext) -> dict:
+    from app.context.curriculum_bezug import curricula_finden
+
+    return await curricula_finden(ctx.db, ctx.user, args.get("fach"), args.get("jahrgangsstufe"))
+
+
+register_tool(ChatTool(
+    name="finde_curriculum", groups=GRUPPE, writes=False, handler=_finde_curriculum,
+    definition={"type": "function", "function": {
+        "name": "finde_curriculum",
+        "description": (
+            "Sucht Curricula der Fächer, in denen die Lehrkraft Curricula bearbeiten darf — wenn die "
+            "Unterhaltung noch kein Bezugscurriculum hat. Liefert Curricula (Entwurf oder veröffentlicht, "
+            "mit offener_entwurf_id) und je Fach die Bildungsplan-Fassungen, für die sich ein neues "
+            "anlegen lässt. Passt eines → waehle_curriculum; keines → nach Zustimmung lege_curriculum_an."),
+        "parameters": {"type": "object", "properties": {
+            "fach": {"type": "string", "description": "Fachname oder Kürzel; ein Teil genügt."},
+            "jahrgangsstufe": {"type": "string", "description": "Stufe oder Band, etwa '7' oder '7/8'."},
+        }, "required": []},
+    }},
+))
+
+
+async def _waehle_curriculum(args: dict, ctx: ToolContext) -> dict:
+    from app.context.curriculum_bezug import curriculum_waehlen
+
+    try:
+        cid = UUID(str(args.get("curriculum_id") or ""))
+    except ValueError:
+        return {"error": "Ungültige curriculum_id"}
+    cur, antwort = await curriculum_waehlen(ctx.db, ctx.user, cid, bool(args.get("als_entwurf_kopieren")))
+    if cur is None:
+        return antwort
+    await _bezug_uebernehmen(ctx, cur)
+    return {**await ca.entwurf_lesen(ctx.db, ctx.user, cur), **antwort, "bezug_gesetzt": True}
+
+
+register_tool(ChatTool(
+    name="waehle_curriculum", groups=GRUPPE, writes=True, handler=_waehle_curriculum,
+    definition={"type": "function", "function": {
+        "name": "waehle_curriculum",
+        "description": (
+            "Macht ein Curriculum aus finde_curriculum zum Bezugscurriculum dieser Unterhaltung und "
+            "liefert es wie get_curriculum_draft. Gibt es zu einem veröffentlichten einen offenen "
+            "Entwurf, wird der gewählt. Ein veröffentlichtes ohne Entwurf ist nur zu lesen; "
+            "als_entwurf_kopieren=true legt einen Entwurf als Kopie an — frage die Lehrkraft vorher."),
+        "parameters": {"type": "object", "properties": {
+            "curriculum_id": {"type": "string", "description": "curriculum_id aus finde_curriculum"},
+            "als_entwurf_kopieren": {"type": "boolean", "description": "Nur nach Zustimmung."},
+        }, "required": ["curriculum_id"]},
+    }},
+))
+
+
+async def _lege_curriculum_an(args: dict, ctx: ToolContext) -> dict:
+    from app.context.curriculum_bezug import curriculum_neu
+
+    cur, antwort = await curriculum_neu(ctx.db, ctx.user, args.get("fach") or "", args.get("jahrgangsstufe") or "",
+                                        args.get("bp_version") or None)
+    if cur is None:
+        return antwort
+    await _bezug_uebernehmen(ctx, cur)
+    return {**await ca.entwurf_lesen(ctx.db, ctx.user, cur), **antwort, "bezug_gesetzt": True}
+
+
+register_tool(ChatTool(
+    name="lege_curriculum_an", groups=GRUPPE, writes=True, handler=_lege_curriculum_an,
+    definition={"type": "function", "function": {
+        "name": "lege_curriculum_an",
+        "description": (
+            "Legt ein leeres Curriculum als Entwurf an und macht es zum Bezugscurriculum — nur nach "
+            "Zustimmung der Lehrkraft und nur, wenn finde_curriculum für Fach, Band und Fassung keines "
+            "gefunden hat. Gibt es keinen Bildungsplan der Fassung, wird nichts angelegt."),
+        "parameters": {"type": "object", "properties": {
+            "fach": {"type": "string", "description": "Fachname oder Kürzel"},
+            "jahrgangsstufe": {"type": "string", "description": "Stufe oder Band, etwa '7' oder '7/8'"},
+            "bp_version": {"type": "string", "description": (
+                "Fassung aus finde_curriculum (faecher[].fassungen); nötig, wenn es mehrere gibt.")},
+        }, "required": ["fach", "jahrgangsstufe"]},
+    }},
+))

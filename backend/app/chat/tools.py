@@ -17,6 +17,9 @@ Freischaltungslogik:
   student_planning — read-only (z. B. get_exam_scope): nur wenn
                             'student_planning' in assistant.tool_groups und
                             conversation.group_id gesetzt (auch für Schüler).
+  curriculum_planning — Curriculum-Assistent (0.46): 'curriculum_planning' in
+                            assistant.tool_groups und Lehrkraft-Rolle, ohne Gruppenbezug.
+                            Zugang und „nur Entwürfe“ prüft jede Funktion am Curriculum.
   image_generation — nur wenn 'image_generation' in assistant.tool_groups.
                             Die Bild-Modell-Freigabe je Team greift zusätzlich am
                             LiteLLM-Proxy (Team-Allowlist), die Function-Calling-
@@ -167,6 +170,10 @@ def tools_for(
         # Ohne Gruppenbezug: Die Stunde kann erst im Chat gefunden werden. Wer sie lesen
         # oder schreiben darf, entscheidet das Werkzeug an der Stunde selbst.
         greifen.add("lesson_planning")
+    if "curriculum_planning" in asst_tool_groups and "teacher" in rollen:
+        # Curriculum-Assistent (0.46): wie die Stundenplanung an der Rolle, ohne Gruppe. Wer an
+        # welchem Curriculum lesen und schreiben darf, prüft jede Funktion selbst.
+        greifen.add("curriculum_planning")
     if "student_planning" in asst_tool_groups and group_id is not None:
         # Read-only Planungsdaten — kein Lehrkraft-Recht nötig, nur Gruppenbezug.
         greifen.add("student_planning")

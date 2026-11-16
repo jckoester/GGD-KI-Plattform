@@ -36,12 +36,14 @@
  */
 export function neuerChatPfad({
   subjectId = null, groupId = null, stundeId = null, assistantId = null, frage = null,
-  faehigkeit = null,
+  faehigkeit = null, curriculumId = null,
 } = {}) {
   const params = new URLSearchParams();
   if (subjectId != null) params.set("subject_id", String(subjectId));
   if (groupId != null) params.set("group_id", String(groupId));
   if (stundeId != null) params.set("stunde_id", String(stundeId));
+  // Curriculumbezug (0.46): aus Editor und Ansicht eines Entwurfs.
+  if (curriculumId != null) params.set("curriculum_id", String(curriculumId));
   if (assistantId != null) params.set("assistant_id", String(assistantId));
   if (faehigkeit) params.set("faehigkeit", faehigkeit);
   if (frage) params.set("q", frage);
@@ -52,7 +54,7 @@ export function neuerChatPfad({
 const UUID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fähigkeiten, nach denen ein Einstieg fragen darf — andere Werte gelten als nicht genannt. */
-const EINSTIEGS_FAEHIGKEITEN = new Set(["planning", "lesson_planning"]);
+const EINSTIEGS_FAEHIGKEITEN = new Set(["planning", "lesson_planning", "curriculum_planning"]);
 
 /**
  * Die Vorbelegung aus der Adresse — `null`, wo nichts steht.
@@ -69,11 +71,13 @@ export function chatVorgaben(searchParams) {
     return Number.isNaN(wert) ? null : wert;
   };
   const roheStunde = searchParams?.get?.("stunde_id");
+  const rohesCurriculum = searchParams?.get?.("curriculum_id");
   const roheFaehigkeit = searchParams?.get?.("faehigkeit");
   return {
     subjectId: zahl("subject_id"),
     groupId: zahl("group_id"),
     stundeId: roheStunde && UUID_FORM.test(roheStunde) ? roheStunde : null,
+    curriculumId: rohesCurriculum && UUID_FORM.test(rohesCurriculum) ? rohesCurriculum : null,
     faehigkeit: EINSTIEGS_FAEHIGKEITEN.has(roheFaehigkeit) ? roheFaehigkeit : null,
   };
 }

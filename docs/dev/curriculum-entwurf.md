@@ -157,9 +157,10 @@ speichert nicht, wenn es scheitert), `POST /curricula/{id}/undo`. Rechte: `_requ
 
 ## Funktionen des Curriculum-Assistenten (seit 0.46)
 
-Fähigkeit `curriculum_planning` (`FAEHIGKEITEN`). Registrierung `app/context/curriculum_tools.py`,
-Arbeit `app/context/curriculum_assistent.py`. Freigeschaltet wird die Fähigkeit in `tools_for` erst
-mit dem Konversationsbezug (Schritt 6); bis dahin ist sie registriert, aber in keinem Chat aktiv.
+Fähigkeit `curriculum_planning` (`FAEHIGKEITEN`, im Assistenten-Editor „Curriculum-Entwurf“).
+Registrierung `app/context/curriculum_tools.py`, Arbeit `app/context/curriculum_assistent.py`.
+`tools_for` schaltet sie frei, wenn der Assistent sie führt und die Person die Rolle `teacher` hat —
+ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`produces: curriculum`).
 
 | Funktion | liest/schreibt | Inhalt |
 |---|---|---|
@@ -170,6 +171,9 @@ mit dem Konversationsbezug (Schritt 6); bis dahin ist sie registriert, aber in k
 | `apply_curriculum_operations` | schreibt | Stapel aus `kapitel_*`, `lernsequenz_*`, `eintrag_*` (anlegen, ändern, löschen; `position` ab 1; `ref` für eben Angelegtes) |
 | `set_curriculum_frame` | schreibt | Rahmenangaben ergänzen (Wochenstunden je Stufe zusammengeführt) |
 | `undo_last_curriculum_change` | schreibt | `zuruecknehmen` aus dem Verlauf — derselbe wie im Editor |
+| `finde_curriculum` | liest | Curricula der eigenen Fachschaften (Admin: alle), gefiltert nach Fach und Band, mit `offener_entwurf_id`; je Fach die Fassungen zum Anlegen |
+| `waehle_curriculum` | Bezug | setzt das Bezugscurriculum; veröffentlicht mit offenem Entwurf → der Entwurf; ohne → nur lesen, mit `als_entwurf_kopieren` eine Kopie |
+| `lege_curriculum_an` | schreibt | leerer Entwurf am Fachplan (`curriculum_anlegen`, dieselbe Funktion wie `POST /curricula/new`); nicht, wenn es für Band und Fassung schon eins gibt |
 
 - **Zugang:** `zugang()` ruft `_require_curriculum_write` (die Regel des Editors) — auch zum Lesen.
   Schreiben zusätzlich nur bei `status == draft` (E17), sonst `NUR_ENTWUERFE`. Bezug:
@@ -184,6 +188,21 @@ mit dem Konversationsbezug (Schritt 6); bis dahin ist sie registriert, aber in k
   Lernsequenzen wie im Editor (`_soll_kanten` ≙ `deriveRefsFromEntries`: IK `references` mit
   `partiell`, PK `develops`, Verweise in Hinweisen `references`, Material `used_with`).
 - Kein Commit in den Funktionen; der Chat committet am Ende der Antwort.
+
+### Bezug der Unterhaltung
+
+`conversations.curriculum_node_id` (Alembic 0109, SET NULL), Dienst `app/context/curriculum_bezug.py`.
+
+- **Setzen** beim Anlegen (`ChatRequest.curriculum_node_id`, aus dem Knopf „Assistent“ in Editor und
+  Ansicht eines Entwurfs, `?curriculum_id=` → `chatVorgaben`) oder im Gespräch (`waehle_curriculum`,
+  `lege_curriculum_an` → `bezug_setzen`; gilt sofort, der Router übernimmt `ctx.curriculum_node_id`).
+  Nicht zusammen mit einem Stundenbezug (422 beim Anlegen; `bezug_setzen` löscht ihn). Die
+  Unterhaltung bekommt das Fach des Curriculums, keine Gruppe.
+- **Lesen** bei jedem Prompt-Aufbau neu mit `zugang` (Regel des Editors): Systemzeile `bezugszeile`,
+  Anzeige `bezug_fuer_anzeige` im Ereignis `bezug` und in `GET /conversations/{id}` (`curriculum`);
+  der Chatkopf verlinkt einen Entwurf in den Editor, ein veröffentlichtes in die Ansicht.
+- Ohne passenden Assistenten öffnet der Knopf den Chat trotzdem; die Chatseite nennt die fehlende
+  Fähigkeit (`einstiegsFaehigkeit` → `curriculum_planning`).
 
 ## Bekannte Grenzen
 

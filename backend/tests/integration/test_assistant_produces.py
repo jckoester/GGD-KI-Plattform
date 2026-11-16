@@ -73,7 +73,7 @@ async def test_liste_der_arten(test_client, auth_headers_teacher2):
     resp = await test_client.get("/assistants/produktarten", headers=auth_headers_teacher2)
     assert resp.status_code == 200, resp.text
     arten = resp.json()
-    assert [a["id"] for a in arten] == ["image", "diagram", "document", "lesson_plan", "year_plan"]
+    assert [a["id"] for a in arten] == ["image", "diagram", "document", "lesson_plan", "year_plan", "curriculum"]
     assert arten[0] == {"id": "image", "marke": "erstellt Bilder", "filter": "Bilder",
                         "faehigkeit": "image_generation"}
 

@@ -37,7 +37,7 @@ from app.context.curriculum_rahmen import (
 from app.context.curriculum_verlauf import sichern
 from app.context.service import _normalize_ref, load_curriculum_tree
 from app.context.stunden import als_stundenzahl
-from app.db.models import ContextEdge, ContextNode
+from app.db.models import ContextEdge, ContextNode, Subject
 
 NUR_ENTWUERFE = ("Der Assistent schreibt nur in Entwürfe. Für ein veröffentlichtes Curriculum: "
                  "„Als Entwurf kopieren“ in der Curriculum-Ansicht.")
@@ -116,7 +116,9 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
                         "lernsequenzen": lss})
     return {
         "curriculum_id": str(cur.id), "titel": tree.get("title"), "status": tree.get("status"),
-        "fach": meta.get("fach"), "jahrgangsstufe": meta.get("jahrgangsstufe"),
+        "fach": meta.get("fach") or (await db.scalar(sa.select(Subject.name).where(Subject.id == cur.subject_id))
+                                     if cur.subject_id else None),
+        "jahrgangsstufe": meta.get("jahrgangsstufe"),
         "bp_version": meta.get("bp_version"), "rahmen": meta.get("rahmen") or {},
         "verplant": _verplant(tree), "kapitel": kapitel,
     }

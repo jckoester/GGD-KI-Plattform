@@ -1,8 +1,8 @@
 <script>
-    import { CalendarDays, MessageSquareWarning, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
+    import { CalendarDays, MessageSquareWarning, BookOpen, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
     import { page } from "$app/stores";
-    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId, activeConversationStunde } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId, activeConversationStunde, activeConversationCurriculum } from "$lib/stores/pageTitle.js";
     import { stundenDatum, stundenPfad, stundenText } from "$lib/chat_stunde.js";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
@@ -25,6 +25,11 @@
 
     // Link zur Bezugsstunde des Chats (0.19) — nur, solange eine Konversation offen ist.
     let stundenLink = $derived($activeConversationId ? stundenPfad($activeConversationStunde) : null);
+    // Link zum Bezugscurriculum (0.46): Entwurf in den Editor, veröffentlicht in die Ansicht.
+    let curriculum = $derived($activeConversationId ? $activeConversationCurriculum : null);
+    let curriculumLink = $derived(curriculum?.curriculum_id
+        ? `/knowledge/curriculum/${curriculum.curriculum_id}${curriculum.entwurf ? "/edit" : ""}`
+        : null);
 
 </script>
 
@@ -72,6 +77,21 @@
                     {#if stundenDatum($activeConversationStunde.datum)}
                         <span class="shrink-0">· {stundenDatum($activeConversationStunde.datum)}</span>
                     {/if}
+                    <span class="shrink-0" aria-hidden="true">↗</span>
+                </a>
+            {/if}
+            {#if curriculumLink}
+                <a
+                    href={curriculumLink}
+                    title={curriculum.entwurf ? "Zum Entwurf im Editor" : "Zum Curriculum"}
+                    class="inline-flex items-center gap-1 min-w-0 rounded-full border
+                           border-light-ui-3 dark:border-dark-ui-3 px-2 py-0.5 text-xs
+                           text-light-bl dark:text-dark-bl hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                    aria-label="Zum Curriculum: {curriculum.titel}"
+                >
+                    <BookOpen size={14} class="shrink-0" />
+                    <span class="truncate max-w-[12rem]">{curriculum.titel}</span>
+                    {#if curriculum.entwurf}<span class="shrink-0">· Entwurf</span>{/if}
                     <span class="shrink-0" aria-hidden="true">↗</span>
                 </a>
             {/if}

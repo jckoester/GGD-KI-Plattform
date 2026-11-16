@@ -39,7 +39,7 @@ describe("streamChat: Ereignis „bezug“ (0.15)", () => {
         const ereignisse = await alles(streamChat([{ role: "user", content: "x" }]));
 
         // Ohne `stunde` im Ereignis (Backend vor 0.19 oder ohne Lesezugang): null, kein Link.
-        expect(ereignisse).toContainEqual({ type: "bezug", groupId: 7, subjectId: 6, stundeId: "s-1", stunde: null });
+        expect(ereignisse).toContainEqual({ type: "bezug", groupId: 7, subjectId: 6, stundeId: "s-1", stunde: null, curriculum: null });
         expect(ereignisse.filter((e) => typeof e === "string").join("")).toBe("Gefunden.");
     });
 

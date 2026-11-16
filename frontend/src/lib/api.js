@@ -366,7 +366,9 @@ export async function* streamChat(
   // C2 (0.24): `assistentBeenden` — zurück zum Standard-Chat in derselben Konversation.
   // 0.41: `produktIds` — Produkte aus der Werkstatt, nur beim Anlegen (erste Antwort sieht sie).
   // 0.41: `kontextIds` — gepufferte Bausteine, ebenso nur beim Anlegen.
-  { signal = null, ersetztLetzte = false, assistentBeenden = false, produktIds = [], kontextIds = [] } = {},
+  // 0.46: `curriculumId` — Curriculumbezug (Curriculum-Assistent), nur beim Anlegen.
+  { signal = null, ersetztLetzte = false, assistentBeenden = false, produktIds = [], kontextIds = [],
+    curriculumId = null } = {},
 ) {
   let res;
   try {
@@ -381,6 +383,7 @@ export async function* streamChat(
       if (subjectId != null) body.subject_id = subjectId;
       if (groupId != null) body.group_id = groupId;
       if (stundeId != null) body.stunde_node_id = stundeId;
+      if (curriculumId != null) body.curriculum_node_id = curriculumId;
       if (produktIds.length) body.produkt_ids = produktIds;
       if (kontextIds.length) body.kontext_node_ids = kontextIds;
     }
@@ -472,7 +475,7 @@ export async function* streamChat(
       // Stundenbezug und Gruppe, von einem Werkzeug gesetzt (`waehle_stunde`, 0.15).
       if (currentEventType === "bezug") {
         try {
-          const { group_id, subject_id, stunde_node_id, stunde } = JSON.parse(payload);
+          const { group_id, subject_id, stunde_node_id, stunde, curriculum } = JSON.parse(payload);
           yield {
             type: "bezug",
             groupId: group_id ?? null,
@@ -480,6 +483,8 @@ export async function* streamChat(
             stundeId: stunde_node_id ?? null,
             // Anzeige und Link im Kopf des Chats (0.19); null ohne Bezug oder Lesezugang.
             stunde: stunde ?? null,
+            // Bezugscurriculum (0.46): {curriculum_id, titel, entwurf} oder null.
+            curriculum: curriculum ?? null,
           };
         } catch {}
         currentEventType = null;

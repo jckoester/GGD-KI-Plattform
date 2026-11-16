@@ -589,6 +589,10 @@ class Conversation(Base):
     stunde_node_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
     )
+    # Ab 0.46: Curriculumbezug (Curriculum-Assistent, `app/context/curriculum_bezug.py`).
+    curriculum_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
     # Ab Phase 8: aktuell aktiver Assistent (wird bei Wechsel mid-Chat aktualisiert)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL")
@@ -634,6 +638,8 @@ class Conversation(Base):
         Index("idx_conversations_group_id", "group_id"),
         Index("idx_conversations_stunde_node_id", "stunde_node_id",
               postgresql_where=text("stunde_node_id IS NOT NULL")),
+        Index("idx_conversations_curriculum_node_id", "curriculum_node_id",
+              postgresql_where=text("curriculum_node_id IS NOT NULL")),
     )
 
 

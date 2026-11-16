@@ -2236,6 +2236,18 @@
                             <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
                                 <input
                                     type="checkbox"
+                                    checked={form.tool_groups.includes('curriculum_planning')}
+                                    onchange={(e) => faehigkeitSetzen('curriculum_planning', e.currentTarget.checked)}
+                                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                />
+                                Curriculum-Entwurf
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    (Kapitel, Lernsequenzen, Kompetenzen; nur Lehrkräfte, schreibt nur in Entwürfe)
+                                </span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                <input
+                                    type="checkbox"
                                     checked={form.tool_groups.includes('image_generation')}
                                     onchange={(e) => faehigkeitSetzen('image_generation', e.currentTarget.checked)}
                                     class="rounded border-light-ui-3 dark:border-dark-ui-3"

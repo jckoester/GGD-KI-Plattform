@@ -114,6 +114,11 @@ describe('einstiegsFaehigkeit', () => {
     expect(einstiegsFaehigkeit({})).toBeNull()
   })
 
+  it('Curriculumbezug → Curriculum-Entwurf (0.46)', () => {
+    expect(einstiegsFaehigkeit({ curriculumId: 'c' })).toBe('curriculum_planning')
+    expect(einstiegsFaehigkeit({ stundeId: 'x', curriculumId: 'c' })).toBe('lesson_planning')
+  })
+
   it('eine Gruppe allein sucht keinen Assistenten (0.15)', () => {
     // „Neuer Chat" auf der Gruppenseite: Bis 0.15 hieß „nur Gruppe" Jahresplanung — eine
     // Schüler:in hätte den Hinweis „kein Assistent verfügbar" bekommen.

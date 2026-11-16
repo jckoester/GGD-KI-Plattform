@@ -92,6 +92,7 @@
         activeConversationSubjectId,
         activeConversationGroupId,
         activeConversationStunde,
+        activeConversationCurriculum,
     } from "$lib/stores/pageTitle.js";
 
     // Wie in der Sidebar: `admin` ist eine Erweiterung der Lehrkraft-Rolle.
@@ -205,6 +206,8 @@
     let pendingGroupId = $state(null);
     // Stundenbezug (0.15) — nur aus der Adresse (`?stunde_id=`), nur für die neue Konversation.
     let pendingStundeId = $state(null);
+    // Curriculumbezug (0.46) — ebenso nur aus der Adresse (`?curriculum_id=`).
+    let pendingCurriculumId = $state(null);
 
     // @-Mention State für Kontext-Knoten
     let mentionQuery = $state("");
@@ -773,6 +776,7 @@
                 {
                     signal, ersetztLetzte, assistentBeenden,
                     produktIds: conversationId ? [] : pendingProdukte.map((p) => p.artifact_id),
+                    curriculumId: conversationId ? null : pendingCurriculumId,
                     kontextIds: conversationId ? [] : pendingContextNodes.map((n) => n.node_id),
                 },
             )) {
@@ -854,7 +858,10 @@
                         pendingSubjectId = null;
                         pendingGroupId = null;
                     }
-                    if (wasNewConversation) pendingStundeId = null;
+                    if (wasNewConversation) {
+                        pendingStundeId = null;
+                        pendingCurriculumId = null;
+                    }
                     // Sidebar-Zähler aktualisieren für neue Konversation
                     if (wasNewConversation) {
                         refreshConversationCounts();
@@ -879,6 +886,7 @@
                     activeConversationGroupId.set(item.groupId);
                     activeConversationSubjectId.set(item.subjectId);
                     activeConversationStunde.set(item.stunde ?? null);
+                    activeConversationCurriculum.set(item.curriculum ?? null);
                     continue;
                 }
                 // Titel-Event
@@ -1354,6 +1362,7 @@
                 activeConversationSubjectId.set(data.subject_id ?? null);
                 activeConversationGroupId.set(data.group_id ?? null);
                 activeConversationStunde.set(data.stunde ?? null);
+                activeConversationCurriculum.set(data.curriculum ?? null);
                 // Kontext-Knoten laden
                 try {
                     contextNodes = await getChatContextNodes(data.id);
@@ -1380,6 +1389,7 @@
                         activeConversationSubjectId.set(null);
                         activeConversationGroupId.set(null);
                         activeConversationStunde.set(null);
+                        activeConversationCurriculum.set(null);
                         pendingSuggestions = null;
                     }
                 } else {
@@ -1391,6 +1401,7 @@
                     activeConversationSubjectId.set(null);
                     activeConversationGroupId.set(null);
                     activeConversationStunde.set(null);
+                    activeConversationCurriculum.set(null);
                 }
                 pendingSuggestions = null;
             } finally {
@@ -1411,12 +1422,14 @@
             activeConversationSubjectId.set(null);
             activeConversationGroupId.set(null);
             activeConversationStunde.set(null);
+            activeConversationCurriculum.set(null);
             conversationAssistant = null;
             pickerOpen = false;
             subjectPickerOpen = false;
             pendingSubjectId = null;
             pendingGroupId = null;
             pendingStundeId = null;
+            pendingCurriculumId = null;
             contextNodes = [];
             // Bausteine, die von der Suchseite mitgegeben wurden („Neuen Chat damit
             // starten"). Einmalig — `uebernehmen()` verbraucht die Übergabe, sonst
@@ -1455,12 +1468,15 @@
     // bekam damit eine schlechtere Suche als über den Umweg „Fach von Hand wählen".
     // Was der Link schreibt und was hier gelesen wird, steht in `$lib/chatziel.js`.
     $effect(() => {
-        const { subjectId, groupId, stundeId, faehigkeit: genannt } = chatVorgaben($page.url.searchParams);
+        const { subjectId, groupId, stundeId, curriculumId, faehigkeit: genannt } = chatVorgaben($page.url.searchParams);
         if (subjectId !== null && !conversationId) {
             pendingSubjectId = subjectId;
         }
         if (stundeId !== null && !conversationId) {
             pendingStundeId = stundeId;
+        }
+        if (curriculumId !== null && stundeId === null && !conversationId) {
+            pendingCurriculumId = curriculumId;
         }
         if (groupId !== null && !conversationId) {
             pendingGroupId = groupId;
@@ -1468,7 +1484,7 @@
         // Nennt der Einstieg keinen Assistenten, sucht er einen nach Fähigkeit — in der
         // festen Reihenfolge aus F7 (`$lib/assistentenwahl.js`). Bis 0.14 hieß das „der erste
         // mit `planning`", und ein zweiter solcher Assistent machte die Wahl zum Zufall.
-        const faehigkeit = einstiegsFaehigkeit({ stundeId, faehigkeit: genannt });
+        const faehigkeit = einstiegsFaehigkeit({ stundeId, curriculumId, faehigkeit: genannt });
         fehlendeFaehigkeit = null;
         if (
             faehigkeit &&
@@ -1522,6 +1538,7 @@
         activeConversationSubjectId.set(null);
         activeConversationGroupId.set(null);
         activeConversationStunde.set(null);
+        activeConversationCurriculum.set(null);
     });
 
     // Automatisch Konversationen neu laden nach Stream-Ende

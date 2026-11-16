@@ -34,6 +34,7 @@ PRODUKTARTEN: tuple[Produktart, ...] = (
     Produktart("document", "erstellt Dokumente", "Dokumente"),
     Produktart("lesson_plan", "plant Stunden", "Stundenentwürfe", "lesson_planning"),
     Produktart("year_plan", "plant das Schuljahr", "Jahresplanung", "planning"),
+    Produktart("curriculum", "erstellt Curricula", "Curricula", "curriculum_planning"),  # 0.46, E21
 )
 
 KENNUNGEN: frozenset[str] = frozenset(p.id for p in PRODUKTARTEN)

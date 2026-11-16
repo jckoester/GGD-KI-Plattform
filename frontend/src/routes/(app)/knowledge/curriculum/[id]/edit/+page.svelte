@@ -19,6 +19,7 @@
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
+    import CurriculumAssistentKnopf from "$lib/components/CurriculumAssistentKnopf.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -620,6 +621,7 @@
                 </div>
                 <div bind:this={topActionsEl} class="flex gap-2 items-center">
                     {#if curriculum?.status === "draft"}
+                        <CurriculumAssistentKnopf {curriculum} gesperrt={dirty || saving} />
                         <CurriculumFreigabe {curriculum} gesperrt={dirty} />
                     {/if}
                     {#if dirty}

@@ -385,14 +385,20 @@ def test_der_chat_uebernimmt_einen_gewaehlten_bezug():
     }
     assert "conversation_stunde_id = tool_ctx.stunde_node_id" in zuweisungen
     assert "conversation_group_id = tool_ctx.group_id" in zuweisungen
+    # 0.46: ebenso das Bezugscurriculum (`waehle_curriculum`, `lege_curriculum_an`).
+    assert "conversation_curriculum_id = tool_ctx.curriculum_node_id" in zuweisungen
     # … und meldet die Änderung der Chatseite, die sonst die alte Gruppe anzeigt (Schritt 4).
     assert "event: bezug" in inspect.getsource(router)
     # 0.19: Das Ereignis trägt die Stunde für den Link im Kopf des Chats — auch gleich zu
     # Beginn einer neuen Konversation aus der Entwurfsansicht, nicht erst nach `waehle_stunde`.
+    # Seit 0.46 baut es eine Hilfsfunktion, mit Stunde und Curriculum; zwei Stellen senden es.
     quelle = inspect.getsource(router)
-    assert quelle.count('"stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)') == 2
-    # 0.20 (AC, F1): ebenso, wenn die Gruppe aus dem Fach abgeleitet wurde.
-    assert "if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet):" in quelle
+    assert '"stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)' in quelle
+    assert '"curriculum": _cur' in quelle
+    assert quelle.count("yield await _bezug_ereignis()") == 2
+    # 0.20 (AC, F1): ebenso, wenn die Gruppe aus dem Fach abgeleitet wurde; 0.46 mit Curriculum.
+    assert "if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet" in quelle
+    assert "or conversation_curriculum_id is not None):" in quelle
 
 
 # ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────

@@ -54,7 +54,7 @@ from app.chat.image_store import (
     save_generated_image,
     unlink_paths,
 )
-from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig
+from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
 from app.assistants import vorschlag as vorschlag_dienst
@@ -96,6 +96,7 @@ from app.pedagogy.hausversuche import (
     gefahr_fuer as hausversuch_gefahr,
 )
 from app.pedagogy.compose import compose_system_content, is_student_treatment
+from app.context import curriculum_bezug
 from app.planning.stundenbezug import (
     bezug_fuer_anzeige, bezugszeile, mit_stundenwerkzeugen, stunde_fuer_bezug,
 )
@@ -181,6 +182,8 @@ class ConversationDetailResponse(BaseModel):
     group_id: Optional[int] = None
     # Die Bezugsstunde für den Link im Kopf des Chats (0.19) — `bezug_fuer_anzeige`.
     stunde: Optional[dict] = None
+    # Curriculumbezug (0.46): {curriculum_id, titel, entwurf} — oder None.
+    curriculum: Optional[dict] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     is_test: bool = False
@@ -2035,6 +2038,22 @@ async def chat(
             gewuenschte_gruppe = stunde.write_scope_group_id
             conversation_stunde_id = stunde.id
 
+        # Curriculumbezug (0.46): bringt sein Fach mit, keine Gruppe. Eine Unterhaltung arbeitet
+        # an einer Stunde oder an einem Curriculum.
+        conversation_curriculum_id = None
+        bezugs_fach = None
+        if request.curriculum_node_id is not None:
+            if conversation_stunde_id is not None:
+                await client.aclose()
+                raise HTTPException(status_code=422, detail="Stunde und Curriculum zugleich geht nicht")
+            try:
+                bezugs_cur = await curriculum_bezug.curriculum_fuer_bezug(db, request.curriculum_node_id, current_user)
+            except HTTPException:
+                await client.aclose()
+                raise
+            conversation_curriculum_id = bezugs_cur.id
+            bezugs_fach = bezugs_cur.subject_id
+
         # Kontext aus Request oder Assistent ableiten
         if gewuenschte_gruppe is not None:
             # group_id gesetzt: nur eine eigene Unterrichtsgruppe; subject_id aus ihr ableiten
@@ -2047,6 +2066,10 @@ async def chat(
         elif request.subject_id is not None:
             # Nur subject_id gesetzt (Lehrkraft: Fach-Ebene ohne Gruppe)
             subject_id = request.subject_id
+            group_id = None
+        elif bezugs_fach is not None:
+            # Curriculumbezug: Fach-Ebene des Curriculums
+            subject_id = bezugs_fach
             group_id = None
         else:
             # Fallback: aus Assistent ableiten
@@ -2070,6 +2093,7 @@ async def chat(
             subject_id=subject_id,
             group_id=group_id,
             stunde_node_id=conversation_stunde_id,
+            curriculum_node_id=conversation_curriculum_id,
             system_prompt_snapshot=system_prompt_snapshot,
             is_test=request.is_test,
             preview_context=vorschau.chat_kontext(current_user),
@@ -2115,6 +2139,7 @@ async def chat(
         active_assistant_id = existing.assistant_id
         conversation_group_id = existing.group_id
         conversation_stunde_id = existing.stunde_node_id
+        conversation_curriculum_id = existing.curriculum_node_id
         conversation_is_test = existing.is_test
         conversation_vorschau = existing.preview_context is not None
         schon_vorgeschlagen = set(existing.vorgeschlagen or [])
@@ -2318,10 +2343,13 @@ async def chat(
             student_treatment=student_treatment,
             stufe=_stufe,
             fach=await _fach_name(db, conversation_id),
-            bezug=await bezugszeile(
-                db, conversation_stunde_id, current_user,
-                mit_lesewerkzeug=mit_stundenwerkzeugen(active_assistant),
-            ),
+            bezug="\n".join(z for z in (
+                await bezugszeile(
+                    db, conversation_stunde_id, current_user,
+                    mit_lesewerkzeug=mit_stundenwerkzeugen(active_assistant),
+                ),
+                await curriculum_bezug.bezugszeile(db, conversation_curriculum_id, current_user),
+            ) if z) or None,
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,
@@ -2513,21 +2541,32 @@ async def chat(
         # ersten Zuweisung endete in einem UnboundLocalError, den das `except` beim
         # Persistieren stillschweigend schluckte: Der Chat sähe normal aus, es würde nur
         # nichts mehr gespeichert. Dasselbe gilt für Stundenbezug und Gruppe (unten).
-        nonlocal _deployment_id, conversation_stunde_id, conversation_group_id
+        nonlocal _deployment_id, conversation_stunde_id, conversation_group_id, conversation_curriculum_id
 
-        # Neue Unterhaltung aus der Entwurfsansicht: Der Kopf des Chats zeigt die Stunde
-        # gleich, nicht erst nach dem Neuladen (0.19, Schritt 2).
-        # Ebenso eine aus dem Fach abgeleitete Gruppe (0.20, F1).
-        if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet):
+        async def _bezug_ereignis() -> str:
+            """Ereignis `bezug`: Gruppe, Fach, Stunde und Curriculum für den Kopf des Chats."""
             _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
+            _cur = await curriculum_bezug.bezug_fuer_anzeige(db, conversation_curriculum_id, current_user)
+            _fach = _gruppe.subject_id if _gruppe else None
+            if _fach is None and _cur is not None:
+                _cur_knoten = await db.get(ContextNode, conversation_curriculum_id)
+                _fach = _cur_knoten.subject_id if _cur_knoten else None
             _bezug = {
                 "group_id": conversation_group_id,
-                "subject_id": _gruppe.subject_id if _gruppe else None,
+                "subject_id": _fach,
                 "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
                 "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user)
                 if conversation_stunde_id else None,
+                "curriculum": _cur,
             }
-            yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
+            return f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
+
+        # Neue Unterhaltung aus der Entwurfsansicht: Der Kopf des Chats zeigt die Stunde
+        # gleich, nicht erst nach dem Neuladen (0.19, Schritt 2).
+        # Ebenso eine aus dem Fach abgeleitete Gruppe (0.20, F1) und ein Curriculum (0.46).
+        if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet
+                       or conversation_curriculum_id is not None):
+            yield await _bezug_ereignis()
 
         full_content: list[str] = []
         usage: dict = {}
@@ -2717,7 +2756,7 @@ async def chat(
                         f"data: {json.dumps({'tool': _tc_name, 'round': _round + 1})}\n\n"
                     )
 
-                    _bezug_vorher = (conversation_stunde_id, conversation_group_id)
+                    _bezug_vorher = (conversation_stunde_id, conversation_group_id, conversation_curriculum_id)
                     try:
                         args = json.loads("".join(_tc_args) or "{}")
                         if _tc_name == "search_context_nodes":
@@ -2732,6 +2771,7 @@ async def chat(
                             erlaubte_modelle=_erlaubte_modelle,
                             bausteine=_werkzeug_bausteine,
                             stunde_node_id=conversation_stunde_id,
+                            curriculum_node_id=conversation_curriculum_id,
                         )
                         tool_result = await tool.handler(args, tool_ctx)
                         if _tc_name == "list_context_nodes":
@@ -2748,21 +2788,15 @@ async def chat(
                         # ein Aufruf ohne Kennung noch in den vorigen Bezug.
                         conversation_stunde_id = tool_ctx.stunde_node_id
                         conversation_group_id = tool_ctx.group_id
+                        conversation_curriculum_id = tool_ctx.curriculum_node_id
                     except Exception:
                         logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
                         tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
 
                     # Die Chatseite zeigt Fach und Gruppe über dem Eingabefeld — ohne dieses
                     # Ereignis stimmte die Anzeige nach `waehle_stunde` erst nach dem Neuladen.
-                    if (conversation_stunde_id, conversation_group_id) != _bezug_vorher:
-                        _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
-                        _bezug = {
-                            "group_id": conversation_group_id,
-                            "subject_id": _gruppe.subject_id if _gruppe else None,
-                            "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
-                            "stunde": await bezug_fuer_anzeige(db, conversation_stunde_id, current_user),
-                        }
-                        yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
+                    if (conversation_stunde_id, conversation_group_id, conversation_curriculum_id) != _bezug_vorher:
+                        yield await _bezug_ereignis()
 
                     # Welches Werkzeug gegriffen hat, ließ sich bisher nirgends ablesen: Das
                     # SSE-Ereignis `tool_status` trägt den Namen, wird im Frontend aber von
@@ -3755,6 +3789,7 @@ async def get_conversation_messages(
         subject_id=conversation.subject_id,
         group_id=conversation.group_id,
         stunde=await bezug_fuer_anzeige(db, conversation.stunde_node_id, current_user),
+        curriculum=await curriculum_bezug.bezug_fuer_anzeige(db, conversation.curriculum_node_id, current_user),
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         is_test=conversation.is_test,

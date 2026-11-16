@@ -2402,12 +2402,8 @@ async def create_curriculum_node(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    """Erstellt einen neuen leeren Curriculum-Knoten für den Editor."""
-    from app.db.models import Group
-    from app.context.service import (
-        get_subject_department_group_id,
-        is_subject_department_member,
-    )
+    """Erstellt einen neuen leeren Curriculum-Knoten für den Editor (als Entwurf)."""
+    from app.context.curriculum_entwurf import curriculum_anlegen
     import uuid as _uuid
 
     # Fachplan laden per Node-UUID — Pflicht (subject_id wird von dort abgeleitet)
@@ -2422,92 +2418,12 @@ async def create_curriculum_node(
             status_code=422,
             detail=f"Für Fach {payload.fach_code} / BP-Version {payload.bp_version} ist kein Bildungsplan importiert",
         )
-
-    subject_id = fachplan_node.subject_id
-    if not subject_id:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Fachplan nicht mit einem Fach verknüpft — bitte Bildungsplan neu importieren",
-        )
-
-    # Fachschafts-Gruppen-ID (deterministisch) — für write_scope_group_id unten.
-    department_group_id = await get_subject_department_group_id(db, subject_id)
-
-    # Fachschafts-Zugehörigkeit prüfen: Mitgliedschaft in IRGENDEINER
-    # subject_department-Gruppe des Fachs (robust gegen Alt-/Doppelgruppen mit
-    # abweichender sso_group_id). Existiert für das Fach gar keine Fachschaft,
-    # wird nicht geprüft (Verhalten wie bisher).
-    #
-    # **Admins sind ausgenommen — bewusst** (Entscheidung Jan, 05.11.2026, 0.34): eine
-    # Verwaltungsbefugnis, keine Abweichung von der Rollenregel „Admin verhält sich wie eine
-    # Lehrkraft“ (die gilt für Chat, Seitenleiste, Verlauf). Admins richten Curricula auch für
-    # Fächer ein, deren Fachschaft (noch) niemanden hat, und helfen dort aus. Dieselbe
-    # Befugnis gilt beim Bearbeiten (`docs/user/curriculum.md`).
-    if department_group_id is not None and "admin" not in user.roles:
-        if not await is_subject_department_member(db, subject_id, user.sub):
-            raise HTTPException(
-                status_code=403,
-                detail="Keine Berechtigung - du musst Mitglied der Fachschaft sein"
-            )
-
-    # Idempotenz: bestehenden aktiven Knoten zurückliefern
-    import_key = f"new_{user.sub}_{payload.fach_code}_{payload.jahrgangsstufe}_{payload.bp_version}"
-    existing = await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.metadata_["import_key"].astext == import_key,
-            ContextNode.status == "active",
-        ).limit(1)
+    curriculum = await curriculum_anlegen(
+        db, fachplan_node, user, fach_code=payload.fach_code, schulart=payload.schulart,
+        jahrgangsstufe=payload.jahrgangsstufe, bp_version=payload.bp_version, schule=payload.schule,
     )
-    existing_node = existing.scalar_one_or_none()
-    if existing_node:
-        return existing_node
-
-    cur_min_grade, cur_max_grade = parse_grade_band(payload.jahrgangsstufe)
-    curriculum = ContextNode(
-        category="knowledge",
-        content_type="curriculum",
-        title=f"{payload.fach_code} Kl. {payload.jahrgangsstufe}",
-        content=None,
-        read_scope="school",
-        write_scope="subject",
-        write_scope_group_id=department_group_id,
-        subject_id=subject_id,
-        min_grade=cur_min_grade,
-        max_grade=cur_max_grade,
-        owner_pseudonym=user.sub,
-        metadata_={
-            # Geschäftsschlüssel des Bildungsplans — konsistent mit dem Import-Pfad
-            # (service.import_curriculum schreibt dasselbe Feld). Kann fehlen, wenn
-            # der Fachplan-Knoten keinen trägt.
-            "fachplan_id": (fachplan_node.metadata_ or {}).get("fachplan_id"),
-            # Node-UUID des Fachplans (Primärschlüssel) — redundant zur part_of-Kante,
-            # aber praktisch für direkte Lookups ohne Kanten-Query.
-            "fachplan_node_id": str(fachplan_node.id),
-            "bp_version": payload.bp_version,
-            "schule": payload.schule,
-            "fach_code": payload.fach_code,
-            "schulart": payload.schulart,
-            "jahrgangsstufe": payload.jahrgangsstufe,
-            "import_key": import_key,
-        },
-        # Jedes neue Curriculum ist ein Entwurf (0.45, F2/E11): Ein leeres Curriculum ist nie
-        # fertig. Sichtbar für alle wird es erst über „Veröffentlichen“.
-        status=ENTWURF,
-    )
-    db.add(curriculum)
     await db.commit()
     await db.refresh(curriculum)
-    
-    # part_of-Kante zum Fachplan
-    edge = ContextEdge(
-        from_node_id=curriculum.id,
-        to_node_id=fachplan_node.id,
-        relation="part_of",
-        metadata_={},
-    )
-    db.add(edge)
-    await db.commit()
-    
     return curriculum
 
 
