@@ -143,6 +143,11 @@ ganze Curriculum gilt:
 
 Die Textfelder verstehen Markdown, also auch Aufzählungen.
 
+> **Das Lehrwerk ist eine Angabe, kein Inhalt.** Die Plattform kennt nur den Titel, nicht
+> das Buch. Auch der Curriculum-Assistent weiß nicht, was in welchem Kapitel des Lehrwerks
+> steht, und plant deshalb nicht von selbst danach. Soll er sich daran halten, nenne ihm
+> die Kapitel und ihre Reihenfolge.
+
 Sobald jede Stufe ihre Wochenstunden hat, zeigt der Rahmen, wie viele Stunden **verplanbar**
 sind: 30 je Wochenstunde, bei einem zweistündigen Fach also 60 im Jahr. Den Rest des Schuljahres
 lässt das Curriculum bewusst frei. Daneben steht, wie viele Stunden die Kapitel schon verplanen.

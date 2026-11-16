@@ -103,6 +103,7 @@ from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
+import app.context.curriculum_tools  # noqa: F401 — registriert die Curriculum-Funktionen (0.46)
 from app.core.audit import audit
 from app.auth import vorschau
 from app.feedback import bewertung

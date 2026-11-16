@@ -4,7 +4,13 @@
 export const STUNDEN_JE_WOCHENSTUNDE = 30;
 
 export const RAHMEN_TEXTFELDER = [
-    { feld: "lehrwerk", label: "Lehrwerk", platzhalter: "z. B. Titel, Verlag, Band" },
+    {
+        feld: "lehrwerk",
+        label: "Lehrwerk",
+        platzhalter: "z. B. Titel, Verlag, Band",
+        // Weckt sonst die Erwartung, der Assistent plane nach dem Buch (Jan, 16.11.2026).
+        hinweis: "Nur der Titel: Den Inhalt des Lehrwerks kennt die Plattform nicht – auch der Assistent nicht.",
+    },
     { feld: "beschluesse", label: "Beschlüsse der Fachschaft", platzhalter: "z. B. Lektüren, Pflichtversuche, Exkursionen" },
     { feld: "schwerpunkte", label: "Schwerpunkte", platzhalter: "Wofür die Fachschaft die freie Zeit nutzt" },
     { feld: "absprachen", label: "Absprachen", platzhalter: "z. B. Leistungsnachweise, Methoden- und Medienkonzept" },

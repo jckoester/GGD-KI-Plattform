@@ -119,6 +119,9 @@
                                        text-light-tx dark:text-dark-tx
                                        focus:outline-none focus:border-primary dark:focus:border-primary-dark"
                             ></textarea>
+                            {#if f.hinweis}
+                                <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">{f.hinweis}</span>
+                            {/if}
                         </label>
                     {:else if rahmen?.[f.feld]}
                         <div>

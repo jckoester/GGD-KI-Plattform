@@ -155,6 +155,36 @@ speichert nicht, wenn es scheitert), `POST /curricula/{id}/undo`. Rechte: `_requ
   vorhandenes Curriculum importiert, löscht dessen Rahmen.
 - Kopieren als Entwurf, Veröffentlichen und Rückgängig nehmen den Rahmen mit (Teil der Metadaten).
 
+## Funktionen des Curriculum-Assistenten (seit 0.46)
+
+Fähigkeit `curriculum_planning` (`FAEHIGKEITEN`). Registrierung `app/context/curriculum_tools.py`,
+Arbeit `app/context/curriculum_assistent.py`. Freigeschaltet wird die Fähigkeit in `tools_for` erst
+mit dem Konversationsbezug (Schritt 6); bis dahin ist sie registriert, aber in keinem Chat aktiv.
+
+| Funktion | liest/schreibt | Inhalt |
+|---|---|---|
+| `get_curriculum_draft` | liest | Baum mit Rahmen, Kennungen, Einträgen; Kompetenzen als Nummern (`ik`, `ik_teilweise`, `pk`), Begriffe mit `zustand` |
+| `get_bp_competences` | liest | ohne `bereich` Übersicht (Bereich = `thematische_gruppe`, Anzahl, Nummernspanne); mit `bereich` (Name, Teil davon, Nummernpräfix, `alle`) die Texte; `typ: pk` |
+| `get_curriculum_coverage` | liest | Abdeckung (Teil A) als Zahlen und Nummern, ohne Texte |
+| `get_hour_frame` | liest | `verplanbar` (30 × Wochenstunden), `verplant` (Summe der Lernsequenzen), `rest`, `fehlende_stufen` |
+| `apply_curriculum_operations` | schreibt | Stapel aus `kapitel_*`, `lernsequenz_*`, `eintrag_*` (anlegen, ändern, löschen; `position` ab 1; `ref` für eben Angelegtes) |
+| `set_curriculum_frame` | schreibt | Rahmenangaben ergänzen (Wochenstunden je Stufe zusammengeführt) |
+| `undo_last_curriculum_change` | schreibt | `zuruecknehmen` aus dem Verlauf — derselbe wie im Editor |
+
+- **Zugang:** `zugang()` ruft `_require_curriculum_write` (die Regel des Editors) — auch zum Lesen.
+  Schreiben zusätzlich nur bei `status == draft` (E17), sonst `NUR_ENTWUERFE`. Bezug:
+  `curriculum_id` im Aufruf oder `ToolContext.curriculum_node_id` (Vorgabe, keine Erlaubnis).
+- **Kompetenzen des Bands:** `kompetenzen_des_bands()` in `curriculum_abdeckung.py` — dieselbe Menge
+  für Abdeckung, `get_bp_competences` und die Prüfung der Nummern. Eine Nummer außerhalb (anderes
+  Band, andere Fassung, erfunden) weist der Stapel ab.
+- **Ganz oder gar nicht:** `_Plan` wendet alle Operationen erst im Speicher an; bei einem Fehler
+  wird nichts geschrieben und kein Stand gesichert. Sonst `sichern(grund="assistant")`, dann
+  schreiben: Gelöschtes zuerst (CASCADE), neue Teile als Entwurf der aufrufenden Person,
+  `reihenfolge` neu durchgezählt, Kapitel-`std` = Summe der Lernsequenzen, Kanten der geänderten
+  Lernsequenzen wie im Editor (`_soll_kanten` ≙ `deriveRefsFromEntries`: IK `references` mit
+  `partiell`, PK `develops`, Verweise in Hinweisen `references`, Material `used_with`).
+- Kein Commit in den Funktionen; der Chat committet am Ende der Antwort.
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

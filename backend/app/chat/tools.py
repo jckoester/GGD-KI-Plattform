@@ -63,6 +63,9 @@ class ToolContext:
     # Stundenbezug der Konversation (0.15): Vorgabe für `node_id` der Stundenwerkzeuge.
     # Eine Vorgabe, keine Erlaubnis — den Zugang prüft das Werkzeug wie bei jeder Kennung.
     stunde_node_id: UUID | None = None
+    # Curriculumbezug der Konversation (0.46): Vorgabe für `curriculum_id` der Funktionen
+    # des Curriculum-Assistenten — wie `stunde_node_id` keine Erlaubnis.
+    curriculum_node_id: UUID | None = None
 
 
 @dataclass
@@ -115,6 +118,7 @@ FAEHIGKEITEN: frozenset[str] = frozenset({
     "lesson_planning",     # Stundenentwurf (Lehrkraft-Rolle, auch ohne Gruppenbezug)
     "student_planning",   # Planungsdaten lesen (Schüler:innen, mit Gruppenbezug)
     "image_generation",    # Bildgenerierung
+    "curriculum_planning", # Curriculum-Entwurf (0.46; schreibt nur in Entwürfe)
 })
 
 TOOL_REGISTRY: dict[str, ChatTool] = {}

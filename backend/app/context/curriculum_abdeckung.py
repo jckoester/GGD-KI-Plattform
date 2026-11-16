@@ -72,21 +72,17 @@ def _bp_version(cur: ContextNode) -> str | None:
     return (cur.metadata_ or {}).get("bp_version") or cur.bp_version
 
 
-async def abdeckung(db: AsyncSession, tree: dict) -> dict:
-    """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
-    cur = await db.get(ContextNode, tree["id"])
-    bp = _bp_version(cur)
-    ls_titel = _lernsequenzen(tree)
-    leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
-            "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
-            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
-            "hinweis": None}
-    if cur.subject_id is None or not bp:
-        return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
+async def kompetenzen_des_bands(db: AsyncSession, cur: ContextNode) -> tuple[list[ContextNode], list[ContextNode]]:
+    """IK des Bands und PK des Fachs in der Fassung des Curriculums — dieselbe Menge für
+    Abdeckung und Assistent (`get_bp_competences`). Leer ohne Fach oder Fassung.
 
-    # Geltende oder kommende Fassung (0.46): nur deren Knoten — archivierte daneben sind
-    # abgelöste Doppel (alte `bp_id`-Schreibweise). Ein Curriculum auf einer abgelösten
-    # Fassung hat nur archivierte; dann zählen die.
+    Geltende oder kommende Fassung (0.46): nur deren Knoten — archivierte daneben sind
+    abgelöste Doppel (alte `bp_id`-Schreibweise). Ein Curriculum auf einer abgelösten
+    Fassung hat nur archivierte; dann zählen die.
+    """
+    bp = _bp_version(cur)
+    if cur.subject_id is None or not bp:
+        return [], []
     fassung = sa.and_(ContextNode.subject_id == cur.subject_id, ContextNode.bp_version == bp)
     lebt = (await db.execute(sa.select(sa.exists().where(
         fassung, ContextNode.status.in_(BP_STATUS_CURRICULUM),
@@ -101,6 +97,21 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
         ContextNode.content_type == "ik_kompetenz", im_fach, band))).scalars().all()
     pks = (await db.execute(sa.select(ContextNode).where(
         ContextNode.content_type == "pk_kompetenz", im_fach))).scalars().all()
+    return list(iks), list(pks)
+
+
+async def abdeckung(db: AsyncSession, tree: dict) -> dict:
+    """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
+    cur = await db.get(ContextNode, tree["id"])
+    bp = _bp_version(cur)
+    ls_titel = _lernsequenzen(tree)
+    leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
+            "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
+            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
+            "hinweis": None}
+    if cur.subject_id is None or not bp:
+        return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
+    iks, pks = await kompetenzen_des_bands(db, cur)
 
     # Spalten IK und PK der Einträge: je Kompetenz die Lernsequenzen, bei IK mit `partiell`.
     voll: dict[UUID, set[str]] = {}
