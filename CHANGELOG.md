@@ -15,6 +15,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   stellt ihn wieder her, Speicherung für Speicherung (bis zu 30).
 - Rahmen am Curriculum: Wochenstunden je Klassenstufe, Lehrwerk, Beschlüsse, Schwerpunkte und
   Absprachen; dazu die verplanbaren Stunden (30 je Wochenstunde). Im Export vor dem ersten Kapitel.
+- Assistent „Curriculum-Entwurf“ für Lehrkräfte: baut Curriculum-Entwürfe Kapitel für Kapitel auf
+  und überarbeitet sie. Er prüft jeden Vorschlag vor dem Zeigen, nennt die Stundenbilanz und, was
+  wegfällt, und schreibt erst nach Zustimmung. Änderungen aus dem Editor oder von anderen nimmt er
+  nur nach Rückfrage zurück.
 
 ### Geändert
 
@@ -30,6 +34,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `alembic upgrade head` (0107, 0108, 0109), danach den Bildungsplan einmal vollständig importieren
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
+- `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an.
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus
   `config/prompts/jahresplan_assistent.md` übernehmen.
 

@@ -8,6 +8,9 @@ Die Funktionen (`app/context/curriculum_tools.py`) sind dünn; hier steht die Ar
   Zustand), `kompetenzen_lesen` (Übersicht des Bands oder die Texte eines Bereichs),
   `abdeckung_kompakt` (Zahlen und Nummern aus der Abdeckung, Teil A), `stundenrahmen`
   (30 × Wochenstunden aus den Rahmenangaben, E19).
+- **Prüfen**: `operationen_pruefen` — derselbe Stapel wie beim Schreiben, im Speicher
+  angewandt (`_planen`), danach Schluss: kein Sichern, kein Schreiben. Prüflauf und Schreiben
+  antworten gleich (`_ergebnis`: Gliederung, `verplant`/`verplanbar`/`rest`, `geloescht`).
 - **Schreiben**: `operationen_anwenden` — ein Stapel, **ganz oder gar nicht**. Erst wird der
   ganze Stapel im Speicher angewandt und geprüft (Kompetenznummern nur aus dem Band, sonst
   abgewiesen und genannt); nur wenn alles passt, wird der Stand gesichert (Rückgängig, Grund
@@ -201,17 +204,28 @@ async def abdeckung_kompakt(db: AsyncSession, cur: ContextNode) -> dict:
     }
 
 
-async def stundenrahmen(db: AsyncSession, cur: ContextNode) -> dict:
+def _bilanz(cur: ContextNode, verplant: int) -> dict:
+    """`verplant`, `verplanbar`, `rest` — und `fehlende_stufen`, solange Wochenstunden fehlen
+    (dann sind `verplanbar` und `rest` null). Dieselbe Rechnung für Stundenrahmen, Prüflauf und
+    Schreiben."""
     meta = cur.metadata_ or {}
     rahmen = meta.get("rahmen") or {}
     jg = meta.get("jahrgangsstufe")
     ws = rahmen.get("wochenstunden") or {}
-    verplant = _verplant(await load_curriculum_tree(db, cur.id))
     v = verplanbar(rahmen, jg)
-    aus = {"jahrgangsstufe": jg, "wochenstunden": ws, "regel": f"{STUNDEN_JE_WOCHENSTUNDE} Stunden je Wochenstunde",
-           "verplanbar": v, "verplant": verplant, "rest": None if v is None else v - verplant}
+    aus: dict[str, Any] = {"verplant": verplant, "verplanbar": v, "rest": None if v is None else v - verplant}
     if fehlt := [s for s in stufen(jg) if str(s) not in ws]:
         aus["fehlende_stufen"] = fehlt
+    return aus
+
+
+async def stundenrahmen(db: AsyncSession, cur: ContextNode) -> dict:
+    meta = cur.metadata_ or {}
+    bilanz = _bilanz(cur, _verplant(await load_curriculum_tree(db, cur.id)))
+    aus = {"jahrgangsstufe": meta.get("jahrgangsstufe"),
+           "wochenstunden": (meta.get("rahmen") or {}).get("wochenstunden") or {},
+           "regel": f"{STUNDEN_JE_WOCHENSTUNDE} Stunden je Wochenstunde", **bilanz}
+    if bilanz.get("fehlende_stufen"):
         aus["hinweis"] = "Wochenstunden für diese Stufen fehlen — frage die Lehrkraft und halte sie mit set_curriculum_frame fest."
     return aus
 
@@ -271,6 +285,11 @@ class _Plan:
             for k in tree.get("kapitel") or []]
         self.alt_kap = {k.id for k in self.kapitel}
         self.alt_ls = {ls.id for k in self.kapitel for ls in k.lss}
+        # Einträge des Stands vorher, per Identität (für `geloescht`). `_halten` hält die
+        # Objekte am Leben, damit keine `id()` neu vergeben wird.
+        self._halten = [e for k in self.kapitel for ls in k.lss for e in ls.meta.get("eintraege") or []]
+        self.alt_eintraege = {id(e) for e in self._halten}
+        self.eintraege_vorher = len(self._halten)
         self.refs: dict[str, object] = {}
         self.ik = {_normalize_ref((k.metadata_ or {}).get("kompetenz_nr") or ""): k for k in iks}
         self.pk = {_normalize_ref((k.metadata_ or {}).get("kompetenz_nr") or ""): k for k in pks}
@@ -406,11 +425,35 @@ class _Plan:
                 if art == "eintrag_loeschen":
                     eintraege.pop(i)
                 else:
-                    eintraege[i] = self.eintrag(op, eintraege[i])
+                    alt = eintraege[i]
+                    eintraege[i] = self.eintrag(op, alt)
+                    if id(alt) in self.alt_eintraege:  # geändert, aber nicht neu
+                        self._halten.append(eintraege[i])
+                        self.alt_eintraege.add(id(eintraege[i]))
             ls.meta["eintraege"] = eintraege
             ls.geaendert = True
         else:
             raise _Fehler(f"unbekannte Operation „{art}“")
+
+    # Ergebnis
+    def geloescht(self) -> dict[str, int]:
+        """Was der Stapel gegenüber dem Stand vorher entfernt — Lernsequenzen und Einträge
+        gelöschter Kapitel mitgezählt, Verschobenes nicht."""
+        bleibt_ls = [ls for k in self.kapitel for ls in k.lss]
+        eintraege_da = sum(1 for ls in bleibt_ls for e in ls.meta.get("eintraege") or []
+                           if id(e) in self.alt_eintraege)
+        return {"kapitel": len(self.alt_kap - {k.id for k in self.kapitel if k.id}),
+                "lernsequenzen": len(self.alt_ls - {ls.id for ls in bleibt_ls if ls.id}),
+                "eintraege": self.eintraege_vorher - eintraege_da}
+
+    def gliederung(self) -> list[dict]:
+        """Neue Teile haben vor dem Schreiben noch keine Kennung (`id: null`)."""
+        return [{"id": str(k.id) if k.id else None, "titel": k.titel,
+                 "std": sum(als_stundenzahl(ls.meta.get("std")) or 0 for ls in k.lss),
+                 "lernsequenzen": [{"id": str(ls.id) if ls.id else None, "titel": ls.titel,
+                                    "std": als_stundenzahl(ls.meta.get("std")),
+                                    "eintraege": len(ls.meta.get("eintraege") or [])} for ls in k.lss]}
+                for k in self.kapitel]
 
 
 # ── Schreiben: Kanten wie im Editor ──────────────────────────────────────────
@@ -466,10 +509,11 @@ def _neuer_knoten(cur: ContextNode, typ: str, titel: str, meta: dict, content: s
                        subject_id=cur.subject_id, owner_pseudonym=user.sub, metadata_=meta)
 
 
-async def operationen_anwenden(db: AsyncSession, user, cur: ContextNode, ops: list[dict]) -> dict:
-    """Ein Stapel, ganz oder gar nicht. Kein Commit (der Chat committet am Ende der Antwort)."""
+async def _planen(db: AsyncSession, cur: ContextNode, ops) -> _Plan | list[str]:
+    """Den ganzen Stapel im Speicher anwenden — der Plan oder die Liste der Fehler.
+    Gemeinsam für Prüflauf und Schreiben; schreibt nichts."""
     if not isinstance(ops, list) or not ops:
-        return {"ok": False, "fehler": ["operations ist leer"]}
+        return ["operations ist leer"]
     tree = await load_curriculum_tree(db, cur.id)
     iks, pks = await kompetenzen_des_bands(db, cur)
     plan = _Plan(tree, iks, pks)
@@ -482,8 +526,36 @@ async def operationen_anwenden(db: AsyncSession, user, cur: ContextNode, ops: li
             plan.anwenden(op)
         except _Fehler as e:
             fehler.append(f"Operation {i} ({op.get('op')}): {e}")
-    if fehler:
-        return {"ok": False, "fehler": fehler, "hinweis": "Nichts geschrieben — korrigiere und schicke den ganzen Stapel neu."}
+    return fehler or plan
+
+
+def _ergebnis(cur: ContextNode, plan: _Plan, ops: list, *, geschrieben: bool) -> dict:
+    """Antwort von Prüflauf und Schreiben: Gliederung, Stundenbilanz, Gelöschtes."""
+    gliederung = plan.gliederung()
+    aus: dict[str, Any] = {"ok": True, "geschrieben": geschrieben, "angewandt": len(ops),
+                           "gliederung": gliederung, **_bilanz(cur, sum(k["std"] for k in gliederung))}
+    geloescht = plan.geloescht()
+    if any(geloescht.values()):
+        aus["geloescht"] = geloescht
+    if leer := [k["titel"] for k in gliederung if not k["lernsequenzen"]]:
+        aus["hinweis"] = f"Kapitel ohne Lernsequenz: {', '.join(leer)}"
+    return aus
+
+
+async def operationen_pruefen(db: AsyncSession, cur: ContextNode, ops: list[dict]) -> dict:
+    """Prüflauf: derselbe Stapel wie beim Schreiben, ohne Sichern und ohne Schreiben."""
+    plan = await _planen(db, cur, ops)
+    if isinstance(plan, list):
+        return {"ok": False, "fehler": plan,
+                "hinweis": "Korrigiere den Stapel, bevor du ihn der Lehrkraft zeigst."}
+    return _ergebnis(cur, plan, ops, geschrieben=False)
+
+
+async def operationen_anwenden(db: AsyncSession, user, cur: ContextNode, ops: list[dict]) -> dict:
+    """Ein Stapel, ganz oder gar nicht. Kein Commit (der Chat committet am Ende der Antwort)."""
+    plan = await _planen(db, cur, ops)
+    if isinstance(plan, list):
+        return {"ok": False, "fehler": plan, "hinweis": "Nichts geschrieben — korrigiere und schicke den ganzen Stapel neu."}
 
     await sichern(db, cur.id, grund="assistant", von=user.sub)
 
@@ -496,7 +568,6 @@ async def operationen_anwenden(db: AsyncSession, user, cur: ContextNode, ops: li
     if weg:
         await db.execute(sa.delete(ContextNode).where(ContextNode.id.in_(weg)))
 
-    neu_ids: dict[str, str] = {}
     for k_pos, k in enumerate(plan.kapitel, 1):
         k_std = sum(als_stundenzahl(ls.meta.get("std")) or 0 for ls in k.lss)
         if k.neu:
@@ -537,21 +608,9 @@ async def operationen_anwenden(db: AsyncSession, user, cur: ContextNode, ops: li
             if ls.neu or ls.geaendert:
                 await _kanten_abgleichen(db, ls.id, ls_meta.get("eintraege") or [])
     await db.flush()
-    for ref, obj in plan.refs.items():
-        if obj.id is not None:
-            neu_ids[ref] = str(obj.id)
-
-    gliederung = [{"id": str(k.id), "titel": k.titel,
-                   "std": sum(als_stundenzahl(ls.meta.get("std")) or 0 for ls in k.lss),
-                   "lernsequenzen": [{"id": str(ls.id), "titel": ls.titel, "std": als_stundenzahl(ls.meta.get("std")),
-                                      "eintraege": len(ls.meta.get("eintraege") or [])} for ls in k.lss]}
-                  for k in plan.kapitel]
-    aus: dict[str, Any] = {"ok": True, "angewandt": len(ops), "gliederung": gliederung,
-                           "verplant": sum(k["std"] for k in gliederung)}
-    if neu_ids:
+    aus = _ergebnis(cur, plan, ops, geschrieben=True)
+    if neu_ids := {ref: str(obj.id) for ref, obj in plan.refs.items() if obj.id is not None}:
         aus["neue_kennungen"] = neu_ids
-    if leer := [k["titel"] for k in gliederung if not k["lernsequenzen"]]:
-        aus["hinweis"] = f"Kapitel ohne Lernsequenz: {', '.join(leer)}"
     return aus
 
 

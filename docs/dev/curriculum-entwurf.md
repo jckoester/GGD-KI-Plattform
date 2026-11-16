@@ -157,6 +157,13 @@ speichert nicht, wenn es scheitert), `POST /curricula/{id}/undo`. Rechte: `_requ
 
 ## Funktionen des Curriculum-Assistenten (seit 0.46)
 
+**Nur für Lehrkräfte, nur von Admins vergeben.** Den Assistenten braucht die Fachschaft; geseedet
+als „Curriculum-Entwurf“ (`config/assistants.example.yaml`, Prompt
+`config/prompts/curriculum_assistent.md`). `app/api/assistants.py`: `NUR_ADMIN_FAEHIGKEITEN` /
+`NUR_ADMIN_PRODUKTE` übergeht die Fähigkeit und die Marke bei Nicht-Admins (Anlegen, Ändern, Import —
+eine vorhandene bleibt stehen), `_pruefe_nur_lehrkraefte` weist sie bei Zielgruppe `student`/`all` ab
+(422, auch für Admins). Der Editor zeigt das Häkchen nur Admins.
+
 Fähigkeit `curriculum_planning` (`FAEHIGKEITEN`, im Assistenten-Editor „Curriculum-Entwurf“).
 Registrierung `app/context/curriculum_tools.py`, Arbeit `app/context/curriculum_assistent.py`.
 `tools_for` schaltet sie frei, wenn der Assistent sie führt und die Person die Rolle `teacher` hat —
@@ -167,10 +174,11 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
 | `get_curriculum_draft` | liest | Baum mit Rahmen, Kennungen, Einträgen; Kompetenzen als Nummern (`ik`, `ik_teilweise`, `pk`), Begriffe mit `zustand` |
 | `get_bp_competences` | liest | ohne `bereich` Übersicht (Bereich = `thematische_gruppe`, Anzahl, Nummernspanne); mit `bereich` (Name, Teil davon, Nummernpräfix, `alle`) die Texte; `typ: pk` |
 | `get_curriculum_coverage` | liest | Abdeckung (Teil A) als Zahlen und Nummern, ohne Texte |
-| `get_hour_frame` | liest | `verplanbar` (30 × Wochenstunden), `verplant` (Summe der Lernsequenzen), `rest`, `fehlende_stufen` |
-| `apply_curriculum_operations` | schreibt | Stapel aus `kapitel_*`, `lernsequenz_*`, `eintrag_*` (anlegen, ändern, löschen; `position` ab 1; `ref` für eben Angelegtes) |
-| `set_curriculum_frame` | schreibt | Rahmenangaben ergänzen (Wochenstunden je Stufe zusammengeführt) |
-| `undo_last_curriculum_change` | schreibt | `zuruecknehmen` aus dem Verlauf — derselbe wie im Editor |
+| `get_hour_frame` | liest | `verplanbar` (30 × Wochenstunden), `verplant` (Summe der Lernsequenzen), `rest`, `fehlende_stufen` — für den gespeicherten Stand |
+| `check_curriculum_operations` | liest | Prüflauf: derselbe Stapel wie beim Schreiben, ohne Sichern und Schreiben; Antwort wie unten, `geschrieben: false`, neue Teile mit `id: null` |
+| `apply_curriculum_operations` | schreibt | Stapel aus `kapitel_*`, `lernsequenz_*`, `eintrag_*` (anlegen, ändern, löschen; `position` ab 1; `ref` für eben Angelegtes). Antwort: `gliederung`, `verplant`, `verplanbar`, `rest` (null ohne Wochenstunden, dann `fehlende_stufen`), `geloescht` (nur wenn etwas wegfällt), `neue_kennungen` |
+| `set_curriculum_frame` | schreibt | Rahmenangaben ergänzen (Wochenstunden je Stufe zusammengeführt); die Antwort auf eine Rahmenfrage gilt als Zustimmung |
+| `undo_last_curriculum_change` | schreibt | `zuruecknehmen` aus dem Verlauf — derselbe wie im Editor; fremde Stände nur mit `auch_fremde` (siehe unten) |
 | `finde_curriculum` | liest | Curricula der eigenen Fachschaften (Admin: alle), gefiltert nach Fach und Band, mit `offener_entwurf_id`; je Fach die Fassungen zum Anlegen |
 | `waehle_curriculum` | Bezug | setzt das Bezugscurriculum; veröffentlicht mit offenem Entwurf → der Entwurf; ohne → nur lesen, mit `als_entwurf_kopieren` eine Kopie |
 | `lege_curriculum_an` | schreibt | leerer Entwurf am Fachplan (`curriculum_anlegen`, dieselbe Funktion wie `POST /curricula/new`); nicht, wenn es für Band und Fassung schon eins gibt |
@@ -181,13 +189,31 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
 - **Kompetenzen des Bands:** `kompetenzen_des_bands()` in `curriculum_abdeckung.py` — dieselbe Menge
   für Abdeckung, `get_bp_competences` und die Prüfung der Nummern. Eine Nummer außerhalb (anderes
   Band, andere Fassung, erfunden) weist der Stapel ab.
-- **Ganz oder gar nicht:** `_Plan` wendet alle Operationen erst im Speicher an; bei einem Fehler
-  wird nichts geschrieben und kein Stand gesichert. Sonst `sichern(grund="assistant")`, dann
+- **Ganz oder gar nicht:** `_planen()` wendet alle Operationen erst im Speicher an (`_Plan`); bei
+  einem Fehler wird nichts geschrieben und kein Stand gesichert. Der Prüflauf
+  (`operationen_pruefen`) endet hier; Prüflauf und Schreiben antworten über dasselbe `_ergebnis()`,
+  also mit derselben Gliederung, Stundenbilanz (`_bilanz`, wie `get_hour_frame`) und `geloescht`
+  (Kapitel, Lernsequenzen, Einträge gegenüber dem Stand vorher — Inhalt gelöschter Kapitel
+  mitgezählt, Verschobenes nicht). Der Prüflauf ist eine eigene Funktion, kein Schalter am
+  Schreiben: Ein vergessener Schalter schriebe ohne Zustimmung. Beim Schreiben
+  `sichern(grund="assistant")`, dann
   schreiben: Gelöschtes zuerst (CASCADE), neue Teile als Entwurf der aufrufenden Person,
   `reihenfolge` neu durchgezählt, Kapitel-`std` = Summe der Lernsequenzen, Kanten der geänderten
   Lernsequenzen wie im Editor (`_soll_kanten` ≙ `deriveRefsFromEntries`: IK `references` mit
   `partiell`, PK `develops`, Verweise in Hinweisen `references`, Material `used_with`).
+- **Rückgängig:** Ohne Rückfrage nimmt `undo_last_curriculum_change` nur einen Stand zurück, den
+  der Assistent für dieselbe Person gesichert hat (`reason == "assistant"` und
+  `created_by == user.sub`). Sonst schreibt er nichts und antwortet mit `bestaetigung_noetig` und
+  `letzte_aenderung {von, von_mir, zeit, gegenstand}` (ohne Pseudonym); erst `auch_fremde: true`
+  nimmt zurück. `gegenstand` (`curriculum_verlauf.gegenstand()`) vergleicht den Stand mit dem
+  heutigen Baum: `rahmen` (Rahmenangaben), `inhalte` (alles andere). Der Grund des Stands bleibt
+  `editor`/`assistant` (Prüfbedingung `check_cs_reason`); `set_curriculum_frame` sichert also mit
+  `assistant` wie ein Stapel. Der Editor-Weg (`POST /curricula/{id}/undo`) fragt nicht.
 - Kein Commit in den Funktionen; der Chat committet am Ende der Antwort.
+- **Funktionsantworten bleiben nicht im Verlauf.** Gespeichert wird nur der Antworttext
+  (`messages.content`, dazu `werkzeuge_mit_wirkung`); Kennungen aus einem früheren Lesen kennt
+  das Modell in der nächsten Nachricht nicht mehr. Wer nach einer Zustimmung schreibt, liest
+  deshalb in derselben Antwort neu (Prompt: „frisch lesen“).
 
 ### Bezug der Unterhaltung
 

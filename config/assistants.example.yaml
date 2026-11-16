@@ -20,12 +20,31 @@ assistants:
     tool_groups:
       - planning
     # Was er herstellt (0.40): Marke und Filter „Werkzeuge“ in der Assistentenliste.
-    # Kennungen: image, diagram, document, lesson_plan, year_plan (app/assistants/produkte.py).
+    # Kennungen: image, diagram, document, lesson_plan, year_plan, curriculum (app/assistants/produkte.py).
     produces: [year_plan]
     system_prompt_file: config/prompts/jahresplan_assistent.md
     tags:
       - planung
       - jahresplan
+
+  - name: Curriculum-Entwurf
+    description: >
+      Hilft Fachschaften, ein Schulcurriculum zu entwerfen und zu überarbeiten: Kapitel,
+      Lernsequenzen und Einträge mit den Kompetenzen des Bildungsplans, Stundenbilanz und
+      Abdeckung. Schreibt nur in Entwürfe und nur nach Zustimmung; öffnet sich aus dem
+      Curriculum-Editor oder fragt nach Fach und Klassenstufe.
+    # Nur für Lehrkräfte (0.46): Die Fähigkeit curriculum_planning setzen nur Admins, und ein
+    # Assistent mit ihr ist immer audience: teacher.
+    audience: teacher
+    scope: teachers
+    status: active
+    tool_groups:
+      - curriculum_planning
+    produces: [curriculum]
+    system_prompt_file: config/prompts/curriculum_assistent.md
+    tags:
+      - planung
+      - curriculum
 
   - name: Stundenentwurf
     description: >

@@ -92,7 +92,7 @@ async def sichern(db: AsyncSession, curriculum_id: UUID, *, grund: str,
     return stand
 
 
-async def _juengster(db: AsyncSession, curriculum_id: UUID) -> CurriculumSnapshot | None:
+async def juengster(db: AsyncSession, curriculum_id: UUID) -> CurriculumSnapshot | None:
     return (await db.execute(
         sa.select(CurriculumSnapshot).where(CurriculumSnapshot.curriculum_id == curriculum_id)
         .order_by(CurriculumSnapshot.created_at.desc(), CurriculumSnapshot.id.desc()).limit(1)
@@ -103,9 +103,42 @@ async def verlauf(db: AsyncSession, curriculum_id: UUID, user_sub: str) -> dict:
     """Für den Knopf: wie viele Stände, und von wann der jüngste ist (ohne Pseudonyme)."""
     anzahl = await db.scalar(sa.select(sa.func.count()).where(
         CurriculumSnapshot.curriculum_id == curriculum_id))
-    j = await _juengster(db, curriculum_id)
+    j = await juengster(db, curriculum_id)
     return {"anzahl": anzahl or 0, "letzter": None if j is None else {
         "zeit": j.created_at, "grund": j.reason, "von_mir": j.created_by == user_sub}}
+
+
+async def gegenstand(db: AsyncSession, curriculum: ContextNode, stand: CurriculumSnapshot) -> list[str]:
+    """Was das Zurücknehmen dieses Stands ändern würde: `rahmen` (Rahmenangaben am Curriculum),
+    `inhalte` (alles andere — Kapitel, Lernsequenzen, Einträge, Titel). Leer, wenn der Stand dem
+    heutigen gleicht.
+
+    Ermittelt durch Vergleich mit dem heutigen Baum, nicht über den Grund des Stands: Ein
+    Speichern im Editor kann beides ändern, und der Grund bliebe so bei `editor`/`assistant`
+    (Prüfbedingung `check_cs_reason`, keine Migration).
+    """
+    gesichert = {UUID(k["id"]): k for k in stand.payload.get("knoten", [])}
+    aus = []
+    alt_meta = (gesichert.get(curriculum.id) or {}).get("metadata_") or {}
+    jetzt_meta = curriculum.metadata_ or {}
+    if (alt_meta.get("rahmen") or {}) != (jetzt_meta.get("rahmen") or {}):
+        aus.append("rahmen")
+
+    jetzt = await baum_ids(db, curriculum.id)
+    if set(jetzt) != set(gesichert):
+        return aus + ["inhalte"]
+    knoten = {n.id: n for n in (await db.execute(
+        sa.select(ContextNode).where(ContextNode.id.in_(jetzt)))).scalars().all()}
+    for nid, daten in gesichert.items():
+        n = knoten[nid]
+        for f in FELDER:
+            alt, neu = daten.get(f), _wert(getattr(n, f))
+            if f == "metadata_" and nid == curriculum.id:
+                alt = {k: v for k, v in (alt or {}).items() if k != "rahmen"}
+                neu = {k: v for k, v in (neu or {}).items() if k != "rahmen"}
+            if alt != neu:
+                return aus + ["inhalte"]
+    return aus
 
 
 def _feld(f: str, v):
@@ -114,7 +147,7 @@ def _feld(f: str, v):
 
 async def zuruecknehmen(db: AsyncSession, curriculum: ContextNode) -> dict:
     """Stellt den jüngsten Stand wieder her und nimmt ihn aus dem Verlauf. Kein Commit."""
-    stand = await _juengster(db, curriculum.id)
+    stand = await juengster(db, curriculum.id)
     if stand is None:
         raise HTTPException(status_code=404, detail="Es gibt nichts zurückzunehmen.")
     status = curriculum.status

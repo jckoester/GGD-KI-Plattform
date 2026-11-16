@@ -206,19 +206,139 @@ async def test_veroeffentlicht_nur_lesen(db, welt):
     await db.flush()
     assert "kapitel" in await _ruf("get_curriculum_draft", db, welt)
     for name, args in (("apply_curriculum_operations", {"operations": [{"op": "kapitel_anlegen", "titel": "X"}]}),
+                       ("check_curriculum_operations", {"operations": [{"op": "kapitel_anlegen", "titel": "X"}]}),
                        ("set_curriculum_frame", {"lehrwerk": "X"}),
                        ("undo_last_curriculum_change", {})):
         assert (await _ruf(name, db, welt, **args)) == {"error": NUR_ENTWUERFE}
 
 
 async def test_fremde_und_ohne_bezug(db, welt):
-    for name in ("get_curriculum_draft", "get_bp_competences", "apply_curriculum_operations"):
+    for name in ("get_curriculum_draft", "get_bp_competences", "check_curriculum_operations",
+                 "apply_curriculum_operations"):
         antwort = await _ruf(name, db, welt, user=FREMDE, operations=[])
         assert "error" in antwort
     ctx = ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=None)
     assert "curriculum_id erforderlich" in (await TOOL_REGISTRY["get_hour_frame"].handler({}, ctx))["error"]
     mit = await TOOL_REGISTRY["get_hour_frame"].handler({"curriculum_id": str(welt["cur"].id)}, ctx)
     assert mit["verplant"] == 4
+
+
+# ── Prüflauf, Bilanz, Gelöschtes (Arbeitsanweisung 16.11.) ───────────────────
+
+
+def _ohne_kennungen(gliederung):
+    return [{**k, "id": None, "lernsequenzen": [{**ls, "id": None} for ls in k["lernsequenzen"]]}
+            for k in gliederung]
+
+
+def _stapel(w):
+    return [
+        {"op": "kapitel_anlegen", "titel": "Mechanik", "ref": "k2"},
+        {"op": "lernsequenz_anlegen", "kapitel_id": "k2", "titel": "Kräfte", "std": 6, "ref": "l2"},
+        {"op": "eintrag_anlegen", "lernsequenz_id": "l2", "ik": ["3.2.2(1)"]},
+        {"op": "eintrag_loeschen", "lernsequenz_id": str(w["ls"].id), "eintrag": 1},
+    ]
+
+
+async def test_pruefen_schreibt_nichts_und_antwortet_wie_schreiben(db, welt):
+    w = welt
+    await _ruf("set_curriculum_frame", db, w, wochenstunden={"7": 2, "8": 2})
+    staende = len(await _staende(db, w["cur"].id))
+    vorher = await _ruf("get_curriculum_draft", db, w)
+
+    probe = await _ruf("check_curriculum_operations", db, w, operations=_stapel(w))
+    assert probe["ok"] and probe["geschrieben"] is False, probe
+    assert probe["gliederung"][1]["id"] is None and probe["gliederung"][1]["lernsequenzen"][0]["id"] is None
+    assert (probe["verplant"], probe["verplanbar"], probe["rest"]) == (10, 120, 110)
+    assert probe["geloescht"] == {"kapitel": 0, "lernsequenzen": 0, "eintraege": 1}
+    assert "neue_kennungen" not in probe
+    assert len(await _staende(db, w["cur"].id)) == staende
+    assert await _ruf("get_curriculum_draft", db, w) == vorher
+
+    echt = await _ruf("apply_curriculum_operations", db, w, operations=_stapel(w))
+    assert echt["ok"] and echt["geschrieben"] is True
+    assert _ohne_kennungen(echt["gliederung"]) == _ohne_kennungen(probe["gliederung"])
+    for f in ("verplant", "verplanbar", "rest", "geloescht"):
+        assert echt[f] == probe[f], f
+
+
+async def test_pruefen_weist_bandfremde_nummer_ab(db, welt):
+    ops = [{"op": "eintrag_anlegen", "lernsequenz_id": str(welt["ls"].id), "ik": ["3.3.1(1)"]}]
+    probe = await _ruf("check_curriculum_operations", db, welt, operations=ops)
+    echt = await _ruf("apply_curriculum_operations", db, welt, operations=ops)
+    assert probe["ok"] is False and probe["fehler"] == echt["fehler"]
+    assert await _staende(db, welt["cur"].id) == []
+
+
+async def test_geloescht_zaehlt_inhalt_geloeschter_kapitel(db, welt):
+    w = welt
+    probe = await _ruf("check_curriculum_operations", db, w, operations=[
+        {"op": "kapitel_loeschen", "kapitel_id": str(w["kap"].id)}])
+    assert probe["geloescht"] == {"kapitel": 1, "lernsequenzen": 1, "eintraege": 1}
+    assert probe["gliederung"] == []
+    # Verschoben ist nicht gelöscht; ein im Stapel angelegter und wieder gelöschter Eintrag zählt nicht.
+    probe = await _ruf("check_curriculum_operations", db, w, operations=[
+        {"op": "kapitel_anlegen", "titel": "Neu", "ref": "k"},
+        {"op": "lernsequenz_aendern", "lernsequenz_id": str(w["ls"].id), "kapitel_id": "k"},
+        {"op": "eintrag_aendern", "lernsequenz_id": str(w["ls"].id), "eintrag": 1, "konkretisierung": "X"},
+        {"op": "eintrag_anlegen", "lernsequenz_id": str(w["ls"].id)},
+        {"op": "eintrag_loeschen", "lernsequenz_id": str(w["ls"].id), "eintrag": 2},
+        {"op": "kapitel_loeschen", "kapitel_id": str(w["kap"].id)},
+    ])
+    assert probe["geloescht"] == {"kapitel": 1, "lernsequenzen": 0, "eintraege": 0}, probe
+    ohne = await _ruf("check_curriculum_operations", db, w, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
+    assert "geloescht" not in ohne
+
+
+async def test_ohne_wochenstunden_kein_verplanbar(db, welt):
+    for name in ("check_curriculum_operations", "apply_curriculum_operations"):
+        a = await _ruf(name, db, welt, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
+        assert a["verplanbar"] is None and a["rest"] is None and a["fehlende_stufen"] == [7, 8], a
+        assert a["hinweis"] == "Kapitel ohne Lernsequenz: X"
+
+
+# ── Rückgängig: eigene sofort, fremde nur mit Bestätigung ────────────────────
+
+
+async def test_eigenen_stapel_zuruecknehmen_ohne_bestaetigung(db, welt):
+    await _ruf("apply_curriculum_operations", db, welt, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
+    zurueck = await _ruf("undo_last_curriculum_change", db, welt)
+    assert zurueck["ok"] and zurueck["zurueckgenommen"]["gegenstand"] == ["inhalte"]
+    assert zurueck["verbleibend"] == 0
+
+
+async def _titel(db, welt):
+    return (await _ruf("get_curriculum_draft", db, welt))["kapitel"][0]["titel"]
+
+
+@pytest.mark.parametrize("grund, von", [("editor", MITGLIED), ("assistant", FREMDE.sub)])
+async def test_fremde_aenderung_nur_mit_bestaetigung(db, welt, grund, von):
+    from app.context.curriculum_verlauf import sichern
+
+    await sichern(db, welt["cur"].id, grund=grund, von=von)
+    welt["kap"].title = "Geändert"
+    await db.flush()
+
+    frage = await _ruf("undo_last_curriculum_change", db, welt)
+    assert frage["ok"] is False and frage["bestaetigung_noetig"] is True
+    letzte = frage["letzte_aenderung"]
+    assert (letzte["von"], letzte["von_mir"], letzte["gegenstand"]) == (grund, von == MITGLIED, ["inhalte"])
+    assert "zeit" in letzte and FREMDE.sub not in str(frage) and MITGLIED not in str(frage)
+    assert await _titel(db, welt) == "Geändert"
+    assert len(await _staende(db, welt["cur"].id)) == 1
+
+    zurueck = await _ruf("undo_last_curriculum_change", db, welt, auch_fremde=True)
+    assert zurueck["ok"] and zurueck["zurueckgenommen"]["von"] == grund
+    assert await _titel(db, welt) == "Optik"
+
+
+async def test_rueckgaengig_nach_rahmen_nennt_den_rahmen(db, welt):
+    await _ruf("apply_curriculum_operations", db, welt, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
+    await _ruf("set_curriculum_frame", db, welt, lehrwerk="Impulse")
+    zurueck = await _ruf("undo_last_curriculum_change", db, welt)
+    assert zurueck["zurueckgenommen"]["gegenstand"] == ["rahmen"]
+    entwurf = await _ruf("get_curriculum_draft", db, welt)
+    assert entwurf["rahmen"] == {} and [k["titel"] for k in entwurf["kapitel"]] == ["Optik", "X"]
 
 
 # ── Schritt 6: Bezug, Einstieg, Freischaltung ────────────────────────────────

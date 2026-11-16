@@ -658,6 +658,28 @@ def validate_assistant_fields(
 #: schickt die Felder ohnehin mit, und ein 403 legte das Speichern lahm.
 ADMIN_FELDER = ("bausteine", "fallbacks", "operator_faecher")
 
+#: Fähigkeiten und Produktarten, die nur Admins vergeben (0.46): Den Curriculum-Assistenten
+#: braucht die Fachschaft, nicht jede Lehrkraft einen eigenen — und Schüler:innen nie. Wie bei
+#: `ADMIN_FELDER` übergangen, nicht abgewiesen; eine vorhandene bleibt bei einer Lehrkraft stehen.
+NUR_ADMIN_FAEHIGKEITEN = frozenset({"curriculum_planning"})
+NUR_ADMIN_PRODUKTE = frozenset({"curriculum"})
+_NUR_LEHRKRAEFTE = ("Die Fähigkeit „Curriculum-Entwurf“ gibt es nur für Assistenten mit der "
+                    "Zielgruppe Lehrkräfte.")
+
+
+def _nur_admin(werte, gesperrt: frozenset, ist_admin: bool, bisher=None):
+    """Was ein Nicht-Admin an `werte` setzen darf: ohne die gesperrten Kennungen, außer sie
+    standen schon da. ``None`` bleibt ``None`` (nicht angefasst)."""
+    if werte is None or ist_admin:
+        return werte
+    behalten = [w for w in (bisher or []) if w in gesperrt]
+    return [w for w in werte if w not in gesperrt] + [w for w in behalten if w not in werte]
+
+
+def _pruefe_nur_lehrkraefte(audience: Optional[str], tool_groups) -> None:
+    if NUR_ADMIN_FAEHIGKEITEN & set(tool_groups or []) and audience != "teacher":
+        raise HTTPException(status_code=422, detail=_NUR_LEHRKRAEFTE)
+
 
 async def fach_der_gruppe(db: AsyncSession, scope: Optional[str], scope_group_id: Optional[int]) -> Optional[int]:
     """Bei Gruppen-Scope das Fach der Gruppe — ``None``, wenn die Eingabe gilt.
@@ -1131,6 +1153,9 @@ async def create_assistant(
     )
     listen = _bereinigte_ausloeser(request.trigger_examples, request.trigger_counterexamples)
     ist_admin = "admin" in current_user.roles
+    request.tool_groups = _nur_admin(request.tool_groups, NUR_ADMIN_FAEHIGKEITEN, ist_admin)
+    request.produces = _nur_admin(request.produces, NUR_ADMIN_PRODUKTE, ist_admin)
+    _pruefe_nur_lehrkraefte(request.audience, request.tool_groups)
     fallbacks = await _gepruefte_fallbacks(db, request.fallbacks if ist_admin else [], None)
     operator_faecher = await _gepruefte_operator_faecher(db, request.operator_faecher if ist_admin else [])
 
@@ -1215,6 +1240,14 @@ async def update_assistant(
     if not is_admin:
         for feld in ADMIN_FELDER:
             update_data.pop(feld, None)
+    if "tool_groups" in update_data:
+        update_data["tool_groups"] = _nur_admin(
+            update_data["tool_groups"], NUR_ADMIN_FAEHIGKEITEN, is_admin, assistant.tool_groups)
+    if "produces" in update_data:
+        update_data["produces"] = _nur_admin(
+            update_data["produces"], NUR_ADMIN_PRODUKTE, is_admin, assistant.produces)
+    _pruefe_nur_lehrkraefte(update_data.get("audience", assistant.audience),
+                            update_data.get("tool_groups", assistant.tool_groups))
     if "fallbacks" in update_data:
         update_data["fallbacks"] = await _gepruefte_fallbacks(
             db, update_data["fallbacks"] or [], assistant.id
@@ -1701,6 +1734,13 @@ async def import_assistant(
     )
 
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
+    if creator_role != "admin":
+        vorher = list(fields.get("tool_groups") or [])
+        fields["tool_groups"] = _nur_admin(vorher, NUR_ADMIN_FAEHIGKEITEN, False)
+        fields["produces"] = _nur_admin(fields.get("produces") or [], NUR_ADMIN_PRODUKTE, False)
+        if len(fields["tool_groups"]) != len(vorher):
+            hinweise.append("Nicht übernommen (nur Admins): Fähigkeit „Curriculum-Entwurf“.")
+    _pruefe_nur_lehrkraefte(fields.get("audience"), fields.get("tool_groups"))
     if creator_role != "admin":
         uebergangen = [f for f in ADMIN_FELDER if fields.get(f)]
         for feld in ADMIN_FELDER:

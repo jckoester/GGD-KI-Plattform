@@ -5,6 +5,10 @@ hier nur Schema und Übergabe. Jede Funktion prüft den Zugang am Curriculum sel
 (`zugang`, dieselbe Regel wie im Editor) — der Bezug der Unterhaltung (`curriculum_node_id`)
 ist eine Vorgabe, keine Erlaubnis. Geschrieben wird nur in Entwürfe (E17), jeder schreibende
 Aufruf sichert vorher den Stand (Rückgängig im Editor und `undo_last_curriculum_change`).
+
+`check_curriculum_operations` ist der Prüflauf zu `apply_curriculum_operations`: eine eigene
+Funktion (`writes=False`), kein Schalter am Schreiben — ein vergessener Schalter schriebe ohne
+Zustimmung, eine vergessene Prüfung schadet nicht.
 """
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ from uuid import UUID
 
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.context import curriculum_assistent as ca
-from app.context.curriculum_verlauf import verlauf, zuruecknehmen
+from app.context.curriculum_verlauf import gegenstand, juengster, verlauf, zuruecknehmen
 
 GRUPPE = frozenset({"curriculum_planning"})
 
@@ -113,13 +117,59 @@ async def _get_hour_frame(args: dict, ctx: ToolContext) -> dict:
 
 _registriere(
     "get_hour_frame", _get_hour_frame,
-    "Stundenbilanz: verplanbar (30 Stunden je Wochenstunde aus den Rahmenangaben, über alle "
-    "Stufen des Bands), verplant (Summe der Lernsequenzen), rest. verplanbar ist null, solange "
-    "Wochenstunden fehlen. Rechne nicht selbst.",
+    "Stundenbilanz des gespeicherten Stands: verplanbar (30 Stunden je Wochenstunde aus den "
+    "Rahmenangaben, über alle Stufen des Bands), verplant (Summe der Lernsequenzen), rest. "
+    "verplanbar ist null, solange Wochenstunden fehlen. Dieselben Zahlen stehen auch in den "
+    "Antworten von check_curriculum_operations und apply_curriculum_operations. Rechne nicht selbst.",
 )
 
 
 # ── Schreiben ────────────────────────────────────────────────────────────────
+
+
+#: Beschreibung der Operationen — gemeinsam für Prüflauf und Schreiben.
+OPERATIONEN = {
+    "operations": {"type": "array", "items": {"type": "object"}, "description": (
+        "Operationen, je mit 'op'. position zählt ab 1, ohne Angabe ans Ende. Mit ref "
+        "(frei gewählt, z. B. 'k1') kann eine spätere Operation desselben Stapels ein eben "
+        "angelegtes Kapitel oder eine Lernsequenz statt der id nennen.\n"
+        "- kapitel_anlegen{titel, einleitung?, position?, ref?}\n"
+        "- kapitel_aendern{kapitel_id, titel?, einleitung?, position?}\n"
+        "- kapitel_loeschen{kapitel_id}: mit allen Lernsequenzen\n"
+        "- lernsequenz_anlegen{kapitel_id, titel, std?, position?, ref?}\n"
+        "- lernsequenz_aendern{lernsequenz_id, titel?, std?, kapitel_id?, position?}: "
+        "kapitel_id verschiebt in ein anderes Kapitel\n"
+        "- lernsequenz_loeschen{lernsequenz_id}\n"
+        "- eintrag_anlegen{lernsequenz_id, ik?, ik_teilweise?, pk?, konkretisierung?, "
+        "hinweise?, material?, begriffe?, fachmethoden?, position?}: ik, ik_teilweise, pk als "
+        "Listen von Nummern aus get_bp_competences; begriffe und fachmethoden als Listen von "
+        "Namen\n"
+        "- eintrag_aendern{lernsequenz_id, eintrag, …}: eintrag = Nummer ab 1; genannte Felder "
+        "ersetzen die bisherigen, andere bleiben\n"
+        "- eintrag_loeschen{lernsequenz_id, eintrag}")},
+}
+
+_ANTWORT = (
+    "Antwort: gliederung (Kapitel mit Lernsequenzen und Stunden; die Stunden eines Kapitels sind "
+    "die Summe seiner Lernsequenzen), verplant, verplanbar, rest (null, solange Wochenstunden "
+    "fehlen — dann fehlende_stufen) und geloescht (Kapitel, Lernsequenzen, Einträge, die der "
+    "Stapel entfernt; fehlt, wenn nichts gelöscht wird).")
+
+
+async def _check_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
+    cur = await _curriculum(args, ctx, schreiben=True)
+    if isinstance(cur, str):
+        return {"error": cur}
+    return await ca.operationen_pruefen(ctx.db, cur, args.get("operations"))
+
+
+_registriere(
+    "check_curriculum_operations", _check_curriculum_operations,
+    "Prüft einen Stapel, ohne zu schreiben: abgewiesene Operationen (fehler) und die Stunden, wie "
+    "sie nach dem Stapel wären. Vor jedem Vorschlag an die Lehrkraft aufrufen; braucht keine "
+    "Zustimmung. Neue Kapitel und Lernsequenzen haben hier noch keine id (null). " + _ANTWORT,
+    OPERATIONEN, ["operations"],
+)
 
 
 async def _apply_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
@@ -131,32 +181,12 @@ async def _apply_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
 
 _registriere(
     "apply_curriculum_operations", _apply_curriculum_operations,
-    "Schreibt einen Stapel Änderungen in den Entwurf — nur nach Zustimmung der Lehrkraft. Ganz "
-    "oder gar nicht: Passt eine Operation nicht (etwa eine Kompetenznummer außerhalb des Bands), "
-    "wird nichts geschrieben und fehler nennt, was. Vorher wird der Stand gesichert; "
-    "undo_last_curriculum_change nimmt den Stapel zurück. Die Stunden eines Kapitels sind die "
-    "Summe seiner Lernsequenzen.",
-    {
-        "operations": {"type": "array", "items": {"type": "object"}, "description": (
-            "Operationen, je mit 'op'. position zählt ab 1, ohne Angabe ans Ende. Mit ref "
-            "(frei gewählt, z. B. 'k1') kann eine spätere Operation desselben Stapels ein eben "
-            "angelegtes Kapitel oder eine Lernsequenz statt der id nennen.\n"
-            "- kapitel_anlegen{titel, einleitung?, position?, ref?}\n"
-            "- kapitel_aendern{kapitel_id, titel?, einleitung?, position?}\n"
-            "- kapitel_loeschen{kapitel_id}: mit allen Lernsequenzen\n"
-            "- lernsequenz_anlegen{kapitel_id, titel, std?, position?, ref?}\n"
-            "- lernsequenz_aendern{lernsequenz_id, titel?, std?, kapitel_id?, position?}: "
-            "kapitel_id verschiebt in ein anderes Kapitel\n"
-            "- lernsequenz_loeschen{lernsequenz_id}\n"
-            "- eintrag_anlegen{lernsequenz_id, ik?, ik_teilweise?, pk?, konkretisierung?, "
-            "hinweise?, material?, begriffe?, fachmethoden?, position?}: ik, ik_teilweise, pk als "
-            "Listen von Nummern aus get_bp_competences; begriffe und fachmethoden als Listen von "
-            "Namen\n"
-            "- eintrag_aendern{lernsequenz_id, eintrag, …}: eintrag = Nummer ab 1; genannte Felder "
-            "ersetzen die bisherigen, andere bleiben\n"
-            "- eintrag_loeschen{lernsequenz_id, eintrag}")},
-    },
-    ["operations"], schreibt=True,
+    "Schreibt einen Stapel Änderungen in den Entwurf — nur nach Zustimmung der Lehrkraft; vorher "
+    "check_curriculum_operations. Ganz oder gar nicht: Passt eine Operation nicht (etwa eine "
+    "Kompetenznummer außerhalb des Bands), wird nichts geschrieben und fehler nennt, was. Vorher "
+    "wird der Stand gesichert; undo_last_curriculum_change nimmt den Stapel zurück. " + _ANTWORT
+    + " Dazu neue_kennungen für die refs.",
+    OPERATIONEN, ["operations"], schreibt=True,
 )
 
 
@@ -173,8 +203,9 @@ async def _set_curriculum_frame(args: dict, ctx: ToolContext) -> dict:
 
 _registriere(
     "set_curriculum_frame", _set_curriculum_frame,
-    "Hält Rahmenangaben aus dem Gespräch fest, damit spätere Sitzungen nicht neu fragen. Nur die "
-    "genannten Felder ändern sich; leerer Text löscht ein Feld. Das Lehrwerk ist nur ein Name: "
+    "Hält Rahmenangaben aus dem Gespräch fest, damit spätere Sitzungen nicht neu fragen. Die "
+    "Antwort der Lehrkraft auf deine Rahmenfrage gilt als Zustimmung — halte sie gleich fest. Nur "
+    "die genannten Felder ändern sich; leerer Text löscht ein Feld. Das Lehrwerk ist nur ein Name: "
     "Seinen Inhalt kennst du nicht — plane nicht danach, ohne dass die Lehrkraft Kapitel und "
     "Reihenfolge nennt.",
     {
@@ -193,18 +224,36 @@ async def _undo_last_curriculum_change(args: dict, ctx: ToolContext) -> dict:
     cur = await _curriculum(args, ctx, schreiben=True)
     if isinstance(cur, str):
         return {"error": cur}
-    vorher = await verlauf(ctx.db, cur.id, ctx.user.sub)
-    if not vorher["anzahl"]:
+    stand = await juengster(ctx.db, cur.id)
+    if stand is None:
         return {"ok": False, "error": "Es gibt nichts zurückzunehmen."}
-    stand = await zuruecknehmen(ctx.db, cur)
-    return {"ok": True, "zurueckgenommen": {"zeit": stand["zeit"].isoformat(), "von": stand["grund"]},
-            "verbleibend": vorher["anzahl"] - 1}
+    was = await gegenstand(ctx.db, cur, stand)
+    eigen = stand.reason == "assistant" and stand.created_by == ctx.user.sub
+    if not eigen and not args.get("auch_fremde"):
+        return {"ok": False, "bestaetigung_noetig": True,
+                "letzte_aenderung": {"von": stand.reason, "von_mir": stand.created_by == ctx.user.sub,
+                                     "zeit": stand.created_at.isoformat(), "gegenstand": was},
+                "hinweis": "Die letzte Änderung stammt nicht von dir (Editor oder andere Person). Nichts zurückgenommen. "
+                           "Sag der Lehrkraft, von wem und von wann sie ist; nur nach ausdrücklicher "
+                           "Bestätigung mit auch_fremde=true zurücknehmen."}
+    anzahl = (await verlauf(ctx.db, cur.id, ctx.user.sub))["anzahl"]
+    zurueck = await zuruecknehmen(ctx.db, cur)
+    return {"ok": True,
+            "zurueckgenommen": {"zeit": zurueck["zeit"].isoformat(), "von": zurueck["grund"], "gegenstand": was},
+            "verbleibend": anzahl - 1}
 
 
 _registriere(
     "undo_last_curriculum_change", _undo_last_curriculum_change,
-    "Nimmt die letzte Speicherung des Curriculums zurück — die eigene oder eine im Editor "
-    "(von: 'assistant' oder 'editor'). Nur auf Wunsch der Lehrkraft; danach get_curriculum_draft.",
+    "Nimmt die letzte Speicherung des Curriculums zurück — nur auf Wunsch der Lehrkraft. Stammt "
+    "sie von dir für diese Lehrkraft, sofort. Sonst (im Editor oder von einer anderen Person) "
+    "nimmt die Funktion nichts zurück und antwortet mit bestaetigung_noetig und letzte_aenderung "
+    "(von: 'editor' oder 'assistant', von_mir, zeit); erst nach ausdrücklicher Bestätigung mit "
+    "auch_fremde=true. gegenstand nennt, was zurückgenommen wird: 'rahmen' (Rahmenangaben), "
+    "'inhalte' (Kapitel, Lernsequenzen, Einträge) — sag es der Lehrkraft. Danach get_curriculum_draft.",
+    {"auch_fremde": {"type": "boolean", "description": (
+        "true nimmt auch eine Änderung aus dem Editor oder von einer anderen Person zurück — nur "
+        "nach ausdrücklicher Bestätigung der Lehrkraft.")}},
     schreibt=True,
 )
 
@@ -265,7 +314,7 @@ register_tool(ChatTool(
         "name": "waehle_curriculum",
         "description": (
             "Macht ein Curriculum aus finde_curriculum zum Bezugscurriculum dieser Unterhaltung und "
-            "liefert es wie get_curriculum_draft. Gibt es zu einem veröffentlichten einen offenen "
+            "liefert es wie get_curriculum_draft — danach nicht noch einmal get_curriculum_draft. Gibt es zu einem veröffentlichten einen offenen "
             "Entwurf, wird der gewählt. Ein veröffentlichtes ohne Entwurf ist nur zu lesen; "
             "als_entwurf_kopieren=true legt einen Entwurf als Kopie an — frage die Lehrkraft vorher."),
         "parameters": {"type": "object", "properties": {
@@ -292,7 +341,8 @@ register_tool(ChatTool(
     definition={"type": "function", "function": {
         "name": "lege_curriculum_an",
         "description": (
-            "Legt ein leeres Curriculum als Entwurf an und macht es zum Bezugscurriculum — nur nach "
+            "Legt ein leeres Curriculum als Entwurf an, macht es zum Bezugscurriculum und liefert es "
+            "wie get_curriculum_draft (danach nicht noch einmal get_curriculum_draft) — nur nach "
             "Zustimmung der Lehrkraft und nur, wenn finde_curriculum für Fach, Band und Fassung keines "
             "gefunden hat. Gibt es keinen Bildungsplan der Fassung, wird nichts angelegt."),
         "parameters": {"type": "object", "properties": {
