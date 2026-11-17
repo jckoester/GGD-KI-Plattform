@@ -369,9 +369,16 @@ class TestSchuelerUebernahme:
 
 class TestMermaid:
     async def test_mermaid_wird_als_diagramm_uebernommen(
-        self, test_client, auth_headers, db_session
+        self, test_client, auth_headers, db_session, monkeypatch
     ):
         """Der Zaun muss mit: Sonst steht in der Knotenansicht Code statt eines Bildes."""
+        from app.render import service
+
+        async def ohne_sidecar(source: str) -> str:
+            return "<svg xmlns='http://www.w3.org/2000/svg'></svg>"
+
+        # Geprüft wird die Übernahme, nicht das Rendern — der Sidecar läuft nicht überall.
+        monkeypatch.setitem(service.RENDERERS, "mermaid", ohne_sidecar)
         gespeichert = await test_client.post(
             "/artifacts/from-diagram",
             json={
