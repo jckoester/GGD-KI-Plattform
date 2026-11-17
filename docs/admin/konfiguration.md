@@ -747,14 +747,19 @@ rollen:
     stufen:
       - stufe: 1
         name: Chatten
-        beschreibung: Chat, freigegebene Assistenten, deine Fächer und dein Verlauf.
-        eintraege: [chat, assistants, subjects, history]
+        beschreibung: Chat, freigegebene Assistenten, deine Fächer, dein Verlauf und die Werkstatt.
+        eintraege: [welcome, chat, assistants, subjects, history, workshop]
       - stufe: 2
-        name: Sammeln und nachschlagen
-        beschreibung: Dazu Werkstatt und Bibliothek.
-        aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
-        eintraege: [workshop, knowledge]
+        name: Nachschlagen
+        beschreibung: Dazu die Bibliothek.
+        aufwand: Lohnt sich, wenn du im Material zum Unterricht suchen willst.
+        eintraege: [knowledge]
 ```
+
+**Seit 0.47 steht die Werkstatt für Schüler:innen auf Stufe 1** (vorher Stufe 2): Unter jeder
+Antwort steht „Speichern“, und die Einrichtung verweist auf die Werkstatt. Wer eine eigene
+`ui_levels.yaml` führt, verschiebt `workshop` dort ebenso; die Vorlage ist
+`config/ui_levels.example.yaml`.
 
 - `startstufe` — womit **neue** Konten beginnen. Bestandskonten wurden bei der Migration
   auf die höchste Stufe gesetzt; ihnen wird nichts weggenommen.

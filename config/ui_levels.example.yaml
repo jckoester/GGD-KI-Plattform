@@ -22,19 +22,22 @@ rollen:
   student:
     startstufe: 1
     stufen:
+      # Werkstatt ab Stufe 1 (0.47): Unter jeder Antwort steht „Speichern“, und die Einrichtung
+      # schickt dorthin — der Ort muss dann auch in der Seitenleiste stehen.
       - stufe: 1
         name: Chatten
         beschreibung: >-
-          Chat, die für dich freigegebenen Assistenten, deine Fächer und dein Verlauf.
-        eintraege: [welcome, chat, assistants, subjects, history]
+          Chat, die für dich freigegebenen Assistenten, deine Fächer, dein Verlauf und
+          die Werkstatt für das, was du speicherst.
+        eintraege: [welcome, chat, assistants, subjects, history, workshop]
 
       - stufe: 2
-        name: Sammeln und nachschlagen
+        name: Nachschlagen
         beschreibung: >-
-          Dazu die Werkstatt für deine Bilder, Diagramme und Dokumente und die
-          Bibliothek mit Suche und eigenen Bausteinen.
-        aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
-        eintraege: [workshop, knowledge]
+          Dazu die Bibliothek: Suche in dem, was deine Schule und deine Lehrkräfte
+          bereitstellen.
+        aufwand: Lohnt sich, wenn du im Material zum Unterricht suchen willst.
+        eintraege: [knowledge]
 
   teacher:
     startstufe: 1

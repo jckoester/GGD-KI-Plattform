@@ -27,8 +27,9 @@ es bleibt bei einem Eintrag.
 Über den Eintrag **„Werkstatt"** in der Seitenleiste. Du siehst dort alle gespeicherten
 Produkte mit Vorschau, dazu oben einen Balken, wie viel Speicherplatz du schon belegst.
 
-> Die Seitenleiste zeigt die Werkstatt erst ab der zweiten Darstellungsstufe (Profil). Speichern
-> kannst du auch vorher — der Link „In der Werkstatt ✓“ unter dem gespeicherten Element führt hin.
+> Als Lehrkraft siehst du die Werkstatt in der Seitenleiste erst ab der zweiten Darstellungsstufe
+> (Profil); als Schüler:in von Anfang an. Speichern kannst du auch vorher — der Link
+> „In der Werkstatt ✓“ unter dem gespeicherten Element führt hin.
 
 ## Ordnen und wiederfinden
 

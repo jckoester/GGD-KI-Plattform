@@ -55,17 +55,21 @@ def test_beide_rollen_starten_auf_stufe_1():
     assert cfg.rollen["teacher"].startstufe == 1
 
 
-def test_schuelerinnen_sehen_bibliothek_und_wissen_erst_auf_stufe_2():
-    """Der Kern der Entscheidung: Was am Anfang leer ist, kostet nur Aufmerksamkeit."""
+def test_schuelerinnen_sehen_die_werkstatt_sofort_die_bibliothek_erst_auf_stufe_2():
+    """Was am Anfang leer ist, kostet nur Aufmerksamkeit — die Bibliothek also später.
+
+    Die Werkstatt dagegen ab Stufe 1 (0.47, F4 c): Unter jeder Antwort steht „Speichern“, und
+    die Einrichtung schickt dorthin; der Ort muss dann in der Seitenleiste stehen.
+    """
     cfg = UiLevels.model_validate(yaml.safe_load(BEISPIEL.read_text(encoding="utf-8")))
     stufe1 = cfg.rollen["student"].eintraege_bis(1)
-    assert "workshop" not in stufe1
+    assert "workshop" in stufe1
     assert "knowledge" not in stufe1
     # Werkzeuge stehen seit 0.40 in der Assistentenliste — sie sind Assistenten.
     assert "assistants" in stufe1 and "tools" not in stufe1
 
     stufe2 = cfg.rollen["student"].eintraege_bis(2)
-    assert {"workshop", "knowledge"} <= set(stufe2)
+    assert "knowledge" in stufe2
 
 
 def test_lehrkraefte_bekommen_planung_erst_auf_stufe_3():

@@ -3,6 +3,18 @@
 Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/) (0.x = vor dem ersten Stable-Release).
 
+## [Unreleased]
+
+### Geändert
+
+- Schüler:innen sehen die Werkstatt von Anfang an in der Seitenleiste (Stufe 1 „Chatten“);
+  Stufe 2 heißt „Nachschlagen“ und bringt die Bibliothek.
+
+### Nach dem Update
+
+- Eigene `config/ui_levels.yaml`: bei `student` den Eintrag `workshop` von Stufe 2 nach Stufe 1
+  verschieben (Vorlage `config/ui_levels.example.yaml`), danach Backend neu starten.
+
 ## [0.46.0] – 2026-11-17
 
 ### Neu
@@ -57,7 +69,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
 - `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an
-  (Modell `chat-komplex`).
+  (Modell `chat-komplex`). Wer eine eigene `config/assistants.yaml` pflegt, übernimmt den Eintrag aus
+  `config/assistants.example.yaml` oder ruft das Skript mit `--config config/assistants.example.yaml` auf.
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus
   `config/prompts/jahresplan_assistent.md` übernehmen.
 - Eigener Reverse-Proxy statt der mitgelieferten Vorlage: Lese-Timeout mindestens 180 s.
