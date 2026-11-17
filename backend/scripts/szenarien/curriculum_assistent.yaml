@@ -153,18 +153,16 @@ faelle:
     vorlage: bestehend
     zuege:
       - text: Das Kapitel „Messgeräte entwickeln“ brauchen wir nicht mehr, lösch es bitte.
-        muss: [preview_curriculum_operations]
-        nicht: [apply_curriculum_operations]
+        # Die ausdrückliche Bitte ist die Zustimmung (Jan, 17.11.2026).
+        muss: [preview_curriculum_operations, apply_curriculum_operations]
         antwort: ["2 Lernsequenzen|zwei Lernsequenzen"]
-        inhalt: gleich
-      - text: Ja, löschen.
-        muss: [apply_curriculum_operations]
         inhalt: geaendert
     ende:
       kapitel_weg: Messgeräte entwickeln
     erwartung: >-
-      Nennt vor dem Löschen, was mit verschwindet (2 Lernsequenzen, 2 Einträge, 12 Stunden), fragt
-      nach Zustimmung; danach neue Bilanz (rest steigt um 12). Bietet nicht an, die Stunden zu füllen.
+      Die Bitte ist die Zustimmung: Vorschau, schreiben, ohne nachzufragen. Nennt danach, was mit
+      verschwunden ist (2 Lernsequenzen, 2 Einträge, 12 Stunden), und die neue Bilanz (rest steigt
+      um 12). Bietet nicht an, die Stunden zu füllen.
 
   - id: nach-dem-buch
     vorlage: leer_mit_stunden

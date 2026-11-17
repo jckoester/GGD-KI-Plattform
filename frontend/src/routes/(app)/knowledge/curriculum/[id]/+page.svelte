@@ -28,6 +28,13 @@
     let deleteError = $state(null);
 
     // Export
+    const WEITERBEARBEITEN = "Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML.";
+    const EXPORTE = [
+        { format: "yaml", label: "YAML" },
+        { format: "pdf", label: "PDF" },
+        { format: "docx", label: "DOCX", titel: WEITERBEARBEITEN },
+        { format: "odt", label: "ODT", titel: WEITERBEARBEITEN },
+    ];
     let exportError = $state(null);
     let exporting = $state(false);
 
@@ -163,7 +170,7 @@
             <ErrorBanner message={error} />
         {:else if curriculum}
             <!-- Kopfzeile mit Metadaten und Aktionen -->
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center justify-between gap-4 mb-6">
                 <div>
                     <a
                         href="/knowledge/curricula"
@@ -229,49 +236,26 @@
                             <Trash2 class="w-4 h-4" /> Löschen
                         </button>
                     {/if}
-                    <button
-                        onclick={() => handleExport("yaml")}
-                        disabled={exporting}
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx font-medium
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <FileDown class="w-4 h-4" /> YAML
-                    </button>
-                    <button
-                        onclick={() => handleExport("pdf")}
-                        disabled={exporting}
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx font-medium
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <FileDown class="w-4 h-4" /> PDF
-                    </button>
-                    <button
-                        onclick={() => handleExport("docx")}
-                        disabled={exporting}
-                        title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx font-medium
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <FileDown class="w-4 h-4" /> DOCX
-                    </button>
-                    <button
-                        onclick={() => handleExport("odt")}
-                        disabled={exporting}
-                        title="Zum Weiterbearbeiten in Word oder LibreOffice. Wieder einlesen lässt sich nur YAML."
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx font-medium
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <FileDown class="w-4 h-4" /> ODT
-                    </button>
                 </div>
+            </div>
+
+            <!-- Export als eigener Block (0.46): Mit Freigabe, Assistent und Löschen standen bis zu
+                 neun Knöpfe neben dem Titel. -->
+            <div class="flex flex-wrap items-center justify-end gap-2 -mt-3 mb-6">
+                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Exportieren:</span>
+                {#each EXPORTE as e (e.format)}
+                    <button
+                        onclick={() => handleExport(e.format)}
+                        disabled={exporting}
+                        title={e.titel}
+                        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FileDown class="w-3.5 h-3.5" /> {e.label}
+                    </button>
+                {/each}
             </div>
 
             {#if curriculum.status === "draft"}

@@ -223,7 +223,10 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
   `scripts/szenarien/curriculum_assistent.yaml` (je Lauf ein Mess-Curriculum aus einer Vorlage,
   danach gelöscht; `--selbsttest` ohne Schreiben, `--trocken` ohne Modellaufrufe). Argumente und
   Ergebnisse der Funktionen liest sie aus dem Messkanal `vorab_debug` (Feld `curriculum`, nur
-  außerhalb der Produktion).
+  außerhalb der Produktion). Stand 16.11.2026, je 10 Fälle × 3 Läufe: `chat-komplex` 22/30
+  (1,39 $), `chat-standard` 7/30 (löscht ohne Zustimmung, bleibt stehen), `mistral-large` 26/30
+  (0,48 $). Seed: `chat-komplex`. Die Umbenennung der Vorschau (vorher
+  `check_curriculum_operations`) änderte an `chat-komplex` nichts messbar.
 - **Bereich einer Kompetenz** (`bereich_von` in `curriculum_abdeckung.py`): `thematische_gruppe`,
   sonst die letzte Überschrift im `breadcrumb` („3.1.7 Optik“) — `thematische_gruppe` ist in den
   meisten Fächern leer. Gilt für die Abdeckung und `get_bp_competences`.

@@ -19,6 +19,10 @@
    * `onanlegen` (Plan Schritt 7): Am Ende des Menüs steht dann „Eigenen Stundenassistenten
    * anlegen …", und der Pfeil erscheint schon bei einem Kandidaten. Nur in der vollen Fassung —
    * die kompakte öffnet mit einem Kandidaten weiterhin direkt.
+   *
+   * `rahmen` (0.46): umrandet statt gefüllt, in Höhe und Abstand wie die Knöpfe einer
+   * Werkzeugleiste (`px-4 py-2`, Symbol 16 px) — etwa im Curriculum neben „Veröffentlichen“
+   * und „Rückgängig“.
    */
   import { Bot, ChevronDown } from 'lucide-svelte'
 
@@ -29,6 +33,7 @@
     kompakt = false,
     beschaeftigt = false,
     onanlegen = null,
+    rahmen = false,
   } = $props()
 
   let offen = $state(false)
@@ -54,6 +59,9 @@
   }
 
   const voll = 'h-8 inline-flex items-center gap-1.5 text-sm font-medium text-white bg-primary dark:bg-primary-dark hover:opacity-90 transition-opacity disabled:opacity-60'
+  const umrandet = 'inline-flex items-center gap-1.5 py-2 text-sm font-medium border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  const haupt = $derived(rahmen ? `${umrandet} px-4` : `${voll} px-3`)
+  const pfeil = $derived(rahmen ? `${umrandet} px-2 rounded-r-md -ml-px` : `${voll} px-1.5 rounded-r-md border-l border-white/30`)
   const klein = 'inline-flex items-center text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx disabled:opacity-60'
   // Eine Trefferfläche, die sich auf dem Telefon treffen lässt — der negative Rand hält die
   // Zeile so hoch wie ihr Text.
@@ -84,10 +92,10 @@
       disabled={beschaeftigt}
       title={titel}
       aria-label={kompakt ? titel : undefined}
-      class="{kompakt ? `${klein} ${flaeche}` : `${voll} px-3`}
+      class="{kompakt ? `${klein} ${flaeche}` : haupt}
              {mitPfeil ? 'rounded-l-md' : 'rounded-md'}"
     >
-      <Bot size={kompakt ? 15 : 14} aria-hidden="true" />
+      <Bot size={kompakt ? 15 : rahmen ? 16 : 14} aria-hidden="true" />
       {#if !kompakt}{beschriftung}{/if}
     </button>
     {#if mitPfeil}
@@ -99,9 +107,9 @@
         aria-expanded={offen}
         aria-label="Anderen Assistenten wählen"
         title="Anderen Assistenten wählen"
-        class="{voll} px-1.5 rounded-r-md border-l border-white/30"
+        class={pfeil}
       >
-        <ChevronDown size={14} aria-hidden="true" />
+        <ChevronDown size={rahmen ? 16 : 14} aria-hidden="true" />
       </button>
     {/if}
   {/if}

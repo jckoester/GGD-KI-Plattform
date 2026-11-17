@@ -31,6 +31,6 @@
     }
 </script>
 
-<span title={gesperrt ? "Erst speichern oder abbrechen" : "Mit dem Assistenten bearbeiten"}>
-    <AssistentenKnopf {kandidaten} onwaehle={oeffne} beschaeftigt={gesperrt} />
+<span class="inline-flex" title={gesperrt ? "Erst speichern oder abbrechen" : "Mit dem Assistenten bearbeiten"}>
+    <AssistentenKnopf {kandidaten} onwaehle={oeffne} beschaeftigt={gesperrt} rahmen />
 </span>

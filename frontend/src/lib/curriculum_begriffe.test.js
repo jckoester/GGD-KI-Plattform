@@ -195,9 +195,15 @@ describe('Leseansicht (Jan, 15.11.2026)', () => {
     // Jeder Knopf der Seite trägt die Flex-Klasse für Icon + Text — und davon gibt es so viele wie Icons.
     const knoepfe = seite.match(/class="inline-flex items-center gap-1.5 px-4/g) ?? []
     const icons = seite.match(/<(?:Pencil|RefreshCw|Trash2|FileDown|X) class="w-4 h-4" \/>/g) ?? []
-    expect(knoepfe).toHaveLength(17)
-    expect(icons).toHaveLength(17)
+    expect(knoepfe).toHaveLength(13)
+    expect(icons).toHaveLength(13)
     expect(seite).not.toMatch(/class="px-4 py-/)
+  })
+  it('Export als eigener Block, nicht neben dem Titel (Jan, 17.11.2026)', () => {
+    const kopf = seite.slice(seite.indexOf('bind:this={topActionsEl}'), seite.indexOf('Exportieren:'))
+    expect(kopf).not.toMatch(/handleExport/)
+    expect(seite).toMatch(/\{#each EXPORTE as e/)
+    expect(seite).toMatch(/<FileDown class="w-3\.5 h-3\.5" \/> \{e\.label\}/)
   })
 })
 
