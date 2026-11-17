@@ -24,6 +24,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   oder einem Fach.
 - Abdeckung über das Band: die inhaltsbezogenen Kompetenzen eines Bands über alle Curricula, die zu
   ihm gehören, wahlweise mit Entwürfen; als PDF exportierbar.
+- Abdeckung über die Fassung: die prozessbezogenen Kompetenzen über alle Curricula eines Fachs in
+  einer Bildungsplan-Fassung, mit der Zahl der Lernsequenzen je Curriculum; als PDF exportierbar.
 - Band am Curriculum der Oberstufe: Wo es zu denselben Stufen mehrere Bänder gibt (Basis- und
   Leistungsfach), wird das Band im Editor gewählt.
 

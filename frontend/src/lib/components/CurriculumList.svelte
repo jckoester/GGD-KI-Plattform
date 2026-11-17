@@ -157,7 +157,17 @@
                     </span>
                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">({anzahlCurricula(f)})</span>
                 </summary>
-                <div class="mt-3">{@render fassungInhalt(f)}</div>
+                <div class="mt-3">
+                    {#if lehrkraft && anzahlCurricula(f) > 0}
+                        <!-- Schritt 9: Die PK gelten für die ganze Fassung, nicht für ein Band. -->
+                        <div class="mb-3 text-right">
+                            <a href={abdeckungsPfad({ fachId: subjectId, fassung: f.bp_version })} class={link}>
+                                PK-Abdeckung der Fassung
+                            </a>
+                        </div>
+                    {/if}
+                    {@render fassungInhalt(f)}
+                </div>
             </details>
         {/each}
         {#if uebersicht?.ohne_fassung?.length}

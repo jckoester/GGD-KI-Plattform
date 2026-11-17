@@ -1,15 +1,17 @@
 <script>
     /**
-     * Abdeckung über das Band (0.46, Päckchen AP Teil B, Schritt 8): die IK eines Bands über alle
-     * Curricula, die ihm zugeordnet sind. Einstieg aus der Curricula-Liste (Bandkopf) und aus der
-     * Abdeckung eines Curriculums. Parameter: `fach`, `fassung`, `band`, optional `entwuerfe=1`.
+     * Abdeckung über das Band und über die Fassung (0.46, Päckchen AP Teil B, Schritte 8 und 9).
+     * Mit `band`: die IK des Bands über alle Curricula, die ihm zugeordnet sind (Einstieg am
+     * Bandkopf der Curricula-Liste und aus der Abdeckung eines Curriculums). Ohne `band`: die PK
+     * der Fassung über alle Curricula des Fachs in ihr (Einstieg am Fassungskopf).
+     * Parameter: `fach`, `fassung`, `band`, optional `entwuerfe=1`.
      */
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
-    import { exportBandAbdeckung, getBandAbdeckung } from '$lib/api.js'
+    import { exportAbdeckung, getBandAbdeckung, getPkAbdeckung } from '$lib/api.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
-    import { abdeckungsPfad } from '$lib/curriculum_baender.js'
+    import { abdeckungsPfad, abdeckungTexte } from '$lib/curriculum_baender.js'
     import { gefilterteGruppen, ZUSTAND } from '$lib/curriculum_abdeckung.js'
     import PageBody from '$lib/components/PageBody.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -34,15 +36,16 @@
     let nurLuecken = $state(false)
 
     $effect(() => {
-        if (!fachId || !fassung || !band) {
-            fehler = 'Fach, Fassung und Band fehlen in der Adresse.'
+        if (!fachId || !fassung) {
+            fehler = 'Fach und Fassung fehlen in der Adresse.'
             laedt = false
             return
         }
         let abgebrochen = false
         laedt = true
         fehler = null
-        getBandAbdeckung(fachId, fassung, band, entwuerfe)
+        abdeckung = null
+        ;(band ? getBandAbdeckung(fachId, fassung, band, entwuerfe) : getPkAbdeckung(fachId, fassung, entwuerfe))
             .then((a) => { if (!abgebrochen) abdeckung = a })
             .catch((e) => { if (!abgebrochen) fehler = e.message })
             .finally(() => { if (!abgebrochen) laedt = false })
@@ -53,7 +56,8 @@
         goto(abdeckungsPfad({ fachId, fassung, band, entwuerfe: ein }), { replaceState: true, noScroll: true })
     }
 
-    const gruppen = $derived(gefilterteGruppen(abdeckung?.ik.gruppen, nurLuecken))
+    const texte = $derived(abdeckungTexte(abdeckung ?? (band ? { ik: { gesamt: 0, gruppen: [] } } : null)))
+    const gruppen = $derived(gefilterteGruppen(texte.teil.gruppen, nurLuecken, texte.gut))
 
     let exportiert = $state(false)
     let exportFehler = $state(null)
@@ -61,7 +65,7 @@
         exportiert = true
         exportFehler = null
         try {
-            await exportBandAbdeckung(fachId, fassung, band, { entwuerfe, nurLuecken })
+            await exportAbdeckung(fachId, fassung, band || null, { entwuerfe, nurLuecken })
         } catch (e) {
             exportFehler = e.message
         } finally {
@@ -79,9 +83,11 @@
         >
             <ArrowLeft class="w-4 h-4" /> Zurück zu Curricula
         </a>
-        <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">IK-Abdeckung im Band</h1>
+        <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
+            {band ? 'IK-Abdeckung im Band' : 'PK-Abdeckung der Fassung'}
+        </h1>
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-            {fach?.name ?? 'Fach'} · BP {fassung} · {band}
+            {fach?.name ?? 'Fach'} · BP {fassung}{band ? ` · ${band}` : ' · alle Curricula der Fassung'}
         </p>
     </div>
 
@@ -94,7 +100,7 @@
             <section>
                 <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
                     <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx">
-                        Curricula des Bands
+                        {band ? 'Curricula des Bands' : 'Curricula der Fassung'}
                     </h2>
                     <label class="inline-flex items-center gap-1.5 text-sm text-light-tx-2 dark:text-dark-tx-2"
                            title="Ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, tritt an dessen Stelle.">
@@ -120,10 +126,10 @@
                     </ul>
                 {:else}
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                        Diesem Band ist noch kein {entwuerfe ? '' : 'veröffentlichtes '}Curriculum zugeordnet.
+                        {band ? 'Diesem Band ist' : 'In dieser Fassung gibt es'} noch kein {entwuerfe ? '' : 'veröffentlichtes '}Curriculum{band ? ' zugeordnet' : ''}.
                     </p>
                 {/if}
-                {#if abdeckung.nicht_zugeordnet.length}
+                {#if abdeckung.nicht_zugeordnet?.length}
                     <div class="mt-3">
                         <WarningBanner
                             message={`Nicht mitgezählt, weil das Band nicht gewählt ist: ${abdeckung.nicht_zugeordnet.map((c) => c.title).join(', ')}. Im Editor lässt sich das Band wählen.`}
@@ -135,9 +141,7 @@
             <section>
                 <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
                     <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx">
-                        {abdeckung.ik.verknuepft} von {abdeckung.ik.gesamt} IK verknüpft{abdeckung.ik.partiell
-                            ? ` · ${abdeckung.ik.partiell} partiell` : ''}{abdeckung.ik.fehlt
-                            ? ` · ${abdeckung.ik.fehlt} fehlen` : ''}
+                        {texte.bilanz}
                     </h2>
                     <div class="flex items-center gap-3">
                         <label class="inline-flex items-center gap-1.5 text-sm text-light-tx-2 dark:text-dark-tx-2">
@@ -173,9 +177,7 @@
                                         · <span class="font-medium">{k.nr}</span>
                                         {k.titel}
                                         {#if k.curricula.length}
-                                            <span class="text-light-tx-2 dark:text-dark-tx-2">
-                                                — {k.curricula.map((c) => c.title + (c.partiell ? ' (partiell)' : '')).join(', ')}
-                                            </span>
+                                            <span class="text-light-tx-2 dark:text-dark-tx-2">— {texte.traeger(k)}</span>
                                         {/if}
                                     </li>
                                 {/each}
@@ -183,7 +185,7 @@
                         </div>
                     {:else}
                         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                            {abdeckung.ik.gesamt ? 'Alle Kompetenzen des Bands sind verknüpft.' : 'Für dieses Band sind keine Kompetenzen hinterlegt.'}
+                            {texte.leer}
                         </p>
                     {/each}
                 </div>

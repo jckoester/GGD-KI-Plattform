@@ -75,6 +75,8 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         # Band und Bänder zur Wahl (`CurriculumBandWahl.svelte`; geschrieben über `PATCH /nodes`).
         ("GET", "/context/curricula/by-subject/{subject_id}/overview"),
         ("GET", "/context/curricula/by-subject/{subject_id}/band-coverage"),
+        # Schritt 9: PK über alle Curricula der Fassung, lesend; Aufrufer dieselbe Seite.
+        ("GET", "/context/curricula/by-subject/{subject_id}/pk-coverage"),
         ("GET", "/context/curricula/{curriculum_id}/band"),
     }
 

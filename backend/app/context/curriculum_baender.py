@@ -96,6 +96,15 @@ async def uebersicht(db: AsyncSession, subject_id: int, curricula: list[ContextN
     return {"fassungen": fassungen, "ohne_fassung": ohne_fassung}
 
 
+def _ohne_ersetzte(beteiligt: list[ContextNode]) -> list[ContextNode]:
+    """Ein Entwurf, der ein beteiligtes veröffentlichtes Curriculum ersetzen soll, tritt an dessen
+    Stelle (F3). Sortiert nach Stufe und Titel."""
+    ersetzt = {str((c.metadata_ or {}).get("kopie_von")) for c in beteiligt
+               if c.status == ENTWURF and (c.metadata_ or {}).get("kopie_von")}
+    return sorted((c for c in beteiligt if str(c.id) not in ersetzt),
+                  key=lambda c: (c.min_grade or 0, c.title or ""))
+
+
 async def band_abdeckung(db: AsyncSession, subject_id: int, bp: str, schluessel: str,
                          curricula: list[ContextNode], mit_entwuerfen: bool) -> dict | None:
     """Abdeckung der IK eines Bands über die zugeordneten Curricula. `None`, wenn es das Band in
@@ -119,11 +128,7 @@ async def band_abdeckung(db: AsyncSession, subject_id: int, bp: str, schluessel:
             beteiligt.append(c)
         elif b is None and any(k.schluessel == schluessel for k in kandidaten):
             offen.append(_kurz(c, titel_je_id))
-    # Ein Entwurf, der ein beteiligtes veröffentlichtes Curriculum ersetzen soll, tritt an dessen Stelle.
-    ersetzt = {str((c.metadata_ or {}).get("kopie_von")) for c in beteiligt
-               if c.status == ENTWURF and (c.metadata_ or {}).get("kopie_von")}
-    beteiligt = sorted((c for c in beteiligt if str(c.id) not in ersetzt),
-                       key=lambda c: (c.min_grade or 0, c.title or ""))
+    beteiligt = _ohne_ersetzte(beteiligt)
 
     # Je IK: welche Curricula sie voll oder partiell verknüpfen.
     traeger: dict[UUID, list[dict]] = {}
@@ -157,11 +162,52 @@ async def band_abdeckung(db: AsyncSession, subject_id: int, bp: str, schluessel:
     }
 
 
-ZUSTAENDE = {VERKNUEPFT: "verknüpft", PARTIELL: "partiell", FEHLT: "fehlt"}
+async def pk_abdeckung(db: AsyncSession, subject_id: int, bp: str, curricula: list[ContextNode],
+                      mit_entwuerfen: bool) -> dict:
+    """Abdeckung der PK einer Fassung über **alle** Curricula des Fachs in dieser Fassung
+    (0.46, Schritt 9): Die PK gelten für die ganze Fassung; ein einzelnes Curriculum fördert nie
+    alle. Je PK die Curricula und die Zahl ihrer Lernsequenzen, die sie fördern."""
+    from app.context.service import load_curriculum_tree
+
+    pks = await kompetenzen_der_fassung(db, subject_id, bp, "pk_kompetenz")
+    titel_je_id = {str(c.id): c.title for c in curricula}
+    beteiligt = _ohne_ersetzte([c for c in curricula if fassung_von(c) == bp
+                                and (c.status != ENTWURF or mit_entwuerfen)])
+
+    traeger: dict[UUID, list[dict]] = {}
+    for c in beteiligt:
+        tree = await load_curriculum_tree(db, c.id)
+        if not tree:
+            continue
+        _, _, gefoerdert = verknuepfungen(tree)
+        for k_id, lss in gefoerdert.items():
+            traeger.setdefault(k_id, []).append({"id": str(c.id), "title": c.title, "anzahl": len(lss)})
+
+    gruppen: dict[str, list[dict]] = {}
+    for k in sorted(pks, key=lambda k: _sortschluessel((k.metadata_ or {}).get("kompetenz_nr"))):
+        meta = k.metadata_ or {}
+        nr = meta.get("kompetenz_nr")
+        t = traeger.get(k.id, [])
+        gruppen.setdefault(bereich_von(meta), []).append(
+            {"node_id": str(k.id), "nr": nr, "titel": _text(k.title, nr),
+             "zustand": GEFOERDERT if t else FEHLT, "anzahl": sum(x["anzahl"] for x in t), "curricula": t})
+
+    return {
+        "bp_version": bp, "mit_entwuerfen": mit_entwuerfen,
+        "curricula": [_kurz(c, titel_je_id) for c in beteiligt],
+        "pk": {"gesamt": len(pks), GEFOERDERT: sum(1 for k in pks if traeger.get(k.id)),
+               FEHLT: sum(1 for k in pks if not traeger.get(k.id)),
+               "gruppen": [{"titel": t, "kompetenzen": ks} for t, ks in gruppen.items()]},
+    }
 
 
-def band_abdeckung_pdf(a: dict, fach: str, nur_luecken: bool = False) -> bytes:
-    """Die Abdeckung über das Band als PDF (weasyprint, Vorlage `abdeckung_band_pdf.html`)."""
+GEFOERDERT = "gefoerdert"
+ZUSTAENDE = {VERKNUEPFT: "verknüpft", PARTIELL: "partiell", FEHLT: "fehlt", GEFOERDERT: "gefördert"}
+
+
+def abdeckung_pdf(a: dict, fach: str, nur_luecken: bool = False) -> bytes:
+    """Abdeckung über das Band (IK, `a["ik"]`) oder über die Fassung (PK, `a["pk"]`) als PDF —
+    die Liste wie auf der Seite (weasyprint, Vorlage `abdeckung_pdf.html`)."""
     import os
     from datetime import date
 
@@ -170,13 +216,39 @@ def band_abdeckung_pdf(a: dict, fach: str, nur_luecken: bool = False) -> bytes:
 
     from app.config import settings
 
+    ik = "ik" in a
+    teil = a["ik"] if ik else a["pk"]
+
+    def traeger(k: dict) -> str:
+        if ik:
+            return ", ".join(c["title"] + (" (partiell)" if c["partiell"] else "") for c in k["curricula"])
+        return ", ".join(f"{c['title']} ({c['anzahl']} LS)" for c in k["curricula"])
+
+    gut = VERKNUEPFT if ik else GEFOERDERT
+    gruppen = []
+    for g in teil["gruppen"]:
+        zeilen = [{**k, "zustand_text": ZUSTAENDE[k["zustand"]], "traeger": traeger(k)}
+                  for k in g["kompetenzen"] if not nur_luecken or k["zustand"] != gut]
+        if zeilen:
+            gruppen.append({"titel": g["titel"], "kompetenzen": zeilen})
+    if ik:
+        titel = "IK-Abdeckung im Band"
+        ort = f"BP {a['bp_version']} · {a['band']['schluessel']}"
+        bilanz = f"{teil['verknuepft']} von {teil['gesamt']} IK verknüpft" + (
+            f" · {teil['partiell']} partiell" if teil["partiell"] else "") + (
+            f" · {teil['fehlt']} fehlen" if teil["fehlt"] else "")
+    else:
+        titel = "PK-Abdeckung der Fassung"
+        ort = f"BP {a['bp_version']}"
+        bilanz = f"{teil[GEFOERDERT]} von {teil['gesamt']} PK gefördert" + (
+            f" · {teil['fehlt']} ohne Lernsequenz" if teil["fehlt"] else "")
+    zusatz = (" · mit Entwürfen" if a["mit_entwuerfen"] else "") + (" · nur Lücken" if nur_luecken else "")
+
     vorlagen = os.path.join(os.path.dirname(__file__), "templates")
     env = Environment(loader=FileSystemLoader(vorlagen), autoescape=select_autoescape(["html"]))
-    gruppen = [{"titel": g["titel"],
-                "kompetenzen": [k for k in g["kompetenzen"] if not nur_luecken or k["zustand"] != VERKNUEPFT]}
-               for g in a["ik"]["gruppen"]]
-    html = env.get_template("abdeckung_band_pdf.html").render(
-        titel="IK-Abdeckung im Band", school_name=settings.export_school_name or "", fach=fach, a=a,
-        gruppen=[g for g in gruppen if g["kompetenzen"]], zustaende=ZUSTAENDE, nur_luecken=nur_luecken,
-        stand=date.today().strftime("%d.%m.%Y"))
+    html = env.get_template("abdeckung_pdf.html").render(
+        titel=titel, school_name=settings.export_school_name or "",
+        unterzeile=f"{fach} · {ort} · Stand {date.today().strftime('%d.%m.%Y')}{zusatz}",
+        a=a, bilanz=bilanz, gruppen=gruppen,
+        leer="Alle Kompetenzen sind abgedeckt." if teil["gesamt"] else "Keine Kompetenzen hinterlegt.")
     return weasyprint.HTML(string=html, base_url=vorlagen).write_pdf()

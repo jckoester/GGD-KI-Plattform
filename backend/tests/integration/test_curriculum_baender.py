@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import HTTPException
 
 from app.auth.jwt import JwtPayload
@@ -226,3 +227,36 @@ async def test_bandabdeckung_als_pdf(db, welt):
                                          format="pdf", nur_luecken=True, db=db, user=_user(MITGLIED, "teacher"))
     assert antwort.media_type == "application/pdf" and antwort.body.startswith(b"%PDF")
     assert "abdeckung_" in antwort.headers["content-disposition"]
+
+
+async def test_pk_abdeckung_ueber_die_fassung(db, welt):
+    from app.context.router import pk_abdeckung_route
+
+    fach = welt["fach"]
+    pk = {nr: await _knoten(db, "pk_kompetenz", f"{nr} PK {nr}", subject_id=fach.id, bp_version=V3,
+                            metadata_={"kompetenz_nr": nr, "breadcrumb": ["BP", "2.1 Erkenntnisgewinnung"]})
+          for nr in ("2.1(1)", "2.1(2)", "2.1(3)")}
+    # Je ein Curriculum aus zwei Bändern fördert eine PK; der Entwurf ersetzt K6 nur mit Entwürfen.
+    for cur, nr in ((welt["cur"]["k5"], "2.1(1)"), (welt["cur"]["lf"], "2.1(1)"),
+                    (welt["cur"]["k6e"], "2.1(2)")):
+        [ls] = (await db.execute(sa.select(ContextNode).where(
+            ContextNode.content_type == "lernsequenz", ContextNode.title == f"{cur.title} LS"))).scalars().all()
+        ls.metadata_ = {"eintraege": [{**ls.metadata_["eintraege"][0], "pk": [{"node_id": str(pk[nr].id)}]}]}
+    await db.flush()
+
+    mitglied = _user(MITGLIED, "teacher")
+    ohne = await pk_abdeckung_route(fach.id, bp_version=V3, entwuerfe=False, db=db, user=mitglied)
+    assert [c["title"] for c in ohne["curricula"]] == [f"K5 {TOKEN}", f"K6 {TOKEN}", f"LF {TOKEN}", f"OS {TOKEN}"]
+    zeilen = {k["nr"]: k for g in ohne["pk"]["gruppen"] for k in g["kompetenzen"]}
+    assert (zeilen["2.1(1)"]["zustand"], zeilen["2.1(1)"]["anzahl"]) == ("gefoerdert", 2)
+    assert zeilen["2.1(2)"]["zustand"] == "fehlt"
+    assert (ohne["pk"]["gesamt"], ohne["pk"]["gefoerdert"], ohne["pk"]["fehlt"]) == (3, 1, 2)
+
+    mit = await pk_abdeckung_route(fach.id, bp_version=V3, entwuerfe=True, db=db, user=mitglied)
+    assert f"K6 neu {TOKEN}" in [c["title"] for c in mit["curricula"]]
+    assert f"K6 {TOKEN}" not in [c["title"] for c in mit["curricula"]]
+    assert mit["pk"]["gefoerdert"] == 2
+
+    pdf = await pk_abdeckung_route(fach.id, bp_version=V3, entwuerfe=False, format="pdf", nur_luecken=False,
+                                   db=db, user=mitglied)
+    assert pdf.body.startswith(b"%PDF") and "pk_abdeckung_" in pdf.headers["content-disposition"]

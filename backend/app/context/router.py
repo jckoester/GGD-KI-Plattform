@@ -2036,6 +2036,37 @@ async def curriculum_als_entwurf_kopieren(
     return {"id": neu_id}
 
 
+@router.get("/curricula/by-subject/{subject_id}/pk-coverage")
+async def pk_abdeckung_route(
+    subject_id: int,
+    bp_version: str,
+    entwuerfe: bool = False,
+    format: str = Query("json", pattern="^(json|pdf)$"),
+    nur_luecken: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Abdeckung der PK einer Fassung über alle Curricula des Fachs in ihr (0.46, Schritt 9).
+
+    `entwuerfe` wie bei der Bandabdeckung; `format=pdf` als PDF (`nur_luecken`: nur PK ohne
+    Lernsequenz)."""
+    from app.context.curriculum_baender import abdeckung_pdf, pk_abdeckung
+
+    aus = await pk_abdeckung(db, subject_id, bp_version, await _lesbare_curricula(db, subject_id, user), entwuerfe)
+    if format == "pdf":
+        import re
+        from datetime import date
+
+        from fastapi.responses import Response
+
+        fach = await db.get(Subject, subject_id)
+        name = re.sub(r"[^\w.-]+", "_", f"pk_abdeckung_{fach.fach_code if fach else subject_id}_{bp_version}_{date.today()}")
+        return Response(content=abdeckung_pdf(aus, fach.name if fach else "", nur_luecken),
+                        media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
+    return aus
+
+
 @router.get("/curricula/{curriculum_id}/band")
 async def curriculum_band(
     curriculum_id: UUID,
@@ -2335,7 +2366,7 @@ async def band_abdeckung_route(
     ersetzt dann das Original. Gespeicherter Stand. `format=pdf` liefert dieselbe Liste als PDF
     (`nur_luecken` ohne die verknüpften).
     """
-    from app.context.curriculum_baender import band_abdeckung, band_abdeckung_pdf
+    from app.context.curriculum_baender import abdeckung_pdf, band_abdeckung
 
     curricula = await _lesbare_curricula(db, subject_id, user)
     aus = await band_abdeckung(db, subject_id, bp_version, band, curricula, entwuerfe)
@@ -2349,7 +2380,7 @@ async def band_abdeckung_route(
 
         fach = await db.get(Subject, subject_id)
         name = re.sub(r"[^\w.-]+", "_", f"abdeckung_{fach.fach_code if fach else subject_id}_{band}_{date.today()}")
-        return Response(content=band_abdeckung_pdf(aus, fach.name if fach else "", nur_luecken),
+        return Response(content=abdeckung_pdf(aus, fach.name if fach else "", nur_luecken),
                         media_type="application/pdf",
                         headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
     return aus

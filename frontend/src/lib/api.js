@@ -2115,13 +2115,24 @@ export async function getBandAbdeckung(subjectId, bpVersion, band, entwuerfe = f
   return _jsonOderFehler(res, 'Abdeckung konnte nicht geladen werden')
 }
 
-/** Abdeckung über das Band als PDF herunterladen (0.46). */
-export async function exportBandAbdeckung(subjectId, bpVersion, band, { entwuerfe = false, nurLuecken = false } = {}) {
+/** Abdeckung der PK einer Fassung über alle Curricula des Fachs in ihr (0.46, Schritt 9). */
+export async function getPkAbdeckung(subjectId, bpVersion, entwuerfe = false) {
+  const q = new URLSearchParams({ bp_version: bpVersion, entwuerfe: entwuerfe ? 'true' : 'false' })
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/pk-coverage?${q}`, {
+    credentials: 'include',
+  })
+  return _jsonOderFehler(res, 'Abdeckung konnte nicht geladen werden')
+}
+
+/** Abdeckung als PDF herunterladen (0.46): mit `band` die IK des Bands, ohne die PK der Fassung. */
+export async function exportAbdeckung(subjectId, bpVersion, band, { entwuerfe = false, nurLuecken = false } = {}) {
   const q = new URLSearchParams({
-    bp_version: bpVersion, band, entwuerfe: entwuerfe ? 'true' : 'false',
+    bp_version: bpVersion, entwuerfe: entwuerfe ? 'true' : 'false',
     nur_luecken: nurLuecken ? 'true' : 'false', format: 'pdf',
   })
-  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/band-coverage?${q}`, {
+  if (band) q.set('band', band)
+  const pfad = band ? 'band-coverage' : 'pk-coverage'
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/${pfad}?${q}`, {
     credentials: 'include',
   })
   if (!res.ok) {

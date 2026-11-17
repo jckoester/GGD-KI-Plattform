@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>{{ titel }}</title>
 <style>
-  /* Abdeckung über das Band (0.46, Schritt 8) — Farben und Schrift wie curriculum_pdf.html. */
+  /* Abdeckung über das Band (IK) und über die Fassung (PK), 0.46, Schritte 8 und 9 — Farben und Schrift wie curriculum_pdf.html. */
   @page {
     size: A4;
     margin: 18mm 15mm 15mm 15mm;
@@ -24,7 +24,7 @@
   ul { margin: 0; padding-left: 5mm; }
   li { margin-bottom: 1.2mm; page-break-inside: avoid; }
   .zustand { font-weight: bold; }
-  .verknuepft { color: #2e7d32; }
+  .verknuepft, .gefoerdert { color: #2e7d32; }
   .partiell { color: #a15c00; }
   .fehlt { color: #c62828; }
   .nr { font-weight: bold; }
@@ -34,24 +34,24 @@
 <body>
   {% if school_name %}<div class="school-header">{{ school_name }}</div>{% endif %}
   <h1>{{ titel }}</h1>
-  <div class="meta">{{ fach }} · BP {{ a.bp_version }} · {{ a.band.schluessel }} · Stand {{ stand }}{% if a.mit_entwuerfen %} · mit Entwürfen{% endif %}{% if nur_luecken %} · nur Lücken{% endif %}</div>
-  <div class="curricula"><strong>Curricula des Bands:</strong>
+  <div class="meta">{{ unterzeile }}</div>
+  <div class="curricula"><strong>Beteiligte Curricula:</strong>
     {% if a.curricula %}{% for c in a.curricula %}{{ c.title }}{% if c.status == "draft" %} (Entwurf){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}keine{% endif %}
   </div>
   {% if a.nicht_zugeordnet %}
   <div class="hinweis">Nicht mitgezählt, weil das Band nicht gewählt ist: {% for c in a.nicht_zugeordnet %}{{ c.title }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
   {% endif %}
-  <div class="bilanz">{{ a.ik.verknuepft }} von {{ a.ik.gesamt }} IK verknüpft{% if a.ik.partiell %} · {{ a.ik.partiell }} partiell{% endif %}{% if a.ik.fehlt %} · {{ a.ik.fehlt }} fehlen{% endif %}</div>
+  <div class="bilanz">{{ bilanz }}</div>
 
   {% for g in gruppen %}
     {% if g.titel %}<h2>{{ g.titel }}</h2>{% endif %}
     <ul>
     {% for k in g.kompetenzen %}
-      <li><span class="zustand {{ k.zustand }}">{{ zustaende[k.zustand] }}</span> · <span class="nr">{{ k.nr }}</span> {{ k.titel }}{% if k.curricula %} <span class="traeger">— {% for c in k.curricula %}{{ c.title }}{% if c.partiell %} (partiell){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>
+      <li><span class="zustand {{ k.zustand }}">{{ k.zustand_text }}</span> · <span class="nr">{{ k.nr }}</span> {{ k.titel }}{% if k.traeger %} <span class="traeger">— {{ k.traeger }}</span>{% endif %}</li>
     {% endfor %}
     </ul>
   {% else %}
-    <p>{% if a.ik.gesamt %}Alle Kompetenzen des Bands sind verknüpft.{% else %}Für dieses Band sind keine Kompetenzen hinterlegt.{% endif %}</p>
+    <p>{{ leer }}</p>
   {% endfor %}
 </body>
 </html>

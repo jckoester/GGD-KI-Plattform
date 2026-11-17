@@ -139,6 +139,15 @@
                     <p class="text-xs font-medium text-light-tx dark:text-dark-tx">
                         Prozessbezogene Kompetenzen — gefördert in wie vielen Lernsequenzen
                     </p>
+                    {#if fachId && abdeckung.bp_version}
+                        <!-- Schritt 9: Ein Curriculum fördert nie alle PK; zählen tut die Fassung. -->
+                        <a
+                            href={abdeckungsPfad({ fachId, fassung: abdeckung.bp_version })}
+                            class="inline-block text-xs text-light-bl dark:text-dark-bl hover:underline"
+                        >
+                            Über alle Curricula der Fassung
+                        </a>
+                    {/if}
                     {#each abdeckung.pk.gruppen as g (g.titel)}
                         <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">{g.titel}</p>
                         <ul class="text-xs space-y-0.5">

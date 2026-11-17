@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { abdeckungsPfad, anzahlCurricula, faecherFiltern, fassungTitel, sichtbareFassungen } from './curriculum_baender.js'
+import { abdeckungTexte, abdeckungsPfad, anzahlCurricula, faecherFiltern, fassungTitel, sichtbareFassungen } from './curriculum_baender.js'
 
 const c = (id, status = 'active') => ({ id, title: id, status })
 const uebersicht = {
@@ -48,6 +48,28 @@ describe('Curricula nach Fassung und Band (0.46, Schritt 8)', () => {
   })
 })
 
+describe('Abdeckungsseite: IK im Band, PK der Fassung (Schritte 8 und 9)', () => {
+  it('IK: Bilanz und Träger mit „partiell“', () => {
+    const t = abdeckungTexte({ ik: { gesamt: 5, verknuepft: 3, partiell: 1, fehlt: 1, gruppen: [] } })
+    expect(t.titel).toBe('IK-Abdeckung im Band')
+    expect(t.bilanz).toBe('3 von 5 IK verknüpft · 1 partiell · 1 fehlen')
+    expect(t.gut).toBe('verknuepft')
+    expect(t.traeger({ curricula: [{ title: 'K5', partiell: true }, { title: 'K6', partiell: false }] }))
+      .toBe('K5 (partiell), K6')
+  })
+  it('PK: Bilanz und Lernsequenzen je Curriculum', () => {
+    const t = abdeckungTexte({ pk: { gesamt: 4, gefoerdert: 3, fehlt: 1, gruppen: [] } })
+    expect(t.titel).toBe('PK-Abdeckung der Fassung')
+    expect(t.bilanz).toBe('3 von 4 PK gefördert · 1 ohne Lernsequenz')
+    expect(t.gut).toBe('gefoerdert')
+    expect(t.traeger({ curricula: [{ title: 'K5', anzahl: 1 }, { title: 'K6', anzahl: 3 }] }))
+      .toBe('K5 (1 Lernsequenz), K6 (3 Lernsequenzen)')
+  })
+  it('Fassungspfad ohne Band', () => {
+    expect(abdeckungsPfad({ fachId: 3, fassung: '2016.V3' })).toBe('/knowledge/curricula/coverage?fach=3&fassung=2016.V3')
+  })
+})
+
 describe('Fächerfilter der Curricula-Seite', () => {
   const faecher = [{ id: 1, name: 'Physik' }, { id: 2, name: 'Chemie' }, { id: 3, name: 'Biologie' }]
   const anzahl = { 1: 0, 2: 3, 3: 0 }
@@ -71,6 +93,7 @@ describe('Liste und Abdeckungsseite', () => {
     expect(liste).not.toMatch(/getCurriculaBySubject/)
     expect(liste).toMatch(/abdeckungsPfad\(\{ fachId: subjectId, fassung: f\.bp_version, band: b\.schluessel \}\)/)
     expect(liste).toMatch(/<details[^>]*open=\{f\.art !== 'aelter'\}/)  // jede Fassung einklappbar, ältere zu
+    expect(liste).toMatch(/abdeckungsPfad\(\{ fachId: subjectId, fassung: f\.bp_version \}\)/)  // PK am Fassungskopf
   })
 
   it('Abdeckungsseite: Schalter für Entwürfe und nicht zugeordnete Curricula', () => {
@@ -82,7 +105,7 @@ describe('Liste und Abdeckungsseite', () => {
   it('Abdeckungsseite: Überschriften je Bereich, Aufzählung, PDF', () => {
     expect(seite).toMatch(/<h3 class="text-base font-semibold/)
     expect(seite).toMatch(/list-disc/)
-    expect(seite).toMatch(/exportBandAbdeckung\(fachId, fassung, band, \{ entwuerfe, nurLuecken \}\)/)
+    expect(seite).toMatch(/exportAbdeckung\(fachId, fassung, band \|\| null, \{ entwuerfe, nurLuecken \}\)/)
   })
 
   it('Dropdown bei „Meine Fächer“ nur mit eigenen Fächern', () => {

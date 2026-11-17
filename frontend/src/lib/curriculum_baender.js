@@ -62,3 +62,31 @@ export function faecherFiltern(faecher, { eigene = [], filter = 'alle', fachId =
     })
     .sort((a, b) => (istEigen(b) - istEigen(a)) || a.name.localeCompare(b.name, 'de'))
 }
+
+/**
+ * Texte der Abdeckungsseite: IK über das Band (`a.ik`) oder PK über die Fassung (`a.pk`).
+ * `gut` ist der Zustand, den „nur Lücken“ ausblendet; `traeger` nennt je Kompetenz die Curricula.
+ */
+export function abdeckungTexte(a) {
+  if (a?.ik) {
+    const ik = a.ik
+    return {
+      titel: 'IK-Abdeckung im Band',
+      teil: ik,
+      gut: 'verknuepft',
+      bilanz: `${ik.verknuepft} von ${ik.gesamt} IK verknüpft`
+        + (ik.partiell ? ` · ${ik.partiell} partiell` : '') + (ik.fehlt ? ` · ${ik.fehlt} fehlen` : ''),
+      traeger: (k) => k.curricula.map((c) => c.title + (c.partiell ? ' (partiell)' : '')).join(', '),
+      leer: ik.gesamt ? 'Alle Kompetenzen des Bands sind verknüpft.' : 'Für dieses Band sind keine Kompetenzen hinterlegt.',
+    }
+  }
+  const pk = a?.pk ?? { gesamt: 0, gefoerdert: 0, fehlt: 0, gruppen: [] }
+  return {
+    titel: 'PK-Abdeckung der Fassung',
+    teil: pk,
+    gut: 'gefoerdert',
+    bilanz: `${pk.gefoerdert} von ${pk.gesamt} PK gefördert` + (pk.fehlt ? ` · ${pk.fehlt} ohne Lernsequenz` : ''),
+    traeger: (k) => k.curricula.map((c) => `${c.title} (${c.anzahl} ${c.anzahl === 1 ? 'Lernsequenz' : 'Lernsequenzen'})`).join(', '),
+    leer: pk.gesamt ? 'Alle prozessbezogenen Kompetenzen werden gefördert.' : 'Für diese Fassung sind keine prozessbezogenen Kompetenzen hinterlegt.',
+  }
+}

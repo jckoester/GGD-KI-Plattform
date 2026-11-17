@@ -23,11 +23,11 @@ export function abdeckungUeberschrift(a) {
 }
 
 /** Gruppen mit den Kompetenzen, die der Filter zeigt; leere Gruppen fallen weg. */
-export function gefilterteGruppen(gruppen, nurLuecken) {
+export function gefilterteGruppen(gruppen, nurLuecken, gut = 'verknuepft') {
   return (gruppen || [])
     .map((g) => ({
       ...g,
-      kompetenzen: nurLuecken ? g.kompetenzen.filter((k) => k.zustand !== 'verknuepft') : g.kompetenzen,
+      kompetenzen: nurLuecken ? g.kompetenzen.filter((k) => k.zustand !== gut) : g.kompetenzen,
     }))
     .filter((g) => g.kompetenzen.length)
 }
@@ -36,4 +36,6 @@ export const ZUSTAND = {
   verknuepft: { text: 'verknüpft', klasse: 'text-light-gr dark:text-dark-gr' },
   partiell: { text: 'partiell', klasse: 'text-light-ye dark:text-dark-ye' },
   fehlt: { text: 'fehlt', klasse: 'text-light-re dark:text-dark-re' },
+  // PK über die Fassung (0.46, Schritt 9)
+  gefoerdert: { text: 'gefördert', klasse: 'text-light-gr dark:text-dark-gr' },
 }
