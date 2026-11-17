@@ -6,18 +6,21 @@
     import { renderMarkdown } from "$lib/markdown.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
-    const VALID_KEYS = ["impressum", "datenschutz", "regeln", "einrichtung_hinweis"];
+    const VALID_KEYS = ["impressum", "datenschutz", "regeln", "einrichtung_hinweis", "einrichtung_hinweis_schueler"];
     const LABELS = {
         impressum: "Impressum",
         datenschutz: "Datenschutzerklärung",
         hilfe: "Hilfe",
         regeln: "Nutzungsregeln",
         einrichtung_hinweis: "Hinweis in der Einrichtung",
+        einrichtung_hinweis_schueler: "Hinweis in der Einrichtung (Schüler:innen)",
     };
     // Wo ein Text erscheint, wenn es nicht aus dem Namen hervorgeht.
     const ERKLAERUNG = {
         einrichtung_hinweis:
             "Ein Absatz „Von deiner Schule“ auf der Seite „Gut zu wissen“ der Einrichtung, die neue Lehrkräfte beim ersten Login durchgehen. Leer: kein Absatz.",
+        einrichtung_hinweis_schueler:
+            "Derselbe Absatz in der Einrichtung neuer Schüler:innen — an sie schreibt die Schule eigens. Leer: kein Absatz.",
     };
 
     // Initialer Tab aus URL-Parameter, Fallback auf 'impressum'

@@ -1,7 +1,8 @@
-"""Einrichtung beim ersten Login (0.43, Plan `Onboarding-Lehrkraefte-Plan.md`).
+"""Einrichtung beim ersten Login (0.43 Lehrkräfte, 0.47 Schüler:innen).
 
-Ein Dialog führt neue Lehrkräfte durch Erscheinungsbild, Darstellungsstufe, Stundenplan-Kürzel
-und Unterrichtsgruppen. Dieser Router liefert nur, was der Dialog **zusätzlich** braucht —
+Pläne `Onboarding-Lehrkraefte-Plan.md` und `Onboarding-Schueler-Plan.md`. Ein Dialog führt neue
+Lehrkräfte durch Erscheinungsbild, Darstellungsstufe, Stundenplan-Kürzel und Unterrichtsgruppen,
+neue Schüler:innen durch Erscheinungsbild, das Wichtigste zu Daten und Budget und ihre Fächer. Dieser Router liefert nur, was der Dialog **zusätzlich** braucht —
 ob er fällig ist, wo die Person stehen geblieben ist, die Fristen der Löschläufe und den Hinweis
 der Schule. Die Inhalte der Seiten kommen von den bestehenden Endpunkten.
 
@@ -26,20 +27,32 @@ from app.preferences.service import einrichtung_lesen, einrichtung_speichern
 
 router = APIRouter(prefix="/einrichtung", tags=["einrichtung"])
 
-#: Konten, die vor diesem Tag entstanden sind, bekommen den Dialog nicht von selbst (F2 a) —
-#: sie haben die Plattform längst eingerichtet und finden ihn unter „Unterricht“ und im Profil.
-EINRICHTUNG_AB = date(2026, 11, 14)
+#: Stichtag je Rolle: Konten, die vor diesem Tag entstanden sind, bekommen den Dialog nicht von
+#: selbst (F2 a bzw. F1 a) — sie kennen die Plattform schon und finden ihn im Profil (Lehrkräfte
+#: auch unter „Unterricht“). Ein eigener Tag je Rolle, sonst bekäme mit einer neuen Rolle ihr
+#: ganzer Bestand seit dem älteren Stichtag den Dialog.
+#: ⚠️ Schüler:innen: bei der Release-Vorbereitung von 0.47 auf den Tag des Ausrollens setzen.
+EINRICHTUNG_AB: dict[str, date] = {
+    "teacher": date(2026, 11, 14),
+    "student": date(2026, 11, 18),
+}
 
-#: Rollen mit einer Einrichtung. Rollen sind additiv: Admin mit `teacher` bekommt sie, ein
-#: reiner Admin nicht (F10). Schüler:innen folgen mit 0.47.
-ROLLEN = ("teacher",)
+#: Rollen mit einer Einrichtung, in der Reihenfolge des Vorrangs. Rollen sind additiv: Admin mit
+#: `teacher` bekommt die der Lehrkraft, ein reiner Admin keine (F10); wer `teacher` und
+#: `student` ist, die der Lehrkraft (0.47, F9).
+ROLLEN = ("teacher", "student")
 
 #: Version des Durchgangs. Ein späterer, verkürzter Durchgang (etwa zum Schuljahreswechsel)
 #: zählt hoch.
 VERSION = 1
 SEITEN_HOECHSTENS = 6
 
-HINWEIS_SCHLUESSEL = "einrichtung_hinweis"
+#: Site-Text „Hinweis der Schule“ je Rolle (0.47, F7 a: an Schüler:innen schreibt eine Schule
+#: anderes als an Lehrkräfte).
+HINWEIS_SCHLUESSEL: dict[str, str] = {
+    "teacher": "einrichtung_hinweis",
+    "student": "einrichtung_hinweis_schueler",
+}
 
 Stand = Literal["spaeter", "erledigt", "abgewaehlt"]
 
@@ -68,15 +81,25 @@ class EinrichtungWrite(BaseModel):
     seite: int = Field(ge=1, le=SEITEN_HOECHSTENS)
 
 
+def einrichtungs_rolle(user: JwtPayload) -> str | None:
+    """Nach welcher Rolle sich die Einrichtung richtet — `None`: keine.
+
+    In der Vorschau die **simulierte** Rolle: Die Lehrkraft soll dort sehen, was ihre Klasse
+    sieht, auch den Hinweis der Schule an Schüler:innen (F6 a). Fällig ist sie dort nie, und
+    speichern lässt sie sich nicht (`_hat_einrichtung`).
+    """
+    return next((r for r in ROLLEN if r in user.roles), None)
+
+
 def _hat_einrichtung(user: JwtPayload) -> bool:
-    return not ist_vorschau(user) and any(r in user.roles for r in ROLLEN)
+    return not ist_vorschau(user) and einrichtungs_rolle(user) is not None
 
 
-async def _konto_neu(db: AsyncSession, pseudonym: str) -> bool:
+async def _konto_neu(db: AsyncSession, pseudonym: str, rolle: str) -> bool:
     seit = (await db.execute(
         select(PseudonymAudit.created_at).where(PseudonymAudit.pseudonym == pseudonym)
     )).scalar_one_or_none()
-    return seit is not None and seit.astimezone().date() >= EINRICHTUNG_AB
+    return seit is not None and seit.astimezone().date() >= EINRICHTUNG_AB[rolle]
 
 
 @router.get("", response_model=EinrichtungRead)
@@ -85,11 +108,14 @@ async def einrichtung_lesen_route(
     db: AsyncSession = Depends(get_db),
 ) -> EinrichtungRead:
     stand, kuerzel_gesetzt = await einrichtung_lesen(db, user.sub)
-    hinweis = (await db.execute(
-        select(SiteConfig.value).where(SiteConfig.key == HINWEIS_SCHLUESSEL)
-    )).scalar_one_or_none()
+    rolle = einrichtungs_rolle(user)
+    hinweis = None
+    if rolle is not None:
+        hinweis = (await db.execute(
+            select(SiteConfig.value).where(SiteConfig.key == HINWEIS_SCHLUESSEL[rolle])
+        )).scalar_one_or_none()
     faellig = (_hat_einrichtung(user) and stand is None
-               and await _konto_neu(db, user.sub))
+               and await _konto_neu(db, user.sub, rolle))
     return EinrichtungRead(
         faellig=faellig,
         stand=(stand or {}).get("stand"),

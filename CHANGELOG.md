@@ -12,6 +12,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
+- `alembic upgrade head` (0111).
 - Eigene `config/ui_levels.yaml`: bei `student` den Eintrag `workshop` von Stufe 2 nach Stufe 1
   verschieben (Vorlage `config/ui_levels.example.yaml`), danach Backend neu starten.
 
