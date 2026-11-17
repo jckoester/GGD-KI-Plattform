@@ -3,7 +3,7 @@
 Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/) (0.x = vor dem ersten Stable-Release).
 
-## [Unreleased]
+## [0.46.0] – 2026-11-17
 
 ### Neu
 
@@ -16,8 +16,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Rahmen am Curriculum: Wochenstunden je Klassenstufe, Lehrwerk, Beschlüsse, Schwerpunkte und
   Absprachen; dazu die verplanbaren Stunden (30 je Wochenstunde). Im Export vor dem ersten Kapitel.
 - Assistent „Curriculum-Entwurf“ für Lehrkräfte: baut Curriculum-Entwürfe Kapitel für Kapitel auf
-  und überarbeitet sie. Er prüft jeden Vorschlag vor dem Zeigen, nennt die Stundenbilanz und, was
-  wegfällt, und schreibt erst nach Zustimmung. Änderungen aus dem Editor oder von anderen nimmt er
+  und überarbeitet sie. Er zeigt jeden Vorschlag mit Stundenbilanz und dem, was wegfällt, und
+  schreibt erst nach Zustimmung. Änderungen aus dem Editor oder von anderen nimmt er
   nur nach Rückfrage zurück.
 - Curricula-Liste nach Bildungsplan: je Fach die Fassungen (geltende, kommende, frühere), darin die
   Bänder des Plans mit ihren Curricula; Fächer und Fassungen einklappbar, Filter nach eigenen Fächern
@@ -56,10 +56,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `alembic upgrade head` (0107–0110), danach den Bildungsplan einmal vollständig importieren
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
-- `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an.
-- Eigener Reverse-Proxy statt der mitgelieferten Vorlage: Lese-Timeout mindestens 180 s.
+- `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an
+  (Modell `chat-komplex`).
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus
   `config/prompts/jahresplan_assistent.md` übernehmen.
+- Eigener Reverse-Proxy statt der mitgelieferten Vorlage: Lese-Timeout mindestens 180 s.
 
 ## [0.45.0] – 2026-11-15
 

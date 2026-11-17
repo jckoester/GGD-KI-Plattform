@@ -63,7 +63,7 @@ cd frontend && npm install && npm run dev
 - [Planung: Archiv, Rechte, Kopieren](planung-archiv-kopieren.md) — wer lesen und ändern darf, Archiv, was eine Kopie mitnimmt
 - [Begriffsvorschlag](begriffsvorschlag.md) — Begriffe aus den Phasentexten: Ablauf, Fallen, Konfiguration
 - [Begriffe im Curriculum](curriculum-begriffe.md) — Begriffe und Fachmethoden am Eintrag: Format, Abgleich, Auflösung, Gerüste, Planung
-- [Entwürfe von Curricula](curriculum-entwurf.md) — Status `draft`, eine Rechteregel mit Fachvorsitz, Veröffentlichen und Ersetzen, Abdeckung
+- [Entwürfe von Curricula](curriculum-entwurf.md) — Status `draft`, eine Rechteregel mit Fachvorsitz, Veröffentlichen und Ersetzen, Abdeckung; seit 0.46 kommende Fassung, Rückgängig, Rahmen, Funktionen des Curriculum-Assistenten, Bänder des Bildungsplans und Abdeckung über Band und Fassung
 - [Neuen Knotentyp einführen](neuer-knotentyp.md) — Checkliste, Netzwerkgraph, die vier stummen Fallen
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
