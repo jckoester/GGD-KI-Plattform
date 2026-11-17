@@ -1,11 +1,12 @@
 /**
- * Einrichtung beim ersten Login (0.43, Plan `Onboarding-Lehrkraefte-Plan.md`) — reine Regeln.
+ * Einrichtung beim ersten Login — reine Regeln. Lehrkräfte seit 0.43
+ * (`Onboarding-Lehrkraefte-Plan.md`), Schüler:innen seit 0.47 (`Onboarding-Schueler-Plan.md`).
  *
  * Welche Seiten eine Rolle durchgeht, welche entfällt, wo ein Wiedereinstieg beginnt und wann
  * der Dialog von selbst aufgeht. Der Stand kommt von `GET /einrichtung`; Seiteninhalte und
  * Speichern stehen in `EinrichtungDialog.svelte`.
  *
- * **Eine Seite dazunehmen** (etwa für Schüler:innen, 0.47): Schlüssel in `SEITEN`, Liste in
+ * **Eine Seite dazunehmen:** Schlüssel in `SEITEN`, Liste in
  * `SEITEN_JE_ROLLE`, Inhalt im Dialog. Die gespeicherte Seitennummer zählt in der **vollen**
  * Liste der Rolle — eine entfallene Seite verschiebt den Wiedereinstieg nicht.
  */
@@ -19,16 +20,26 @@ export const SEITEN = {
     stufe: { titel: 'Umfang der Oberfläche' },
     stundenplan: { titel: 'Stundenplan' },
     gruppen: { titel: 'Unterrichtsgruppen' },
+    ki_hilft: { titel: 'So hilft dir die KI' },
+    faecher: { titel: 'Deine Fächer' },
     fertig: { titel: 'Fertig' },
 }
 
 export const SEITEN_JE_ROLLE = {
     teacher: ['willkommen', 'gut_zu_wissen', 'stufe', 'stundenplan', 'gruppen', 'fertig'],
+    student: ['willkommen', 'gut_zu_wissen', 'ki_hilft', 'faecher', 'fertig'],
 }
 
-/** Die Rolle, nach der sich die Einrichtung richtet — `null`: keine Einrichtung (reine Admins, F10). */
+/**
+ * Die Rolle, nach der sich die Einrichtung richtet — `null`: keine Einrichtung (reine Admins, F10).
+ * Wer Lehrkraft und Schüler:in ist, bekommt die der Lehrkraft (0.47, F9) — wie `ROLLEN` im Backend.
+ * In der Vorschau sind die Rollen die simulierten: Die Lehrkraft sieht die Einrichtung ihrer Klasse.
+ */
 export function einrichtungsRolle(rollen) {
-    return (rollen ?? []).includes('teacher') ? 'teacher' : null
+    const r = rollen ?? []
+    if (r.includes('teacher')) return 'teacher'
+    if (r.includes('student')) return 'student'
+    return null
 }
 
 /**
@@ -127,6 +138,111 @@ export function gutZuWissen(daten, budget) {
                 'Planung, bleibt.',
         },
         { titel: 'Budget.', text: budgetText(budget) },
+    ]
+}
+
+// ── Seiten der Schüler:innen (0.47) ──────────────────────────────────────────
+//
+// Leserschaft ab Klasse 6 (F3): kurze, klare Sätze ohne Fachwörter, aber nicht kindlich.
+
+/**
+ * Seite „Gut zu wissen“ für Schüler:innen: vier Absätze. Fristen aus `daten.fristen`, Budget aus
+ * `GET /budget/me`. In der Vorschau ohne `budget` aufrufen — der Endpunkt liefert dort das Budget
+ * der Lehrkraft, und deren Zahlen gehören nicht in die Sicht der Klasse.
+ */
+export function gutZuWissenSchueler(daten, budget) {
+    const chat = daten?.fristen?.chat_tage
+    const konto = daten?.fristen?.konto_tage
+    return [
+        {
+            titel: 'Keine Namen in den Chat.',
+            text: 'Die Plattform gibt deinen Namen nicht an die KI weiter. Was du tippst, geht aber ' +
+                'an den KI-Anbieter — schreib deshalb keine Namen, Adressen oder Telefonnummern ' +
+                'hinein, auch nicht von anderen. Erkennt die Plattform so etwas, warnt sie dich vor ' +
+                'dem Senden.',
+            links: [
+                { text: 'Datenschutz', href: '/help/datenschutz' },
+                { text: 'Nutzungsregeln', href: '/info/regeln' },
+            ],
+        },
+        {
+            // F5 a: „niemand“ ohne die Ausnahme wäre nicht ehrlich (Wortlaut wie `docs/user/schueler.md`).
+            titel: 'Deine Chats sieht niemand außer dir.',
+            text: 'Auch deine Lehrkraft kann sie nicht lesen. Eine Ausnahme gibt es: Schreibst du ' +
+                'etwas, das nach einer Notlage klingt, bekommt die Schule einen Hinweis — ohne ' +
+                'deinen Namen und ohne den Text — und du siehst Hilfsangebote. Hineinsehen kann ' +
+                'erst jemand, wenn zwei Personen der Schule das gemeinsam freigeben.',
+        },
+        {
+            titel: 'Chats bleiben nicht für immer.',
+            text: `Ein Chat wird ${chat} Tage nach der letzten Nachricht gelöscht. Was du ` +
+                'behalten willst, speicherst du mit „Speichern“ in deiner Werkstatt. Wer sich ' +
+                `${konto} Tage nicht anmeldet, verliert sein Konto — mit allem in der Werkstatt.`,
+        },
+        { titel: 'Budget.', text: budgetText(budget) },
+    ]
+}
+
+/** Seite „So hilft dir die KI“ (F8): was die Assistenten tun, und dass KI angegeben wird. */
+export function kiHilft() {
+    return [
+        {
+            titel: 'Lernen statt abschreiben.',
+            text: 'Die Assistenten sind so eingestellt, dass du selbst nachdenkst. Oft fragen sie ' +
+                'zurück, statt die Lösung hinzuschreiben — das ist Absicht.',
+        },
+        {
+            titel: 'Assistenten für deine Fächer.',
+            text: 'Ein Fachassistent weiß schon, worum es geht, und kennt manchmal, was ihr im ' +
+                'Unterricht gemacht habt. Du findest sie unter „Assistenten“ und auf der Seite ' +
+                'deines Fachs.',
+        },
+        {
+            titel: 'Vorschläge im Chat.',
+            text: 'Fragst du im freien Chat, schlägt dir die Plattform manchmal einen passenden ' +
+                'Assistenten vor.',
+        },
+        {
+            titel: 'KI angeben.',
+            text: 'Nutzt du KI für eine GFS, ein Referat oder eine Facharbeit, gib das an — wie ' +
+                'jede andere Quelle.',
+            links: [{ text: 'KI-Ergebnisse zitieren', href: '/help/zitieren' }],
+        },
+    ]
+}
+
+/**
+ * Seite „Deine Fächer“ ohne Fach: derselbe Satz wie auf `/subjects`. Im Erprobungsbetrieb wäre
+ * „keine Fächer zugeordnet“ unwahr — es gibt sie, sie sind nur nicht freigegeben.
+ */
+export function faecherLeerText(erprobung) {
+    return erprobung
+        ? 'Für dich ist noch kein Fach freigegeben. Während der Erprobung sind nur die Fächer der ' +
+            'teilnehmenden Lehrkräfte zu sehen.'
+        : 'Dir sind noch keine Fächer zugeordnet.'
+}
+
+/**
+ * Darunter, ob Fächer da sind oder nicht: woher sie kommen und was tun, wenn eins fehlt. Die
+ * Regel „erscheint mit Chat oder Fachassistent“ gilt im Erprobungsbetrieb nicht
+ * (`fachWirdAngeboten`) — dort fehlt der Satz.
+ */
+export function fachFehltText(erprobung) {
+    return [
+        'Deine Fächer kommen aus deinem Schulkonto. Fehlt eins oder steht eins zu viel da, sag es ' +
+            'deiner Lehrkraft — hier lässt sich das nicht ändern.',
+        erprobung ? null : 'Ein Fach erscheint, sobald es dort einen Assistenten für dich gibt ' +
+            'oder du dort chattest.',
+        'Hat deine Lehrkraft dir einen Code genannt, trittst du der Gruppe hier bei.',
+    ].filter(Boolean).join(' ')
+}
+
+/** Seite „Fertig“ der Schüler:innen: drei Wege weiter. */
+export function wegeWeiterSchueler() {
+    return [
+        { text: 'Ersten Chat beginnen', href: '/chat' },
+        { text: 'Assistenten ansehen', href: '/assistants' },
+        { text: 'Hilfe für Schüler:innen', href: '/help/schueler' },
     ]
 }
 

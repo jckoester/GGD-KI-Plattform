@@ -1,19 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
-    budgetText, einrichtungsRolle, hinweisText, hinweisZeigen, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, seitenNummer,
-    sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
+    budgetText, einrichtungsRolle, fachFehltText, faecherLeerText, gutZuWissenSchueler, hinweisText,
+    hinweisZeigen, kiHilft, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe,
+    seitenNummer, sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
+    wegeWeiterSchueler,
 } from './einrichtung.js'
 
 const mitPlan = { stundenplan: { configured: true } }
 const ohnePlan = { stundenplan: { configured: false } }
 
 describe('Rolle (F10)', () => {
-    it('Lehrkraft, auch mit Admin; reiner Admin und Schüler:in nicht', () => {
+    it('Lehrkraft, auch mit Admin; Schüler:in (0.47); reiner Admin nicht', () => {
         expect(einrichtungsRolle(['teacher'])).toBe('teacher')
         expect(einrichtungsRolle(['teacher', 'admin'])).toBe('teacher')
         expect(einrichtungsRolle(['admin'])).toBeNull()
-        expect(einrichtungsRolle(['student'])).toBeNull()
+        expect(einrichtungsRolle(['student'])).toBe('student')
         expect(einrichtungsRolle(undefined)).toBeNull()
+    })
+
+    it('Doppelrolle: die Lehrkraft gewinnt (F9), unabhängig von der Reihenfolge', () => {
+        expect(einrichtungsRolle(['student', 'teacher'])).toBe('teacher')
+        expect(einrichtungsRolle(['teacher', 'student'])).toBe('teacher')
     })
 
     it('jede Seite einer Rolle hat einen Titel', () => {
@@ -190,5 +197,77 @@ describe('„Später“ (F4 a)', () => {
         expect(start).toContain('onclose={einrichtungAbwaehlen}')
         expect(lies('routes/(app)/teaching/+page.svelte')).toContain('<EinrichtungEintrag')
         expect(lies('routes/(app)/profile/+page.svelte')).toContain('<EinrichtungEintrag')
+    })
+})
+
+describe('Schüler:innen (0.47)', () => {
+    const daten = { fristen: { chat_tage: 93, konto_tage: 90 }, stundenplan: { configured: true } }
+
+    it('fünf Seiten, keine entfällt — auch nicht ohne Stundenplanquelle', () => {
+        expect(SEITEN_JE_ROLLE.student).toEqual(['willkommen', 'gut_zu_wissen', 'ki_hilft', 'faecher', 'fertig'])
+        expect(sichtbareSeiten('student', ohnePlan)).toHaveLength(5)
+        expect(fortschritt(3, sichtbareSeiten('student', daten))).toBe('4 von 5')
+    })
+
+    it('Gut zu wissen: Namen, wer mitliest (mit Ausnahme, F5), Fristen samt Konto (F2), Budget', () => {
+        const absaetze = gutZuWissenSchueler(daten, null)
+        expect(absaetze).toHaveLength(4)
+        expect(absaetze[0].titel).toMatch(/Namen/)
+        expect(absaetze[0].links.map((l) => l.href)).toEqual(['/help/datenschutz', '/info/regeln'])
+        expect(absaetze[1].titel).toMatch(/niemand/)
+        expect(absaetze[1].text).toMatch(/Notlage/)
+        expect(absaetze[1].text).toMatch(/zwei Personen/)
+        expect(absaetze[2].text).toContain('93 Tage')
+        expect(absaetze[2].text).toContain('90 Tage')
+        expect(absaetze[2].text).toMatch(/Werkstatt/)
+        expect(absaetze[3].titel).toBe('Budget.')
+    })
+
+    it('ohne Budget (Vorschau) keine Zahlen, nur der allgemeine Satz', () => {
+        const budget = gutZuWissenSchueler(daten, null)[3].text
+        expect(budget).toMatch(/wächst jede Unterrichtswoche/)
+        expect(budget).not.toMatch(/\d/)
+    })
+
+    it('mit Budget die eigenen Zahlen wie bei Lehrkräften', () => {
+        const b = { remaining_eur: 1.5, einheiten_je_euro: 100 }
+        expect(gutZuWissenSchueler(daten, b)[3].text).toBe(budgetText(b))
+    })
+
+    it('Texte ohne „Sie“ und ohne Fachwörter der Plattform', () => {
+        const alle = [...gutZuWissenSchueler(daten, null), ...kiHilft()]
+            .map((a) => `${a.titel} ${a.text}`).join(' ')
+        expect(alle).not.toMatch(/\bSie\b/)
+        expect(alle).not.toMatch(/Pseudonym|Baustein|Knoten|Token|LiteLLM|Modell/)
+    })
+
+    it('So hilft dir die KI: vier Absätze, Angabe mit Link aufs Zitieren', () => {
+        const absaetze = kiHilft()
+        expect(absaetze).toHaveLength(4)
+        expect(absaetze[0].text).toMatch(/Absicht/)
+        expect(absaetze[3].links).toEqual([{ text: 'KI-Ergebnisse zitieren', href: '/help/zitieren' }])
+    })
+
+    it('Deine Fächer: leer wie auf /subjects, Erprobung eigens', () => {
+        expect(faecherLeerText(false)).toBe('Dir sind noch keine Fächer zugeordnet.')
+        expect(faecherLeerText(true)).toMatch(/Erprobung/)
+    })
+
+    it('Fach fehlt: die Regel „Chat oder Assistent“ nur außerhalb der Erprobung', () => {
+        expect(fachFehltText(false)).toMatch(/Assistenten für dich gibt/)
+        expect(fachFehltText(true)).not.toMatch(/Assistenten für dich gibt/)
+        for (const e of [true, false]) {
+            expect(fachFehltText(e)).toMatch(/Schulkonto/)
+            expect(fachFehltText(e)).toMatch(/Code/)
+        }
+    })
+
+    it('Fertig: Chat, Assistenten, Hilfe für Schüler:innen', () => {
+        expect(wegeWeiterSchueler().map((w) => w.href)).toEqual(['/chat', '/assistants', '/help/schueler'])
+    })
+
+    it('Hinweis auf der Startseite zählt in der Schüler-Liste', () => {
+        const d = { ...daten, stand: 'spaeter', seite: seitenNummer('student', 'faecher') }
+        expect(hinweisText('student', d)).toBe('3 von 5 Schritten erledigt.')
     })
 })
