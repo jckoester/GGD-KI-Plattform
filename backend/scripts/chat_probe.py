@@ -85,7 +85,7 @@ def frage_stellen(
     # Assistenten-Vorschlag (C2, 0.24): Optionen und wann sie kamen — relativ zum Ende der
     # Antwort (`message`), daran hängt K6.
     vorschlag: list | None = None
-    t_message = t_vorschlag = None
+    t_message = t_vorschlag = t_erste = None
     import time as _zeit
     beginn = _zeit.monotonic()
 
@@ -124,6 +124,10 @@ def frage_stellen(
             elif name is None and nutzlast != "[DONE]":
                 try:
                     brocken = json.loads(nutzlast)["choices"][0]["delta"]
+                    if brocken.get("content") and t_erste is None:
+                        # Erste sichtbare Ausgabe (Mistral-Messung): Ein denkendes Modell schweigt
+                        # vorher, ein nicht denkendes antwortet sofort.
+                        t_erste = _zeit.monotonic() - beginn
                     stuecke.append(brocken.get("content") or "")
                 except (KeyError, IndexError, json.JSONDecodeError):
                     pass
@@ -142,6 +146,7 @@ def frage_stellen(
         "t_message": t_message,
         "t_vorschlag": t_vorschlag,
         "t_ende": _zeit.monotonic() - beginn,
+        "t_erste": t_erste,
         # Die Kennzahlen aus dem Messplan (N8): Kürze und Rückfragen sind das, was die
         # neue Präambel ändern soll — sie hier mitzuzählen erspart das Nachzählen von
         # Hand und macht zwei Läufe vergleichbar.

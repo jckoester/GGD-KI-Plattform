@@ -405,7 +405,8 @@ def begriffe_info(conn, stunde: str) -> dict:
 # ── Ein Lauf und seine Bewertung ─────────────────────────────────────────────
 
 
-def lauf(client, conn, fall: dict, assistent: int, gruppen: list[int]) -> tuple[list[dict], str | None]:
+def lauf(client, conn, fall: dict, assistent: int, gruppen: list[int],
+         modell: str | None = None) -> tuple[list[dict], str | None]:
     stunde = stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None
     verlauf: list[dict] = []
     konversation = None
@@ -414,6 +415,7 @@ def lauf(client, conn, fall: dict, assistent: int, gruppen: list[int]) -> tuple[
         zug = chat_probe.frage_stellen(
             client, text, assistent=assistent, gruppe=None,
             stunde=stunde if nr == 1 else None, verlauf=verlauf, konversation=konversation,
+            modell=modell,
         )
         konversation = zug["konversation"]
         verlauf += [{"role": "user", "content": text}, {"role": "assistant", "content": zug["antwort"]}]
@@ -983,7 +985,9 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
         for z in l["zuege"]:
             werkzeuge = " → ".join(z["werkzeuge"]) or "—"
             zeilen += [f"**Lehrkraft** ({z['zeit']}): {z['frage']}", "",
-                       f"*Werkzeuge:* {werkzeuge}" + (" ⚠️ Rundenlimit erreicht" if len(z["werkzeuge"]) >= 6 else ""),
+                       f"*Werkzeuge:* {werkzeuge}" + (" ⚠️ Rundenlimit erreicht" if len(z["werkzeuge"]) >= 6 else "")
+                       + (f" · *Antwortzeit:* erste Ausgabe {_sek(z.get('t_erste'))}, fertig {_sek(z['t_ende'])}"
+                          if z.get("t_ende") is not None else ""),
                        "", _zitat(z["antwort"], z.get("fehler")), ""]
         if l.get("vorher") is not None and l.get("nachher") != l.get("vorher"):
             zeilen += ["**Entwurf vorher:**", ""] + [f"{i}. {_phase_kurz(p)}" for i, p in enumerate(l["vorher"], 1)]
@@ -1005,11 +1009,36 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
 # ── Ablauf ───────────────────────────────────────────────────────────────────
 
 
+def _sek(t: float | None) -> str:
+    return "—" if t is None else f"{t:.1f} s"
+
+
+def kosten_der_konversationen(conn, konversationen: list[str], warten_s: float = 60.0) -> dict:
+    """Summe der Kosten aller Antworten (`messages.cost_usd`) der Konversationen dieses Laufs."""
+    import time
+
+    if not konversationen:
+        return {"usd": 0.0, "zuege": 0, "offen": 0}
+    ende = time.monotonic() + warten_s
+    while True:
+        with conn.cursor() as cur:
+            cur.execute("SELECT cost_usd, cost_status FROM messages WHERE role = 'assistant' "
+                        "AND conversation_id::text = ANY(%s)", (konversationen,))
+            zeilen = cur.fetchall()
+        if not any(z[1] == "ausstehend" for z in zeilen) or time.monotonic() > ende:
+            break
+        time.sleep(2)
+    return {"usd": sum(float(z[0]) for z in zeilen if z[0] is not None), "zuege": len(zeilen),
+            "offen": sum(1 for z in zeilen if z[0] is None)}
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Messung zum Stundenassistenten")
     p.add_argument("--datei", type=Path, help="Szenariendatei (nicht nötig mit --bewertung)")
     p.add_argument("--laeufe", type=int, default=3)
     p.add_argument("--assistent", type=int, default=None)
+    p.add_argument("--modell", default=None,
+                   help="Modell-Alias je Anfrage (Mistral-Messung); ohne = Modell des Assistenten bzw. Standard")
     p.add_argument("--nur", action="append", default=[], help="nur diesen Fall (mehrfach möglich)")
     p.add_argument("--basis", default="http://localhost:8000")
     p.add_argument("--json", type=Path, default=None, help="Ergebnis mit allen Antworten hierhin")
@@ -1100,7 +1129,7 @@ def main() -> None:
                         refs_vorbelegen(conn, stunde_am(conn, **fall["stunde"]), vorbelegt[fall["id"]])
                         lauf_ausgang = stand(conn, gruppen)
                     try:
-                        zuege, konversation = lauf(client, conn, fall, assistent, gruppen)
+                        zuege, konversation = lauf(client, conn, fall, assistent, gruppen, args.modell)
                     except (httpx.HTTPError, SystemExit) as fehler:
                         grund = f"{type(fehler).__name__}: {str(fehler)[:200]}"
                         print(f"{fall['id']:<30} Lauf {nr}  ✗  abgebrochen — {grund}", flush=True)
@@ -1159,12 +1188,16 @@ def main() -> None:
                         "refs_vorher": _refs(vorher), "refs_nachher": _refs(nachher),
                         "zaehlung": zaehlung,
                         "zuege": [{"frage": z["frage"], "werkzeuge": _werkzeuge(z), "antwort": z["antwort"],
-                                   "zeit": z["zeit"], "fehler": z.get("fehler")} for z in zuege],
+                                   "zeit": z["zeit"], "fehler": z.get("fehler"),
+                                   "t_erste": z.get("t_erste"), "t_ende": z.get("t_ende")} for z in zuege],
                         "erwartung": fall.get("erwartung"),
                     })
                     if args.verlauf:
                         args.verlauf.write_text(verlauf_als_markdown(kopf, laeufe), encoding="utf-8")
     finally:
+        # Kosten vor dem Löschen der Konversationen (Mistral-Messung); das Backend trägt sie im
+        # Hintergrund nach — bis 60 s warten, bis keine Antwort mehr aussteht.
+        kosten = kosten_der_konversationen(conn, konversationen)
         zuruecksetzen(conn, ausgang, gruppen, ausgang_vektoren)
         with conn.cursor() as cur:
             cur.execute("DELETE FROM conversations WHERE (id::text = ANY(%s)) OR (pseudonym = %s "
@@ -1196,6 +1229,15 @@ def main() -> None:
                 " · ".join(str(len(z["vorhanden_nicht_eingetragen"])) for z in eigene),
             ]
             print(f"{fall['id']:<27} " + "  |  ".join(spalten))
+    zeiten = [z.get("t_ende") for l in laeufe for z in l.get("zuege", []) if z.get("t_ende") is not None]
+    erste = [z.get("t_erste") for l in laeufe for z in l.get("zuege", []) if z.get("t_erste") is not None]
+    if zeiten:
+        import statistics
+        print(f"\nAntwortzeit: erste Ausgabe Median {_sek(statistics.median(erste) if erste else None)}, "
+              f"fertig Median {_sek(statistics.median(zeiten))} (größte {_sek(max(zeiten))})")
+    if kosten["zuege"]:
+        print(f"Kosten gesamt: {kosten['usd']:.4f} $ für {kosten['zuege']} Antworten"
+              + (f" ({kosten['offen']} ohne Kosten)" if kosten["offen"] else ""))
     mit_kennung = [e for e in ergebnisse if e.get("kennungen")]
     print(f"\nKennungen oder Werkzeugnamen in Antworten (nur berichtet): {len(mit_kennung)}/{len(ergebnisse)} Läufe"
           + (f" — {', '.join(sorted({e['fall'] for e in mit_kennung}))}" if mit_kennung else ""))

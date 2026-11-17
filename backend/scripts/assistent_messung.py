@@ -575,6 +575,8 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
             zuege.append({
                 "nr": nr, "schueler": zug["schueler"], "antwort": ergebnis["antwort"],
                 "modell": ergebnis["modell"], "fehler": ergebnis["fehler"],
+                # Antwortzeit (Mistral-Messung): erste sichtbare Ausgabe und Ende, Sekunden.
+                "t_erste": ergebnis.get("t_erste"), "t_ende": ergebnis.get("t_ende"),
                 "werkzeuge": [w.get("tool") for w in ergebnis["werkzeuge"] if w.get("tool")],
                 "angebot": [a["titel"] for a in (ergebnis.get("vorab_debug") or {}).get("angebot", [])],
                 "suchanfragen": (ergebnis.get("vorab_debug") or {}).get("suchanfragen", []),
@@ -676,6 +678,8 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
                 t.append("- **Vorgriff:** keiner")
             for v in z.get("stufenvorgriffe") or []:
                 t.append(f"- ⚠️ **Stufenvorgriff „{v['wert']}“:** " + " · ".join(f"„{s}“" for s in v["saetze"]))
+            if z.get("t_ende") is not None:
+                t.append(f"- **Antwortzeit:** erste Ausgabe {_sek(z.get('t_erste'))}, fertig {_sek(z['t_ende'])}")
             if z.get("kosten"):
                 k = z["kosten"]
                 t.append(f"- **Kosten:** {k['ein'] or '?'} Tokens ein, {k['aus'] or '?'} aus, "
@@ -747,6 +751,7 @@ def protokoll(kopf: dict, faelle: list[dict]) -> str:
     t += werkzeug_zusammenfassung(zuege)
     t += operator_zusammenfassung(zuege)
     t += kosten_zusammenfassung(kopf, zuege)
+    t += zeiten_zusammenfassung(zuege)
     return "\n".join(t) + "\n"
 
 
@@ -787,6 +792,23 @@ def werkzeug_zusammenfassung(zuege: list[tuple[str, dict]]) -> list[str]:
                       + (f"; Treffer je Aufruf Mittel {round(sum(gesamt) / len(gesamt))}, größter {max(gesamt)}"
                          if gesamt else ""))
     return zeilen
+
+
+def _sek(t: float | None) -> str:
+    return "—" if t is None else f"{t:.1f} s"
+
+
+def zeiten_zusammenfassung(zuege: list[tuple[str, dict]]) -> list[str]:
+    """Antwortzeiten über alle Züge: Median und größter Wert, je erste Ausgabe und Ende."""
+    import statistics
+
+    erste = [z["t_erste"] for _, z in zuege if z.get("t_erste") is not None]
+    ende = [z["t_ende"] for _, z in zuege if z.get("t_ende") is not None]
+    if not ende:
+        return []
+    return [f"- **Antwortzeit:** erste Ausgabe Median {_sek(statistics.median(erste) if erste else None)}"
+            f" (größte {_sek(max(erste) if erste else None)}) · fertig Median {_sek(statistics.median(ende))}"
+            f" (größte {_sek(max(ende))})"]
 
 
 def kosten_zusammenfassung(kopf: dict, zuege: list[tuple[str, dict]]) -> list[str]:
