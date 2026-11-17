@@ -175,7 +175,7 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
 | `get_bp_competences` | liest | ohne `bereich` Übersicht (Bereich = `thematische_gruppe`, Anzahl, Nummernspanne); mit `bereich` (Name, Teil davon, Nummernpräfix, `alle`) die Texte; `typ: pk` |
 | `get_curriculum_coverage` | liest | Abdeckung (Teil A) als Zahlen und Nummern, ohne Texte |
 | `get_hour_frame` | liest | `verplanbar` (30 × Wochenstunden), `verplant` (Summe der Lernsequenzen), `rest`, `fehlende_stufen` — für den gespeicherten Stand |
-| `check_curriculum_operations` | liest | Prüflauf: derselbe Stapel wie beim Schreiben, ohne Sichern und Schreiben; Antwort wie unten, `geschrieben: false`, neue Teile mit `id: null` |
+| `preview_curriculum_operations` | liest | Prüflauf: derselbe Stapel wie beim Schreiben, ohne Sichern und Schreiben; Antwort wie unten, `geschrieben: false`, neue Teile mit `id: null` |
 | `apply_curriculum_operations` | schreibt | Stapel aus `kapitel_*`, `lernsequenz_*`, `eintrag_*` (anlegen, ändern, löschen; `position` ab 1; `ref` für eben Angelegtes). Antwort: `gliederung`, `verplant`, `verplanbar`, `rest` (null ohne Wochenstunden, dann `fehlende_stufen`), `geloescht` (nur wenn etwas wegfällt), `neue_kennungen` |
 | `set_curriculum_frame` | schreibt | Rahmenangaben ergänzen (Wochenstunden je Stufe zusammengeführt); die Antwort auf eine Rahmenfrage gilt als Zustimmung |
 | `undo_last_curriculum_change` | schreibt | `zuruecknehmen` aus dem Verlauf — derselbe wie im Editor; fremde Stände nur mit `auch_fremde` (siehe unten) |
@@ -201,6 +201,15 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
   `reihenfolge` neu durchgezählt, Kapitel-`std` = Summe der Lernsequenzen, Kanten der geänderten
   Lernsequenzen wie im Editor (`_soll_kanten` ≙ `deriveRefsFromEntries`: IK `references` mit
   `partiell`, PK `develops`, Verweise in Hinweisen `references`, Material `used_with`).
+- **Geprüfter Vorschlag:** Ein bestandener Prüflauf wird an der Unterhaltung gemerkt
+  (`conversations.curriculum_vorschlag`, Migration 0110: Curriculum, Operationen, `stand_kennung`).
+  Nach der Zustimmung schreibt `apply_curriculum_operations` **ohne** `operations` genau diesen
+  Stapel — die Funktionsantworten der vorigen Nachricht kennt das Modell nicht mehr. Hat sich das
+  Curriculum seitdem geändert (Prüfsumme über dieselben Felder wie ein gesicherter Stand), wird
+  nichts geschrieben. Nach dem Schreiben ist der Vorschlag verbraucht.
+- **Veröffentlichte Curricula:** `zugang()` lässt die ganze Fachschaft lesen, als Bezug wählen
+  und als Entwurf kopieren (`darf_entwurf`, wie „Als Entwurf kopieren“ im Editor), auch wenn ein
+  Fachvorsitz zugeordnet ist und das Schreibrecht des Editors nur ihn hat.
 - **Rückgängig:** Ohne Rückfrage nimmt `undo_last_curriculum_change` nur einen Stand zurück, den
   der Assistent für dieselbe Person gesichert hat (`reason == "assistant"` und
   `created_by == user.sub`). Sonst schreibt er nichts und antwortet mit `bestaetigung_noetig` und

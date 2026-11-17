@@ -30,10 +30,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Abdeckung eines Curriculums zählt keine abgelösten Doppel von Kompetenzen derselben Fassung mehr.
 - Abdeckung eines Curriculums gliedert die Kompetenzen auch in Fächern ohne thematische Gruppen nach
   den Abschnitten des Bildungsplans (etwa „3.1.7 Optik“).
+- Chat bricht bei großen Funktionsaufrufen nicht mehr mit „KI-Dienst hat zu lange nicht
+  geantwortet“ ab.
 
 ### Nach dem Update
 
-- `alembic upgrade head` (0107, 0108, 0109), danach den Bildungsplan einmal vollständig importieren
+- `alembic upgrade head` (0107–0110), danach den Bildungsplan einmal vollständig importieren
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
 - `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an.

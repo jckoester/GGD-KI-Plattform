@@ -226,7 +226,12 @@ router = APIRouter(tags=["chat"])
 # (chat-standard) und 0,9 s (chat-komplex) — auch das Denken kommt gestreamt
 # (`reasoning_content`). Wer ein lokales Modell ohne GPU einträgt, braucht womöglich
 # allein für das Einlesen eines langen Kontexts länger; dann hier anheben.
-_LITELLM_LESE_TIMEOUT = 60.0
+#
+# **Ausnahme Funktionsaufrufe (gemessen 16.11.2026, chat-komplex):** Die Argumente eines
+# Aufrufs kommen nicht gestreamt, sondern nach dem Namen in einem Stück — dazwischen steht der
+# Strom, so lange das Modell sie erzeugt (rund 1 500 Tokens → 42 s Pause). Ein Gerüst des
+# Curriculum-Assistenten mit über 30 Lernsequenzen riss die frühere Grenze von 60 s.
+_LITELLM_LESE_TIMEOUT = 180.0
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=_LITELLM_LESE_TIMEOUT, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
 # Was die Oberfläche bei einem Abbruch zeigt — vor dem Strom als 504, im Strom als

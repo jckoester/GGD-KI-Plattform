@@ -70,7 +70,7 @@ chat_probe = _modul("chat_probe")
 
 FUNKTIONEN = (
     "get_curriculum_draft", "get_bp_competences", "get_curriculum_coverage", "get_hour_frame",
-    "check_curriculum_operations", "apply_curriculum_operations", "set_curriculum_frame",
+    "preview_curriculum_operations", "apply_curriculum_operations", "set_curriculum_frame",
     "undo_last_curriculum_change", "finde_curriculum", "waehle_curriculum", "lege_curriculum_an",
 )
 LESEN = {"get_curriculum_draft", "waehle_curriculum", "lege_curriculum_an"}
@@ -81,6 +81,12 @@ GLEICH, GEAENDERT = "gleich", "geaendert"
 NUMMER = re.compile(r"\b\d(?:\.\d+){1,3}\s?\(\d+\)")
 #: Eine Stundenzahl im Text. „Wochenstunden“ trifft nicht (kein Wortanfang vor „Stunden“).
 STUNDEN = re.compile(r"(?<![\d.,])(\d+(?:,5)?)\s*(?:Std\b\.?|Stunden\b|Unterrichtsstunden\b)")
+#: Eine Frage nach Zustimmung im Text („Soll ich das so anlegen?“, „Passt das?“).
+ZUSTIMMUNGSFRAGE = re.compile(r"\b(soll ich|passt (das|dies|der|die|es|so)|einverstanden)\b[^?\n]*"
+                              r"\b(anlegen|übernehmen|schreiben|löschen|eintragen|ergänzen|umsetzen|prüfen|erstellen|machen|berechnen|so)\b[^?\n]*\?"
+                              r"|\bso (anlegen|übernehmen|schreiben|löschen)\?", re.I)
+#: Ein gezeigter Vorschlag: Tabelle oder Liste.
+VORSCHLAG = re.compile(r"^\s*(\||[-*]\s|\d+\.\s)", re.M)
 KENNUNG = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 
 
@@ -357,6 +363,17 @@ def _zahl(x: float) -> str:
     return str(int(x)) if float(x) == int(x) else str(x).replace(".", ",")
 
 
+#: Stunden ohne Einheit direkt an der Zahl: Bilanz („verplant: 120“), „120 verplanbare Stunden“,
+#: Tabellenkopf mit Stundenspalte.
+STUNDEN_GENANNT = re.compile(r"\b(verplant|verplanbar|rest)\b\W{0,6}\d|\d+\s+\w+\s+Stunden\b"
+                             r"|^\s*\|.*\b(Std|Stunden)\b.*\|", re.I | re.M)
+
+
+def stunden_genannt(text: str) -> bool:
+    """Nennt der Text Stunden — auch ohne Einheit an der Zahl (Kriterium „Vorschlag geprüft“)."""
+    return bool(STUNDEN.search(text) or STUNDEN_GENANNT.search(text))
+
+
 def stunden_im_text(text: str) -> list[str]:
     return [_zahl(float(z.replace(",", "."))) for z in STUNDEN.findall(text)]
 
@@ -400,12 +417,14 @@ def bewerte(fall: dict, zuege: list[dict], *, band: set[str], ende: dict) -> tup
             ergebnis = a.get("ergebnis") if isinstance(a.get("ergebnis"), dict) else {}
             if a["tool"] in LESEN and not ergebnis.get("error"):
                 gelesen = True
-            if a["tool"] == "check_curriculum_operations":
+            if a["tool"] == "preview_curriculum_operations":
                 geprueft = bool(ergebnis.get("ok"))
                 letzter = a["args"].get("operations")
-            elif a["tool"] == "apply_curriculum_operations":
+            elif a["tool"] == "apply_curriculum_operations" and ergebnis.get("ok"):
+                # Nur ein erfolgreiches Schreiben verbraucht den Prüflauf — ein abgewiesenes
+                # schreibt nichts (etwa eine geratene Kennung, danach gelesen und neu geschickt).
                 ok &= bool(geprueft)
-                gleich.append(a["args"].get("operations") == letzter)
+                gleich.append(not a["args"].get("operations") or a["args"].get("operations") == letzter)
                 if _beruehrt_bestehendes(a["args"].get("operations")) and not gelesen:
                     frisch = False
                 geprueft = None
@@ -413,6 +432,17 @@ def bewerte(fall: dict, zuege: list[dict], *, band: set[str], ende: dict) -> tup
         k["Prüflauf vor Schreiben"] = ok
         k["frisch gelesen"] = frisch
         berichtet["gleicher Stapel"] = f"{sum(gleich)}/{len(gleich)}"
+
+    # Ein gezeigter Vorschlag mit Stunden und Frage nach Zustimmung braucht einen bestandenen
+    # Prüflauf im selben Zug.
+    ungeprueft = [n for n, z in enumerate(zuege, 1)
+                  if ZUSTIMMUNGSFRAGE.search(z["antwort"]) and stunden_genannt(z["antwort"])
+                  and VORSCHLAG.search(z["antwort"])
+                  and not any(a["tool"] == "preview_curriculum_operations"
+                              and (a.get("ergebnis") or {}).get("ok") for a in z["aufrufe"])]
+    k["Vorschlag geprüft"] = not ungeprueft
+    if ungeprueft:
+        berichtet["Vorschlag ohne Prüflauf in Zug"] = ungeprueft
 
     antworten = "\n".join(z["antwort"] for z in zuege)
     lehrkraft = "\n".join(d["text"] for d in fall["zuege"])
@@ -463,11 +493,15 @@ def ende_pruefen(fall: dict, zuege: list[dict], ende: dict) -> dict[str, bool]:
         a, b = e["getauscht"]
         vorschlag = None
         for x in zuege[0]["aufrufe"]:
-            if x["tool"] == "check_curriculum_operations" and (x.get("ergebnis") or {}).get("ok"):
+            if x["tool"] == "preview_curriculum_operations" and (x.get("ergebnis") or {}).get("ok"):
                 vorschlag = [g["titel"] for g in x["ergebnis"]["gliederung"]]
+        # Ohne führende Nummer vergleichen: Manche Läufe tragen sie in den Titel („2. Akustik“)
+        # und zählen nach dem Tausch richtig weiter („3. Akustik“).
+        ohne_nr = [re.sub(r"^\s*\d+\.\s*", "", t) for t in titel]
+        vorschlag = [re.sub(r"^\s*\d+\.\s*", "", t) for t in vorschlag or []]
         k["Ende getauscht"] = bool(vorschlag) and len(vorschlag) >= max(a, b) and all(
-            t in titel for t in (vorschlag[a - 1], vorschlag[b - 1])) and \
-            titel.index(vorschlag[b - 1]) < titel.index(vorschlag[a - 1])
+            t in ohne_nr for t in (vorschlag[a - 1], vorschlag[b - 1])) and \
+            ohne_nr.index(vorschlag[b - 1]) < ohne_nr.index(vorschlag[a - 1])
     if "bezug" in e:
         k["Ende Bezug"] = ende["bezug"] == ende["cid"]
     if "kopie" in e:
@@ -585,6 +619,12 @@ def selbsttest(daten: dict, conn) -> bool:
     pruefe(not stunden_im_text("Klasse 7 hat 2 Wochenstunden"), "Wochenstunden zählen nicht")
     pruefe(_zahlen({"verplant": 54, "x": [{"std": 8.0}], "t": "rest 66"}) == {"54", "8", "66"}, "Zahlen im Ergebnis")
     pruefe(_teilmenge({"wochenstunden": {"7": 2}}, {"wochenstunden": {"7": 2.0, "8": 2}}), "Teilmenge Rahmen")
+    pruefe(bool(ZUSTIMMUNGSFRAGE.search("Soll ich das Gerüst so anlegen?"))
+           and bool(ZUSTIMMUNGSFRAGE.search("Soll ich diesen Vorschlag so übernehmen?"))
+           and not ZUSTIMMUNGSFRAGE.search("Woran möchtest du arbeiten?"), "Zustimmungsfrage")
+    pruefe(stunden_genannt("| Kapitel | Std |\n|---|---|\n| Optik | 20 |")
+           and stunden_genannt("- **verplant**: 120") and stunden_genannt("ihr habt 120 verplanbare Stunden")
+           and not stunden_genannt("Kapitel 3 vor 2"), "Stunden ohne Einheit")
     pruefe(_beruehrt_bestehendes([{"op": "x", "kapitel_id": "2ee4dad2-fcc9-4b5a-b83d-364318fd3953"}])
            and not _beruehrt_bestehendes([{"op": "kapitel_anlegen", "ref": "k1"}]), "Bestehendes berührt")
 

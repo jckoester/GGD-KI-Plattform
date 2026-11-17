@@ -138,8 +138,11 @@ steht ebenso in der gespeicherten Nachricht.
 sich verbessern (`_unbekanntes_werkzeug`). Die Runde zählt gegen das Limit.
 
 **Lese-Timeout.** `_LITELLM_TIMEOUT` begrenzt die Pause zwischen zwei Teilen des Stroms
-(`read`, 60 s), nicht die Dauer der Antwort. Gemessen lag die längste Pause unter 1 s, auch
-bei denkenden Modellen — das Denken kommt gestreamt.
+(`read`, 180 s), nicht die Dauer der Antwort. Bei Text lag die längste Pause unter 1 s, auch
+bei denkenden Modellen — das Denken kommt gestreamt. Die Argumente eines Funktionsaufrufs
+dagegen kommen in einem Stück, und bis dahin steht der Strom: gemessen 42 s für rund
+1 500 Tokens (`chat-komplex`, 16.11.2026). Bis 0.45 lag die Grenze bei 60 s; große Stapel des
+Curriculum-Assistenten rissen sie.
 
 **Abbruch.** Reißt der Strom (Timeout, Verbindungsabbruch) oder lehnt LiteLLM eine
 Folgeanfrage ab (etwa Budget mitten im Zug erschöpft), endet der Zug mit dem, was bis dahin

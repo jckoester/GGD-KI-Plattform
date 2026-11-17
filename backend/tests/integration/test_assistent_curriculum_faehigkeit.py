@@ -84,7 +84,7 @@ async def test_pruefen_gehoert_zur_faehigkeit_und_schreibt_nicht():
     import app.context.curriculum_tools  # noqa: F401 — registriert
     from app.chat.tools import TOOL_REGISTRY
 
-    pruefen = TOOL_REGISTRY["check_curriculum_operations"]
+    pruefen = TOOL_REGISTRY["preview_curriculum_operations"]
     assert F in pruefen.groups and pruefen.writes is False
     assert TOOL_REGISTRY["apply_curriculum_operations"].writes is True
     assert (pruefen.definition["function"]["parameters"]["properties"]["operations"]

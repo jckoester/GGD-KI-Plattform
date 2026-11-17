@@ -90,7 +90,7 @@ faelle:
     vorlage: leer
     zuege:
       - text: Hilf mir, das Physik-Curriculum für Klasse 7/8 aufzubauen.
-        nicht: [check_curriculum_operations, apply_curriculum_operations]
+        nicht: [preview_curriculum_operations, apply_curriculum_operations]
         antwort: [Wochenstunde]
         inhalt: gleich
       - text: >-
@@ -118,7 +118,7 @@ faelle:
       - text: >-
           Schlag mir ein Gerüst für unser Curriculum vor. Eine alte Kapitelfolge gibt es nicht,
           Lehrwerk und Beschlüsse trage ich später nach.
-        muss: [check_curriculum_operations]
+        muss: [preview_curriculum_operations]
         nicht: [apply_curriculum_operations]
         inhalt: gleich
       - text: Ja, aber tausch Kapitel 2 und 3.
@@ -136,7 +136,7 @@ faelle:
       - text: >-
           Im Kapitel Optik fehlen mir die Brechung, Linsen und die Zerlegung von weißem Licht.
           Ergänze das bitte.
-        muss: [check_curriculum_operations]
+        muss: [preview_curriculum_operations]
         nicht: [apply_curriculum_operations]
         inhalt: gleich
       - text: Ja, so übernehmen.
@@ -153,7 +153,7 @@ faelle:
     vorlage: bestehend
     zuege:
       - text: Das Kapitel „Messgeräte entwickeln“ brauchen wir nicht mehr, lösch es bitte.
-        muss: [check_curriculum_operations]
+        muss: [preview_curriculum_operations]
         nicht: [apply_curriculum_operations]
         antwort: ["2 Lernsequenzen|zwei Lernsequenzen"]
         inhalt: gleich
@@ -172,13 +172,13 @@ faelle:
       - text: >-
           Wir arbeiten mit Impulse Physik 7/8 und gehen einfach nach dem Buch vor. Mach daraus
           bitte das Curriculum.
-        nicht: [check_curriculum_operations, apply_curriculum_operations]
+        nicht: [preview_curriculum_operations, apply_curriculum_operations]
         antwort: [Kapitel]
         inhalt: gleich
       - text: >-
           Die Kapitel im Buch sind: 1 Akustik, 2 Temperatur und Thermometer, 3 Energie,
           4 Bewegungen, 5 Kräfte, 6 Licht und Schatten, 7 Spiegel und Linsen, 8 Magnetismus.
-        muss: [check_curriculum_operations]
+        muss: [preview_curriculum_operations]
         nicht: [apply_curriculum_operations]
         inhalt: gleich
     erwartung: >-
@@ -198,7 +198,7 @@ faelle:
           4. Magnetismus – 8 Std. (3.2.4(1)–(4))
           5. Kinematik – 10 Std. (3.2.6(1)–(4))
           6. Dynamik – 14 Std. (3.2.7(1)–(9))
-        muss: [check_curriculum_operations]
+        muss: [preview_curriculum_operations]
         nicht: [apply_curriculum_operations]
         inhalt: gleich
       - text: Ja, leg das Gerüst so an.
@@ -213,7 +213,7 @@ faelle:
     vorlage: bestehend
     zuege:
       - text: Ergänze in der Lernsequenz „Bewegungen beschreiben“ bitte noch die Kompetenz 3.1.9(2).
-        muss_eine: [check_curriculum_operations, get_bp_competences]
+        muss_eine: [preview_curriculum_operations, get_bp_competences]
         nicht: [apply_curriculum_operations]
         inhalt: gleich
     erwartung: >-
@@ -254,7 +254,7 @@ faelle:
   - id: veroeffentlicht-kopieren
     vorlage: veroeffentlicht
     zuege:
-      - text: Im Kapitel Kinematik fehlt mir noch die Geschwindigkeit als Thema, ergänze das bitte.
+      - text: Im Kapitel Optik fehlt mir noch die Brechung, ergänze das bitte.
         nicht: [apply_curriculum_operations, waehle_curriculum]
         antwort: [Entwurf]
         inhalt: gleich

@@ -6,9 +6,10 @@ hier nur Schema und Übergabe. Jede Funktion prüft den Zugang am Curriculum sel
 ist eine Vorgabe, keine Erlaubnis. Geschrieben wird nur in Entwürfe (E17), jeder schreibende
 Aufruf sichert vorher den Stand (Rückgängig im Editor und `undo_last_curriculum_change`).
 
-`check_curriculum_operations` ist der Prüflauf zu `apply_curriculum_operations`: eine eigene
+`preview_curriculum_operations` ist die Vorschau zu `apply_curriculum_operations`: eine eigene
 Funktion (`writes=False`), kein Schalter am Schreiben — ein vergessener Schalter schriebe ohne
-Zustimmung, eine vergessene Prüfung schadet nicht.
+Zustimmung, eine vergessene Vorschau schadet nicht. Bis zur Messung am 16.11.2026 hieß sie
+`check_curriculum_operations`; „prüfen“ las das Modell als Schritt, der eine Zustimmung braucht.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from uuid import UUID
 
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.context import curriculum_assistent as ca
-from app.context.curriculum_verlauf import gegenstand, juengster, verlauf, zuruecknehmen
+from app.context.curriculum_verlauf import gegenstand, juengster, stand_kennung, verlauf, zuruecknehmen
 
 GRUPPE = frozenset({"curriculum_planning"})
 
@@ -121,14 +122,14 @@ _registriere(
     "Stundenbilanz des gespeicherten Stands: verplanbar (30 Stunden je Wochenstunde aus den "
     "Rahmenangaben, über alle Stufen des Bands), verplant (Summe der Lernsequenzen), rest. "
     "verplanbar ist null, solange Wochenstunden fehlen. Dieselben Zahlen stehen auch in den "
-    "Antworten von check_curriculum_operations und apply_curriculum_operations. Rechne nicht selbst.",
+    "Antworten von preview_curriculum_operations und apply_curriculum_operations. Rechne nicht selbst.",
 )
 
 
 # ── Schreiben ────────────────────────────────────────────────────────────────
 
 
-#: Beschreibung der Operationen — gemeinsam für Prüflauf und Schreiben.
+#: Beschreibung der Operationen — gemeinsam für Vorschau und Schreiben.
 OPERATIONEN = {
     "operations": {"type": "array", "items": {"type": "object"}, "description": (
         "Operationen, je mit 'op'. position zählt ab 1, ohne Angabe ans Ende. Mit ref "
@@ -157,18 +158,35 @@ _ANTWORT = (
     "Stapel entfernt; fehlt, wenn nichts gelöscht wird).")
 
 
-async def _check_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
+async def _konversation(ctx: ToolContext):
+    from app.db.models import Conversation
+
+    return await ctx.db.get(Conversation, ctx.conversation_id) if ctx.conversation_id else None
+
+
+async def _preview_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
     cur = await _curriculum(args, ctx, schreiben=True)
     if isinstance(cur, str):
         return {"error": cur}
-    return await ca.operationen_pruefen(ctx.db, cur, args.get("operations"))
+    antwort = await ca.operationen_pruefen(ctx.db, cur, args.get("operations"))
+    # Den geprüften Stapel merken: Nach der Zustimmung (nächste Nachricht) kennt das Modell ihn
+    # nicht mehr — Funktionsantworten bleiben nicht im Verlauf (Messung 16.11.2026).
+    if antwort.get("ok") and (k := await _konversation(ctx)) is not None:
+        k.curriculum_vorschlag = {"curriculum_id": str(cur.id), "operations": args["operations"],
+                                  "stand": await stand_kennung(ctx.db, cur.id)}
+        await ctx.db.flush()
+        antwort["vorschlag_gemerkt"] = True
+    return antwort
 
 
 _registriere(
-    "check_curriculum_operations", _check_curriculum_operations,
-    "Prüft einen Stapel, ohne zu schreiben: abgewiesene Operationen (fehler) und die Stunden, wie "
-    "sie nach dem Stapel wären. Vor jedem Vorschlag an die Lehrkraft aufrufen; braucht keine "
-    "Zustimmung. Neue Kapitel und Lernsequenzen haben hier noch keine id (null). " + _ANTWORT,
+    "preview_curriculum_operations", _preview_curriculum_operations,
+    "Vorschau eines Stapels, ohne zu schreiben: abgewiesene Operationen (fehler) und die Stunden, "
+    "wie sie nach dem Stapel wären. Vor jedem Vorschlag an die Lehrkraft aufrufen, ohne zu fragen — "
+    "die Vorschau braucht keine Zustimmung. Eine Vorschau ohne fehler wird als Vorschlag gemerkt "
+    "(vorschlag_gemerkt): Nach "
+    "Zustimmung schreibt ihn apply_curriculum_operations ohne operations. Neue Kapitel und "
+    "Lernsequenzen haben hier noch keine id (null). " + _ANTWORT,
     OPERATIONEN, ["operations"],
 )
 
@@ -177,17 +195,40 @@ async def _apply_curriculum_operations(args: dict, ctx: ToolContext) -> dict:
     cur = await _curriculum(args, ctx, schreiben=True)
     if isinstance(cur, str):
         return {"error": cur}
-    return await ca.operationen_anwenden(ctx.db, ctx.user, cur, args.get("operations"))
+    k = await _konversation(ctx)
+    ops = args.get("operations")
+    if not ops:
+        vorschlag = (k.curriculum_vorschlag if k is not None else None) or {}
+        if vorschlag.get("curriculum_id") != str(cur.id):
+            return {"ok": False, "fehler": [
+                "Kein Vorschlag aus einer Vorschau für dieses Curriculum — erst preview_curriculum_operations, "
+                "den Vorschlag der Lehrkraft zeigen, nach Zustimmung schreiben."]}
+        if vorschlag.get("stand") != await stand_kennung(ctx.db, cur.id):
+            k.curriculum_vorschlag = None
+            await ctx.db.flush()
+            return {"ok": False, "fehler": [
+                "Das Curriculum hat sich seit der Vorschau geändert (im Editor, von einer anderen Person "
+                "oder durch einen anderen Schritt). Nichts geschrieben. Lies es neu, mach eine neue "
+                "Vorschau und zeig den Vorschlag der Lehrkraft."]}
+        ops = vorschlag["operations"]
+    antwort = await ca.operationen_anwenden(ctx.db, ctx.user, cur, ops)
+    if antwort.get("ok") and k is not None:
+        k.curriculum_vorschlag = None
+        await ctx.db.flush()
+    return antwort
 
 
 _registriere(
     "apply_curriculum_operations", _apply_curriculum_operations,
-    "Schreibt einen Stapel Änderungen in den Entwurf — nur nach Zustimmung der Lehrkraft; vorher "
-    "check_curriculum_operations. Ganz oder gar nicht: Passt eine Operation nicht (etwa eine "
-    "Kompetenznummer außerhalb des Bands), wird nichts geschrieben und fehler nennt, was. Vorher "
-    "wird der Stand gesichert; undo_last_curriculum_change nimmt den Stapel zurück. " + _ANTWORT
+    "Schreibt Änderungen in den Entwurf — nur nach Zustimmung der Lehrkraft. **Ohne operations** "
+    "schreibt es genau den Vorschlag der letzten Vorschau dieser Unterhaltung "
+    "(preview_curriculum_operations) — der Normalfall nach „ja“. Hat sich das Curriculum seit der "
+    "Vorschau geändert, wird nichts geschrieben: neu lesen, neue Vorschau, neu zeigen. Mit operations: "
+    "dieser Stapel (vorher ebenfalls Vorschau). Ganz oder gar nicht: Passt eine Operation nicht, wird "
+    "nichts geschrieben und fehler nennt, was. Vorher wird der Stand gesichert; "
+    "undo_last_curriculum_change nimmt den Stapel zurück. " + _ANTWORT
     + " Dazu neue_kennungen für die refs.",
-    OPERATIONEN, ["operations"], schreibt=True,
+    OPERATIONEN, [], schreibt=True,
 )
 
 

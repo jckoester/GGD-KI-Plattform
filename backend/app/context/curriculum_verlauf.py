@@ -56,6 +56,20 @@ async def baum_ids(db: AsyncSession, curriculum_id: UUID) -> list[UUID]:
     return [curriculum_id, *kapitel, *ls]
 
 
+async def stand_kennung(db: AsyncSession, curriculum_id: UUID) -> str:
+    """Prüfsumme über den Baum — dieselben Felder wie ein gesicherter Stand, dazu der Status.
+    Ändert sich irgendetwas am Curriculum (Editor, Assistent, Rückgängig), ändert sich die
+    Kennung. Für den geprüften Vorschlag des Assistenten (`apply_curriculum_operations`)."""
+    import hashlib
+    import json
+
+    ids = await baum_ids(db, curriculum_id)
+    knoten = (await db.execute(sa.select(ContextNode).where(ContextNode.id.in_(ids)))).scalars().all()
+    daten = sorted(([str(n.id), n.status, {f: _wert(getattr(n, f)) for f in FELDER}] for n in knoten),
+                   key=lambda x: x[0])
+    return hashlib.sha256(json.dumps(daten, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def _wert(v):
     if isinstance(v, UUID):
         return str(v)

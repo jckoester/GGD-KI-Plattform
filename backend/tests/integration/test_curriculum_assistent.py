@@ -206,14 +206,14 @@ async def test_veroeffentlicht_nur_lesen(db, welt):
     await db.flush()
     assert "kapitel" in await _ruf("get_curriculum_draft", db, welt)
     for name, args in (("apply_curriculum_operations", {"operations": [{"op": "kapitel_anlegen", "titel": "X"}]}),
-                       ("check_curriculum_operations", {"operations": [{"op": "kapitel_anlegen", "titel": "X"}]}),
+                       ("preview_curriculum_operations", {"operations": [{"op": "kapitel_anlegen", "titel": "X"}]}),
                        ("set_curriculum_frame", {"lehrwerk": "X"}),
                        ("undo_last_curriculum_change", {})):
         assert (await _ruf(name, db, welt, **args)) == {"error": NUR_ENTWUERFE}
 
 
 async def test_fremde_und_ohne_bezug(db, welt):
-    for name in ("get_curriculum_draft", "get_bp_competences", "check_curriculum_operations",
+    for name in ("get_curriculum_draft", "get_bp_competences", "preview_curriculum_operations",
                  "apply_curriculum_operations"):
         antwort = await _ruf(name, db, welt, user=FREMDE, operations=[])
         assert "error" in antwort
@@ -246,7 +246,7 @@ async def test_pruefen_schreibt_nichts_und_antwortet_wie_schreiben(db, welt):
     staende = len(await _staende(db, w["cur"].id))
     vorher = await _ruf("get_curriculum_draft", db, w)
 
-    probe = await _ruf("check_curriculum_operations", db, w, operations=_stapel(w))
+    probe = await _ruf("preview_curriculum_operations", db, w, operations=_stapel(w))
     assert probe["ok"] and probe["geschrieben"] is False, probe
     assert probe["gliederung"][1]["id"] is None and probe["gliederung"][1]["lernsequenzen"][0]["id"] is None
     assert (probe["verplant"], probe["verplanbar"], probe["rest"]) == (10, 120, 110)
@@ -264,7 +264,7 @@ async def test_pruefen_schreibt_nichts_und_antwortet_wie_schreiben(db, welt):
 
 async def test_pruefen_weist_bandfremde_nummer_ab(db, welt):
     ops = [{"op": "eintrag_anlegen", "lernsequenz_id": str(welt["ls"].id), "ik": ["3.3.1(1)"]}]
-    probe = await _ruf("check_curriculum_operations", db, welt, operations=ops)
+    probe = await _ruf("preview_curriculum_operations", db, welt, operations=ops)
     echt = await _ruf("apply_curriculum_operations", db, welt, operations=ops)
     assert probe["ok"] is False and probe["fehler"] == echt["fehler"]
     assert await _staende(db, welt["cur"].id) == []
@@ -272,12 +272,12 @@ async def test_pruefen_weist_bandfremde_nummer_ab(db, welt):
 
 async def test_geloescht_zaehlt_inhalt_geloeschter_kapitel(db, welt):
     w = welt
-    probe = await _ruf("check_curriculum_operations", db, w, operations=[
+    probe = await _ruf("preview_curriculum_operations", db, w, operations=[
         {"op": "kapitel_loeschen", "kapitel_id": str(w["kap"].id)}])
     assert probe["geloescht"] == {"kapitel": 1, "lernsequenzen": 1, "eintraege": 1}
     assert probe["gliederung"] == []
     # Verschoben ist nicht gelöscht; ein im Stapel angelegter und wieder gelöschter Eintrag zählt nicht.
-    probe = await _ruf("check_curriculum_operations", db, w, operations=[
+    probe = await _ruf("preview_curriculum_operations", db, w, operations=[
         {"op": "kapitel_anlegen", "titel": "Neu", "ref": "k"},
         {"op": "lernsequenz_aendern", "lernsequenz_id": str(w["ls"].id), "kapitel_id": "k"},
         {"op": "eintrag_aendern", "lernsequenz_id": str(w["ls"].id), "eintrag": 1, "konkretisierung": "X"},
@@ -286,12 +286,12 @@ async def test_geloescht_zaehlt_inhalt_geloeschter_kapitel(db, welt):
         {"op": "kapitel_loeschen", "kapitel_id": str(w["kap"].id)},
     ])
     assert probe["geloescht"] == {"kapitel": 1, "lernsequenzen": 0, "eintraege": 0}, probe
-    ohne = await _ruf("check_curriculum_operations", db, w, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
+    ohne = await _ruf("preview_curriculum_operations", db, w, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
     assert "geloescht" not in ohne
 
 
 async def test_ohne_wochenstunden_kein_verplanbar(db, welt):
-    for name in ("check_curriculum_operations", "apply_curriculum_operations"):
+    for name in ("preview_curriculum_operations", "apply_curriculum_operations"):
         a = await _ruf(name, db, welt, operations=[{"op": "kapitel_anlegen", "titel": "X"}])
         assert a["verplanbar"] is None and a["rest"] is None and a["fehlende_stufen"] == [7, 8], a
         assert a["hinweis"] == "Kapitel ohne Lernsequenz: X"
@@ -465,3 +465,74 @@ async def test_bereich_aus_dem_breadcrumb(db, welt):
     assert {b["bereich"] for b in ueber["ik"]["bereiche"]} == {"Optik", "Mechanik", "3.2.3 Wärme"}
     waerme = await _ruf("get_bp_competences", db, welt, bereich="wärme")
     assert waerme["bereiche"][0]["kompetenzen"] == [{"nr": "3.2.3(1)", "text": "Wärme leiten"}]
+
+
+async def test_veroeffentlicht_mit_fachvorsitz_lesen_und_kopieren(db, welt, monkeypatch):
+    """Ist der Rolle `fachvorsitz` eine Gruppe zugeordnet, ändert nur der Vorsitz ein
+    veröffentlichtes Curriculum. Lesen, als Bezug wählen und als Entwurf kopieren darf die ganze
+    Fachschaft — wie „Als Entwurf kopieren“ im Editor (Messung 16.11.: vorher 404)."""
+    from app.context import curriculum_entwurf, router
+    from app.context.curriculum_bezug import curriculum_fuer_bezug
+
+    for modul in (curriculum_entwurf, router):
+        monkeypatch.setattr(modul, "fachvorsitz_zugeordnet", lambda: True)
+    for n in ("cur", "kap", "ls"):
+        welt[n].status = "active"
+    await db.flush()
+
+    assert (await curriculum_fuer_bezug(db, welt["cur"].id, LEHRKRAFT)).id == welt["cur"].id
+    assert (await _ruf("get_curriculum_draft", db, welt))["status"] == "active"
+    assert await _ruf("apply_curriculum_operations", db, welt,
+                      operations=[{"op": "kapitel_anlegen", "titel": "X"}]) == {"error": NUR_ENTWUERFE}
+    kopie = await TOOL_REGISTRY["waehle_curriculum"].handler(
+        {"curriculum_id": str(welt["cur"].id), "als_entwurf_kopieren": True},
+        ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=None))
+    assert kopie["status"] == "draft"
+    # Wer nicht in der Fachschaft ist, bleibt draußen.
+    assert "error" in await _ruf("get_curriculum_draft", db, welt, user=FREMDE)
+
+
+# ── Geprüften Vorschlag schreiben (Messung 16.11.: Zustimmung ohne Kennungen) ──
+
+
+async def _mit_konversation(name, db, welt, k, **args):
+    ctx = ToolContext(db=db, user=LEHRKRAFT, group_id=None, conversation_id=k.id,
+                      curriculum_node_id=welt["cur"].id)
+    return await TOOL_REGISTRY[name].handler(args, ctx)
+
+
+async def test_gepruefter_vorschlag_wird_ohne_operationen_geschrieben(db, welt):
+    k = await _konversation(db)
+    leer = await _mit_konversation("apply_curriculum_operations", db, welt, k)
+    assert leer["ok"] is False and "Kein Vorschlag aus einer Vorschau" in leer["fehler"][0]
+
+    probe = await _mit_konversation("preview_curriculum_operations", db, welt, k, operations=_stapel(welt))
+    assert probe["vorschlag_gemerkt"] is True
+    assert await _staende(db, welt["cur"].id) == []
+    echt = await _mit_konversation("apply_curriculum_operations", db, welt, k)
+    assert echt["ok"] and echt["verplant"] == probe["verplant"] and echt["geloescht"] == probe["geloescht"]
+    assert [x["titel"] for x in echt["gliederung"]] == ["Optik", "Mechanik"]
+    await db.refresh(k)
+    assert k.curriculum_vorschlag is None
+    # Ein zweites „ja“ schreibt nicht noch einmal.
+    assert (await _mit_konversation("apply_curriculum_operations", db, welt, k))["ok"] is False
+
+
+async def test_vorschlag_verfaellt_wenn_sich_das_curriculum_aendert(db, welt):
+    k = await _konversation(db)
+    await _mit_konversation("preview_curriculum_operations", db, welt, k,
+                            operations=[{"op": "kapitel_anlegen", "titel": "Mechanik"}])
+    welt["kap"].title = "Optik (im Editor geändert)"
+    await db.flush()
+    antwort = await _mit_konversation("apply_curriculum_operations", db, welt, k)
+    assert antwort["ok"] is False and "geändert" in antwort["fehler"][0]
+    assert [x["titel"] for x in (await _ruf("get_curriculum_draft", db, welt))["kapitel"]] == [
+        "Optik (im Editor geändert)"]
+
+
+async def test_vorschlag_gilt_nur_fuer_sein_curriculum(db, welt):
+    k = await _konversation(db)
+    k.curriculum_vorschlag = {"curriculum_id": str(uuid.uuid4()), "operations": [], "stand": "x"}
+    await db.flush()
+    antwort = await _mit_konversation("apply_curriculum_operations", db, welt, k)
+    assert antwort["ok"] is False and "Kein Vorschlag aus einer Vorschau" in antwort["fehler"][0]

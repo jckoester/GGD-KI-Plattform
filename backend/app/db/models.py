@@ -593,6 +593,10 @@ class Conversation(Base):
     curriculum_node_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
     )
+    # Ab 0.46: der zuletzt erfolgreich geprüfte Stapel des Curriculum-Assistenten
+    # (`preview_curriculum_operations`) — nach Zustimmung schreibt ihn `apply_curriculum_operations`
+    # ohne Operationen, sofern sich das Curriculum seitdem nicht geändert hat.
+    curriculum_vorschlag: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     # Ab Phase 8: aktuell aktiver Assistent (wird bei Wechsel mid-Chat aktualisiert)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL")

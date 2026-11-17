@@ -38,6 +38,7 @@ assistants:
     audience: teacher
     scope: teachers
     status: active
+    model: chat-komplex
     tool_groups:
       - curriculum_planning
     produces: [curriculum]
