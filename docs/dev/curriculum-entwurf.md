@@ -80,7 +80,12 @@ Stundenassistent liest archivierte Kapitel nicht und fällt auf die passenden Cu
 
 `GET /context/curricula/{id}/coverage` (`abdeckung(db, tree)`):
 
-- **IK des Bands:** Fach und Fassung (`metadata.bp_version`) des Curriculums, Stufen überlappend.
+- **IK des Bands** (seit 0.46, `band_des_curriculums`): die IK unter der Bandüberschrift des
+  Bildungsplans, die dem Curriculum zugeordnet ist (siehe [Bänder](#bänder-des-bildungsplans-seit-046)).
+  Ohne Zuordnung (parallele Bänder ohne Wahl) die IK aller Bänder, die die Stufen berühren; die
+  Antwort nennt dann `baender_zur_wahl` und einen `hinweis`. Bis 0.45 zählten nur die Stufen —
+  ein Oberstufen-Curriculum maß gegen Basis- und Leistungsfach zusammen, und IK ohne Stufen
+  (Physik V2, Basisfach 11/12) zählten in jedem Band.
 - **Gezählt werden die Einträge** (`eintraege[].ik` mit `partiell`, `eintraege[].pk`), nicht die
   Kanten — der Editor legt auch für Verweise in Hinweisen `references`-Kanten an.
 - `anderswo`: andere **veröffentlichte** Curricula desselben Fachs und derselben Fassung, die eine
@@ -91,6 +96,35 @@ Stundenassistent liest archivierte Kapitel nicht und fällt auf die passenden Cu
   (`docs/admin/updates-und-wartung.md`).
 
 Teil B (Assistent) nutzt denselben Dienst als Funktion.
+
+## Bänder des Bildungsplans (seit 0.46)
+
+`app/context/bp_baender.py`. Ein **Band** ist eine Bandüberschrift im `breadcrumb` der IK
+(„3.1 Klassen 5/6“, „3.4 Klassen 12/13 (Leistungsfach)“); Schlüssel ist die Überschrift ohne
+Nummer, weil die Nummer zwischen Fassungen wechselt. Geprüft am 17.11.2026: Alle 10 098 geltenden
+und kommenden IK tragen eine. Stufen aus `min_grade`/`max_grade` der IK, sonst aus der
+Überschrift (Physik V2 führt die Basisfach-Bänder 11/12 ohne Stufen). IK ohne Bandüberschrift
+(nur in Testdaten) gehen nach Stufen.
+
+- **Parallele Bänder:** In 27 Fach-Fassungen gibt es zu denselben Stufen zwei oder drei Bänder
+  (Basis-/Leistungsfach, Physik zwei Basisfach-Schwerpunkte). `band_zuordnen` nimmt
+  `metadata.band`, wenn es unter den Kandidaten ist, sonst den einzigen Kandidaten, sonst keinen.
+- **Setzen:** Editor über `PATCH /context/nodes/{id}` (geprüft: nur ein Kandidat der Stufen,
+  sonst 422), Auswahl aus `GET /context/curricula/{id}/band` (`CurriculumBandWahl.svelte`);
+  `lege_curriculum_an` fragt bei parallelen Bändern nach (`band`). `band` steht nicht im
+  `import_key` (der wird beim Ändern der Stufe segmentweise umgeschrieben); die Idempotenz von
+  `curriculum_anlegen` vergleicht es mit.
+- **Übersicht:** `GET /context/curricula/by-subject/{id}/overview` (`curriculum_baender.uebersicht`)
+  — Fassungen (geltend, kommend, älter mit Curricula), je Fassung die Bänder mit ihren Curricula,
+  dazu `nicht_zugeordnet`. Gleiche Leseregel wie die Liste (`_lesbare_curricula`). Frontend
+  `CurriculumList.svelte`, Hilfen `lib/curriculum_baender.js`.
+- **Abdeckung über das Band:** `GET …/by-subject/{id}/band-coverage?bp_version&band&entwuerfe`
+  — IK des Bands über alle zugeordneten Curricula (verknüpft, sobald eines voll; partiell, wenn
+  nur teilweise). **Abdeckung über die Fassung:** `GET …/pk-coverage?bp_version&entwuerfe` — PK
+  über alle Curricula des Fachs in der Fassung, auch ohne Band. In beiden ersetzt mit
+  `entwuerfe` ein Entwurf mit `kopie_von` das Original (`_ohne_ersetzte`). `format=pdf`
+  (`nur_luecken`) rendert `templates/abdeckung_pdf.html` mit weasyprint. Seite
+  `/knowledge/curricula/coverage?fach&fassung[&band][&entwuerfe=1]`.
 
 ## Kommende Fassung (`upcoming`, seit 0.46)
 

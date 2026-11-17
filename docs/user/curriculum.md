@@ -12,6 +12,22 @@ eines Fachs unterrichtet werden.
 
 Du erreichst Curricula über **Wissen → Curricula** oder direkt von der Fachseite aus.
 
+## Die Liste
+
+Die Liste ist nach dem Bildungsplan gegliedert: je **Fach** die **Fassungen** des Bildungsplans,
+darin die **Bänder** des Plans („Klassen 5/6“, „Klassen 12/13 (Leistungsfach)“) und in jedem
+Band die Curricula, die dazu gehören.
+
+- Oben wählst du **Meine Fächer**, **Alle Fächer** oder ein **bestimmtes Fach**. Bei „Meine
+  Fächer“ bietet auch die Fachauswahl nur deine Fächer an.
+- Fächer und Fassungen lassen sich einklappen. Zuerst stehen die geltenden Fassungen, dann die
+  kommende; frühere Fassungen, an denen noch Curricula hängen, sind eingeklappt.
+- In deinen eigenen Fächern siehst du auch Bänder ohne Curriculum — dort fehlt noch eines.
+- Ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, steht daneben mit
+  „ersetzt …“.
+- Am Kopf eines Bands führt **IK-Abdeckung im Band**, am Kopf einer Fassung **PK-Abdeckung der
+  Fassung** zur Abdeckung über mehrere Curricula (siehe [Abdeckung](#abdeckung)).
+
 ---
 
 ## Wer darf was
@@ -48,7 +64,17 @@ veröffentlichtes Curriculum überarbeitest du ohne Fachvorsitz über **„Als E
 2. **Jahrgangsstufe oder Stufenband** eintragen — freie Eingabe: `7`, `7/8`, `5–6`.
 
 Den Rest baust du im Editor auf. Das neue Curriculum ist ein **Entwurf** — siehe nächster
-Abschnitt.
+Abschnitt. Legst du für dieselbe Stufe und Fassung noch einmal eins an, öffnet sich dein
+vorhandener Entwurf; ein Doppel entsteht nicht.
+
+**Oberstufe: das Band wählen.** In der Kursstufe gibt es zu denselben Klassen mehrere Bänder
+im Bildungsplan — Basis- und Leistungsfach, in Physik auch zwei Basisfach-Schwerpunkte. Dann
+wählst du im Editor unter **Band im Bildungsplan**, wofür das Curriculum gilt. Bis dahin steht
+es in der Liste unter „Band nicht zugeordnet“, und die Abdeckung zählt die Kompetenzen aller
+dieser Bänder.
+
+**Mit dem Assistenten:** Der Assistent **Curriculum-Entwurf** legt ein Curriculum auch für dich
+an und baut es mit dir auf (siehe [Mit dem Assistenten arbeiten](#mit-dem-assistenten-arbeiten)).
 
 **Für eine Fassung, die erst später gilt:** Steht neben dem Bildungsplan „gilt ab 2027/28“,
 ist das die kommende Fassung. Du kannst dein Curriculum dafür schon jetzt schreiben —
@@ -193,15 +219,76 @@ des Bands das Curriculum verknüpft, welche nur partiell und welche gar nicht �
 prozessbezogene Kompetenz gefördert wird. Gezählt wird, was in den Spalten IK und PK steht,
 nicht die Verweise in den Hinweisen.
 
-- **Zum Band** gehören die Kompetenzen deines Fachs in der Fassung des Curriculums, deren
-  Stufen sich mit denen des Curriculums überschneiden. Ein Curriculum für Klasse 9 sieht also
-  die Kompetenzen des Bands 9/10.
+- **Zum Band** gehören die Kompetenzen, die der Bildungsplan unter der Überschrift des Bands
+  führt, etwa „Klassen 9/10“. Ein Curriculum für Klasse 9 sieht also die Kompetenzen des Bands
+  9/10. In der Oberstufe zählt das gewählte Band (Basis- oder Leistungsfach).
 - Fehlt eine Kompetenz, steht dabei, ob ein **anderes veröffentlichtes Curriculum** desselben
   Bands sie verknüpft — etwa das für Klasse 10.
+- Zwei Links führen weiter: **Abdeckung über alle Curricula des Bands** und, bei den
+  prozessbezogenen Kompetenzen, **Über alle Curricula der Fassung**.
 - **Aus einem anderen Fach:** Erscheint dieser Abschnitt, hängt das Curriculum an Kompetenzen
   eines anderen Fachs — meist ein Überbleibsel eines alten Imports. Ersetze sie im Editor oder
   bitte die Schul-IT um die Reparatur.
 - Die Abdeckung zeigt den **gespeicherten** Stand; im Editor lädt sie nach dem Speichern neu.
+
+### Abdeckung über das Band
+
+Ein Band umfasst oft zwei oder drei Klassenstufen, und jede hat ihr eigenes Curriculum. Ob das
+Band als Ganzes abgedeckt ist, zeigt **IK-Abdeckung im Band** (am Bandkopf der Liste):
+
+- Oben stehen die Curricula des Bands. Mit **Entwürfe einbeziehen** zählen auch Entwürfe der
+  Fachschaft; ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, tritt an dessen
+  Stelle — so siehst du den Stand nach dem Veröffentlichen.
+- Je inhaltsbezogener Kompetenz: **verknüpft**, sobald ein Curriculum sie ganz verknüpft;
+  **partiell**, wenn sie nur teilweise vorkommt; sonst **fehlt**. Dahinter steht, welche
+  Curricula sie tragen.
+- **nur Lücken** blendet die verknüpften aus, **PDF** exportiert die Liste so, wie sie gerade
+  angezeigt wird.
+- Ein Oberstufen-Curriculum ohne gewähltes Band zählt nicht mit; die Seite nennt es.
+
+### Abdeckung über die Fassung (PK)
+
+Die prozessbezogenen Kompetenzen gelten für alle Klassenstufen einer Fassung — ein einzelnes
+Curriculum fördert nie alle. **PK-Abdeckung der Fassung** (am Fassungskopf der Liste) zählt
+deshalb über **alle** Curricula des Fachs in dieser Fassung: Je Kompetenz steht, ob sie
+gefördert wird, in welchen Curricula und in wie vielen Lernsequenzen. „Entwürfe einbeziehen“,
+„nur Lücken“ und PDF funktionieren wie bei der Abdeckung über das Band.
+
+---
+
+## Mit dem Assistenten arbeiten
+
+Der Assistent **Curriculum-Entwurf** baut mit dir ein Curriculum auf oder überarbeitet ein
+bestehendes. Du startest ihn im Entwurf mit dem Knopf **Assistent** (Ansicht oder Editor) oder
+aus der Assistentenliste — dann fragt er nach Fach und Klassenstufe.
+
+So arbeitet er:
+
+1. **Rahmen klären:** Er fragt nach den Wochenstunden je Stufe und einmal nach Lehrwerk,
+   Beschlüssen, Schwerpunkten und einer bisherigen Kapitelfolge. Deine Antworten trägt er in den
+   Rahmen ein; „später“ genügt.
+2. **Gerüst:** Er schlägt Kapitel und Lernsequenzen mit Stunden vor und nennt darunter, wie
+   viele Stunden verplant und wie viele noch frei sind. Die Zahlen rechnet die Plattform, nicht
+   die KI.
+3. **Kapitel für Kapitel:** Er schlägt je Lernsequenz Einträge mit Kompetenzen vor — nur mit
+   Nummern aus dem Bildungsplan der Fassung.
+
+Geschrieben wird erst, wenn du zustimmst. „Ja, aber Kapitel 3 vor 2“ arbeitet er ein und
+schreibt dann. Bittest du ihn ausdrücklich, etwas zu löschen („lösch das Kapitel Optik“), ist
+das die Zustimmung; er sagt danach, was mit verschwunden ist.
+
+- Er schreibt nur in **Entwürfe**. Ein veröffentlichtes Curriculum liest er und schlägt vor,
+  es als Entwurf zu kopieren.
+- Jede Speicherung lässt sich zurücknehmen — im Editor mit **Rückgängig** oder im Chat. Stammt
+  die letzte Änderung nicht von ihm (aus dem Editor oder von jemand anderem), fragt er vorher
+  nach.
+- Er kennt nur den Titel des Lehrwerks, nicht seinen Inhalt. Willst du dem Buch folgen, nenn ihm
+  Kapitel und Reihenfolge.
+- Eine alte Kapitelfolge kannst du in den Chat einfügen. Er übernimmt Reihenfolge und Stunden,
+  aber keine alten Kompetenznummern.
+- Bei großen Vorschlägen dauert eine Antwort manchmal eine Minute.
+
+Veröffentlichen kann er nicht — das geschieht wie immer in der Ansicht.
 
 ---
 
@@ -362,6 +449,10 @@ Noch nicht gespeichert: **Abbrechen** schließt den Editor ohne Änderungen. Sch
 Entweder heißt er in der Bibliothek anders — dann lohnt ein Alias am Begriff —, oder er
 gehört zu einem Fach, das weder dein Fach noch eines seiner Bezugsfächer ist. Bei gelben
 Begriffen gibt es mehrere Fassungen; wähle die gemeinte.
+
+**Mein Oberstufen-Curriculum steht unter „Band nicht zugeordnet“.**
+Zu seinen Klassen gibt es im Bildungsplan mehrere Bänder (Basis- und Leistungsfach). Wähle im
+Editor unter **Band im Bildungsplan** das richtige und speichere.
 
 **Wer sieht mein Curriculum?**
 Solange es ein Entwurf ist, nur die Fachschaft und Admins. Veröffentlicht sehen es alle

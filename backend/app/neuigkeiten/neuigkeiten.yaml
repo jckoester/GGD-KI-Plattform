@@ -421,3 +421,32 @@
     Schuljahrs wandern mit. Neu ist auch die Abdeckung: welche Kompetenzen des Bands verknüpft
     sind und welche fehlen.
   link: /help/curriculum#entwurf-und-veröffentlichen
+
+- id: "0.46-curriculum-assistent"
+  version: "0.46.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-17
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curriculum mit dem Assistenten entwerfen"
+  text: >-
+    Der Assistent „Curriculum-Entwurf“ baut mit dir ein Schulcurriculum auf: Er klärt den Rahmen,
+    schlägt ein Gerüst mit Stunden vor und füllt dann Kapitel für Kapitel die Einträge mit
+    Kompetenzen des Bildungsplans. Er schreibt nur in Entwürfe und erst, wenn du zustimmst. Du
+    startest ihn im Entwurf mit dem Knopf „Assistent“. Neu sind auch Rückgängig im Editor und der
+    Rahmen mit Wochenstunden, Lehrwerk und Beschlüssen.
+  link: /help/curriculum#mit-dem-assistenten-arbeiten
+
+- id: "0.46-curricula-baender"
+  version: "0.46.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-17
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curricula nach Bildungsplan-Band"
+  text: >-
+    Die Curricula-Liste ist jetzt nach Fassung und Band des Bildungsplans gegliedert. Am Band
+    siehst du, welche inhaltsbezogenen Kompetenzen alle Curricula des Bands zusammen abdecken, an
+    der Fassung dasselbe für die prozessbezogenen — beides auch als PDF. In der Oberstufe wählst du
+    im Editor, ob ein Curriculum zum Basis- oder Leistungsfach gehört.
+  link: /help/curriculum#die-liste

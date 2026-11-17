@@ -37,6 +37,15 @@ Wenn du den Assistenten während eines Gesprächs wechselst, bleibt der bisherig
 
 Im Verlauf sind Assistenten-Gespräche mit einem Icon gekennzeichnet, damit du sie leicht von normalen Chats unterscheiden kannst.
 
+## Für Lehrkräfte: Assistenten, die mitplanen
+
+Einige Assistenten arbeiten nicht nur im Chat, sondern schreiben nach deiner Zustimmung in die
+Planung: **Jahresplanung**, **Stundenentwurf** und seit 0.46 der Assistent
+**Curriculum-Entwurf**. Er baut mit der Fachschaft ein Schulcurriculum auf — Rahmen, Gerüst mit
+Stunden, dann Kapitel für Kapitel die Einträge mit Kompetenzen — und schreibt nur in Entwürfe.
+Wie das abläuft, steht unter [Schulcurriculum → Mit dem Assistenten
+arbeiten](curriculum.md#mit-dem-assistenten-arbeiten).
+
 ## Lernhilfe statt fertiger Lösungen
 
 Für **Schüler:innen** ist die KI darauf ausgelegt, beim **Lernen** zu helfen: Sie gibt

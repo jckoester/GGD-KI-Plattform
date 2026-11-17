@@ -57,6 +57,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`docs/admin/bildungsplan-import.md`, Schritt 2–3): Kommende Fassungen werden „künftig“, eine
   Fassung, die inzwischen gilt, wird wieder aktiv.
 - `python scripts/seed_assistants.py` (aus `backend/`) legt den Assistenten „Curriculum-Entwurf“ an.
+- Eigener Reverse-Proxy statt der mitgelieferten Vorlage: Lese-Timeout mindestens 180 s.
 - Der Seed überschreibt keinen gesetzten Prompt: den Prompt des Jahresplan-Assistenten im Editor aus
   `config/prompts/jahresplan_assistent.md` übernehmen.
 

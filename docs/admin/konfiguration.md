@@ -353,6 +353,8 @@ oauth:
 
 yaml_test:
   users_file: config/test_users.yaml
+  # Seit 0.46 laufen `sso_groups`/`sso_roles` der Testnutzer ebenfalls durch group_role_map
+  # (zusätzlich zu `roles:`) — so lässt sich etwa der Fachvorsitz wie in Produktion testen.
 
 # SSO-Gruppen UND SSO-Rollen → Plattform-Rollen.
 # Jeder `group:`-Eintrag wird CASE-INSENSITIV sowohl gegen die Gruppen

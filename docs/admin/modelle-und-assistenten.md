@@ -433,6 +433,7 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten* — mit einer 
 |---|---|---|
 | `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien, Ausfall (mit Nachrücken) sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
 | `lesson_planning` | **Stundenplanung:** Stundenentwurf lesen — samt passender Fachbegriffe des Fachs und seiner Bezugsfächer (`begriffe`) — und Phasen, Stundenziel, Kompetenzen und Fachbegriffe schreiben (`get_lesson_detail`, `update_lesson_phases`; Begriffe über Titel oder Alias, fehlende meldet `nicht_eingetragen`); eine Stunde aus Angaben im Chat finden und als Bezug setzen (`finde_stunde`, `waehle_stunde`); Einheit samt Kapitel lesen (`get_unit_detail`, auch in `planning`) | **Lehrkräfte**, auch **ohne Gruppenbezug** — den Zugang zur einzelnen Stunde prüft jede Funktion selbst |
+| `curriculum_planning` | **Curriculum-Entwurf** (seit 0.46): Curriculum finden, wählen, anlegen, als Entwurf kopieren; lesen samt Stundenbilanz, Abdeckung und Kompetenzen des Bands; Rahmen festhalten; Änderungen als Vorschau prüfen und nach Zustimmung schreiben; letzte Speicherung zurücknehmen. Geschrieben wird nur in Entwürfe. | nur **Admins** vergeben sie, nur an Assistenten mit Zielgruppe **Lehrkräfte**; den Zugang zum Curriculum prüft jede Funktion wie im Editor |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
 | `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
@@ -516,6 +517,31 @@ Die Auslöser in der Planungs-UI (Ausfall-Banner, Drag & Drop einer geplanten St
 Halbjahres-Hinweis, Überhang-Hinweisleiste) öffnen jeweils einen Chat mit
 Gruppenbezug und vorbefülltem Anliegen — ein freigeschalteter Assistent mit
 `planning` ist Voraussetzung, damit die Funktionen greifen.
+
+### Curriculum-Assistent einrichten
+
+Der Assistent **Curriculum-Entwurf** (seit 0.46) baut mit einer Fachschaft ein Schulcurriculum
+auf: Rahmen, Gerüst mit Stunden, dann Kapitel für Kapitel die Einträge mit Kompetenzen. Er
+schreibt nur in Entwürfe und erst nach Zustimmung; Lehrkräfte starten ihn aus der Ansicht eines
+Entwurfs (Knopf **Assistent**) oder aus der Assistentenliste.
+
+- **Seed:** `python scripts/seed_assistants.py` legt ihn an — Fähigkeit `curriculum_planning`,
+  Zielgruppe Lehrkräfte, Prompt aus `config/prompts/curriculum_assistent.md`, Modell
+  `chat-komplex`. Der Seed überschreibt einen vorhandenen Assistenten nicht; das Modell stellen
+  Sie dann im Editor um.
+- **Modell:** Gemessen am 16.11.2026 mit zehn Fällen zu je drei Läufen: `chat-komplex` 22 von 30,
+  `chat-standard` 7 von 30 (löschte ohne Zustimmung, blieb nach der Suche stehen). Ein Modell
+  ohne verlässliches Function-Calling ist für diesen Assistenten ungeeignet. Die Messung lässt
+  sich mit `scripts/curriculum_assistent_messung.py` wiederholen (`docs/dev/curriculum-entwurf.md`).
+- **Fähigkeit:** Nur Admins setzen `curriculum_planning`, und nur an Assistenten mit Zielgruppe
+  Lehrkräfte — Anlegen, Ändern und Import weisen anderes ab.
+- **Antwortzeit:** Bei großen Vorschlägen erzeugt das Modell einen langen Funktionsaufruf, und
+  der Datenstrom steht so lange (gemessen 42 s für rund 1 500 Tokens). Das Backend wartet dafür
+  bis zu 180 s. Ein Reverse-Proxy davor muss mindestens so lange warten: Die mitgelieferte
+  nginx-Vorlage setzt `proxy_read_timeout 300s`; ein eigener nginx mit dem Standard von 60 s
+  bricht solche Antworten ab.
+- **Kosten:** Ein Gespräch, das ein Gerüst und ein Kapitel schreibt, kostete in der Messung mit
+  `chat-komplex` etwa 0,05–0,10 $.
 
 ## Assistenten freigeben (`/settings/assistants`)
 
