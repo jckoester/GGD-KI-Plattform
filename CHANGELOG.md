@@ -19,6 +19,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und überarbeitet sie. Er prüft jeden Vorschlag vor dem Zeigen, nennt die Stundenbilanz und, was
   wegfällt, und schreibt erst nach Zustimmung. Änderungen aus dem Editor oder von anderen nimmt er
   nur nach Rückfrage zurück.
+- Curricula-Liste nach Bildungsplan: je Fach die Fassungen (geltende, kommende, frühere), darin die
+  Bänder des Plans mit ihren Curricula; Fächer und Fassungen einklappbar, Filter nach eigenen Fächern
+  oder einem Fach.
+- Abdeckung über das Band: die inhaltsbezogenen Kompetenzen eines Bands über alle Curricula, die zu
+  ihm gehören, wahlweise mit Entwürfen; als PDF exportierbar.
+- Band am Curriculum der Oberstufe: Wo es zu denselben Stufen mehrere Bänder gibt (Basis- und
+  Leistungsfach), wird das Band im Editor gewählt.
 
 ### Geändert
 
@@ -30,6 +37,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Abdeckung eines Curriculums zählt keine abgelösten Doppel von Kompetenzen derselben Fassung mehr.
 - Abdeckung eines Curriculums gliedert die Kompetenzen auch in Fächern ohne thematische Gruppen nach
   den Abschnitten des Bildungsplans (etwa „3.1.7 Optik“).
+- Abdeckung eines Oberstufen-Curriculums misst nur die Kompetenzen seines Bands statt Basis- und
+  Leistungsfach zusammen.
 - Chat bricht bei großen Funktionsaufrufen nicht mehr mit „KI-Dienst hat zu lange nicht
   geantwortet“ ab.
 

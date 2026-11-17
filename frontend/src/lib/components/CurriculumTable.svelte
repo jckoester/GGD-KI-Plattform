@@ -555,7 +555,7 @@
 <!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
 <svelte:document onvisibilitychange={beiRueckkehr} />
 
-<CurriculumAbdeckung curriculumId={curriculum?.id} stand={curriculum} {editMode} />
+<CurriculumAbdeckung curriculumId={curriculum?.id} stand={curriculum} {editMode} {fachId} />
 
 {#if fehlListe.fehlend.length || fehlListe.mehrdeutig.length}
     <details

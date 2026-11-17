@@ -989,6 +989,16 @@ async def update_node(
                 ),
             )
 
+        # Band des Bildungsplans (0.46, Schritt 8): nur eines, das die Stufen berührt.
+        if band := (update_data["metadata_"] or {}).get("band"):
+            from app.context.curriculum_abdeckung import baender_fuer
+
+            gefunden, kandidaten = await baender_fuer(db, node.subject_id, alt, node.min_grade, node.max_grade, band)
+            if gefunden is None or gefunden.schluessel != band:
+                raise HTTPException(status_code=422, detail=(
+                    f"„{band}“ ist kein Band des Bildungsplans für diese Stufen."
+                    + (f" Möglich: {', '.join(b.schluessel for b in kandidaten)}." if kandidaten else "")))
+
     # Der Typ kann im selben Aufruf mitgeändert werden — dann gilt der neue.
     typ_danach = update_data.get("content_type", node.content_type)
     try:
@@ -2026,6 +2036,33 @@ async def curriculum_als_entwurf_kopieren(
     return {"id": neu_id}
 
 
+@router.get("/curricula/{curriculum_id}/band")
+async def curriculum_band(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Band des Curriculums und die Bänder zur Wahl (0.46, Schritt 8) — die Auswahl im Editor.
+
+    `baender_zur_wahl` ist nur gefüllt, wenn die Stufen mehrere Bänder berühren (Oberstufe:
+    Basis- und Leistungsfach)."""
+    from app.context.curriculum_abdeckung import _bp_version, baender_fuer
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    await _curriculum_lesen(db, tree, user)
+    cur = await db.get(ContextNode, curriculum_id)
+    bp = _bp_version(cur)
+    if cur.subject_id is None or not bp:
+        return {"band": None, "baender_zur_wahl": []}
+    band, kandidaten = await baender_fuer(db, cur.subject_id, bp, cur.min_grade, cur.max_grade,
+                                          (cur.metadata_ or {}).get("band"))
+    return {"band": band.als_dict() if band else None,
+            "baender_zur_wahl": [b.als_dict() for b in kandidaten] if len(kandidaten) > 1 else []}
+
+
 @router.get("/curricula/{curriculum_id}/coverage")
 async def curriculum_abdeckung(
     curriculum_id: UUID,
@@ -2227,6 +2264,12 @@ async def list_curricula_by_subject(
     Entwürfe (0.45) nur für die Fachschaft und Admins — die Oberfläche markiert sie über
     `status`.
     """
+    return await _lesbare_curricula(db, subject_id, user)
+
+
+async def _lesbare_curricula(db: AsyncSession, subject_id: int, user: JwtPayload) -> list[ContextNode]:
+    """Die Curricula eines Fachs, die die Person sieht, mit `darf_schreiben` und bei Entwürfen
+    `zuletzt_geaendert` — für die Liste, die Übersicht nach Bändern und die Bandabdeckung."""
     from app.context.curriculum_entwurf import darf_entwurf
 
     status = ["active", ENTWURF] if await darf_entwurf(db, subject_id, user) else ["active"]
@@ -2256,7 +2299,60 @@ async def list_curricula_by_subject(
         stand = await letzte_aenderung(db, [c.id for c in entwuerfe])
         for c in entwuerfe:
             c.zuletzt_geaendert = stand.get(c.id, c.updated_at)
-    return curricula
+    return list(curricula)
+
+
+@router.get("/curricula/by-subject/{subject_id}/overview")
+async def curricula_nach_baendern(
+    subject_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Die Curricula eines Fachs nach Fassung und Band des Bildungsplans (0.46, Schritt 8).
+
+    Fassungen: erst geltende, dann kommende, dann ältere mit Curricula. Bänder aus den
+    Bandüberschriften des Plans; Curricula ohne eindeutiges Band unter `nicht_zugeordnet`.
+    """
+    from app.context.curriculum_baender import uebersicht
+
+    return await uebersicht(db, subject_id, await _lesbare_curricula(db, subject_id, user))
+
+
+@router.get("/curricula/by-subject/{subject_id}/band-coverage")
+async def band_abdeckung_route(
+    subject_id: int,
+    bp_version: str,
+    band: str,
+    entwuerfe: bool = False,
+    format: str = Query("json", pattern="^(json|pdf)$"),
+    nur_luecken: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Abdeckung der IK eines Bands über alle ihm zugeordneten Curricula (0.46, Schritt 8).
+
+    `entwuerfe`: Entwürfe einbeziehen (nur, wen die Person sieht); ein Entwurf mit `kopie_von`
+    ersetzt dann das Original. Gespeicherter Stand. `format=pdf` liefert dieselbe Liste als PDF
+    (`nur_luecken` ohne die verknüpften).
+    """
+    from app.context.curriculum_baender import band_abdeckung, band_abdeckung_pdf
+
+    curricula = await _lesbare_curricula(db, subject_id, user)
+    aus = await band_abdeckung(db, subject_id, bp_version, band, curricula, entwuerfe)
+    if aus is None:
+        raise HTTPException(status_code=404, detail="Dieses Band gibt es in der Fassung nicht.")
+    if format == "pdf":
+        import re
+        from datetime import date
+
+        from fastapi.responses import Response
+
+        fach = await db.get(Subject, subject_id)
+        name = re.sub(r"[^\w.-]+", "_", f"abdeckung_{fach.fach_code if fach else subject_id}_{band}_{date.today()}")
+        return Response(content=band_abdeckung_pdf(aus, fach.name if fach else "", nur_luecken),
+                        media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
+    return aus
 
 
 # ── Curriculum aus vollständigem Entwurf anlegen: ENTFERNT ──────────────────

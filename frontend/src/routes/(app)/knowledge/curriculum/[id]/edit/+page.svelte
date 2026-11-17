@@ -19,6 +19,7 @@
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
+    import CurriculumBandWahl from "$lib/components/CurriculumBandWahl.svelte";
     import CurriculumAssistentKnopf from "$lib/components/CurriculumAssistentKnopf.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -687,6 +688,15 @@
             {/if}
 
             {#if draft}
+                <CurriculumBandWahl
+                    curriculumId={draft.id}
+                    wert={draft.metadata?.band ?? null}
+                    editMode={true}
+                    onchange={(band) => {
+                        draft.metadata = { ...draft.metadata, band };
+                        dirty = true;
+                    }}
+                />
                 <CurriculumRahmen
                     rahmen={draft.metadata?.rahmen ?? {}}
                     jahrgangsstufe={draft.metadata?.jahrgangsstufe ?? ""}

@@ -1,29 +1,31 @@
 <script>
     /**
-     * Liste der Curricula für ein Fach
-     * 
+     * Curricula eines Fachs nach Fassung und Band des Bildungsplans (0.46, Schritt 8).
+     *
+     * Fassungen: erst geltende, dann kommende, ältere eingeklappt. Darin die Bänder aus dem Plan
+     * und je Band die Curricula. Lehrkräfte sehen am Band den Link zur IK-Abdeckung über alle
+     * Curricula des Bands. Wer Curricula anlegen darf, sieht auch Bänder ohne Curriculum.
+     *
      * Props:
      * - subjectId: ID des Fachs
-     * - subjectSlug: Slug des Fachs (für Links)
-     * - subjectFachCode: Bildungsplan-Fachkürzel (z. B. 'M', 'CH') — für die
-     *   Vorbelegung der Curriculum-Neuanlage. NICHT der Slug! Fehlt der Code,
-     *   wird die Neuanlage ohne Vorbelegung verlinkt.
-     * - showNewButton: boolean (Default: true) - Zeigt "Neues Curriculum anlegen" Button
+     * - subjectFachCode: Bildungsplan-Fachkürzel (z. B. 'M', 'CH') — für die Vorbelegung der
+     *   Curriculum-Neuanlage. NICHT der Slug! Fehlt der Code, wird ohne Vorbelegung verlinkt.
+     * - showNewButton: boolean (Default: true) — „Neues Curriculum“ für Fachschaft und Admins
      */
-    import { goto } from '$app/navigation'
-    import { getCurriculaBySubject } from '$lib/api.js'
+    import { getCurriculaNachBaendern } from '$lib/api.js'
     import { user } from '$lib/stores/user.js'
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
+    import { abdeckungsPfad, anzahlCurricula, fassungTitel, sichtbareFassungen } from '$lib/curriculum_baender.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    
+
     let { subjectId = null, subjectFachCode = null, showNewButton = true } = $props()
-    
-    let curricula = $state([])
+
+    let uebersicht = $state(null)
     let loading = $state(true)
     let error = $state(null)
-    
-    // Prüfe ob User Mitglied der Fachschaft ist (kann Curricula bearbeiten)
+
+    // Mitglied der Fachschaft (oder Admin): darf Curricula anlegen.
     const canEditSubject = $derived.by(() => {
         if (!subjectId || !$user) return false
         if ($user.roles?.includes('admin')) return true
@@ -33,108 +35,141 @@
         }
         return false
     })
-    
-    // Lade Curricula beim Mount
+    const lehrkraft = $derived(!!$user?.roles?.includes('teacher'))
+
     $effect(() => {
-        if (subjectId) {
-            loadCurricula()
-        }
-    })
-    
-    async function loadCurricula() {
+        if (!subjectId) return
+        let abgebrochen = false
         loading = true
         error = null
-        try {
-            const data = await getCurriculaBySubject(subjectId)
-            curricula = data || []
-        } catch (e) {
-            error = e.message
-        } finally {
-            loading = false
-        }
-    }
-    
-    // Sortiere nach Jahrgangsstufe
-    const sortedCurricula = $derived(
-        [...curricula].sort((a, b) => {
-            const aJg = parseInt(a.metadata?.jahrgangsstufe) || 999
-            const bJg = parseInt(b.metadata?.jahrgangsstufe) || 999
-            return aJg - bJg
-        })
-    )
-    
-    // Formatiere Jahrgangsstufe
-    function formatJahrgangsstufe(jg) {
-        if (!jg) return '?'
-        return `Klasse ${jg}`
-    }
+        getCurriculaNachBaendern(subjectId)
+            .then((u) => { if (!abgebrochen) uebersicht = u })
+            .catch((e) => { if (!abgebrochen) error = e.message })
+            .finally(() => { if (!abgebrochen) loading = false })
+        return () => { abgebrochen = true }
+    })
+
+    const fassungen = $derived(sichtbareFassungen(uebersicht, { leereBaender: canEditSubject }))
+    const leer = $derived(fassungen.length === 0 && !(uebersicht?.ohne_fassung?.length))
+
+    const link = 'text-xs text-light-bl dark:text-dark-bl hover:underline'
 </script>
 
+{#snippet zeile(curr)}
+    <a
+        href={`/knowledge/curriculum/${curr.id}`}
+        class="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+           hover:border-primary dark:hover:border-primary-dark hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+           transition-colors"
+    >
+        <div class="flex-1 min-w-0">
+            <span class="font-medium text-light-tx dark:text-dark-tx">{curr.title}</span>
+            <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                · Klasse {curr.jahrgangsstufe || '?'}
+                {#if curr.ersetzt}
+                    · ersetzt „{curr.ersetzt.title ?? 'veröffentlichtes Curriculum'}“
+                {/if}
+                {#if curr.status === 'draft' && curr.zuletzt_geaendert}
+                    · zuletzt geändert {new Date(curr.zuletzt_geaendert).toLocaleDateString('de-DE')}
+                {/if}
+            </span>
+        </div>
+        <!-- Entwurf (0.45): kommt nur für Fachschaft und Admins aus dem Backend -->
+        {#if curr.status === 'draft'}
+            <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                       bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye"
+                title="Nur für die Fachschaft sichtbar, bis es veröffentlicht ist"
+            >
+                Entwurf
+            </span>
+        {/if}
+        <!-- Seit 0.45 vom Backend (`darf_schreiben`, Curriculum-Regel samt Fachvorsitz). -->
+        {#if curr.darf_schreiben}
+            <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                       bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl"
+            >
+                Bearbeitbar
+            </span>
+        {/if}
+    </a>
+{/snippet}
+
+{#snippet fassungInhalt(f)}
+    <div class="space-y-4">
+        {#each f.baender as b (b.schluessel)}
+            <div>
+                <div class="flex items-baseline justify-between gap-2 mb-1.5">
+                    <h4 class="text-sm font-semibold text-light-tx dark:text-dark-tx">{b.schluessel}</h4>
+                    {#if lehrkraft && b.curricula.length > 0}
+                        <a href={abdeckungsPfad({ fachId: subjectId, fassung: f.bp_version, band: b.schluessel })}
+                           class={link}>
+                            IK-Abdeckung im Band
+                        </a>
+                    {/if}
+                </div>
+                {#if b.curricula.length > 0}
+                    <div class="space-y-1.5">
+                        {#each b.curricula as curr (curr.id)}
+                            {@render zeile(curr)}
+                        {/each}
+                    </div>
+                {:else}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">noch kein Curriculum</p>
+                {/if}
+            </div>
+        {/each}
+        {#if f.nicht_zugeordnet.length > 0}
+            <div>
+                <h4 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-0.5">Band nicht zugeordnet</h4>
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1.5">
+                    Zu diesen Stufen gibt es mehrere Bänder. Im Editor lässt sich das Band wählen.
+                </p>
+                <div class="space-y-1.5">
+                    {#each f.nicht_zugeordnet as curr (curr.id)}
+                        {@render zeile(curr)}
+                    {/each}
+                </div>
+            </div>
+        {/if}
+    </div>
+{/snippet}
+
 <div class="space-y-4">
-    <!-- Fehler -->
     {#if error}
         <ErrorBanner message={error} />
     {/if}
-    
-    <!-- Ladeindikator -->
+
     {#if loading}
         <LoadingBanner message="Curricula werden geladen…" />
-    {:else if sortedCurricula.length === 0}
+    {:else if leer}
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
             Keine Curricula für dieses Fach verfügbar.
         </p>
     {:else}
-        <!-- Curricula-Liste -->
-        <div class="space-y-3">
-            {#each sortedCurricula as curr (curr.id)}
-                <a
-                    href={`/knowledge/curriculum/${curr.id}`}
-                    onclick={(e) => { e.preventDefault(); goto(`/knowledge/curriculum/${curr.id}`) }}
-                    class="flex items-center justify-between p-4 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                       hover:border-primary dark:hover:border-primary-dark hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
-                       transition-colors group"
-                >
-                    <div class="flex-1 min-w-0">
-                        <h3 class="font-medium text-light-tx dark:text-dark-tx truncate">
-                            {curr.title}
-                        </h3>
-                        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                            {curr.metadata?.schulart || '–'} · 
-                            {formatJahrgangsstufe(curr.metadata?.jahrgangsstufe)}
-                            {#if curr.metadata?.bp_version}
-                                · BP {curr.metadata?.bp_version}
-                            {/if}
-                            {#if curr.status === 'draft' && curr.zuletzt_geaendert}
-                                · zuletzt geändert {new Date(curr.zuletzt_geaendert).toLocaleDateString('de-DE')}
-                            {/if}
-                        </p>
-                    </div>
-                    
-                    <!-- Entwurf (0.45): kommt nur für Fachschaft und Admins aus dem Backend -->
-                    {#if curr.status === 'draft'}
-                        <span
-                            class="inline-flex items-center px-2 py-1 mr-2 rounded-full text-xs font-medium
-                                   bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye"
-                            title="Nur für die Fachschaft sichtbar, bis es veröffentlicht ist"
-                        >
-                            Entwurf
-                        </span>
-                    {/if}
-                    <!-- Badge wenn bearbeitbar -->
-                    <!-- Seit 0.45 vom Backend (`darf_schreiben`, Curriculum-Regel samt Fachvorsitz).
-                         Bis dahin verglich die Marke die Fachschaft mit den Unterrichtsgruppen und
-                         erschien deshalb nie. -->
-                    {#if curr.darf_schreiben}
-                        <span 
-                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium 
-                                   bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl"
-                        >
-                            Bearbeitbar
-                        </span>
-                    {/if}
-                </a>
-            {/each}
-        </div>
+        {#each fassungen as f (f.bp_version)}
+            <!-- Jede Fassung einklappbar; frühere zu Beginn eingeklappt. -->
+            <details class="group rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3" open={f.art !== 'aelter'}>
+                <summary class="cursor-pointer flex items-baseline gap-2">
+                    <span class="text-base font-semibold {f.art === 'aelter' ? 'text-light-tx-2 dark:text-dark-tx-2' : 'text-light-tx dark:text-dark-tx'}">
+                        {fassungTitel(f)}
+                    </span>
+                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">({anzahlCurricula(f)})</span>
+                </summary>
+                <div class="mt-3">{@render fassungInhalt(f)}</div>
+            </details>
+        {/each}
+        {#if uebersicht?.ohne_fassung?.length}
+            <section>
+                <h3 class="text-sm font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-1.5">Ohne Bildungsplan-Fassung</h3>
+                <div class="space-y-1.5">
+                    {#each uebersicht.ohne_fassung as curr (curr.id)}
+                        {@render zeile(curr)}
+                    {/each}
+                </div>
+            </section>
+        {/if}
     {/if}
 
     <!-- "Neues Curriculum anlegen"-Button für Fachschaftsmitglieder / Admins -->

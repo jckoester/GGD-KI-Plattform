@@ -10,6 +10,7 @@
     import { curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
+    import CurriculumBandWahl from "$lib/components/CurriculumBandWahl.svelte";
     import CurriculumAssistentKnopf from "$lib/components/CurriculumAssistentKnopf.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -277,6 +278,7 @@
                 </div>
             {/if}
 
+            <CurriculumBandWahl curriculumId={curriculum.id} wert={curriculum.metadata?.band ?? null} />
             <CurriculumRahmen
                 rahmen={curriculum.metadata?.rahmen ?? {}}
                 jahrgangsstufe={curriculum.metadata?.jahrgangsstufe ?? ""}

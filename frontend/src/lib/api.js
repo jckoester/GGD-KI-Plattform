@@ -2092,6 +2092,56 @@ export async function getCurriculumAbdeckung(curriculumId) {
   return res.json()
 }
 
+async function _jsonOderFehler(res, meldung) {
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? meldung)
+  }
+  return res.json()
+}
+
+/** Curricula eines Fachs nach Fassung und Band des Bildungsplans (0.46). */
+export async function getCurriculaNachBaendern(subjectId) {
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/overview`, { credentials: 'include' })
+  return _jsonOderFehler(res, 'Curricula konnten nicht geladen werden')
+}
+
+/** Abdeckung der IK eines Bands über alle ihm zugeordneten Curricula (0.46). */
+export async function getBandAbdeckung(subjectId, bpVersion, band, entwuerfe = false) {
+  const q = new URLSearchParams({ bp_version: bpVersion, band, entwuerfe: entwuerfe ? 'true' : 'false' })
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/band-coverage?${q}`, {
+    credentials: 'include',
+  })
+  return _jsonOderFehler(res, 'Abdeckung konnte nicht geladen werden')
+}
+
+/** Abdeckung über das Band als PDF herunterladen (0.46). */
+export async function exportBandAbdeckung(subjectId, bpVersion, band, { entwuerfe = false, nurLuecken = false } = {}) {
+  const q = new URLSearchParams({
+    bp_version: bpVersion, band, entwuerfe: entwuerfe ? 'true' : 'false',
+    nur_luecken: nurLuecken ? 'true' : 'false', format: 'pdf',
+  })
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}/band-coverage?${q}`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'abdeckung.pdf'
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Band eines Curriculums und die Bänder zur Wahl (nur bei parallelen Bändern gefüllt). */
+export async function getCurriculumBand(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/band`, { credentials: 'include' })
+  return _jsonOderFehler(res, 'Band konnte nicht geladen werden')
+}
+
 export async function updateCurriculumMeta(curriculumId, { title, jahrgangsstufe } = {}) {
   // Titel und Jahrgangsband ändern. Bewusst NICHT über updateContextNode: Das Band steht
   // auch in min_grade/max_grade und in den import_keys des ganzen Baums — der eigene

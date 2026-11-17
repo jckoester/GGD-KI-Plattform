@@ -7,8 +7,9 @@
     import { getCurriculumAbdeckung } from "$lib/api.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import { abdeckungUeberschrift, gefilterteGruppen, ZUSTAND } from "$lib/curriculum_abdeckung.js";
+    import { abdeckungsPfad } from "$lib/curriculum_baender.js";
 
-    let { curriculumId = null, stand = null, editMode = false } = $props();
+    let { curriculumId = null, stand = null, editMode = false, fachId = null } = $props();
 
     let abdeckung = $state(null);
     let fehler = $state(null);
@@ -49,6 +50,15 @@
         <div class="mt-2 space-y-3">
             {#if abdeckung.hinweis}
                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">{abdeckung.hinweis}</p>
+            {/if}
+            {#if abdeckung.band && fachId}
+                <!-- Bandsicht (0.46, Schritt 8): ein Band verteilt sich oft auf mehrere Curricula. -->
+                <a
+                    href={abdeckungsPfad({ fachId, fassung: abdeckung.bp_version, band: abdeckung.band.schluessel })}
+                    class="inline-block text-xs text-light-bl dark:text-dark-bl hover:underline"
+                >
+                    {abdeckung.band.schluessel}: Abdeckung über alle Curricula des Bands
+                </a>
             {/if}
             {#if abdeckung.ik.gesamt}
                 <div class="flex flex-wrap items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2">

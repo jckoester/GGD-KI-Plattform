@@ -181,9 +181,11 @@ async def curriculum_waehlen(db: AsyncSession, user, curriculum_id: UUID, kopier
 
 
 async def curriculum_neu(db: AsyncSession, user, fach: str, jahrgangsstufe: str,
-                         bp_version: str | None) -> tuple[ContextNode | None, dict]:
+                         bp_version: str | None, band: str | None = None) -> tuple[ContextNode | None, dict]:
     """Legt einen leeren Entwurf an — nach Zustimmung. Kein zweites Curriculum für dasselbe Band
-    und dieselbe Fassung: Dann nennt die Antwort das vorhandene."""
+    und dieselbe Fassung: Dann nennt die Antwort das vorhandene.
+
+    Parallele Bänder (Oberstufe, 0.46): Ohne `band` fragt die Antwort nach, welches."""
     import re
 
     from app.context.curriculum_entwurf import LESBARE_STATUS, curriculum_anlegen
@@ -211,10 +213,19 @@ async def curriculum_neu(db: AsyncSession, user, fach: str, jahrgangsstufe: str,
     if plan is None:
         return None, {"error": f"Für {subj.name} gibt es keinen Bildungsplan der Fassung {bp_version}. "
                                "Schreibe kein Curriculum.", "fassungen": fassungen}
+    from app.context.curriculum_abdeckung import baender_fuer
+
+    gefunden, kandidaten = await baender_fuer(db, subj.id, bp_version, lo, hi, band)
+    if len(kandidaten) > 1 and gefunden is None:
+        return None, {"error": "Zu diesen Stufen gibt es im Bildungsplan mehrere Bänder. Frage die "
+                               "Lehrkraft, für welches das Curriculum gilt, und gib es als band an.",
+                      "baender": [b.schluessel for b in kandidaten]}
+    band = gefunden.schluessel if gefunden is not None and len(kandidaten) > 1 else None
     vorhanden = [c for c in (await db.execute(sa.select(ContextNode).where(
         ContextNode.content_type == "curriculum", ContextNode.subject_id == subj.id,
         ContextNode.status.in_(LESBARE_STATUS)))).scalars().all()
-        if (c.metadata_ or {}).get("bp_version") == bp_version and (c.min_grade, c.max_grade) == (lo, hi)]
+        if (c.metadata_ or {}).get("bp_version") == bp_version and (c.min_grade, c.max_grade) == (lo, hi)
+        and (band is None or (c.metadata_ or {}).get("band") in (None, band))]
     if vorhanden:
         return None, {"error": "Für dieses Band und diese Fassung gibt es schon ein Curriculum — wähle es mit waehle_curriculum.",
                       "vorhanden": [{"curriculum_id": str(c.id), "titel": c.title,
@@ -223,6 +234,6 @@ async def curriculum_neu(db: AsyncSession, user, fach: str, jahrgangsstufe: str,
     cur = await curriculum_anlegen(
         db, plan, user, fach_code=subj.fach_code or "", schulart=_SCHULARTEN.get(m.group(1), m.group(1)) if m else "",
         jahrgangsstufe=jahrgangsstufe.strip(), bp_version=bp_version, titel=f"{subj.name} Kl. {jahrgangsstufe.strip()}")
-    cur.metadata_ = {**(cur.metadata_ or {}), "fach": subj.name}
+    cur.metadata_ = {**(cur.metadata_ or {}), "fach": subj.name, **({"band": band} if band else {})}
     await db.flush()
     return cur, {"hinweis": "Leerer Entwurf angelegt."}

@@ -371,7 +371,7 @@ async def _lege_curriculum_an(args: dict, ctx: ToolContext) -> dict:
     from app.context.curriculum_bezug import curriculum_neu
 
     cur, antwort = await curriculum_neu(ctx.db, ctx.user, args.get("fach") or "", args.get("jahrgangsstufe") or "",
-                                        args.get("bp_version") or None)
+                                        args.get("bp_version") or None, args.get("band") or None)
     if cur is None:
         return antwort
     await _bezug_uebernehmen(ctx, cur)
@@ -392,6 +392,9 @@ register_tool(ChatTool(
             "jahrgangsstufe": {"type": "string", "description": "Stufe oder Band, etwa '7' oder '7/8'"},
             "bp_version": {"type": "string", "description": (
                 "Fassung aus finde_curriculum (faecher[].fassungen); nötig, wenn es mehrere gibt.")},
+            "band": {"type": "string", "description": (
+                "Band des Bildungsplans, nur wenn die Antwort mehrere nennt (Oberstufe: Basis- oder "
+                "Leistungsfach) — wörtlich aus baender, nach Rückfrage bei der Lehrkraft.")},
         }, "required": ["fach", "jahrgangsstufe"]},
     }},
 ))

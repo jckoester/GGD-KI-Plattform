@@ -26,12 +26,14 @@ den PK von Kunst, Geographie, Chemie … Reparatur: `scripts/curriculum_kompeten
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.context.bp_baender import Band, band_schluessel, band_zuordnen, baender_aus
 from app.context.editions import BP_STATUS_CURRICULUM
 from app.db.models import ContextEdge, ContextNode, Subject
 
@@ -72,32 +74,72 @@ def _bp_version(cur: ContextNode) -> str | None:
     return (cur.metadata_ or {}).get("bp_version") or cur.bp_version
 
 
-async def kompetenzen_des_bands(db: AsyncSession, cur: ContextNode) -> tuple[list[ContextNode], list[ContextNode]]:
-    """IK des Bands und PK des Fachs in der Fassung des Curriculums — dieselbe Menge für
-    Abdeckung und Assistent (`get_bp_competences`). Leer ohne Fach oder Fassung.
+async def kompetenzen_der_fassung(db: AsyncSession, subject_id: int, bp: str,
+                                  typ: str = "ik_kompetenz") -> list[ContextNode]:
+    """IK (oder PK) eines Fachs in einer Fassung, ohne Stufenfilter.
 
     Geltende oder kommende Fassung (0.46): nur deren Knoten — archivierte daneben sind
-    abgelöste Doppel (alte `bp_id`-Schreibweise). Ein Curriculum auf einer abgelösten
-    Fassung hat nur archivierte; dann zählen die.
+    abgelöste Doppel (alte `bp_id`-Schreibweise). Eine abgelöste Fassung hat nur archivierte;
+    dann zählen die.
     """
-    bp = _bp_version(cur)
-    if cur.subject_id is None or not bp:
-        return [], []
-    fassung = sa.and_(ContextNode.subject_id == cur.subject_id, ContextNode.bp_version == bp)
+    fassung = sa.and_(ContextNode.subject_id == subject_id, ContextNode.bp_version == bp)
     lebt = (await db.execute(sa.select(sa.exists().where(
         fassung, ContextNode.status.in_(BP_STATUS_CURRICULUM),
         ContextNode.content_type.in_(("ik_kompetenz", "pk_kompetenz")))))).scalar()
     im_fach = sa.and_(fassung, ContextNode.status.in_(BP_STATUS_CURRICULUM) if lebt
                       else ContextNode.status != "deleted")
-    band = sa.true()
-    if cur.min_grade is not None and cur.max_grade is not None:
-        band = sa.and_(sa.or_(ContextNode.min_grade.is_(None), ContextNode.min_grade <= cur.max_grade),
-                       sa.or_(ContextNode.max_grade.is_(None), ContextNode.max_grade >= cur.min_grade))
-    iks = (await db.execute(sa.select(ContextNode).where(
-        ContextNode.content_type == "ik_kompetenz", im_fach, band))).scalars().all()
-    pks = (await db.execute(sa.select(ContextNode).where(
-        ContextNode.content_type == "pk_kompetenz", im_fach))).scalars().all()
-    return list(iks), list(pks)
+    return list((await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == typ, im_fach))).scalars().all())
+
+
+@dataclass
+class BandDesCurriculums:
+    iks: list[ContextNode]
+    pks: list[ContextNode]
+    band: Band | None = None                      # zugeordnet (gewählt oder eindeutig)
+    kandidaten: list[Band] = field(default_factory=list)   # Bänder, die die Stufen berühren
+
+
+async def band_des_curriculums(db: AsyncSession, cur: ContextNode) -> BandDesCurriculums:
+    """IK des Bands, PK des Fachs und das Band des Curriculums (0.46, Schritt 8).
+
+    Zum Band gehören die IK unter seiner Überschrift im Bildungsplan (`bp_baender`). Ohne
+    Zuordnung (parallele Bänder der Oberstufe ohne `metadata.band`) die IK aller Bänder, die
+    die Stufen berühren — wie bis 0.45, als nur die Stufen zählten. Leer ohne Fach oder Fassung.
+    """
+    bp = _bp_version(cur)
+    if cur.subject_id is None or not bp:
+        return BandDesCurriculums([], [])
+    alle = await kompetenzen_der_fassung(db, cur.subject_id, bp)
+    band, kandidaten = band_zuordnen(baender_aus(alle), cur.min_grade, cur.max_grade,
+                                     (cur.metadata_ or {}).get("band"))
+    schluessel = {band.schluessel} if band else {b.schluessel for b in kandidaten}
+
+    def gehoert_dazu(k: ContextNode) -> bool:
+        if (s := band_schluessel(k.metadata_)) is not None:
+            return s in schluessel
+        # Ohne Bandüberschrift im Pfad (im Bestand keine, Stand 17.11.2026): nach Stufen.
+        lo, hi = cur.min_grade, cur.max_grade
+        return (lo is None or hi is None
+                or ((k.min_grade is None or k.min_grade <= hi) and (k.max_grade is None or k.max_grade >= lo)))
+
+    iks = [k for k in alle if gehoert_dazu(k)]
+    pks = await kompetenzen_der_fassung(db, cur.subject_id, bp, "pk_kompetenz")
+    return BandDesCurriculums(iks, pks, band, kandidaten)
+
+
+async def baender_fuer(db: AsyncSession, subject_id: int, bp: str, min_grade: int | None,
+                       max_grade: int | None, gewaehlt: str | None = None) -> tuple[Band | None, list[Band]]:
+    """Band und Kandidaten für Fach, Fassung und Stufen — zum Anlegen und Ändern von `band`."""
+    return band_zuordnen(baender_aus(await kompetenzen_der_fassung(db, subject_id, bp)),
+                         min_grade, max_grade, gewaehlt)
+
+
+async def kompetenzen_des_bands(db: AsyncSession, cur: ContextNode) -> tuple[list[ContextNode], list[ContextNode]]:
+    """IK des Bands und PK des Fachs in der Fassung des Curriculums — dieselbe Menge für
+    Abdeckung und Assistent (`get_bp_competences`). Leer ohne Fach oder Fassung."""
+    b = await band_des_curriculums(db, cur)
+    return b.iks, b.pks
 
 
 def bereich_von(meta: dict) -> str:
@@ -111,20 +153,8 @@ def bereich_von(meta: dict) -> str:
     return str(pfad[-1]).strip() if isinstance(pfad, list) and pfad else ""
 
 
-async def abdeckung(db: AsyncSession, tree: dict) -> dict:
-    """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
-    cur = await db.get(ContextNode, tree["id"])
-    bp = _bp_version(cur)
-    ls_titel = _lernsequenzen(tree)
-    leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
-            "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
-            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
-            "hinweis": None}
-    if cur.subject_id is None or not bp:
-        return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
-    iks, pks = await kompetenzen_des_bands(db, cur)
-
-    # Spalten IK und PK der Einträge: je Kompetenz die Lernsequenzen, bei IK mit `partiell`.
+def verknuepfungen(tree: dict) -> tuple[dict[UUID, set[str]], dict[UUID, set[str]], dict[UUID, set[str]]]:
+    """Spalten IK und PK der Einträge: je Kompetenz die Lernsequenzen — IK voll, IK partiell, PK."""
     voll: dict[UUID, set[str]] = {}
     teil: dict[UUID, set[str]] = {}
     gefoerdert: dict[UUID, set[str]] = {}
@@ -136,6 +166,26 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
             for ref in e.get("pk") or []:
                 if k_id := _uuid(ref):
                     gefoerdert.setdefault(k_id, set()).add(ls_id)
+    return voll, teil, gefoerdert
+
+
+async def abdeckung(db: AsyncSession, tree: dict) -> dict:
+    """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
+    cur = await db.get(ContextNode, tree["id"])
+    bp = _bp_version(cur)
+    ls_titel = _lernsequenzen(tree)
+    leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
+            "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
+            "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
+            "band": None, "baender_zur_wahl": [], "hinweis": None}
+    if cur.subject_id is None or not bp:
+        return {**leer, "hinweis": "Fach oder Bildungsplan-Fassung des Curriculums fehlen."}
+    bd = await band_des_curriculums(db, cur)
+    iks, pks = bd.iks, bd.pks
+    # Parallele Bänder ohne Wahl (Oberstufe): gemessen wird gegen alle, die Wahl steht offen.
+    zur_wahl = [b.als_dict() for b in bd.kandidaten] if len(bd.kandidaten) > 1 else []
+
+    voll, teil, gefoerdert = verknuepfungen(tree)
 
     anderswo = await _anderswo(db, cur, bp, [k.id for k in iks])
 
@@ -190,8 +240,14 @@ async def abdeckung(db: AsyncSession, tree: dict) -> dict:
                "gruppen": [{"titel": t, "kompetenzen": ks} for t, ks in pk_gruppen.items()]},
         "ausserhalb": ausserhalb,
         "fremdes_fach": fremdes_fach,
-        "hinweis": None if iks else "Für Fach, Fassung und Stufen dieses Curriculums sind keine "
-                                    "inhaltsbezogenen Kompetenzen im Bildungsplan hinterlegt.",
+        "band": bd.band.als_dict() if bd.band else None,
+        "baender_zur_wahl": zur_wahl,
+        "hinweis": ("Für Fach, Fassung und Stufen dieses Curriculums sind keine inhaltsbezogenen "
+                    "Kompetenzen im Bildungsplan hinterlegt." if not iks else
+                    "Zu diesen Stufen gibt es im Bildungsplan mehrere Bänder ("
+                    + ", ".join(b["schluessel"] for b in zur_wahl) + "). Ordne das Curriculum im "
+                    "Editor einem Band zu — bis dahin zählen die Kompetenzen aller dieser Bänder."
+                    if zur_wahl and bd.band is None else None),
     }
 
 

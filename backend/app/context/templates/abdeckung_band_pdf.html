@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ titel }}</title>
+<style>
+  /* Abdeckung über das Band (0.46, Schritt 8) — Farben und Schrift wie curriculum_pdf.html. */
+  @page {
+    size: A4;
+    margin: 18mm 15mm 15mm 15mm;
+    @top-left  { content: string(school-running); font-size: 8pt; color: #777; }
+    @top-right { content: "Seite " counter(page) " / " counter(pages); font-size: 8pt; color: #777; }
+  }
+  body { font-family: "Liberation Sans", Arial, sans-serif; font-size: 9.5pt; color: #1a1a1a; line-height: 1.4; }
+  .school-header { string-set: school-running content(); font-size: 12pt; font-weight: bold; color: #1e3a5f;
+                   border-bottom: 1pt solid #1e3a5f; padding-bottom: 1.5mm; margin-bottom: 3mm; }
+  h1 { font-size: 15pt; margin: 0 0 1mm 0; }
+  .meta { font-size: 9pt; color: #555; margin-bottom: 4mm; }
+  .curricula { font-size: 9pt; margin-bottom: 2mm; }
+  .hinweis { font-size: 8.5pt; color: #a15c00; margin-bottom: 2mm; }
+  .bilanz { font-size: 11pt; font-weight: bold; margin: 3mm 0 4mm 0; }
+  h2 { font-size: 11.5pt; color: #1e3a5f; border-bottom: 0.5pt solid #1e3a5f; margin: 5mm 0 2mm 0;
+       page-break-after: avoid; }
+  ul { margin: 0; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; page-break-inside: avoid; }
+  .zustand { font-weight: bold; }
+  .verknuepft { color: #2e7d32; }
+  .partiell { color: #a15c00; }
+  .fehlt { color: #c62828; }
+  .nr { font-weight: bold; }
+  .traeger { color: #555; }
+</style>
+</head>
+<body>
+  {% if school_name %}<div class="school-header">{{ school_name }}</div>{% endif %}
+  <h1>{{ titel }}</h1>
+  <div class="meta">{{ fach }} · BP {{ a.bp_version }} · {{ a.band.schluessel }} · Stand {{ stand }}{% if a.mit_entwuerfen %} · mit Entwürfen{% endif %}{% if nur_luecken %} · nur Lücken{% endif %}</div>
+  <div class="curricula"><strong>Curricula des Bands:</strong>
+    {% if a.curricula %}{% for c in a.curricula %}{{ c.title }}{% if c.status == "draft" %} (Entwurf){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}keine{% endif %}
+  </div>
+  {% if a.nicht_zugeordnet %}
+  <div class="hinweis">Nicht mitgezählt, weil das Band nicht gewählt ist: {% for c in a.nicht_zugeordnet %}{{ c.title }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+  {% endif %}
+  <div class="bilanz">{{ a.ik.verknuepft }} von {{ a.ik.gesamt }} IK verknüpft{% if a.ik.partiell %} · {{ a.ik.partiell }} partiell{% endif %}{% if a.ik.fehlt %} · {{ a.ik.fehlt }} fehlen{% endif %}</div>
+
+  {% for g in gruppen %}
+    {% if g.titel %}<h2>{{ g.titel }}</h2>{% endif %}
+    <ul>
+    {% for k in g.kompetenzen %}
+      <li><span class="zustand {{ k.zustand }}">{{ zustaende[k.zustand] }}</span> · <span class="nr">{{ k.nr }}</span> {{ k.titel }}{% if k.curricula %} <span class="traeger">— {% for c in k.curricula %}{{ c.title }}{% if c.partiell %} (partiell){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>
+    {% endfor %}
+    </ul>
+  {% else %}
+    <p>{% if a.ik.gesamt %}Alle Kompetenzen des Bands sind verknüpft.{% else %}Für dieses Band sind keine Kompetenzen hinterlegt.{% endif %}</p>
+  {% endfor %}
+</body>
+</html>

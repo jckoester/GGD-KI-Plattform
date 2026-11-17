@@ -6,6 +6,7 @@
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import { getCurriculaBySubject } from '$lib/api.js'
     import CurriculumList from '$lib/components/CurriculumList.svelte'
+    import { faecherFiltern } from '$lib/curriculum_baender.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import { ArrowLeft } from 'lucide-svelte'
@@ -59,6 +60,20 @@
         }
     }
 
+    // Filter (0.46): alle, nur eigene oder ein bestimmtes Fach. Ohne eigene Fächer: alle.
+    let filter = $state(null)
+    let fachWahl = $state('')
+    const filterWert = $derived(filter ?? (mySubjectIds.length ? 'eigene' : 'alle'))
+    const anzahlJeFach = $derived(Object.fromEntries(
+        Object.entries(curriculaBySubject).map(([id, c]) => [id, c?.length ?? 0])))
+    const sichtbareFaecher = $derived(faecherFiltern($subjects, {
+        eigene: mySubjectIds, filter: filterWert, fachId: fachWahl ? Number(fachWahl) : null, anzahl: anzahlJeFach,
+    }))
+    // Auswahl im Dropdown: bei „Meine Fächer“ nur die eigenen.
+    const alleFaecher = $derived([...($subjects ?? [])]
+        .filter((f) => filterWert !== 'eigene' || mySubjectIds.includes(f.id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'de')))
+
     // Sortierte Liste der Fächer: eigene Fächer zuerst
     const sortedSubjects = $derived($subjects
         .filter(s => Object.keys(curriculaBySubject).includes(s.id.toString()))
@@ -70,12 +85,6 @@
             if (!aIsMySubject && bIsMySubject) return 1
             return a.name.localeCompare(b.name, 'de')
         }))
-
-    // Gruppe Fächer nach eigenen/anderen
-    const groupedSubjects = $derived({
-        own: sortedSubjects.filter(s => mySubjectIds.includes(s.id)),
-        other: sortedSubjects.filter(s => !mySubjectIds.includes(s.id))
-    })
 
     // Gesamtanzahl der Curricula
     const totalCurricula = $derived(Object.values(curriculaBySubject)
@@ -98,7 +107,7 @@
                     Curricula
                 </h1>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                    {totalCurricula} Curricula in {sortedSubjects.length} Fächern
+                    {totalCurricula} Curricula in {Object.values(anzahlJeFach).filter((n) => n > 0).length} Fächern
                 </p>
             </div>
         </div>
@@ -113,53 +122,58 @@
                 Keine Curricula verfügbar.
             </p>
         {:else}
-            <!-- Eigene Fächer (oben) -->
-            {#if groupedSubjects.own.length > 0}
-                <div class="mb-8">
-                    <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-4">
-                        Meine Fächer
-                    </h2>
-                    <div class="space-y-4">
-                        {#each groupedSubjects.own as subject (subject.id)}
-                            <div class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border 
-                                        border-light-ui-3 dark:border-dark-ui-3 p-4">
-                                <h3 class="font-medium text-light-tx dark:text-dark-tx mb-3">
-                                    {subject.name}
-                                </h3>
-                                <CurriculumList
-                                    subjectId={subject.id}
-                                    subjectSlug={subject.slug}
-                                    subjectFachCode={subject.fach_code}
-                                    showNewButton={true}
-                                />
-                            </div>
-                        {/each}
-                    </div>
-                </div>
-            {/if}
+            <!-- Filter (0.46) -->
+            <div class="flex flex-wrap items-center gap-2 mb-5" data-abschnitt="faecherfilter">
+                {#each [['eigene', 'Meine Fächer'], ['alle', 'Alle Fächer']] as [wert, text] (wert)}
+                    <button
+                        onclick={() => { filter = wert; fachWahl = '' }}
+                        aria-pressed={!fachWahl && filterWert === wert}
+                        class="px-3 py-1.5 text-sm rounded-md border transition-colors
+                               {!fachWahl && filterWert === wert
+                                   ? 'border-primary dark:border-primary-dark text-light-tx dark:text-dark-tx bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
+                                   : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+                    >
+                        {text}
+                    </button>
+                {/each}
+                <select
+                    bind:value={fachWahl}
+                    aria-label="Fach wählen"
+                    class="px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
+                           text-light-tx dark:text-dark-tx"
+                >
+                    <option value="">Fach wählen …</option>
+                    {#each alleFaecher as f (f.id)}
+                        <option value={String(f.id)}>{f.name}</option>
+                    {/each}
+                </select>
+            </div>
 
-            <!-- Andere Fächer -->
-            {#if groupedSubjects.other.length > 0}
-                <div>
-                    <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-4">
-                        Andere Fächer
-                    </h2>
-                    <div class="space-y-4">
-                        {#each groupedSubjects.other as subject (subject.id)}
-                            <div class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border 
-                                        border-light-ui-3 dark:border-dark-ui-3 p-4">
-                                <h3 class="font-medium text-light-tx dark:text-dark-tx mb-3">
-                                    {subject.name}
-                                </h3>
-                                <CurriculumList 
-                                    subjectId={subject.id} 
-                                    subjectSlug={subject.slug}
-                                    showNewButton={false}
-                                />
-                            </div>
-                        {/each}
-                    </div>
-                </div>
+            {#if sichtbareFaecher.length === 0}
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    {filterWert === 'eigene' ? 'Du bist in keinem Fach Mitglied der Fachschaft oder einer Unterrichtsgruppe.' : 'Keine Curricula verfügbar.'}
+                </p>
             {/if}
+            <div class="space-y-3">
+                {#each sichtbareFaecher as subject (subject.id)}
+                    <!-- Je Fach einklappbar; eigene und ein gezielt gewähltes Fach zu Beginn offen. -->
+                    <details
+                        class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-4"
+                        open={!!fachWahl || mySubjectIds.includes(subject.id)}
+                    >
+                        <summary class="cursor-pointer flex items-baseline gap-2">
+                            <span class="text-lg font-semibold text-light-tx dark:text-dark-tx">{subject.name}</span>
+                            <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">({anzahlJeFach[subject.id] ?? 0})</span>
+                        </summary>
+                        <div class="mt-3">
+                            <CurriculumList
+                                subjectId={subject.id}
+                                subjectFachCode={subject.fach_code}
+                                showNewButton={mySubjectIds.includes(subject.id)}
+                            />
+                        </div>
+                    </details>
+                {/each}
+            </div>
         {/if}
 </PageBody>
