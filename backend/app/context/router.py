@@ -1240,6 +1240,17 @@ async def verwalte_node(
 
     vektor_vorher = await eingabe_mit_aliasen(db, node)
     if payload.title is not None:
+        # Kollision über Fachgrenzen (0.16, F7) wie im Editor und beim Anlegen — bis 0.46 ließ
+        # dieser Weg sie aus. Eine Abgrenzung lässt sich hier nicht angeben; dafür der Editor.
+        if node.content_type in fachbegriffe_kollision.TYPEN and payload.title != node.title:
+            try:
+                await _pruefe_kollisionen(
+                    db, typ=node.content_type, subject_id=node.subject_id, titel=payload.title,
+                    aliase=await aliase_modul.lade(db, node.id), abgrenzung_zu=[], user=user, node=node)
+            except HTTPException as e:
+                if e.status_code == 409 and isinstance(e.detail, dict):
+                    e.detail["nachricht"] += " Umbenennen mit Abgrenzung geht im Editor des Bausteins."
+                raise
         if node.content_type in BEGRIFF_TYPEN:
             await aliase_modul.behalte_alten_titel(db, node, payload.title)  # E12
         node.title = payload.title

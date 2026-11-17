@@ -233,7 +233,8 @@ async def curriculum_neu(db: AsyncSession, user, fach: str, jahrgangsstufe: str,
     m = re.search(r"_(GYM|RS|GMS|GS|BSO)_", (plan.metadata_ or {}).get("bp_id") or "")
     cur = await curriculum_anlegen(
         db, plan, user, fach_code=subj.fach_code or "", schulart=_SCHULARTEN.get(m.group(1), m.group(1)) if m else "",
-        jahrgangsstufe=jahrgangsstufe.strip(), bp_version=bp_version, titel=f"{subj.name} Kl. {jahrgangsstufe.strip()}")
-    cur.metadata_ = {**(cur.metadata_ or {}), "fach": subj.name, **({"band": band} if band else {})}
+        jahrgangsstufe=jahrgangsstufe.strip(), bp_version=bp_version, titel=f"{subj.name} Kl. {jahrgangsstufe.strip()}",
+        band=band)
+    cur.metadata_ = {**(cur.metadata_ or {}), "fach": subj.name}
     await db.flush()
     return cur, {"hinweis": "Leerer Entwurf angelegt."}

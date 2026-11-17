@@ -627,6 +627,8 @@ def _exec_result(*, fetchone=None, scalar=None):
     m = MagicMock()
     m.fetchone.return_value = fetchone
     m.scalar_one_or_none.return_value = scalar
+    # `curriculum_anlegen` liest seit 0.46 alle Treffer des Schlüssels (Vergleich des Bands).
+    m.scalars.return_value = [scalar] if scalar is not None else []
     return m
 
 

@@ -218,7 +218,7 @@ async def letzte_aenderung(db: AsyncSession, curriculum_ids) -> dict:
 
 async def curriculum_anlegen(db: AsyncSession, fachplan_node, user, *, fach_code: str, schulart: str,
                              jahrgangsstufe: str, bp_version: str, schule: str = "",
-                             titel: str | None = None):
+                             titel: str | None = None, band: str | None = None):
     """Ein neues, leeres Curriculum als Entwurf am Fachplan — für `POST /curricula/new` und den
     Assistenten (`lege_curriculum_an`, 0.46). Kein Commit.
 
@@ -227,8 +227,12 @@ async def curriculum_anlegen(db: AsyncSession, fachplan_node, user, *, fach_code
     Rollenregel „Admin verhält sich wie eine Lehrkraft“. Existiert für das Fach gar keine
     Fachschaft, wird nicht geprüft.
 
-    Idempotent je Person, Fach, Band und Fassung: Ein zweiter Aufruf liefert das vorhandene
-    aktive Curriculum mit demselben Schlüssel.
+    Idempotent je Person, Fach, Jahrgangsstufe, Fassung und Band des Bildungsplans: Ein zweiter
+    Aufruf liefert das vorhandene Curriculum mit demselben Schlüssel — Entwurf oder
+    veröffentlicht. Bis 0.46 suchte die Prüfung nur veröffentlichte; weil neue Curricula seit
+    0.45 Entwürfe sind, griff sie nie, und ein zweiter Aufruf legte ein Doppel an.
+    `band` (parallele Bänder der Oberstufe) steht nicht im Schlüssel — der wird beim Ändern der
+    Jahrgangsstufe segmentweise umgeschrieben —, sondern wird beim Vergleich mitgeprüft.
     """
     from fastapi import HTTPException
 
@@ -246,11 +250,12 @@ async def curriculum_anlegen(db: AsyncSession, fachplan_node, user, *, fach_code
             raise HTTPException(status_code=403, detail="Keine Berechtigung - du musst Mitglied der Fachschaft sein")
 
     import_key = f"new_{user.sub}_{fach_code}_{jahrgangsstufe}_{bp_version}"
-    vorhanden = (await db.execute(sa.select(ContextNode).where(
-        ContextNode.metadata_["import_key"].astext == import_key,
-        ContextNode.status == "active").limit(1))).scalar_one_or_none()
-    if vorhanden is not None:
-        return vorhanden
+    for vorhanden in (await db.execute(sa.select(ContextNode).where(
+            ContextNode.content_type == "curriculum",
+            ContextNode.metadata_["import_key"].astext == import_key,
+            ContextNode.status.in_(LESBARE_STATUS)).order_by(ContextNode.created_at))).scalars():
+        if (vorhanden.metadata_ or {}).get("band") == band:
+            return vorhanden
 
     lo, hi = parse_grade_band(jahrgangsstufe)
     curriculum = ContextNode(
@@ -266,6 +271,7 @@ async def curriculum_anlegen(db: AsyncSession, fachplan_node, user, *, fach_code
             "fachplan_node_id": str(fachplan_node.id),
             "bp_version": bp_version, "schule": schule, "fach_code": fach_code,
             "schulart": schulart, "jahrgangsstufe": jahrgangsstufe, "import_key": import_key,
+            **({"band": band} if band else {}),
         },
         # Jedes neue Curriculum ist ein Entwurf (0.45, F2/E11): Ein leeres Curriculum ist nie
         # fertig. Sichtbar für alle wird es erst über „Veröffentlichen“.

@@ -206,3 +206,21 @@ class TestYamlTestAdapterSsoGroups:
         assert identity.sso_roles == ["Lehrer"]
         admin = await yaml_adapter_with_sso_groups.authenticate_direct("admin", "admin")
         assert admin.sso_roles == []
+
+
+@pytest.mark.asyncio
+async def test_group_role_map_gilt_auch_fuer_testnutzer(tmp_path: Path):
+    """Seit 0.46: `sso_groups`/`sso_roles` laufen wie bei der SSO-Anmeldung durch die
+    `group_role_map` (case-insensitiv, additiv zu `roles:`) — Fachvorsitz lässt sich auf Dev testen."""
+    datei = tmp_path / "users.yaml"
+    datei.write_text(yaml.dump({"users": [{
+        "username": "lehrer01",
+        "password_hash": "$2b$12$oK3VKqm5UJo/iEQv2iInR.nCUA3jBrZwu7v7dLvmQIovz1dZtiEl2",
+        "roles": ["teacher"], "grade": None,
+        "sso_groups": ["KI-Fachvorsitz", "irgendwas"], "sso_roles": ["Lehrer"],
+    }]}))
+    adapter = YamlTestAdapter(raw={"users_file": str(datei)},
+                              group_role_map={"ki-fachvorsitz": "fachvorsitz", "lehrer": "teacher"})
+    identity = await adapter.authenticate_direct("lehrer01", "lehrer01")
+    assert identity.roles == ["teacher", "fachvorsitz"]
+    assert identity.sso_groups == ["KI-Fachvorsitz", "irgendwas"]

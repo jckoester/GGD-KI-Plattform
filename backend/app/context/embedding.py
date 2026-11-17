@@ -580,10 +580,15 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
     try:
         text = _build_embedding_input(node, node_aliase)
         embedding = await generate_embedding(text)
+        werte: dict = {"embedding": embedding}
+        # Eine Fehlermarke aus einem früheren Versuch fällt mit dem Erfolg weg — wie im
+        # Backfill (`embedding_backfill_service`). Bis 0.46 blieb sie hier stehen.
+        if (node.metadata_ or {}).get("embedding_error") is not None:
+            werte["metadata_"] = {k: v for k, v in node.metadata_.items() if k != "embedding_error"}
         await db.execute(
             update(ContextNode)
             .where(ContextNode.id == node_id)
-            .values(embedding=embedding, **ohne_aenderungsstempel())
+            .values(**werte, **ohne_aenderungsstempel())
         )
         await db.commit()
     except Exception as exc:

@@ -41,6 +41,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   den Abschnitten des Bildungsplans (etwa „3.1.7 Optik“).
 - Abdeckung eines Oberstufen-Curriculums misst nur die Kompetenzen seines Bands statt Basis- und
   Leistungsfach zusammen.
+- Ein zweites „Neues Curriculum“ für dieselbe Stufe und Fassung legt kein Doppel mehr an, sondern
+  öffnet den vorhandenen Entwurf.
+- Umbenennen in „Meine Bausteine“ prüft gleichnamige Fachbegriffe anderer Fächer wie der Editor.
+- Die Fehlermarke einer Einbettung verschwindet, sobald die Einbettung gelingt.
+- Der Merkposten des Wochenbudgets hält fest, wann zuletzt gebucht wurde.
+- Testanmeldung: SSO-Gruppen und -Rollen der Testnutzer laufen durch die Rollenzuordnung wie bei
+  der echten Anmeldung (etwa Fachvorsitz).
 - Chat bricht bei großen Funktionsaufrufen nicht mehr mit „KI-Dienst hat zu lange nicht
   geantwortet“ ab.
 

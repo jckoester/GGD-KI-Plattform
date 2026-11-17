@@ -1083,8 +1083,10 @@ class BudgetAccrual(Base):
     schuljahr: Mapped[str] = mapped_column(Text, nullable=False)
     # `Unterrichtswoche.index` der zuletzt gebuchten Woche (1-basiert).
     letzte_woche: Mapped[int] = mapped_column(nullable=False)
+    # Wann zuletzt gebucht wurde. `onupdate` seit 0.46 — vorher blieb hier der erste Eintrag
+    # stehen, weil `merke()` nur Schuljahr und Woche fortschreibt. Clientseitig, keine Migration.
     aktualisiert_am: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+        TIMESTAMP(timezone=True), server_default=text("now()"), onupdate=text("now()"), nullable=False
     )
 
 

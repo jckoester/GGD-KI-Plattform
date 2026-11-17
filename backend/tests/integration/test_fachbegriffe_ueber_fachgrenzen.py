@@ -339,6 +339,20 @@ class TestEditor:
                                           json={"title": SYNTHESE, "abgrenzung_zu": [str(ziel)]})
         assert antwort.status_code == 200, antwort.text
 
+    async def test_umbenennen_in_meine_bausteine_prueft_die_kollision(self, test_client, auth_headers,
+                                                                       editorbestand):
+        """Bis 0.46 ließ `PATCH …/verwalten` die Prüfung aus. Dort gibt es keine Abgrenzung —
+        die Meldung verweist auf den Editor."""
+        nwt = editorbestand["nwt"]
+        blatt = editorbestand["knoten"][(f"Blatt{TOKEN}", nwt.id)]
+        antwort = await test_client.patch(f"/context/nodes/{blatt}/verwalten", json={"title": SYNTHESE},
+                                          headers=auth_headers)
+        assert antwort.status_code == 409, antwort.text
+        assert "im Editor" in antwort.json()["detail"]["nachricht"]
+        anders = await test_client.patch(f"/context/nodes/{blatt}/verwalten",
+                                         json={"title": f"Blattwerk{TOKEN}"}, headers=auth_headers)
+        assert anders.status_code == 200, anders.text
+
     async def test_alte_kollision_blockiert_keine_bearbeitung(self, test_client, auth_headers,
                                                               editorbestand):
         nwt = editorbestand["nwt"]

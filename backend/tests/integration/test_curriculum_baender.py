@@ -260,3 +260,22 @@ async def test_pk_abdeckung_ueber_die_fassung(db, welt):
     pdf = await pk_abdeckung_route(fach.id, bp_version=V3, entwuerfe=False, format="pdf", nur_luecken=False,
                                    db=db, user=mitglied)
     assert pdf.body.startswith(b"%PDF") and "pk_abdeckung_" in pdf.headers["content-disposition"]
+
+
+async def test_anlegen_ist_idempotent_auch_fuer_entwuerfe(db, welt):
+    """Bis 0.46 suchte die Prüfung nur veröffentlichte Curricula — neue sind seit 0.45 Entwürfe,
+    ein zweites Anlegen ergab ein Doppel. Das Band zählt mit, steht aber nicht im Schlüssel."""
+    from app.context.curriculum_entwurf import curriculum_anlegen
+
+    plan = await _knoten(db, "fachplan", "BP", subject_id=welt["fach"].id, bp_version=V3,
+                         metadata_={"fachplan_id": "X"})
+    mitglied = _user(MITGLIED, "teacher")
+    args = dict(fach_code="X", schulart="Gymnasium", jahrgangsstufe="7", bp_version=V3)
+    erst = await curriculum_anlegen(db, plan, mitglied, **args)
+    assert erst.status == "draft"
+    assert (await curriculum_anlegen(db, plan, mitglied, **args)).id == erst.id
+
+    lf = await curriculum_anlegen(db, plan, mitglied, **{**args, "jahrgangsstufe": "12/13"}, band=LF)
+    basis = await curriculum_anlegen(db, plan, mitglied, **{**args, "jahrgangsstufe": "12/13"}, band=BASIS)
+    assert lf.id != basis.id and basis.metadata_["band"] == BASIS
+    assert (await curriculum_anlegen(db, plan, mitglied, **{**args, "jahrgangsstufe": "12/13"}, band=LF)).id == lf.id
