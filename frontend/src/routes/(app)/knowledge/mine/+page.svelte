@@ -228,7 +228,7 @@
 
 <svelte:head><title>Meine Bausteine</title></svelte:head>
 
-<PageBody>
+<PageBody breit>
   {#if istLehrkraft}
     <UebergangsHinweis
       neuigkeitId={WERKSTATT_NEUIGKEIT}

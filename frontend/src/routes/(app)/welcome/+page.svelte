@@ -118,11 +118,13 @@
     }
 </script>
 
+<!-- Eigene Struktur (ohne Kacheln senkrecht zentriert), aber dieselbe schmale Breite und derselbe
+     Rand wie `PageBody` (0.48, Jan 18.11.2026). -->
 <div
-    class="h-full overflow-y-auto flex flex-col items-center px-4 py-12"
+    class="h-full overflow-y-auto flex flex-col items-center py-6"
     class:justify-center={!hatKacheln}
 >
-    <div class="w-full max-w-xl flex flex-col gap-6">
+    <div class="w-full max-w-4xl px-6 flex flex-col gap-6">
 
         {#if kacheln.einrichtung}
             <InfoBanner

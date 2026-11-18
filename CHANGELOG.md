@@ -37,6 +37,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Seitenbreiten vereinheitlicht: Es gibt nur noch zwei, schmal für Formulare, Detail und Einstellungen,
   breit (höchstens 1280 px) für Listen und Tabellen; auch im Verwaltungsbereich. Hilfe und Infoseiten
   behalten ihre Lesespalte.
+- Startseite so breit wie die übrigen schmalen Seiten; „Meine Bausteine“ breit wie „Alle Bausteine“.
 - Vorschau: zeigt immer die höchste Darstellungsstufe der Schüler:innen, unabhängig von der eigenen
   Stufe; der Hinweis „Es gibt mehr“ entfällt dort.
 

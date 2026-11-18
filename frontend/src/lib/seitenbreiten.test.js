@@ -66,4 +66,11 @@ describe('Seitenbreiten', () => {
             expect(readFileSync(join(ROUTES, rel), 'utf8'), rel).toContain('prose dark:prose-invert max-w-prose')
         }
     })
+
+    it('Startseite schmal wie PageBody, Meine Bausteine breit (G9, 18.11.2026)', () => {
+        const start = readFileSync(join(ROUTES, '(app)', 'welcome', '+page.svelte'), 'utf8')
+        expect(start).toContain('class="w-full max-w-4xl px-6 flex flex-col gap-6"')
+        const mine = readFileSync(join(ROUTES, '(app)', 'knowledge', 'mine', '+page.svelte'), 'utf8')
+        expect(mine).toContain('<PageBody breit>')
+    })
 })
