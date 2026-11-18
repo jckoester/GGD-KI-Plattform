@@ -36,8 +36,11 @@ export async function refreshUiLevels() {
  * Ein gespeicherter Wert außerhalb des Bereichs wird geklemmt: Er darf niemals eine
  * leere Navigation erzeugen, auch wenn er aus einer älteren Konfiguration stammt.
  */
-export function wirksameStufe(prefs, registry) {
+export function wirksameStufe(prefs, registry, vorschau = false) {
     if (!registry || !registry.rolle || !registry.stufen?.length) return null
+    // Vorschau (0.48, G5 a): die höchste Stufe der Schüler:innen, unabhängig von der eigenen
+    // Stufe der Lehrkraft. „Es gibt mehr“ verschwindet damit von selbst — dort ginge nichts.
+    if (vorschau) return registry.hoechste
     const roh = Number(prefs?.ui_level)
     if (!Number.isFinite(roh)) return registry.startstufe
     return Math.max(1, Math.min(registry.hoechste, Math.trunc(roh)))
@@ -78,7 +81,7 @@ export function verborgeneStufen(registry, stufe) {
 }
 
 export const uiStufe = derived([user, _registry], ([$u, $r]) =>
-    wirksameStufe($u?.preferences, $r),
+    wirksameStufe($u?.preferences, $r, Boolean($u?.vorschau)),
 )
 
 export const sichtbar = derived([_registry, uiStufe], ([$r, $s]) =>

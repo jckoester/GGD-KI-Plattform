@@ -105,10 +105,10 @@ Die **Einrichtung der Schüler:innen** (seit 0.47) lässt sich in der Vorschau �
 Profil öffnen, geht aber nie von selbst auf und speichert nichts; `GET /einrichtung` liefert dort
 keinen Stand. Einzelheiten: [Einrichtung](einrichtung.md).
 
-**Darstellungsstufe in der Vorschau** (geprüft 0.48): `GET /ui/levels` liefert den Zuschnitt der
-Schüler:innen (Rolle aus dem Token), die Stufe aber kommt aus den Einstellungen der Lehrkraft
-(`GET /preferences` liest dasselbe Pseudonym). `wirksameStufe` klemmt sie auf die Stufen der
-Schüler:innen: Eine Lehrkraft ab Stufe 2 sieht deren höchste Stufe, eine auf Stufe 1 nur Stufe 1.
-Ändern lässt sie sich in der Vorschau nicht (`PATCH /preferences` gesperrt; „Einblenden“ unter
-„Es gibt mehr“ rollt still zurück). Tests: `tests/integration/test_vorschau_stufe.py`,
+**Darstellungsstufe in der Vorschau** (0.48): `GET /ui/levels` liefert den Zuschnitt der
+Schüler:innen (Rolle aus dem Token). Die eigene Stufe der Lehrkraft steht in ihren Einstellungen
+(`GET /preferences` liest dasselbe Pseudonym) und spielt seit 0.48 keine Rolle mehr: In der Vorschau
+gilt immer die **höchste Stufe der Schüler:innen** (`wirksameStufe(…, vorschau)` im Frontend,
+`stufe_fuer(…, vorschau=True)` im Backend für die Neuigkeiten). „Es gibt mehr“ entfällt damit. Ändern
+lässt sich die Stufe in der Vorschau nicht (`PATCH /preferences` gesperrt). Tests: `tests/integration/test_vorschau_stufe.py`,
 `frontend/src/lib/stores/uiLevel.test.js`.

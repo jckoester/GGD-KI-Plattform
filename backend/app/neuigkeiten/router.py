@@ -11,6 +11,7 @@ from app.auth.jwt import JwtPayload
 from app.db.models import PseudonymAudit
 from app.db.session import get_db
 from app.neuigkeiten.quelle import alle, sichtbar
+from app.auth.vorschau import ist_vorschau
 from app.preferences.service import neuigkeit_gelesen_merken, neuigkeiten_gelesen, ui_stufe
 from app.ui.levels import load_ui_levels
 
@@ -41,7 +42,8 @@ async def meine_neuigkeiten(
         rollen=list(current_user.roles),
         gelesen=set() if alle_laufenden else await neuigkeiten_gelesen(db, current_user.sub),
         konto_seit=konto_seit,
-        stufe=await ui_stufe(db, current_user.sub, list(current_user.roles)),
+        stufe=await ui_stufe(db, current_user.sub, list(current_user.roles),
+                             vorschau=ist_vorschau(current_user)),
         stufen=load_ui_levels(),
         heute=date.today(),
     )

@@ -223,7 +223,9 @@ class UiLevels(BaseModel):
 STUFEN_SCHLUESSEL = "ui_level"
 
 
-def stufe_fuer(prefs: dict, rollen: list[str], cfg: "UiLevels | None" = None) -> int | None:
+def stufe_fuer(
+    prefs: dict, rollen: list[str], cfg: "UiLevels | None" = None, *, vorschau: bool = False,
+) -> int | None:
     """Die wirksame Stufe einer Nutzer:in — oder ``None``.
 
     ``None`` heißt **nicht** „Stufe 0", sondern: Für diese Rolle sind keine Stufen
@@ -244,6 +246,10 @@ def stufe_fuer(prefs: dict, rollen: list[str], cfg: "UiLevels | None" = None) ->
     r = c.fuer(rollen)
     if r is None:
         return None
+    # Vorschau (0.48, G5 a): immer die höchste Stufe der Schüler:innen — alles, was eine Klasse
+    # erreichen kann. Die eigene Stufe der Lehrkraft hat mit der Schülersicht nichts zu tun.
+    if vorschau:
+        return r.hoechste
     try:
         wert = int(prefs.get(STUFEN_SCHLUESSEL, r.startstufe))
     except (TypeError, ValueError):

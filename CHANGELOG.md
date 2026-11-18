@@ -34,6 +34,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Letzte Chats) haben kein Zurück mehr. Profil und Unterricht haben „Schließen“.
 - Von Baustein zu Baustein führt Zurück Schritt für Schritt zurück.
 - Der Assistenten-Editor heißt am × jetzt „Schließen“.
+- Vorschau: zeigt immer die höchste Darstellungsstufe der Schüler:innen, unabhängig von der eigenen
+  Stufe; der Hinweis „Es gibt mehr“ entfällt dort.
 
 ## [0.47.1] – 2026-11-18
 

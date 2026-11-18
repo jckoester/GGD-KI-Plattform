@@ -72,11 +72,13 @@ async def anzeige_limit(db: AsyncSession, pseudonym: str) -> int:
 NEUIGKEITEN_SCHLUESSEL = "neuigkeiten_gelesen"
 
 
-async def ui_stufe(db: AsyncSession, pseudonym: str, rollen: list[str]) -> int | None:
+async def ui_stufe(
+    db: AsyncSession, pseudonym: str, rollen: list[str], *, vorschau: bool = False,
+) -> int | None:
     """Die wirksame Darstellungsstufe (`stufe_fuer`); ``None``: Für die Rolle gibt es keine."""
     from app.ui.levels import stufe_fuer
 
-    return stufe_fuer(await get_preferences(db, pseudonym), rollen)
+    return stufe_fuer(await get_preferences(db, pseudonym), rollen, vorschau=vorschau)
 
 
 async def neuigkeiten_gelesen(db: AsyncSession, pseudonym: str) -> set[str]:

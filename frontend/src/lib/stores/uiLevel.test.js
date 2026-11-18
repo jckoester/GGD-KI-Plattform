@@ -183,10 +183,10 @@ describe("stufeVon", () => {
   })
 })
 
-describe("Vorschau (0.48, Päckchen N Schritt 8)", () => {
-  // In der Vorschau kommt der Zuschnitt der Schüler:innen (`/ui/levels` nach Token-Rolle), die
-  // Stufe aber aus den Einstellungen der Lehrkraft. Festgehalten, wie es ist — Gegenstück im
-  // Backend: `tests/integration/test_vorschau_stufe.py`.
+describe("Vorschau (0.48, Päckchen N Schritt 8, G5 a)", () => {
+  // In der Vorschau kommt der Zuschnitt der Schüler:innen (`/ui/levels` nach Token-Rolle). Die
+  // Stufe ist immer deren höchste, egal auf welcher Stufe die Lehrkraft selbst steht.
+  // Gegenstück im Backend: `tests/integration/test_vorschau_stufe.py`.
   const SCHUELER = {
     rolle: "student",
     startstufe: 1,
@@ -197,11 +197,17 @@ describe("Vorschau (0.48, Päckchen N Schritt 8)", () => {
     ],
   }
 
-  it("eine Lehrkraft auf Stufe 4 sieht die höchste Stufe der Schüler:innen", () => {
-    expect(wirksameStufe({ ui_level: 4 }, SCHUELER)).toBe(2)
+  it("zeigt die höchste Stufe der Schüler:innen, unabhängig von der Stufe der Lehrkraft", () => {
+    expect(wirksameStufe({ ui_level: 1 }, SCHUELER, true)).toBe(2)
+    expect(wirksameStufe({ ui_level: 4 }, SCHUELER, true)).toBe(2)
+    expect(wirksameStufe({}, SCHUELER, true)).toBe(2)
   })
 
-  it("eine Lehrkraft auf Stufe 1 sieht die Stufe 1 der Schüler:innen", () => {
+  it("kein „Es gibt mehr“ in der Vorschau", () => {
+    expect(verborgeneStufen(SCHUELER, wirksameStufe({ ui_level: 1 }, SCHUELER, true))).toEqual([])
+  })
+
+  it("außerhalb der Vorschau bleibt die eigene Stufe", () => {
     expect(wirksameStufe({ ui_level: 1 }, SCHUELER)).toBe(1)
   })
 })

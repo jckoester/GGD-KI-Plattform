@@ -1,12 +1,10 @@
 """Vorschau und Darstellungsstufe (0.48, Päckchen N, Schritt 8 / Päckchen O Punkt 3).
 
-Festgehalten wird, wie es ist:
-
 - `GET /ui/levels` liefert in der Vorschau den Zuschnitt der **Schüler:innen** (Rolle aus dem
   Vorschau-Token).
-- Die Stufe selbst kommt aus den Einstellungen der **Lehrkraft** (`GET /preferences` liest
-  dasselbe Pseudonym); die Oberfläche klemmt sie auf die Stufen der Schüler:innen
-  (`wirksameStufe`, Frontend-Test `ui_level.test.js`).
+- Die Stufe ist in der Vorschau immer deren **höchste** (G5 a, 18.11.2026), unabhängig von der
+  eigenen Stufe der Lehrkraft — im Frontend `wirksameStufe` (`uiLevel.test.js`), im Backend
+  `stufe_fuer(…, vorschau=True)` für die Neuigkeiten.
 - Ändern lässt sie sich in der Vorschau nicht: `PATCH /preferences` ist gesperrt, die eigene
   Stufe der Lehrkraft bleibt unberührt.
 """
@@ -17,8 +15,6 @@ import pytest
 from app.auth.vorschau import Vorschau
 from app.ui.levels import load_ui_levels
 from tests.integration.conftest import TEACHER1_PSEUDO
-
-pytestmark = pytest.mark.asyncio
 
 
 def _kopf(jwt_service, *, vorschau: bool):
@@ -47,6 +43,7 @@ async def eigene_stufe(test_client, jwt_service):
         await test_client.patch("/preferences", json={"ui_level": vorher}, headers=lehrkraft)
 
 
+@pytest.mark.asyncio
 async def test_vorschau_bekommt_den_zuschnitt_der_schuelerinnen(test_client, jwt_service, eigene_stufe):
     r = await test_client.get("/ui/levels", headers=_kopf(jwt_service, vorschau=True))
     assert r.status_code == 200
@@ -57,14 +54,23 @@ async def test_vorschau_bekommt_den_zuschnitt_der_schuelerinnen(test_client, jwt
     assert {s["stufe"] for s in daten["stufen"]} == {s.stufe for s in schueler.stufen}
 
 
-async def test_stufe_kommt_aus_den_einstellungen_der_lehrkraft(test_client, jwt_service, eigene_stufe):
+@pytest.mark.asyncio
+async def test_eigene_stufe_der_lehrkraft_bleibt_in_ihren_einstellungen(test_client, jwt_service, eigene_stufe):
     prefs = (await test_client.get("/preferences", headers=_kopf(jwt_service, vorschau=True))).json()
     assert prefs["ui_level"] == eigene_stufe
 
 
+@pytest.mark.asyncio
 async def test_stufe_laesst_sich_in_der_vorschau_nicht_aendern(test_client, jwt_service, eigene_stufe):
     r = await test_client.patch("/preferences", json={"ui_level": 1},
                                 headers=_kopf(jwt_service, vorschau=True))
     assert r.status_code == 403
     lehrkraft = (await test_client.get("/preferences", headers=_kopf(jwt_service, vorschau=False))).json()
     assert lehrkraft["ui_level"] == eigene_stufe
+
+
+def test_stufe_fuer_in_der_vorschau_ist_die_hoechste_der_schuelerinnen():
+    from app.ui.levels import stufe_fuer
+    schueler = load_ui_levels().rollen["student"]
+    assert stufe_fuer({"ui_level": 1}, ["student"], vorschau=True) == schueler.hoechste
+    assert stufe_fuer({"ui_level": 1}, ["student"]) == 1
