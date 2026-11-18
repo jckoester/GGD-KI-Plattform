@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from '$lib/components/ZurueckLink.svelte';
     import { page } from '$app/stores';
     import { getSiteText } from '$lib/api.js';
     import { renderMarkdown } from '$lib/markdown.js';
@@ -45,13 +46,7 @@
 </script>
 
 <div class="max-w-2xl mx-auto py-10 px-4">
-    <button
-        onclick={() => history.back()}
-        class="flex items-center gap-1 mb-6 text-sm text-light-tx-2 dark:text-dark-tx-2 
-               hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-    >
-        ← Zurück
-    </button>
+    <ZurueckLink href="/" />
 
     {#if loading}
         <div class="text-center py-8">Laden...</div>

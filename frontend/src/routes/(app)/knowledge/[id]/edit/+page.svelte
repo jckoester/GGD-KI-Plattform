@@ -1,4 +1,5 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
     import { rueckwegAus } from "$lib/rueckweg.js";
     import { bearbeitenZiel } from "$lib/bearbeiten.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -387,7 +388,8 @@
                 valid_until: copyValidUntil || null,
             });
             showCopyDialog = false;
-            goto(`/knowledge/${created.id}`);
+            // Die Kopie erbt den Rückweg des Originals.
+            goto(`/knowledge/${created.id}` + (backParam ? `?back=${encodeURIComponent(backParam)}` : ""));
         } catch (e) {
             copyError = e.message;
         } finally {
@@ -475,7 +477,7 @@
                                 >{ref.relation}:</span
                             >
                             <a
-                                href="/knowledge/{ref.id}"
+                                href={bausteinPfad(ref.id, $page.url)}
                                 class="underline text-light-tx dark:text-dark-tx hover:text-primary dark:hover:text-primary-dark"
                             >
                                 {ref.title}
@@ -486,7 +488,7 @@
                                 >
                                     → Möglicher Nachfolger:
                                     <a
-                                        href="/knowledge/{ref.suggested_successor_id}"
+                                        href={bausteinPfad(ref.suggested_successor_id, $page.url)}
                                         class="underline hover:text-primary dark:hover:text-primary-dark"
                                     >
                                         Baustein anzeigen

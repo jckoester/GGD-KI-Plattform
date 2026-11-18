@@ -1,11 +1,14 @@
 <script>
+    import ZurueckLink from '$lib/components/ZurueckLink.svelte';
+    import { rueckwegAus } from '$lib/rueckweg.js';
+    import { bausteinPfad } from '$lib/rueckweg.js';
     // Eine Ansicht für jedes Produkt (0.41, Schritt 8): Rahmen mit Titel, Art, Fach, Thema,
     // Herkunft und Frist; darunter je Art der Inhalt — Dokument: der Editor; Diagramm: ansehen
     // mit Zoom und Quelltext (bearbeiten kommt mit Päckchen L, F7); Bild: Bild und Prompt;
     // Datei: Verweis auf ihr Dokument. Bis 0.41 hatten nur Dokumente eine eigene Ansicht.
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { ArrowLeft, Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil, MessageSquarePlus } from 'lucide-svelte';
+    import { Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil, MessageSquarePlus } from 'lucide-svelte';
     import { user } from '$lib/stores/user.js';
     import { ANHAENGBARE_ARTEN, produktFuerNeuenChat } from '$lib/produkt_im_chat.js';
     import { getProduktInfo, produktKopieren, deleteArtifact } from '$lib/api.js';
@@ -110,9 +113,7 @@
 
 <PageBody breit>
     <div class="max-w-6xl mx-auto flex flex-col gap-4">
-        <a href="/workshop" class="self-start inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline">
-            <ArrowLeft class="w-4 h-4" /> Werkstatt
-        </a>
+        <ZurueckLink href={rueckwegAus($page.url.searchParams) ?? "/workshop"} label={rueckwegAus($page.url.searchParams) ? undefined : "Werkstatt"} />
 
         {#if error}<ErrorBanner message={error} />{/if}
 
@@ -161,7 +162,7 @@
                     gültig bis {datum(info.expires_at)} · {formatBytes(info.byte_size)}
                 </p>
                 {#if info.baustein_id}
-                    <a href="/knowledge/{info.baustein_id}" class="self-start text-xs text-light-bl dark:text-dark-bl hover:underline">
+                    <a href={bausteinPfad(info.baustein_id, $page.url)} class="self-start text-xs text-light-bl dark:text-dark-bl hover:underline">
                         als Baustein übernommen: „{info.baustein_titel}“ →
                     </a>
                 {/if}

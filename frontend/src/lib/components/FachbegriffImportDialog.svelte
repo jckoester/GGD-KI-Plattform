@@ -1,4 +1,6 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
+    import { page } from "$app/stores";
     /**
      * Fachbegriffe aus Dateien einspielen (Paket 10, AP4).
      *
@@ -344,7 +346,7 @@
                     {#each ergebniszeilen as zeile (zeile.datei)}
                         <li class="text-sm">
                             <a
-                                href="/knowledge/{zeile.node_id}"
+                                href={bausteinPfad(zeile.node_id, $page.url)}
                                 class="text-light-bl dark:text-dark-bl hover:underline
                                        inline-flex items-center gap-1"
                             >

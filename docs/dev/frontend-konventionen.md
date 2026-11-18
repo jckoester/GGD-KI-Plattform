@@ -118,6 +118,22 @@ info/[key]/     → statische Texte (impressum, datenschutz, regeln)
 
 Die vollständige Routen-Tabelle steht in `CLAUDE.md`.
 
+### Zurück
+
+Ein Zurück ist **`ZurueckLink`**, ein Link mit festem Ziel (festgelegt 0.48, Päckchen N). Es gibt
+kein `history.back()` in Seiten; der Wächter dafür steht in `zurueck.test.js`. Dabei gilt:
+
+- **Seiten mit eigenem Eintrag in der Seitenleiste** (`/settings`, `/budget`, `/flags`,
+  `/statistics`, `/history`) haben **kein** Zurück. Navigiert wird über die Seitenleiste.
+- **Seiten aus dem Nutzermenü** (`/profile`, `/teaching`) haben „Schließen“ (`schliessen`), das
+  auf die Startseite führt.
+- **Unterseiten** führen auf ihre Oberseite und nennen sie (`label="Einstellungen"`); die Bereiche
+  der Bibliothek führen auf `/knowledge`.
+- **Seiten mit `?back=`** setzen `href={rueckwegAus(…) ?? <Oberseite>}`.
+- **`echt`** nur dort, wo man von Seite zu Seite derselben Art geht (Baustein zu Baustein). Der
+  Klick geht dann per `history.back()`, sofern dieser Tab vorher eine Seite der Plattform gezeigt
+  hat; sonst gilt der Link.
+
 ### Pfade der Verwaltung
 
 Die Route-Gruppe `(admin)` bündelt die Admin-Seiten im Code: eigenes Layout, eigene Seitenleiste,
@@ -140,6 +156,11 @@ Der Wert stammt von wem auch immer den Link gebaut hat. Ungeprüft im `href` war
 Durchgelassen werden nur Pfade der Plattform. Der Wächter in `rueckweg.test.js` findet jedes
 ungeprüfte `searchParams.get('back')`. `lokalesZiel` (Rücksprung nach dem Login) folgt derselben
 Regel.
+
+Umgekehrt: Wer **auf** einen Baustein verlinkt, nimmt den Rückweg mit. Dafür gibt es
+`bausteinPfad(id, $page.url)`, allgemein `mitRueckweg(pfad, $page.url)`; beide hängen Pfad und
+Query der aktuellen Seite an (seit 0.48). Ein Wächter in `rueckweg.test.js` findet Links der Form
+`/knowledge/{id}` ohne Rückweg. Die wenigen Ausnahmen stehen dort mit Grund.
 
 Neue Routen brauchen eine `+page.js` (oder `+page.server.js`) mit mindestens:
 ```js

@@ -1,4 +1,6 @@
 <script>
+    import { bausteinPfad } from '$lib/rueckweg.js'
+    import { page } from '$app/stores'
     import { untrack } from 'svelte'
   import { goto } from '$app/navigation'
   import { getNeighborhood } from '$lib/api.js'
@@ -203,11 +205,11 @@
               transform="translate({node.x},{node.y})"
               onmouseenter={() => { hoveredId = node.id }}
               onmouseleave={() => { hoveredId = null }}
-              onclick={() => goto(`/knowledge/${node.id}`)}
+              onclick={() => goto(bausteinPfad(node.id, $page.url))}
               role="link"
               tabindex="0"
               aria-label={node.title}
-              onkeydown={(e) => { if (e.key === 'Enter') goto(`/knowledge/${node.id}`) }}
+              onkeydown={(e) => { if (e.key === 'Enter') goto(bausteinPfad(node.id, $page.url)) }}
               onfocus={() => { hoveredId = node.id }}
               onblur={() => { hoveredId = null }}
             >

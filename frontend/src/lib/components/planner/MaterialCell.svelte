@@ -1,4 +1,6 @@
 <script>
+  import { bausteinPfad } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   /**
    * Material-Zelle einer Phase: Kombination aus Freitext und Knoten-Verlinkung.
    *
@@ -117,7 +119,7 @@
       <span class="text-xs flex items-center gap-1">
         <span class="text-light-tx-2 dark:text-dark-tx-2" aria-hidden="true">📎</span>
         <a
-          href="/knowledge/{mat.node_id}"
+          href={bausteinPfad(mat.node_id, $page.url)}
           class="text-light-bl dark:text-dark-bl hover:underline truncate max-w-[140px]"
           title={mat.titel || mat.node_id}
         >{mat.titel || mat.node_id}</a>

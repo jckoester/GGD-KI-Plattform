@@ -1,4 +1,6 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
+    import { page } from "$app/stores";
     /**
      * Gleichnamiger Fachbegriff in einem anderen Fach (0.16, F7) — beim Speichern im Editor.
      *
@@ -24,7 +26,7 @@
                 {#each kollisionen as k (k.node_id)}
                     <li>
                         <a
-                            href={`/knowledge/${k.node_id}`}
+                            href={bausteinPfad(k.node_id, $page.url)}
                             target="_blank"
                             rel="noopener"
                             class="text-light-bl dark:text-dark-bl hover:underline">{k.titel}</a

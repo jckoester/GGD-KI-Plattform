@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from '$lib/components/ZurueckLink.svelte'
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
@@ -9,7 +10,6 @@
     import { faecherFiltern } from '$lib/curriculum_baender.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    import { ArrowLeft } from 'lucide-svelte'
     import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
 
@@ -96,13 +96,7 @@
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>
-                <a
-                    href="/knowledge"
-                    class="flex items-center gap-1 mb-2 text-sm text-light-tx-2 dark:text-dark-tx-2
-                         hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-                >
-                    <ArrowLeft class="w-4 h-4" /> Zurück zu Wissensdatenbank
-                </a>
+                <ZurueckLink href="/knowledge" label="Bibliothek" />
                 <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
                     Curricula
                 </h1>

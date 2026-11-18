@@ -1,4 +1,6 @@
 <script>
+  import { mitRueckweg } from "$lib/rueckweg.js";
+  import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { TriangleAlert } from "lucide-svelte";
@@ -121,13 +123,6 @@
   onMount(load);
 </script>
 
-<button
-  onclick={() => history.back()}
-  class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
-         hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-  ← Zurück
-</button>
 
 <div class="max-w-4xl mx-auto py-8">
   <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
@@ -248,7 +243,7 @@
               <td class="py-2 text-xs">
                 {#if f.active_request_status === "approved"}
                   <button
-                    onclick={() => goto(`/access-requests/${f.active_request_id}`)}
+                    onclick={() => goto(mitRueckweg(`/access-requests/${f.active_request_id}`, $page.url))}
                     class="text-light-gr dark:text-dark-gr hover:underline"
                   >
                     Einsehen

@@ -1,4 +1,6 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js"
+    import { page } from "$app/stores"
     /**
      * „Als Baustein speichern" — ein Formular, zwei Einstiege (UI-Notiz A5).
      *
@@ -158,7 +160,7 @@
             <div class="mt-5 flex justify-end gap-2">
                 {#if ergebnis?.node_id}
                     <a
-                        href="/knowledge/{ergebnis.node_id}"
+                        href={bausteinPfad(ergebnis.node_id, $page.url)}
                         class="px-3 py-1.5 text-sm rounded-lg
                                text-light-tx dark:text-dark-tx
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
@@ -212,7 +214,7 @@
                     <p class="text-sm text-light-tx dark:text-dark-tx">
                         Dieses Produkt ist bereits als
                         <a
-                            href="/knowledge/{vorschlag.vorhandener_baustein_id}"
+                            href={bausteinPfad(vorschlag.vorhandener_baustein_id, $page.url)}
                             class="text-light-bl dark:text-dark-bl underline"
                         >{vorschlag.vorhandener_baustein_titel}</a>
                         gespeichert. Speichern legt eine neue Fassung an; die bisherige

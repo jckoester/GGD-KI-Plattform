@@ -1,5 +1,6 @@
 <script>
-    import { ArrowLeft, CalendarDays, Copy, RefreshCw, Save } from "lucide-svelte";
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
+    import { CalendarDays, Copy, RefreshCw, Save } from "lucide-svelte";
     import { getHolidayProposal, applyHolidayProposal } from "$lib/api.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -84,12 +85,7 @@
 </script>
 
 <div class="max-w-4xl mx-auto p-6">
-    <a
-        href="/settings"
-        class="inline-flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4"
-    >
-        <ArrowLeft class="w-4 h-4" /> Einstellungen
-    </a>
+    <ZurueckLink href="/settings" label="Einstellungen" />
 
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-2 flex items-center gap-2">
         <CalendarDays class="w-5 h-5" /> Ferienkalender

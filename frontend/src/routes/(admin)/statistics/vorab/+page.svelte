@@ -1,7 +1,10 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
+    import { bausteinPfad } from "$lib/rueckweg.js";
+    import { page } from "$app/stores";
     import { onMount } from "svelte";
     import { getVorabStatistik } from "$lib/api.js";
-    import { ArrowLeft, ScanSearch, Download } from "lucide-svelte";
+    import { ScanSearch, Download } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import {
@@ -76,12 +79,7 @@
     <title>Vorab-Suche</title>
 </svelte:head>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/statistics" label="Statistiken" />
 
 <div class="max-w-5xl mx-auto py-8 space-y-6 text-light-tx dark:text-dark-tx">
     <div class="flex items-center gap-2">
@@ -270,7 +268,7 @@
                                 <tr class="border-t border-light-ui-3 dark:border-dark-ui-3">
                                     <td class="px-3 py-1.5">
                                         {#if k.titel}
-                                            <a href={`/knowledge/${k.node_id}`}
+                                            <a href={bausteinPfad(k.node_id, $page.url)}
                                                class="text-light-bl dark:text-dark-bl hover:underline">{k.titel}</a>
                                         {:else}
                                             <span class="italic text-light-tx-2 dark:text-dark-tx-2">nicht sichtbar</span>

@@ -1,4 +1,6 @@
 <script>
+  import { mitRueckweg } from "$lib/rueckweg.js";
+  import { page } from "$app/stores";
   import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -53,7 +55,7 @@
         await approveAccessRequest(id);
         refreshCrisisAlerts();
         // Freigegeben → direkt in die Einsicht (Zweitperson ist Beteiligte).
-        goto(`/access-requests/${id}`);
+        goto(mitRueckweg(`/access-requests/${id}`, $page.url));
         return;
       }
       await denyAccessRequest(id);
@@ -193,7 +195,7 @@
                 </span>
               </div>
               <button
-                onclick={() => goto(`/access-requests/${req.id}`)}
+                onclick={() => goto(mitRueckweg(`/access-requests/${req.id}`, $page.url))}
                 class="shrink-0 px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white
                        hover:bg-primary-dark dark:hover:bg-primary transition-colors"
               >

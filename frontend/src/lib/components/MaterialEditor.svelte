@@ -1,4 +1,6 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
+    import { page } from "$app/stores";
     /**
      * MaterialEditor — Textarea mit @-Autocomplete für Knoten-Referenzen.
      *
@@ -180,7 +182,7 @@
             <span class="shrink-0">Vorschau:</span>
             {#each previewParts as part}
                 {#if part.kind === "node"}
-                    <HinweisChip typ="material" text={part.label} href="/knowledge/{part.node_id}" />
+                    <HinweisChip typ="material" text={part.label} href={bausteinPfad(part.node_id, $page.url)} />
                 {:else if part.label.trim()}
                     {#each linkifyText(part.label) as sub}
                         {#if sub.kind === "url"}

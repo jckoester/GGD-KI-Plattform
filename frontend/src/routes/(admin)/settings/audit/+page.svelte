@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Audit-Log lesen (0.28, Plan Schritt 6, F5 „einfach halten“).
      *
@@ -7,7 +8,7 @@
      * dafür gibt es die 4-Augen-Wege. Ein Klick aufs Pseudonym filtert nach ihm.
      */
     import { onMount } from "svelte";
-    import { ArrowLeft, ChevronLeft, ChevronRight, ScrollText } from "lucide-svelte";
+    import { ChevronLeft, ChevronRight, ScrollText } from "lucide-svelte";
     import { getAuditKatalog, getAuditLog } from "$lib/api.js";
     import { datenText, zielText } from "$lib/auditanzeige.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -100,12 +101,7 @@
         "bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3 rounded px-2 py-1 text-light-tx dark:text-dark-tx";
 </script>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/settings" label="Einstellungen" />
 
 <div class="max-w-6xl mx-auto py-4 space-y-5">
     <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">

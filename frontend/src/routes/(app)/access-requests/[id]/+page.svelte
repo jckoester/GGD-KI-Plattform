@@ -1,9 +1,11 @@
 <script>
+  import ZurueckLink from "$lib/components/ZurueckLink.svelte";
+  import { rueckwegAus } from "$lib/rueckweg.js";
   import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { ArrowLeft, Download, CheckCircle } from "lucide-svelte";
+  import { Download, CheckCircle } from "lucide-svelte";
   import {
     getReaderConversation,
     exportReaderConversation,
@@ -28,6 +30,8 @@
   let stepUpAction = $derived(pendingIntent === "export" ? "export" : "read");
 
   let isAdmin = $derived($user?.roles?.includes("admin") ?? false);
+  // Zurück dorthin, woher man kam (`/flags` oder `/review`, 0.48); ohne Angabe je nach Rolle.
+  const zurueck = $derived(rueckwegAus($page.url.searchParams) ?? (isAdmin ? "/flags" : "/review"));
 
   // Fall-Abschluss (nur Admin)
   let showResolve = $state(false);
@@ -139,13 +143,7 @@
 </script>
 
 <PageBody>
-    <button
-      onclick={() => history.back()}
-      class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
-             hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-    >
-      <ArrowLeft class="w-4 h-4" /> Zurück
-    </button>
+    <ZurueckLink href={zurueck} />
 
     {#if loading}
       <div class="text-center py-12 text-light-tx-2 dark:text-dark-tx-2">Laden...</div>

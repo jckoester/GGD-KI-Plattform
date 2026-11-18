@@ -43,3 +43,24 @@ export function sichererRueckweg(wert) {
 export function rueckwegAus(params) {
     return sichererRueckweg(params?.get('back'))
 }
+
+/**
+ * Ein Pfad mit `?back=` auf die aktuelle Seite (Pfad **und** Query, 0.48).
+ *
+ * Konvention der Bibliothek: Wer in einen Baustein springt, nimmt den Weg zurück mit. Ohne ihn
+ * fällt „Zurück“ auf die Übersicht `/knowledge`, und Filter, Suche oder Planer-Ansicht der
+ * Herkunftsseite sind verloren.
+ *
+ * @param {string} pfad   Ziel, darf schon eine Query tragen
+ * @param {URL} url       die aktuelle Adresse (`$page.url`)
+ * @returns {string}
+ */
+export function mitRueckweg(pfad, url) {
+    const zurueck = encodeURIComponent(url.pathname + url.search)
+    return `${pfad}${pfad.includes('?') ? '&' : '?'}back=${zurueck}`
+}
+
+/** Link auf einen Baustein mit Rückweg auf die aktuelle Seite. */
+export function bausteinPfad(id, url) {
+    return mitRueckweg(`/knowledge/${id}`, url)
+}

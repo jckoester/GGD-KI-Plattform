@@ -1,7 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
-    import { PiggyBank, ArrowLeft, LoaderCircle } from 'lucide-svelte';
+    import { PiggyBank, LoaderCircle } from 'lucide-svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
     import WarningBanner from '$lib/components/WarningBanner.svelte';
     import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';
@@ -116,12 +116,6 @@
     <title>Budget-Einstellungen</title>
 </svelte:head>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
 
 <div class="max-w-4xl mx-auto py-8">
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">

@@ -1,4 +1,6 @@
 <script>
+  import { bausteinPfad } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   /**
    * Die Unterrichtsgruppen vergangener Schuljahre.
    *
@@ -154,7 +156,7 @@
                 {@const ziel =
                   knoten.content_type === 'unterrichtsstunde'
                     ? `/subjects/${$subjectMap[knoten.subject_id]?.slug ?? ''}/groups/${gruppe.group_id}/planner/lessons/${knoten.id}`
-                    : `/knowledge/${knoten.id}`}
+                    : bausteinPfad(knoten.id, $page.url)}
                 <a
                   href={ziel}
                   class="flex items-center gap-2 px-4 py-2 text-sm

@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { rueckwegAus, sichererRueckweg } from './rueckweg.js'
+import { bausteinPfad, mitRueckweg, rueckwegAus, sichererRueckweg } from './rueckweg.js'
 
 describe('sichererRueckweg', () => {
     it('lässt Pfade der Plattform samt Query und Anker durch', () => {
@@ -68,5 +68,46 @@ describe('Wächter: `back` nur über rueckwegAus', () => {
             .filter((pfad) => roh.test(readFileSync(pfad, 'utf8')))
             .map((pfad) => relative(SRC, pfad))
         expect(funde).toEqual([])
+    })
+})
+
+describe('mitRueckweg und bausteinPfad (0.48)', () => {
+    const url = new URL('http://x.invalid/knowledge/search?q=Optik&fach=3')
+
+    it('hängt Pfad und Query der aktuellen Seite an', () => {
+        expect(bausteinPfad('abc', url)).toBe('/knowledge/abc?back=%2Fknowledge%2Fsearch%3Fq%3DOptik%26fach%3D3')
+        expect(rueckwegAus(new URL(bausteinPfad('abc', url), 'http://x.invalid').searchParams))
+            .toBe('/knowledge/search?q=Optik&fach=3')
+    })
+
+    it('verträgt ein Ziel, das schon eine Query trägt', () => {
+        expect(mitRueckweg('/knowledge/abc?tab=2', url)).toMatch(/^\/knowledge\/abc\?tab=2&back=/)
+    })
+})
+
+describe('Wächter: Links auf einen Baustein tragen den Rückweg', () => {
+    // Ausnahmen, je mit Grund. Alles andere nimmt `bausteinPfad`.
+    const AUSNAHMEN = {
+        'lib/rueckweg.js': 'bausteinPfad selbst',
+        'lib/gruppenseite.js': 'reine Daten; GruppenUebersicht hängt den Rückweg beim Anzeigen an',
+        'lib/kontext_anzeige.js': 'Zweig ohne bekannten Rückweg; der Chat übergibt ihn',
+        'routes/(app)/knowledge/new/+page.svelte': 'nach dem Anlegen in den neuen Baustein',
+        'routes/(app)/knowledge/[id]/edit/+page.svelte': 'zurück in die Leseansicht, `back` wird durchgereicht',
+        'routes/(app)/knowledge/[id]/graph/+page.svelte': 'zurück zum Baustein, `back` wird durchgereicht',
+    }
+    const ohneRueckweg = /href="\/knowledge\/\{[^}]+\}"|\/knowledge\/\$\{[^}]+\}`/
+
+    it('keine Stelle verlinkt einen Baustein ohne ?back=', () => {
+        const funde = dateien(SRC)
+            .map((pfad) => relative(SRC, pfad))
+            .filter((rel) => !(rel in AUSNAHMEN))
+            .filter((rel) => ohneRueckweg.test(readFileSync(join(SRC, rel), 'utf8')))
+        expect(funde).toEqual([])
+    })
+
+    it('jede Ausnahme gibt es noch', () => {
+        for (const rel of Object.keys(AUSNAHMEN)) {
+            expect(ohneRueckweg.test(readFileSync(join(SRC, rel), 'utf8')), rel).toBe(true)
+        }
     })
 })

@@ -14,12 +14,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Geändert
 
 - „Alle Bausteine“ liegt jetzt unter `/knowledge/all`.
+- Wer aus Curriculum, Planer, Werkstatt, Gruppenseite, Archiv, Statistik oder einem Dialog in einen
+  Baustein springt, kommt mit „Zurück“ wieder dorthin, samt Suche und Filtern.
 - Das Archiv der Bibliothek ist wieder erreichbar, über die Übersicht.
 
 - Seitenleiste und Verwaltungs-Seitenleiste: Alle Einträge sind Links. Die ganze Zeile ist klickbar,
   Strg-Klick und „In neuem Tab öffnen“ funktionieren. In aufklappbaren Bereichen öffnet der Name die
   Seite, der Pfeil klappt nur auf und zu. Die aktuelle Seite ist hervorgehoben.
 - Statistik „Costs“ heißt „Kosten“.
+- Zurück führt überall an ein festes, genanntes Ziel statt „dorthin, wo man vorher war“:
+  - Unterseiten führen auf ihre Oberseite (Einstellungen, Statistiken, Bibliothek, Curricula, Profil).
+  - Die Einsicht in Krisen-Meldungen führt zurück auf Meldungen bzw. Freigaben.
+  - Die Infoseiten führen auf die Startseite.
+- Seiten mit eigenem Eintrag in der Seitenleiste (Einstellungen, Budget, Krisen-Meldungen, Statistiken,
+  Letzte Chats) haben kein Zurück mehr. Profil und Unterricht haben „Schließen“.
+- Von Baustein zu Baustein führt Zurück Schritt für Schritt zurück.
+- Der Assistenten-Editor heißt am × jetzt „Schließen“.
 
 ## [0.47.1] – 2026-11-18
 

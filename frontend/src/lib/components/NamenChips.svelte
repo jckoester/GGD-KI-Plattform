@@ -1,4 +1,6 @@
 <script>
+  import { bausteinPfad } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   /**
    * Begriffe oder Fachmethoden am Eintrag eines Curriculums (0.44, Päckchen AQ) — Chips mit
    * Eingabe. Logik in `$lib/curriculum_begriffe.js`.
@@ -128,7 +130,7 @@
         title={begriffe ? chipHinweis(a, { kannAnlegen: darfAnlegen }) : null}
         data-zustand={zustand}>
     {#if zustand === 'gefunden'}
-      <a href="/knowledge/{a.node_id}" class="hover:underline">{chipText(n, a)}</a>
+      <a href={bausteinPfad(a.node_id, $page.url)} class="hover:underline">{chipText(n, a)}</a>
     {:else if zustand === 'mehrdeutig' && editMode}
       <button type="button" class="hover:underline" onclick={() => (fassungWahl = fassungWahl === i ? null : i)}
               aria-expanded={fassungWahl === i}>{chipText(n, a)} ▾</button>

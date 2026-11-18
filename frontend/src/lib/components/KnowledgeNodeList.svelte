@@ -1,4 +1,5 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
     import { untrack } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
@@ -462,7 +463,7 @@
         <ul class="mb-2 space-y-0.5 text-light-tx-2 dark:text-dark-tx-2">
             {#each blockiertVon.referenzen as ref}
                 <li>
-                    <a href="/knowledge/{ref.id}" class="hover:underline">{ref.title}</a>
+                    <a href={bausteinPfad(ref.id, $page.url)} class="hover:underline">{ref.title}</a>
                     <span class="opacity-60 text-xs"> — {ref.relation}</span>
                 </li>
             {/each}
@@ -591,9 +592,7 @@
                         onclick={() =>
                             onNodeClick
                                 ? onNodeClick(node)
-                                : goto(
-                                      `/knowledge/${node.id}?back=${encodeURIComponent(window.location.pathname + window.location.search)}`,
-                                  )}
+                                : goto(bausteinPfad(node.id, $page.url))}
                     >
                         <!-- Titel mit Icon -->
                         <td

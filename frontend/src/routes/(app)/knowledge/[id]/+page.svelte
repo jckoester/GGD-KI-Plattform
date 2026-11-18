@@ -1,4 +1,6 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
+    import { bausteinPfad } from "$lib/rueckweg.js";
     import { rueckwegAus } from "$lib/rueckweg.js";
     import { untrack } from "svelte";
     import { getNeighborhood, deleteContextEdge } from "$lib/api.js";
@@ -29,7 +31,7 @@
     import { feldSchema } from "$lib/collections.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
-    import { ArrowLeft, Pencil, Check, X, Download } from "lucide-svelte";
+    import { Pencil, Check, X, Download } from "lucide-svelte";
     import { IMPORTIERBARE_TYPEN } from "$lib/fachbegriffe_import.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -319,13 +321,7 @@
      Typografie-Plugins (65 Zeichen); eine Definition über die volle Breite zu lesen
      ist mühsamer, nicht leichter. -->
 <PageBody>
-    <a
-        href={backUrl}
-        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
-             hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-    >
-        <ArrowLeft class="w-4 h-4" /> Zurück
-    </a>
+    <ZurueckLink href={backUrl} echt />
 
     {#if loadingNode}
         <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
@@ -506,7 +502,7 @@
                                 >{ref.relation}:</span
                             >
                             <a
-                                href="/knowledge/{ref.id}"
+                                href={bausteinPfad(ref.id, $page.url)}
                                 class="underline text-light-tx dark:text-dark-tx hover:text-primary dark:hover:text-primary-dark"
                             >
                                 {ref.title}
@@ -714,7 +710,7 @@
                                                 size={16}
                                             />
                                             <a
-                                                href="/knowledge/{eintrag.gegen.id}"
+                                                href={bausteinPfad(eintrag.gegen.id, $page.url)}
                                                 title={eintrag.kante.metadata
                                                     ?.hinweis ?? eintrag.gegen.title}
                                                 class="text-light-tx dark:text-dark-tx

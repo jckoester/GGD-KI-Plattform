@@ -1,4 +1,6 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
+    import { rueckwegAus } from "$lib/rueckweg.js";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import {
@@ -16,7 +18,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
-    import { ArrowLeft, FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
+    import { FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
 
     let curriculum = $state(null);
     const totalStd = $derived(curriculumStd(curriculum));
@@ -173,13 +175,7 @@
             <!-- Kopfzeile mit Metadaten und Aktionen -->
             <div class="flex items-center justify-between gap-4 mb-6">
                 <div>
-                    <a
-                        href="/knowledge/curricula"
-                        class="flex items-center gap-1 mb-2 text-sm text-light-tx-2 dark:text-dark-tx-2
-                             hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-                    >
-                        <ArrowLeft class="w-4 h-4" /> Zurück zu Curricula
-                    </a>
+                    <ZurueckLink href={rueckwegAus($page.url.searchParams) ?? "/knowledge/curricula"} label={rueckwegAus($page.url.searchParams) ? undefined : "Curricula"} />
                     <h1
                         class="text-2xl font-bold text-light-tx dark:text-dark-tx"
                     >

@@ -1,4 +1,6 @@
 <script>
+  import { mitRueckweg } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   import { allgemeineImFach, zurAnzeige } from '$lib/assistentenliste.js'
   /**
    * Die Übersicht einer Unterrichtsgruppe — für **beide** Rollen dieselbe Seite.
@@ -416,7 +418,7 @@
     <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
       {#each entstanden as eintrag (eintrag.art + eintrag.id)}
         <a
-          href={eintrag.href}
+          href={eintrag.art === 'baustein' ? mitRueckweg(eintrag.href, $page.url) : eintrag.href}
           class="flex items-center gap-3 px-4 py-2.5
                  border-b last:border-b-0 border-light-ui-2 dark:border-dark-ui-2
                  hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"

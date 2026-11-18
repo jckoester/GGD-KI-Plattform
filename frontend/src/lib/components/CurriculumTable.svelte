@@ -1,4 +1,5 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
     /**
      * Curriculum-Tabelle für Read-only und Edit-Darstellung
      *
@@ -430,7 +431,7 @@
 
     // Link zu einem Wissensknoten (Read-only-Ansicht von PK/IK)
     function nodeLink(nodeId) {
-        return `/knowledge/${nodeId}`;
+        return bausteinPfad(nodeId, $page.url);
     }
 
     // Volltext einer IK/PK aus den Refs der Lernsequenz (für title-Attribut)
@@ -1111,19 +1112,19 @@
                                                         <HinweisChip
                                                             typ="leitperspektive"
                                                             lp_code={part.label}
-                                                            href="/knowledge/{part.node_id}"
+                                                            href={bausteinPfad(part.node_id, $page.url)}
                                                         />
                                                     {:else if part.kind === "lpa"}
                                                         <HinweisChip
                                                             typ="leitperspektive_aspekt"
                                                             lp_code={part.label}
-                                                            href="/knowledge/{part.node_id}"
+                                                            href={bausteinPfad(part.node_id, $page.url)}
                                                         />
                                                     {:else if part.kind === "ik"}
                                                         <HinweisChip
                                                             typ="fach_bezug"
                                                             fach={part.label}
-                                                            href="/knowledge/{part.node_id}"
+                                                            href={bausteinPfad(part.node_id, $page.url)}
                                                         />
                                                     {:else if part.label.trim()}
                                                         <!-- Freitext als Markdown (URLs verlinkt marked/gfm selbst) -->
@@ -1155,7 +1156,7 @@
                                                             <HinweisChip
                                                                 typ="material"
                                                                 text={part.label}
-                                                                href="/knowledge/{part.node_id}"
+                                                                href={bausteinPfad(part.node_id, $page.url)}
                                                             />
                                                         {:else if part.label.trim()}
                                                             <!-- Freitext als Markdown (URLs verlinkt marked/gfm selbst) -->

@@ -1,7 +1,8 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount } from "svelte";
     import { getHeatmap, getStatsTeams, getStatsModels } from "$lib/api.js";
-    import { ArrowLeft, ChartColumn, ChevronLeft, ChevronRight } from "lucide-svelte";
+    import { ChartColumn, ChevronLeft, ChevronRight } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
 
@@ -57,12 +58,7 @@
     <title>Anzahl Prompts</title>
 </svelte:head>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/statistics" label="Statistiken" />
 
 <div class="max-w-2xl mx-auto py-8 space-y-6">
     <div class="flex items-center justify-between">

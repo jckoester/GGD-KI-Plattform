@@ -1,7 +1,8 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount, onDestroy, tick } from "svelte";
     import { getSpend, getStatsTeams, getStatsModels } from "$lib/api.js";
-    import { ArrowLeft, ReceiptEuro, LoaderCircle } from "lucide-svelte";
+    import { ReceiptEuro, LoaderCircle } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { token, beobachteModus } from "$lib/diagrammfarben.js";
@@ -164,12 +165,7 @@
     <title>Kosten</title>
 </svelte:head>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/statistics" label="Statistiken" />
 
 <div class="max-w-4xl mx-auto py-8 space-y-6">
     <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">

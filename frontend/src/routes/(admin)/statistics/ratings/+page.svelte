@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Antwortbewertung (0.31, Päckchen T, ADR-020): Daumen je Assistent oder Modell.
      *
@@ -8,7 +9,7 @@
      */
     import { onMount } from "svelte";
     import { getBewertungStatistik } from "$lib/api.js";
-    import { ArrowLeft, Download, ThumbsUp } from "lucide-svelte";
+    import { Download, ThumbsUp } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { kalenderwoche } from "$lib/vorabstatistik.js";
@@ -72,12 +73,7 @@
     <title>Antwortbewertung</title>
 </svelte:head>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/statistics" label="Statistiken" />
 
 <div class="max-w-5xl mx-auto py-8 space-y-6 text-light-tx dark:text-dark-tx">
     <div class="flex items-center gap-2">

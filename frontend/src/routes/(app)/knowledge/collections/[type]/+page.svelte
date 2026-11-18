@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Sammlungs-Liste (UI-Notiz A1) — **eine** Seite für alle Sammlungen.
      *
@@ -203,13 +204,7 @@
     {#if !config}
         <ErrorBanner message="Für „{typ}“ gibt es keine Sammlung." />
     {:else}
-        <a
-            href="/knowledge"
-            class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx
-                   dark:hover:text-dark-tx transition-colors mb-1 block"
-        >
-            ← Bibliothek
-        </a>
+        <ZurueckLink href="/knowledge" label="Bibliothek" />
 
         <div class="flex items-start justify-between gap-4 mb-4">
             <div>

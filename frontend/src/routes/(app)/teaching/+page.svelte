@@ -1,7 +1,8 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
-    import { ArrowLeft, Check, ChevronRight, Pencil, TriangleAlert, Trash2, X } from "lucide-svelte";
+    import { Check, ChevronRight, Pencil, TriangleAlert, Trash2, X } from "lucide-svelte";
     import {
         aktuelleTeachingGroups,
         fruehereTeachingGroups,
@@ -146,12 +147,7 @@
 </script>
 
 <PageBody>
-    <button
-        onclick={() => history.back()}
-        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-    >
-        <ArrowLeft class="w-4 h-4" /> Zurück
-    </button>
+    <ZurueckLink href="/welcome" schliessen />
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
             Unterricht

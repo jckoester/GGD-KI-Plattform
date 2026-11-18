@@ -1086,13 +1086,14 @@
         class="flex items-center justify-between p-4 border-b border-light-ui-3 dark:border-dark-ui-3"
     >
         <div class="flex items-center gap-2">
-            <button
-                onclick={() => goto(backUrl)}
+            <!-- Ein Link (0.48): Strg-Klick und Ziel beim Überfahren; × heißt „Schließen“. -->
+            <a
+                href={backUrl}
                 class="flex items-center gap-2 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
             >
                 <X class="w-4 h-4" />
-                Zurück
-            </button>
+                Schließen
+            </a>
             <span class="text-light-tx-2 dark:text-dark-tx-2">/</span>
             <Bot class="w-5 h-5 text-light-bl dark:text-dark-bl" />
             <h1 class="text-xl font-bold text-light-tx dark:text-dark-tx">

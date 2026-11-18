@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from '$lib/components/ZurueckLink.svelte'
     /**
      * Abdeckung über das Band und über die Fassung (0.46, Päckchen AP Teil B, Schritte 8 und 9).
      * Mit `band`: die IK des Bands über alle Curricula, die ihm zugeordnet sind (Einstieg am
@@ -17,7 +18,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import WarningBanner from '$lib/components/WarningBanner.svelte'
-    import { ArrowLeft, FileDown } from 'lucide-svelte'
+    import { FileDown } from 'lucide-svelte'
 
     // Wie die Curricula-Liste: nur Lehrkräfte und Admins.
     $effect(() => {
@@ -76,13 +77,7 @@
 
 <PageBody breit>
     <div class="mb-6">
-        <a
-            href="/knowledge/curricula"
-            class="flex items-center gap-1 mb-2 text-sm text-light-tx-2 dark:text-dark-tx-2
-                 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-        >
-            <ArrowLeft class="w-4 h-4" /> Zurück zu Curricula
-        </a>
+        <ZurueckLink href="/knowledge/curricula" label="Curricula" />
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
             {band ? 'IK-Abdeckung im Band' : 'PK-Abdeckung der Fassung'}
         </h1>

@@ -1,4 +1,5 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Fachbegriffe in **jedes** Fach einspielen (Admin, 0.15.2).
      *
@@ -15,7 +16,7 @@
      * zeigen.
      */
     import { onMount } from "svelte";
-    import { ArrowLeft, BookOpen, Download, Upload } from "lucide-svelte";
+    import { BookOpen, Download, Upload } from "lucide-svelte";
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
     import FachbegriffImportDialog from "$lib/components/FachbegriffImportDialog.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -50,12 +51,7 @@
 </script>
 
 <div class="max-w-5xl mx-auto p-6">
-    <a
-        href="/settings"
-        class="inline-flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4"
-    >
-        <ArrowLeft class="w-4 h-4" /> Einstellungen
-    </a>
+    <ZurueckLink href="/settings" label="Einstellungen" />
 
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-2 flex items-center gap-2">
         <BookOpen class="w-5 h-5" /> Fachbegriffe

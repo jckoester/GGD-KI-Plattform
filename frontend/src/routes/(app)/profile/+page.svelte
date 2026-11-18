@@ -1,6 +1,7 @@
 <script>
+    import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
-    import { User, Sun, Moon, Monitor, ArrowLeft, Check, ChevronRight, Eye } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, Check, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -153,12 +154,7 @@
     import EinrichtungEintrag from "$lib/components/EinrichtungEintrag.svelte";
 </script>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
+<ZurueckLink href="/welcome" schliessen />
 
 <PageBody>
         <div

@@ -8,7 +8,7 @@
     import { Loader2, Bot } from "lucide-svelte";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
-    import { History, ArrowLeft } from "lucide-svelte";
+    import { History } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -91,12 +91,6 @@
 
 <PageBody breit>
   <StufenHinweis eintrag="history" />
-    <button
-        onclick={() => history.back()}
-        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-    >
-        <ArrowLeft class="w-4 h-4" /> Zurück
-    </button>
 
     <div class="max-w-4xl mx-auto">
         <div

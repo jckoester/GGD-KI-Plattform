@@ -1,4 +1,7 @@
 <script>
+  import ZurueckLink from '$lib/components/ZurueckLink.svelte'
+  import { bausteinPfad } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   import { getContextNodes, deleteContextNode, reactivateContextNode } from '$lib/api.js'
   import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_ANCHOR_CONTENT_TYPES } from '$lib/taxonomy.js'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
@@ -113,11 +116,7 @@
 <PageBody breit>
   <div class="flex items-center justify-between mb-6">
     <div>
-      <a href="/knowledge"
-         class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx
-                transition-colors mb-1 block">
-        ← Bibliothek
-      </a>
+      <ZurueckLink href="/knowledge" label="Bibliothek" />
       <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">Archiv</h1>
     </div>
   </div>
@@ -133,7 +132,7 @@
       <ul class="mb-2 space-y-0.5 text-light-tx-2 dark:text-dark-tx-2">
         {#each blockiertVon.referenzen as ref}
           <li>
-            <a href="/knowledge/{ref.id}" class="hover:underline">{ref.title}</a>
+            <a href={bausteinPfad(ref.id, $page.url)} class="hover:underline">{ref.title}</a>
             <span class="opacity-60 text-xs"> — {ref.relation}</span>
           </li>
         {/each}
@@ -214,7 +213,7 @@
             <tr class="border-b border-light-ui-3 dark:border-dark-ui-3
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
               <td class="px-3 py-2">
-                <a href="/knowledge/{node.id}"
+                <a href={bausteinPfad(node.id, $page.url)}
                    class="text-light-tx dark:text-dark-tx font-medium hover:underline flex items-center gap-2">
                   <NodeTypeIcon category={node.category} contentType={node.content_type} size={16} />
                   {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}

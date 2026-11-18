@@ -1,4 +1,6 @@
 <script>
+  import { bausteinPfad } from '$lib/rueckweg.js'
+  import { page } from '$app/stores'
   /**
    * Einzelwert-Combobox für kontrolliertes Vokabular (Methode/Sozialform).
    * Pendant zur MaterialCell, aber Einzelwert statt Liste.
@@ -150,7 +152,7 @@
       ein Wechsel im selben Tab verlöre sie.
     -->
     <a
-      href={`/knowledge/${value.node_id}`}
+      href={bausteinPfad(value.node_id, $page.url)}
       target="_blank"
       rel="noopener"
       class="text-light-tx dark:text-dark-tx truncate max-w-[140px] underline

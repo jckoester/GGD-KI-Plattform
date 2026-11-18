@@ -22,7 +22,8 @@ describe("Verlinktes Vokabular im Stundenentwurf", () => {
         // nicht zur Erklärung — obwohl jede Methode eine Kurzbeschreibung trägt.
         const block = CHIP.slice(CHIP.indexOf("{#if isNode}"))
         const bis = block.slice(0, block.indexOf("{:else}"))
-        expect(bis).toMatch(/<a\s+href=\{`\/knowledge\/\$\{value\.node_id\}`\}/)
+        // Seit 0.48 mit Rückweg in den Planer (`bausteinPfad`).
+        expect(bis).toMatch(/<a\s+href=\{bausteinPfad\(value\.node_id, \$page\.url\)\}/)
     })
 
     it("⚠️ öffnet in einem neuen Tab", () => {

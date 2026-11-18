@@ -1,4 +1,5 @@
 <script>
+    import { bausteinPfad } from "$lib/rueckweg.js";
     import UebergangsHinweis from "$lib/components/UebergangsHinweis.svelte";
     import { WERKSTATT_NEUIGKEIT } from "$lib/neuigkeiten.js";
     import PageBody from '$lib/components/PageBody.svelte'
@@ -378,7 +379,7 @@
                      wüsste niemand, ob es sie schon gab. -->
                 {#if item.baustein_id}
                     <a
-                        href="/knowledge/{item.baustein_id}"
+                        href={bausteinPfad(item.baustein_id, $page.url)}
                         title="Zum Baustein „{item.baustein_titel}“"
                         class="mt-1 inline-flex items-center gap-1 self-start max-w-full
                                text-xs px-1.5 py-0.5 rounded-full
