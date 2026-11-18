@@ -118,6 +118,19 @@ info/[key]/     → statische Texte (impressum, datenschutz, regeln)
 
 Die vollständige Routen-Tabelle steht in `CLAUDE.md`.
 
+### Pfade der Verwaltung
+
+Die Route-Gruppe `(admin)` bündelt die Admin-Seiten im Code: eigenes Layout, eigene Seitenleiste,
+Rollenprüfung. In der Adresse taucht sie nicht auf. Für die Pfade gilt (festgelegt 18.11.2026, Päckchen N):
+
+| Art der Seite | Pfad | Beispiele |
+|---|---|---|
+| Verwaltung einer Funktion, die alle nutzen | `/<funktion>/manage` | `/assistants/manage`, `/feedback/manage` |
+| Was nur Admins kennen | flach auf der Wurzel | `/budget`, `/flags`, `/statistics/…`, `/settings/…` |
+
+Ein eigener Bereich `/admin/…` ist bewusst verworfen. Er brächte Ordnung in der Adresse, aber keinen
+Nutzen auf der Seite, und verlangte bei jedem Umzug Links, Doku, Weiterleitungen und neue Lesezeichen.
+
 ### Rückweg `?back=`
 
 Eine Seite, die den Weg zurück aus der Adresse übernimmt, liest `back` **nur** über
