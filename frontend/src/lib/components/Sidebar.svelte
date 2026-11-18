@@ -3,7 +3,6 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte';
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
-    import { goto } from "$app/navigation";
     import {
         Home,
         Plus,
@@ -42,6 +41,8 @@
     import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js"
     import { aufmerksamkeit, refreshAufmerksamkeit } from "$lib/stores/meineBausteine.js"
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
+    import SidebarLink from "./SidebarLink.svelte"
+    import SidebarBereich from "./SidebarBereich.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { getPlanungsgruppen } from "$lib/api.js";
     import { menueGruppen, mitBeschriftung, plannerPfad } from "$lib/planung_archiv.js";
@@ -60,6 +61,11 @@
 
     function toggle(key) {
         openSection = openSection === key ? null : key
+    }
+
+    // Der Name eines Bereichs öffnet ihn (und führt auf seine Seite); nur der Pfeil schließt.
+    function oeffne(key) {
+        openSection = key
     }
 
     // Assistenten-Sektion beim Navigieren auf /assistants/* auto-öffnen
@@ -113,9 +119,9 @@
         if (imPlaner) openSection = 'planning';
     });
 
-    // Wissensgraph-Sektion beim Navigieren auf /knowledge/* auto-öffnen
+    // Bibliothek beim Navigieren auf /knowledge[/*] auto-öffnen
     $effect(() => {
-        if ($page.url.pathname.startsWith('/knowledge/')) {
+        if ($page.url.pathname.startsWith('/knowledge')) {
             openSection = 'knowledge'
         }
     })
@@ -226,102 +232,66 @@
         <span class="ml-2 font-semibold {textClass}">{branding.name}</span>
     </div>
 
-    <!-- Sidebar-Inhalt -->
+    <!-- Sidebar-Inhalt. Seit 0.48 (Päckchen N) sind alle Einträge echte Links
+         (`SidebarLink`, `SidebarBereich`): ganze Zeile klickbar, Strg-Klick und neuer Tab
+         gehen, der Pfeil eines Bereichs klappt nur auf oder zu. -->
     <div class="flex-1 overflow-y-auto p-2">
         {#if $zeigtEintrag('welcome')}
     <!-- Startseite: der Tag auf einen Blick. Steht ganz oben, weil sie die Frage
          beantwortet, mit der man sich morgens anmeldet. -->
-            <button
-                onclick={() => goto("/welcome")}
-                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-            >
+            <SidebarLink href="/welcome" haupt aktiv={$page.url.pathname === '/welcome'}>
                 <Home class="w-4 h-4" />
                 Startseite
-            </button>
+            </SidebarLink>
         {/if}
 
         {#if $zeigtEintrag('chat')}
-    <!-- Neuer Chat Button -->
-            <button
-                onclick={() => goto("/chat")}
-                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-            >
+            <SidebarLink href="/chat" haupt>
                 <Plus class="w-4 h-4" />
                 Neuer Chat
-            </button>
+            </SidebarLink>
         {/if}
 
         {#if $zeigtEintrag('assistants')}
-    <!-- Assistenten -->
+    <!-- Assistenten: aufklappbar nur für Lehrkräfte (Meine, Verwalten, Freigaben). -->
             <div class="mt-2">
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {$page.url.pathname.startsWith('/assistants') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                <SidebarBereich
+                    href="/assistants"
+                    label="Assistenten"
+                    aufklappbar={istLehrkraft}
+                    offen={openSection === 'assistants'}
+                    ontoggle={() => toggle('assistants')}
+                    onnavigate={() => oeffne('assistants')}
+                    aktiv={$page.url.pathname.startsWith('/assistants')}
                 >
-                    <button onclick={() => { openSection = 'assistants'; goto('/assistants') }}>
-                        <span class="flex items-center gap-2">
-                            <Bot class="w-4 h-4" />
-                            Assistenten
-                        </span>
-                    </button>
-                    {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
-                        <button onclick={() => toggle('assistants')}>
-                            {#if openSection === 'assistants'}
-                                <ChevronDown class="w-4 h-4" />
-                            {:else}
-                                <ChevronRight class="w-4 h-4" />
-                            {/if}
-                        </button>
-                    {/if}
-                </div>
-                {#if openSection === 'assistants' && ($user?.roles.includes('teacher') || $user?.roles.includes('admin'))}
+                    <Bot class="w-4 h-4" />
+                    Assistenten
+                </SidebarBereich>
+                {#if openSection === 'assistants' && istLehrkraft}
                     <div class="mt-1 space-y-1 pl-5">
                         {#if $zeigtEintrag('assistants_my')}
-                        <button
-                            onclick={() => goto('/assistants/my')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname.startsWith('/assistants/my')
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
+                            <SidebarLink href="/assistants/my"
+                                aktiv={$page.url.pathname.startsWith('/assistants/my')}>
                                 <Pencil class="w-4 h-4" />
                                 Meine Assistenten
-                            </span>
-                        </button>
+                            </SidebarLink>
                         {/if}
                         {#if $user?.roles.includes('admin')}
-                            <button
-                                onclick={() => { goto('/assistants/manage'); refreshPendingCount(); }}
-                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                       {$page.url.pathname === '/assistants/manage'
-                                            ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                            >
-                                <span class="flex items-center gap-2">
-                                    <Settings class="w-4 h-4" />
-                                    Verwalten
-                                </span>
-                            </button>
+                            <SidebarLink href="/assistants/manage" onclick={refreshPendingCount}
+                                aktiv={$page.url.pathname === '/assistants/manage'}>
+                                <Settings class="w-4 h-4" />
+                                Verwalten
+                            </SidebarLink>
                             <!-- Offene Freigaben stehen seit 0.27 unter Einstellungen → Assistenten-Freigabe. -->
                             {#if $pendingCount > 0}
-                                <button
-                                    onclick={() => goto('/settings/assistants')}
-                                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                                >
-                                    <span class="flex items-center gap-2">
-                                        <Check class="w-4 h-4" />
-                                        Freigaben
-                                        <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
-                                             bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
-                                            {$pendingCount}
-                                        </span>
+                                <SidebarLink href="/settings/assistants">
+                                    <Check class="w-4 h-4" />
+                                    Freigaben
+                                    <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
+                                        {$pendingCount}
                                     </span>
-                                </button>
+                                </SidebarLink>
                             {/if}
                         {/if}
                     </div>
@@ -332,20 +302,15 @@
         {#if $zeigtEintrag('workshop')}
     <!-- Werkstatt (alle Rollen; bis 0.40 „Bibliothek“) -->
             <div class="mt-2">
-                <button
-                    onclick={() => goto('/workshop')}
-                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {$page.url.pathname.startsWith('/workshop') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
-                >
+                <SidebarLink href="/workshop" haupt aktiv={$page.url.pathname.startsWith('/workshop')}>
                     <Hammer class="w-4 h-4" />
                     Werkstatt
-                </button>
+                </SidebarLink>
             </div>
 
         {/if}
         {#if $zeigtEintrag('knowledge')}
-    <!-- Wissensgraph. Der Menüpunkt steht allen offen: Seine Landeseite ist die
+    <!-- Bibliothek. Der Menüpunkt steht allen offen: Seine Landeseite ist die
                  Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
                  Suchknopf im Chat ohnehin erreichen.
 
@@ -355,77 +320,48 @@
                  übrigen Unterpunkte (Meine und Alle Bausteine, Sammlungen, Curricula,
                  Bildungspläne, Leitperspektiven) bleiben Lehrkraft-Sache. -->
               <div class="mt-2">
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                <SidebarBereich
+                    href="/knowledge/search"
+                    label="Bibliothek"
+                    offen={openSection === 'knowledge'}
+                    ontoggle={() => toggle('knowledge')}
+                    onnavigate={() => oeffne('knowledge')}
+                    aktiv={$page.url.pathname.startsWith('/knowledge')}
                 >
-                    <button onclick={() => { toggle('knowledge'); goto('/knowledge/search') }}>
-                        <span class="flex items-center gap-2">
-                            <Library class="w-4 h-4" />
-                            Bibliothek
-                        </span>
-                    </button>
-                    <button onclick={() => toggle('knowledge')} aria-label="Bibliothek auf- oder zuklappen">
-                        {#if openSection === 'knowledge'}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </button>
-                </div>
+                    <Library class="w-4 h-4" />
+                    Bibliothek
+                </SidebarBereich>
                 {#if openSection === 'knowledge'}
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         <!-- Für alle Rollen: die Suche. „Meine Bausteine“ nur für Lehrkräfte (0.41). -->
-                        <button
-                            onclick={() => goto('/knowledge/search')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge/search'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <Search class="w-4 h-4" />
-                                Suche
-                            </span>
-                        </button>
+                        <SidebarLink href="/knowledge/search"
+                            aktiv={$page.url.pathname === '/knowledge/search'}>
+                            <Search class="w-4 h-4" />
+                            Suche
+                        </SidebarLink>
                         {#if istLehrkraft}
-                        <button
-                            onclick={() => goto('/knowledge/mine')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge/mine'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <FolderHeart class="w-4 h-4" />
-                                Meine Bausteine
-                                {#if $aufmerksamkeit.gesamt > 0}
-                                    <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
-                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye"
-                                         title="{$aufmerksamkeit.gesamt} Bausteine brauchen Aufmerksamkeit">
-                                        {$aufmerksamkeit.gesamt}
-                                    </span>
-                                {/if}
-                            </span>
-                        </button>
+                        <SidebarLink href="/knowledge/mine"
+                            aktiv={$page.url.pathname === '/knowledge/mine'}>
+                            <FolderHeart class="w-4 h-4" />
+                            Meine Bausteine
+                            {#if $aufmerksamkeit.gesamt > 0}
+                                <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                     bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye"
+                                     title="{$aufmerksamkeit.gesamt} Bausteine brauchen Aufmerksamkeit">
+                                    {$aufmerksamkeit.gesamt}
+                                </span>
+                            {/if}
+                        </SidebarLink>
                         {/if}
 
                         <!-- Ab hier Lehrkraft-Sache. Bewusst im selben Aufklapp-Container:
                              Zwei `transition:slide` nebeneinander liefen als zwei
                              Animationen ab und ruckelten sichtbar. -->
                         {#if istLehrkraft}
-                        <button
-                            onclick={() => goto('/knowledge')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <Database class="w-4 h-4" />
-                                Alle Bausteine
-                            </span>
-                        </button>
+                        <SidebarLink href="/knowledge" aktiv={$page.url.pathname === '/knowledge'}>
+                            <Database class="w-4 h-4" />
+                            Alle Bausteine
+                        </SidebarLink>
                         <!-- Sammlungen: gepflegte Bestände je Bausteinart. Die Liste
                              kommt aus der Taxonomie (`collection:`-Block) — eine neue
                              Sammlung erscheint hier ohne Code-Änderung. -->
@@ -433,60 +369,32 @@
                                     text-light-tx-3 dark:text-dark-tx-3">
                             Sammlungen
                         </div>
-                        {#each sidebarSammlungen() as s}
-                            <button
-                                onclick={() => goto(`/knowledge/collections/${s.typ}`)}
-                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                       {$page.url.pathname === `/knowledge/collections/${s.typ}`
-                                            ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                            >
-                                <span class="flex items-center gap-2">
-                                    <NodeTypeIcon contentType={s.typ} size={16} />
-                                    {s.label}
-                                </span>
-                            </button>
+                        {#each sidebarSammlungen() as s (s.typ)}
+                            <SidebarLink href={`/knowledge/collections/${s.typ}`}
+                                aktiv={$page.url.pathname === `/knowledge/collections/${s.typ}`}>
+                                <NodeTypeIcon contentType={s.typ} size={16} />
+                                {s.label}
+                            </SidebarLink>
                         {/each}
 
                         {#if $zeigtEintrag('curricula')}
-                        <button
-                            onclick={() => goto('/knowledge/curricula')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge/curricula'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <BookOpen class="w-4 h-4" />
-                                Curricula
-                            </span>
-                        </button>
+                        <SidebarLink href="/knowledge/curricula"
+                            aktiv={$page.url.pathname === '/knowledge/curricula'}>
+                            <BookOpen class="w-4 h-4" />
+                            Curricula
+                        </SidebarLink>
                         {/if}
                         {#if $zeigtEintrag('education_plans')}
-                        <button
-                            onclick={() => goto('/knowledge/education-plans')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge/education-plans'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <BookOpen class="w-4 h-4" />
-                                Bildungspläne
-                            </span>
-                        </button>
-                        <button
-                            onclick={() => goto('/knowledge/cross-cutting-themes')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/knowledge/cross-cutting-themes'
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <ShieldCheck class="w-4 h-4" />
-                                Leitperspektiven
-                            </span>
-                        </button>
+                        <SidebarLink href="/knowledge/education-plans"
+                            aktiv={$page.url.pathname === '/knowledge/education-plans'}>
+                            <BookOpen class="w-4 h-4" />
+                            Bildungspläne
+                        </SidebarLink>
+                        <SidebarLink href="/knowledge/cross-cutting-themes"
+                            aktiv={$page.url.pathname === '/knowledge/cross-cutting-themes'}>
+                            <ShieldCheck class="w-4 h-4" />
+                            Leitperspektiven
+                        </SidebarLink>
                         {/if}
                         {/if}
                     </div>
@@ -499,30 +407,17 @@
          Keine Liste aller Planungsknoten (Jan, F2). Seit 0.42.2 öffnet der Kopf die
          Übersicht `/planning` (Kacheln je Gruppe, Archiv abgesetzt). -->
               <div class="mt-2">
-                <!-- Wie „Meine Fächer“: Der Name öffnet die Übersicht (0.42.2) und klappt auf,
-                     der Pfeil klappt nur auf oder zu. -->
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {imPlaner ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                <SidebarBereich
+                    href="/planning"
+                    label="Planung"
+                    offen={openSection === 'planning'}
+                    ontoggle={() => toggle('planning')}
+                    onnavigate={() => oeffne('planning')}
+                    aktiv={imPlaner}
                 >
-                    <button onclick={() => { openSection = 'planning'; goto('/planning') }}>
-                        <span class="flex items-center gap-2">
-                            <CalendarRange class="w-4 h-4" />
-                            Planung
-                        </span>
-                    </button>
-                    <button
-                        onclick={() => toggle('planning')}
-                        aria-expanded={openSection === 'planning'}
-                        aria-label={openSection === 'planning' ? 'Planung zuklappen' : 'Planung aufklappen'}
-                    >
-                        {#if openSection === 'planning'}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </button>
-                </div>
+                    <CalendarRange class="w-4 h-4" />
+                    Planung
+                </SidebarBereich>
                 {#if openSection === 'planning'}
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
                         {#each planungsgruppen as g (g.id)}
@@ -530,32 +425,22 @@
                             {@const fach = $subjectMap[g.fach.id]}
                             <!-- Wie „Meine Fächer“: Fachsymbol in Fachfarbe. Beschriftung statt der
                                  Kennung aus dem Schulkonto; die steht im Tooltip. -->
-                            <button
-                                onclick={() => goto(pfad)}
+                            <SidebarLink href={pfad}
                                 title={g.beschriftung === g.name ? g.fach.name : `${g.fach.name} · ${g.name}`}
-                                class="w-full flex items-center gap-2 text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                       {$page.url.pathname.startsWith(pfad) ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                            >
+                                aktiv={$page.url.pathname.startsWith(pfad)}>
                                 <SubjectIcon name={fach?.icon ?? null} size={15} color={fach?.color ?? null} />
                                 <span class="flex-1 min-w-0 truncate">{g.beschriftung}</span>
-                            </button>
+                            </SidebarLink>
                         {:else}
                             <p class="px-3 py-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
                                 Keine Unterrichtsgruppe in diesem Schuljahr.
                             </p>
                         {/each}
-                        <button
-                            onclick={() => goto('/planning/archive')}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname.startsWith('/planning/archive') ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <Archive class="w-4 h-4" />
-                                Archiv
-                            </span>
-                        </button>
+                        <SidebarLink href="/planning/archive"
+                            aktiv={$page.url.pathname.startsWith('/planning/archive')}>
+                            <Archive class="w-4 h-4" />
+                            Archiv
+                        </SidebarLink>
                     </div>
                 {/if}
               </div>
@@ -564,24 +449,17 @@
         {#if $zeigtEintrag('subjects')}
     {#if $visibleSidebarSubjectSections.length > 0}
               <div class="mt-2">
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           {$page.url.pathname.startsWith('/subjects') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                <SidebarBereich
+                    href="/subjects"
+                    label="Meine Fächer"
+                    offen={subjectsOpen}
+                    ontoggle={toggleSubjects}
+                    onnavigate={() => { if (!subjectsOpen) openSection = 'subjects' }}
+                    aktiv={$page.url.pathname.startsWith('/subjects')}
                 >
-                    <button onclick={() => { toggleSubjects(); goto('/subjects') }}>
-                        <span class="flex items-center gap-2">
-                            <BookOpen size={16} />
-                            Meine Fächer
-                        </span>
-                    </button>
-                    <button onclick={toggleSubjects}>
-                        {#if subjectsOpen}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </button>
-                </div>
+                    <BookOpen size={16} />
+                    Meine Fächer
+                </SidebarBereich>
 
                 {#if subjectsOpen}
                     <div class="mt-1 space-y-1 pl-5" transition:slide={{ duration: 150 }}>
@@ -599,32 +477,19 @@
         {/if}
 
         {#if $zeigtEintrag('history')}
-    <!-- Letzte Chats Sektion -->
+    <!-- Letzte Chats: Kopf führt in den Verlauf, aufgeklappt die letzten Chats. -->
             <div class="mt-2">
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+                <SidebarBereich
+                    href="/history"
+                    label="Letzte Chats"
+                    offen={openSection === 'recent'}
+                    ontoggle={() => toggle('recent')}
+                    onnavigate={() => oeffne('recent')}
+                    aktiv={$page.url.pathname === '/history'}
                 >
-                    <button
-                        onclick={() => {
-                            openSection = 'recent';
-                            goto("/history");
-                        }}
-                    >
-                        <span class="flex items-center gap-2">
-                            <History class="w-4 h-4" />
-                            Letzte Chats
-                        </span>
-                    </button>
-                    <button onclick={() => toggle('recent')}>
-                        <span class="flex items-center gap-2">
-                            {#if openSection === 'recent'}
-                                <ChevronDown class="w-4 h-4" />
-                            {:else}
-                                <ChevronRight class="w-4 h-4" />
-                            {/if}
-                        </span>
-                    </button>
-                </div>
+                    <History class="w-4 h-4" />
+                    Letzte Chats
+                </SidebarBereich>
 
                 {#if openSection === 'recent'}
                     <div class="mt-1 space-y-1 pl-5">
@@ -635,17 +500,19 @@
                                 Noch keine Chats
                             </p>
                         {:else}
-                            {#each $recentConversations as conv}
+                            {#each $recentConversations as conv (conv.id)}
                                 {@const convColor = conv.subject_id != null
                                     ? ($subjectMap[conv.subject_id]?.color ?? null)
                                     : null}
-                                <button
-                                    onclick={() => goto(`/chat?id=${conv.id}`)}
-                                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors relative overflow-hidden
+                                <!-- Link und Menü nebeneinander statt verschachtelt: Ein Knopf
+                                     im Link wäre ungültiges HTML, und ein Klick ins Menü
+                                     öffnete sonst zugleich den Chat. -->
+                                <div
+                                    class="relative overflow-hidden flex items-center gap-1 pr-1 rounded-lg text-sm
+                                           text-light-tx dark:text-dark-tx transition-colors
                                            {conv.id === currentConversationId
                                         ? 'bg-light-ui-2 dark:bg-dark-ui-2'
-                                        : ''}"
+                                        : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
                                 >
                                     <!-- Farbstreifen links (nur wenn Fach mit Farbe) -->
                                     {#if convColor}
@@ -654,12 +521,12 @@
                                             style="background-color: {convColor}"
                                         ></span>
                                     {/if}
-                                    <div
-                                        class="flex justify-between items-center gap-1"
+                                    <a
+                                        href={`/chat?id=${conv.id}`}
+                                        aria-current={conv.id === currentConversationId ? 'page' : undefined}
+                                        class="flex-1 min-w-0 flex justify-between items-center gap-1 pl-3 py-2"
                                     >
-                                        <div
-                                            class="flex items-center gap-1 min-w-0"
-                                        >
+                                        <span class="flex items-center gap-1 min-w-0">
                                             {#if conv.assistant_name}
                                                 <Bot
                                                     class="w-3 h-3 shrink-0 text-light-bl dark:text-dark-bl"
@@ -679,22 +546,22 @@
                                             >
                                                 {conv.title ?? "Unbenannter Chat"}
                                             </span>
-                                        </div>
+                                        </span>
                                         <span
                                             class="text-xs text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap"
                                         >
                                             {formatDate(conv.last_message_at)}
                                         </span>
-                                        <ConversationMenu
-                                            conversationId={conv.id}
-                                            title={conv.title}
-                                            subject_id={conv.subject_id}
-                                            group_id={conv.group_id}
-                                            onDeleted={handleDeleted}
-                                            iconSize={12}
-                                        />
-                                    </div>
-                                </button>
+                                    </a>
+                                    <ConversationMenu
+                                        conversationId={conv.id}
+                                        title={conv.title}
+                                        subject_id={conv.subject_id}
+                                        group_id={conv.group_id}
+                                        onDeleted={handleDeleted}
+                                        iconSize={12}
+                                    />
+                                </div>
                             {/each}
                         {/if}
                     </div>

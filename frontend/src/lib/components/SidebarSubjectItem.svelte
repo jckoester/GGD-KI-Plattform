@@ -28,6 +28,7 @@
         : "/history"}
     <a
         href={ziel}
+        aria-current={section.slug && $page.url.pathname === ziel ? 'page' : undefined}
         class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors
                text-light-tx dark:text-dark-tx
                {section.slug && $page.url.pathname === ziel
@@ -46,13 +47,14 @@
     {@const isSubjectActive = $page.url.pathname.startsWith(`/subjects/${section.slug}`)}
     <!-- Lehrkraft-Kopfzeile: Link zum Fach + optionaler Chevron-Toggle -->
     <div
-        class="flex items-center gap-0 rounded-md transition-colors
+        class="flex items-stretch gap-0 rounded-md transition-colors
                {isSubjectActive
                  ? 'bg-light-ui-2 dark:bg-dark-ui-2'
                  : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
     >
         <a
             href={`/subjects/${section.slug}`}
+            aria-current={$page.url.pathname === `/subjects/${section.slug}` ? 'page' : undefined}
             class="flex items-center gap-2 flex-1 min-w-0 px-3 py-1.5 text-sm font-medium
                    text-light-tx dark:text-dark-tx"
         >
@@ -61,9 +63,13 @@
         </a>
         {#if section.groups.length > 0 || ($groupsConfig.allow_manual_teaching_groups && section.potentialGroups.length > 0)}
             <button
+                type="button"
                 onclick={ontoggle}
-                class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
-                aria-label={expanded ? "Zuklappen" : "Aufklappen"}
+                class="flex items-center px-2.5 rounded-r-md shrink-0 text-light-tx-2 dark:text-dark-tx-2
+                       hover:text-light-tx dark:hover:text-dark-tx
+                       hover:bg-light-ui-3/50 dark:hover:bg-dark-ui-3/50 transition-colors"
+                aria-expanded={expanded}
+                aria-label={`${section.name} ${expanded ? "zuklappen" : "aufklappen"}`}
             >
                 {#if expanded}
                     <ChevronDown size={14} />
@@ -79,15 +85,18 @@
             <!-- Bestätigte Gruppen -->
             {#each section.groups as group (group.groupId)}
                 {@const isGroupActive = $page.url.pathname === `/subjects/${section.slug}/groups/${group.groupId}`}
+                <!-- Die Einrückung liegt im Link, nicht im Rahmen — sonst reagierte der
+                     linke Rand der Zeile nicht (0.48). -->
                 <div
-                    class="flex items-center group/item pl-10 pr-1 rounded-md transition-colors
+                    class="flex items-center group/item pr-1 rounded-md transition-colors
                            {isGroupActive
                              ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
                              : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
                 >
                     <a
                         href={`/subjects/${section.slug}/groups/${group.groupId}`}
-                        class="flex items-center gap-2 flex-1 py-1.5 text-sm min-w-0
+                        aria-current={isGroupActive ? 'page' : undefined}
+                        class="flex items-center gap-2 flex-1 pl-10 py-1.5 text-sm min-w-0
                                text-light-tx-2 dark:text-dark-tx-2"
                     >
                         <span class="flex-1 truncate">{group.name}</span>

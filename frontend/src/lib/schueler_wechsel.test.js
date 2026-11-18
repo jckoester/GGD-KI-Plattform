@@ -37,7 +37,7 @@ describe("Schüler-Wechsel", () => {
 
     it("„Meine Bausteine“ in der Seitenleiste nur für Lehrkräfte", () => {
         const sidebar = lesen("components", "Sidebar.svelte")
-        const eintrag = sidebar.indexOf("goto('/knowledge/mine')")
+        const eintrag = sidebar.indexOf('href="/knowledge/mine"')
         const davor = sidebar.lastIndexOf("{#if", eintrag)
         expect(sidebar.slice(davor, eintrag)).toContain("{#if istLehrkraft}")
     })

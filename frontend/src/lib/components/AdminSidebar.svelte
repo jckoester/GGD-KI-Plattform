@@ -1,10 +1,7 @@
 <script>
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
-    import { goto } from "$app/navigation";
     import {
-        ChevronDown,
-        ChevronRight,
         ChevronLeft,
         Settings,
         CloudCog,
@@ -28,6 +25,8 @@
         ScrollText,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
+    import SidebarLink from "./SidebarLink.svelte";
+    import SidebarBereich from "./SidebarBereich.svelte";
     import { hasAnyRole } from "$lib/stores/user.js";
     import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import { onMount } from "svelte";
@@ -70,6 +69,22 @@
         openSection = $page.data.sidebarSection ?? "";
     });
 
+    const einstellungenOffen = $derived(
+        ["settings", "settings-texts", "settings-guardrail"].includes(openSection),
+    );
+
+    /** Genau diese Seite oder eine darunter. */
+    function istPfad(pfad) {
+        return $page.url.pathname === pfad || $page.url.pathname.startsWith(`${pfad}/`);
+    }
+
+    const TEXTE = [
+        { tab: "impressum", label: "Impressum", icon: Section },
+        { tab: "datenschutz", label: "Datenschutz", icon: ShieldBan },
+        { tab: "hilfe", label: "Hilfe", icon: FileQuestionMark },
+        { tab: "regeln", label: "Regeln", icon: TriangleAlert },
+    ];
+
     function toggleOpenSection(section) {
         if (openSection === section) {
             openSection = "";
@@ -106,24 +121,14 @@
         <span class="ml-2 font-semibold {textClass}">{branding.name}</span>
     </div>
 
-    <!-- Sidebar-Inhalt -->
+    <!-- Sidebar-Inhalt. Seit 0.48 echte Links wie in der App-Seitenleiste
+         (`SidebarLink`, `SidebarBereich`, Päckchen N). -->
     <div class="flex-1 overflow-y-auto p-2">
-        <!-- zurück zur App -->
         <div class="mt-2">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
-            >
-                <button
-                    onclick={() => {
-                        goto("/welcome");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <ChevronLeft class="w-4 h-4" />
-                        zurück zur App
-                    </span>
-                </button>
-            </div>
+            <SidebarLink href="/welcome" haupt>
+                <ChevronLeft class="w-4 h-4" />
+                Zurück zur App
+            </SidebarLink>
         </div>
 
         <!-- Assistenten: seit 0.27 unter Einstellungen (Plan F8 a) — Verwalten und Freigabe
@@ -132,224 +137,75 @@
         <!-- Einstellungen -->
         {#if $canSeeSettings}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+            <SidebarBereich
+                href="/settings"
+                label="Einstellungen"
+                offen={einstellungenOffen}
+                ontoggle={() => (openSection = einstellungenOffen ? "" : "settings")}
+                onnavigate={() => { if (!einstellungenOffen) openSection = "settings"; }}
+                aktiv={$page.url.pathname === "/settings"}
             >
-                <button
-                    onclick={() => {
-                        toggleOpenSection("settings");
-                        goto("/settings");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <Settings
-                            class="w-4 h-4 text-light-re dark:text-dark-re"
-                        />
-                        Einstellungen
-                    </span>
-                </button>
-                <button
-                    onclick={() => {
-                        if (
-                            openSection === "settings-texts" ||
-                            openSection === "settings" ||
-                            openSection === "settings-guardrail"
-                        ) {
-                            openSection = "";
-                        } else {
-                            openSection = "settings";
-                        }
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        {#if openSection === "settings" || openSection === "settings-texts" || openSection === "settings-guardrail"}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </span>
-                </button>
-            </div>
+                <Settings class="w-4 h-4 text-light-re dark:text-dark-re" />
+                Einstellungen
+            </SidebarBereich>
         </div>
-        {#if openSection === "settings" || openSection === "settings-texts" || openSection === "settings-guardrail"}
+        {#if einstellungenOffen}
             <div class="mt-1 space-y-1 pl-5">
-                <button
-                    onclick={() => goto(`/settings/models`)}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2">
-                            <CloudCog class="w-4 h4" />
-                            Modell-Freischaltung
+                <SidebarLink href="/settings/models" aktiv={istPfad("/settings/models")}>
+                    <CloudCog class="w-4 h-4" />
+                    Modell-Freischaltung
+                </SidebarLink>
+                <SidebarLink href="/assistants/manage" aktiv={istPfad("/assistants/manage")}>
+                    <Bot class="w-4 h-4" />
+                    Assistenten verwalten
+                </SidebarLink>
+                <SidebarLink href="/settings/assistants" aktiv={istPfad("/settings/assistants")}>
+                    <Check class="w-4 h-4" />
+                    Assistenten-Freigabe
+                    {#if $pendingCount > 0}
+                        <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                     bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
+                            {$pendingCount}
                         </span>
-                    </div>
-                </button>
-                <button
-                    onclick={() => goto('/assistants/manage')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <Bot class="w-4 h-4" />
-                        Assistenten verwalten
-                    </span>
-                </button>
-                <button
-                    onclick={() => goto('/settings/assistants')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <Check class="w-4 h-4" />
-                        Assistenten-Freigabe
-                        {#if $pendingCount > 0}
-                            <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
-                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
-                                {$pendingCount}
-                            </span>
-                        {/if}
-                    </span>
-                </button>
-                <button
-                    onclick={() => goto('/settings/guardrail')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <ShieldCheck class="w-4 h-4" />
-                        Guardrails
-                    </span>
-                </button>
-                <button
-                    onclick={() => goto('/settings/audit')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <ScrollText class="w-4 h-4" />
-                        Audit-Log
-                    </span>
-                </button>
-                <button
-                    onclick={() => goto('/settings/fachbegriffe')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <BookOpen class="w-4 h-4" />
-                        Fachbegriffe
-                    </span>
-                </button>
+                    {/if}
+                </SidebarLink>
+                <SidebarLink href="/settings/guardrail" aktiv={istPfad("/settings/guardrail")}>
+                    <ShieldCheck class="w-4 h-4" />
+                    Guardrails
+                </SidebarLink>
+                <SidebarLink href="/settings/audit" aktiv={istPfad("/settings/audit")}>
+                    <ScrollText class="w-4 h-4" />
+                    Audit-Log
+                </SidebarLink>
+                <SidebarLink href="/settings/fachbegriffe" aktiv={istPfad("/settings/fachbegriffe")}>
+                    <BookOpen class="w-4 h-4" />
+                    Fachbegriffe
+                </SidebarLink>
                 {#if $calendarConfigured}
-                <button
-                    onclick={() => goto('/settings/holidays')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <CalendarDays class="w-4 h-4" />
-                        Ferienkalender
-                    </span>
-                </button>
+                <SidebarLink href="/settings/holidays" aktiv={istPfad("/settings/holidays")}>
+                    <CalendarDays class="w-4 h-4" />
+                    Ferienkalender
+                </SidebarLink>
                 {/if}
-                <div
-                    class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                <SidebarBereich
+                    href="/settings/texts?tab=impressum"
+                    label="Texte"
+                    offen={openSection === "settings-texts"}
+                    ontoggle={() => (openSection = openSection === "settings-texts" ? "settings" : "settings-texts")}
+                    onnavigate={() => (openSection = "settings-texts")}
                 >
-                    <button
-                        onclick={() => {
-                            goto(`/settings/texts?tab=impressum`);
-                            openSection = "settings-texts";
-                        }}
-                    >
-                        <div class="flex justify-between items-center">
-                            <span class="flex items-center gap-2">
-                                <FileText class="w-4 h4" />
-                                Texte
-                            </span>
-                        </div>
-                    </button>
-                    <button
-                        onclick={() => {
-                            if (openSection === "settings-texts")
-                                openSection = "settings";
-                            else openSection = "settings-texts";
-                        }}
-                    >
-                        <span class="flex items-center gap-2">
-                            {#if openSection === "settings-texts"}
-                                <ChevronDown class="w-4 h-4" />
-                            {:else}
-                                <ChevronRight class="w-4 h-4" />
-                            {/if}
-                        </span>
-                    </button>
-                </div>
+                    <FileText class="w-4 h-4" />
+                    <span class="font-normal">Texte</span>
+                </SidebarBereich>
                 {#if openSection === "settings-texts"}
                     <div class="mt-1 space-y-1 pl-4">
-                        <button
-                            onclick={() =>
-                                goto(`/settings/texts?tab=impressum`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg
-                                   {openSection === 'settings-texts' &&
-                            $page.url.searchParams.get('tab') === 'impressum'
-                                ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
-                                : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'} transition-colors"
-                        >
-                            <div class="flex justify-between items-center">
-                                <span class="flex items-center gap-2">
-                                    <Section class="w-4 h4" />
-                                    Impressum
-                                </span>
-                            </div>
-                        </button>
-                        <button
-                            onclick={() =>
-                                goto(`/settings/texts?tab=datenschutz`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg
-                                   {openSection === 'settings-texts' &&
-                            $page.url.searchParams.get('tab') === 'datenschutz'
-                                ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
-                                : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'} transition-colors"
-                        >
-                            <div class="flex justify-between items-center">
-                                <span class="flex items-center gap-2">
-                                    <ShieldBan class="w-4 h4" />
-                                    Datenschutz
-                                </span>
-                            </div>
-                        </button>
-                        <button
-                            onclick={() => goto(`/settings/texts?tab=hilfe`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg
-                                   {openSection === 'settings-texts' &&
-                            $page.url.searchParams.get('tab') === 'hilfe'
-                                ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
-                                : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'} transition-colors"
-                        >
-                            <div class="flex justify-between items-center">
-                                <span class="flex items-center gap-2">
-                                    <FileQuestionMark class="w-4 h4" />
-                                    Hilfe
-                                </span>
-                            </div>
-                        </button>
-                        <button
-                            onclick={() => goto(`/settings/texts?tab=regeln`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg
-                                   {openSection === 'settings-texts' &&
-                            $page.url.searchParams.get('tab') === 'regeln'
-                                ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
-                                : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'} transition-colors"
-                        >
-                            <div class="flex justify-between items-center">
-                                <span class="flex items-center gap-2">
-                                    <TriangleAlert class="w-4 h4" />
-                                    Regeln
-                                </span>
-                            </div>
-                        </button>
+                        {#each TEXTE as t (t.tab)}
+                            <SidebarLink href={`/settings/texts?tab=${t.tab}`}
+                                aktiv={istPfad("/settings/texts") && $page.url.searchParams.get("tab") === t.tab}>
+                                <t.icon class="w-4 h-4" />
+                                {t.label}
+                            </SidebarLink>
+                        {/each}
                     </div>
                 {/if}
             </div>
@@ -359,179 +215,72 @@
         <!-- Krisen-Meldungen (operativer Bereich, nicht unter Einstellungen) -->
         {#if $canSeeSettings}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
-            >
-                <button
-                    onclick={() => {
-                        toggleOpenSection("flags");
-                        goto("/flags");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <TriangleAlert
-                            class="w-4 h-4 text-light-re dark:text-dark-re"
-                        />
-                        Krisen-Meldungen
-                    </span>
-                </button>
-            </div>
+            <SidebarLink href="/flags" haupt aktiv={istPfad("/flags")}>
+                <TriangleAlert class="w-4 h-4 text-light-re dark:text-dark-re" />
+                Krisen-Meldungen
+            </SidebarLink>
         </div>
         {/if}
 
         <!-- Rückmeldungen (operativer Bereich wie die Krisen-Meldungen) -->
         {#if $canSeeSettings}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
-            >
-                <button
-                    onclick={() => {
-                        toggleOpenSection("feedback");
-                        goto("/feedback/manage");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <Inbox class="w-4 h-4 text-light-bl dark:text-dark-bl" />
-                        Rückmeldungen
-                    </span>
-                </button>
+            <SidebarLink href="/feedback/manage" haupt aktiv={istPfad("/feedback/manage")}>
+                <Inbox class="w-4 h-4 text-light-bl dark:text-dark-bl" />
+                Rückmeldungen
                 {#if $offeneFeedbackCount > 0}
-                    <span class="text-xs font-semibold px-1.5 py-0.5 rounded-full
+                    <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
                                  bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl">
                         {$offeneFeedbackCount}
                     </span>
                 {/if}
-            </div>
+            </SidebarLink>
         </div>
         {/if}
 
         <!-- Statistiken -->
         {#if $canSeeStatistics}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+            <SidebarBereich
+                href="/statistics"
+                label="Statistiken"
+                offen={openSection === "statistics"}
+                ontoggle={() => toggleOpenSection("statistics")}
+                onnavigate={() => (openSection = "statistics")}
+                aktiv={$page.url.pathname === "/statistics"}
             >
-                <button
-                    onclick={() => {
-                        toggleOpenSection("statistics");
-                        goto("/statistics");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <ChartNoAxesCombined
-                            class="w-4 h-4 text-light-gr dark:text-dark-gr"
-                        />
-                        Statistiken
-                    </span>
-                </button>
-                <button
-                    onclick={() => {
-                        toggleOpenSection("statistics");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        {#if openSection === "statistics"}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </span>
-                </button>
-            </div>
+                <ChartNoAxesCombined class="w-4 h-4 text-light-gr dark:text-dark-gr" />
+                Statistiken
+            </SidebarBereich>
         </div>
         {#if openSection === "statistics"}
             <div class="mt-1 space-y-1 pl-5">
-                <button
-                    onclick={() => goto(`/statistics/prompts`)}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2">
-                            <ChartColumn class="w-4 h4" />
-                            Prompts
-                        </span>
-                    </div>
-                </button>
-            </div>
-            <div class="mt-1 space-y-1 pl-5">
-                <button
-                    onclick={() => goto(`/statistics/costs`)}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2">
-                            <ReceiptEuro class="w-4 h4" />
-                            Costs
-                        </span>
-                    </div>
-                </button>
-            </div>
-            <div class="mt-1 space-y-1 pl-5">
-                <button
-                    onclick={() => goto(`/statistics/vorab`)}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2">
-                            <ScanSearch class="w-4 h-4" />
-                            Vorab-Suche
-                        </span>
-                    </div>
-                </button>
-            </div>
-            <div class="mt-1 space-y-1 pl-5">
-                <button
-                    onclick={() => goto(`/statistics/ratings`)}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <div class="flex justify-between items-center">
-                        <span class="flex items-center gap-2">
-                            <ThumbsUp class="w-4 h-4" />
-                            Antwortbewertung
-                        </span>
-                    </div>
-                </button>
+                <SidebarLink href="/statistics/prompts" aktiv={istPfad("/statistics/prompts")}>
+                    <ChartColumn class="w-4 h-4" />
+                    Prompts
+                </SidebarLink>
+                <SidebarLink href="/statistics/costs" aktiv={istPfad("/statistics/costs")}>
+                    <ReceiptEuro class="w-4 h-4" />
+                    Kosten
+                </SidebarLink>
+                <SidebarLink href="/statistics/vorab" aktiv={istPfad("/statistics/vorab")}>
+                    <ScanSearch class="w-4 h-4" />
+                    Vorab-Suche
+                </SidebarLink>
+                <SidebarLink href="/statistics/ratings" aktiv={istPfad("/statistics/ratings")}>
+                    <ThumbsUp class="w-4 h-4" />
+                    Antwortbewertung
+                </SidebarLink>
             </div>
         {/if}
         {/if}
         <!--Budget-->
         {#if $canSeeBudget}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
-            >
-                <button
-                    onclick={() => {
-                        toggleOpenSection("budget");
-                        goto("/budget");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        <PiggyBank
-                            class="w-4 h-4 text-light-ma dark:text-dark-ma"
-                        />
-                        Budget
-                    </span>
-                </button>
-                <!--<button
-                    onclick={() => {
-                        toggleOpenSection("budget");
-                    }}
-                >
-                    <span class="flex items-center gap-2">
-                        {#if openSection === "budget"}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </span>
-                </button>-->
-            </div>
+            <SidebarLink href="/budget" haupt aktiv={istPfad("/budget")}>
+                <PiggyBank class="w-4 h-4 text-light-ma dark:text-dark-ma" />
+                Budget
+            </SidebarLink>
         </div>
         {/if}
     </div>

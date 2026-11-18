@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Seitenleiste und Verwaltungs-Seitenleiste: Alle Einträge sind Links. Die ganze Zeile ist klickbar,
+  Strg-Klick und „In neuem Tab öffnen“ funktionieren. In aufklappbaren Bereichen öffnet der Name die
+  Seite, der Pfeil klappt nur auf und zu. Die aktuelle Seite ist hervorgehoben.
+- Statistik „Costs“ heißt „Kosten“.
+
 ## [0.47.1] – 2026-11-18
 
 ### Behoben

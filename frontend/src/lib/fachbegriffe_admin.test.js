@@ -49,7 +49,7 @@ describe("Wege dorthin", () => {
     })
 
     it("Eintrag in der Admin-Seitenleiste", () => {
-        expect(lies("lib/components/AdminSidebar.svelte")).toMatch(/goto\('\/settings\/fachbegriffe'\)/)
+        expect(lies("lib/components/AdminSidebar.svelte")).toContain('href="/settings/fachbegriffe"')
     })
 })
 

@@ -157,7 +157,7 @@ describe('Verdrahtung', () => {
         expect(sidebar).toContain('mitBeschriftung(menueGruppen(')
         expect(sidebar).toContain('{g.beschriftung}')
         expect(sidebar).toMatch(/<SubjectIcon name=\{fach\?\.icon/)
-        expect(sidebar).toContain("goto('/planning/archive')")
+        expect(sidebar).toContain('href="/planning/archive"')
     })
 
     it('Übersicht /planning (0.42.2): Kacheln je Gruppe wie im Menü, Archiv abgesetzt; der Kopf führt hin', () => {
@@ -165,7 +165,7 @@ describe('Verdrahtung', () => {
         expect(seite).toContain('mitBeschriftung(menueGruppen(')
         expect(seite).toContain('plannerPfad(g)')
         expect(seite).toContain('archivPfad()')
-        expect(quelle('lib/components/Sidebar.svelte')).toContain("goto('/planning')")
+        expect(quelle('lib/components/Sidebar.svelte')).toContain('href="/planning"')
     })
 
     it('Stundenentwurf im Lesezustand führt zurück ins Archiv, nicht in den Planer', () => {
