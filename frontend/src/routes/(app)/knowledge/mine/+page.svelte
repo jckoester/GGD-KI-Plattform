@@ -219,8 +219,8 @@
   const schluessel = (abschnitt) => String(abschnitt.subject_id ?? 'ohne-fach')
 
   // Wohin die Detailansicht zurückführt. Konvention im Wissensgraphen: `?back=` mit
-  // Pfad **und** Query — ohne ihn landet der Zurück-Weg auf `/knowledge`, das
-  // Schüler:innen gar nicht offensteht.
+  // Pfad **und** Query — ohne ihn landet der Zurück-Weg auf der Übersicht `/knowledge`,
+  // und Filter und Auswahl hier sind verloren.
   const rueckweg = $derived(
     encodeURIComponent($page.url.pathname + $page.url.search),
   )

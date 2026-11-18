@@ -208,7 +208,7 @@ describe('wo die Dateiwerkzeuge stehen', () => {
   const fach = { id: 1, slug: 'chemie', name: 'Chemie' }
 
   it('nur mit Fach', () => {
-    // ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge` ganz ohne Fach. Dort wäre
+    // ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge/all` ganz ohne Fach. Dort wäre
     // der Knopf ein Versprechen, das das Backend nicht halten kann — und der
     // Komponente sieht man das nicht an.
     expect(zeigeDateiwerkzeuge(null, ['teacher'])).toBe(false)
@@ -254,7 +254,7 @@ describe('die Regel hängt auch wirklich am Knopf', () => {
     expect(start).toBeGreaterThan(-1)
     const ende = quelle.indexOf('{/if}', start)
     const block = quelle.slice(start, ende)
-    // Unter `/knowledge` gibt es kein Fach: `importFach.name` im Titel liefe dort auf
+    // Unter `/knowledge/all` gibt es kein Fach: `importFach.name` im Titel liefe dort auf
     // `null` und risse die Seite mit.
     expect(block).toContain('Aus Dateien')
     expect(block).toContain('Als Zip')

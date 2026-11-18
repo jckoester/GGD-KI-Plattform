@@ -259,7 +259,7 @@ Drei Gründe, der mittlere ist der schwerste:
    Schüler:innen offen.
 
 ⚠️ **Der Knopf hängt an einem Prop, nicht am Einbau.** `KnowledgeNodeList` steht auch
-unter `/knowledge` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe, nicht
+unter `/knowledge/all` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe, nicht
 die Fachschaft). Nur die Fachseite gibt `importFach` mit; die Regel steht in
 `zeigeDateiwerkzeuge()`. Dass die Komponente sie **benutzt**, prüft eine
 Quelltextprüfung in `fachbegriffe_import.test.js` — das Projekt hat keine

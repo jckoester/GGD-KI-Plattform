@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { bibliothekBereiche } from './bibliothek_bereiche.js'
 
 const KOMPONENTEN = join(dirname(fileURLToPath(import.meta.url)), 'components')
 const lies = (name) => readFileSync(join(KOMPONENTEN, name), 'utf8')
@@ -53,5 +54,30 @@ describe('Seitenleisten aus Links', () => {
         const letzterLink = quelle.lastIndexOf('<a', menue)
         const letztesEnde = quelle.lastIndexOf('</a>', menue)
         expect(letztesEnde).toBeGreaterThan(letzterLink)
+    })
+})
+
+describe('Übersicht der Bibliothek (0.48)', () => {
+    const alle = bibliothekBereiche({ istLehrkraft: true, zeigt: () => true })
+
+    it('Schüler:innen bekommen keine Kacheln, nur die Suche', () => {
+        expect(bibliothekBereiche({ istLehrkraft: false, zeigt: () => true })).toEqual([])
+    })
+
+    it('Stufen blenden Curricula und Bildungspläne aus wie in der Seitenleiste', () => {
+        const pfade = bibliothekBereiche({ istLehrkraft: true, zeigt: () => false }).map((b) => b.href)
+        expect(pfade).toEqual(['/knowledge/mine', '/knowledge/all', '/knowledge/archive'])
+    })
+
+    it('jede Kachel außer dem Archiv steht auch in der Seitenleiste', () => {
+        // Das Archiv hatte vor 0.48 gar keinen Zugang mehr; es bekommt ihn über die Übersicht.
+        const sidebar = lies('Sidebar.svelte')
+        for (const { href } of alle.filter((b) => b.href !== '/knowledge/archive')) {
+            expect(sidebar, href).toContain(`href="${href}"`)
+        }
+    })
+
+    it('der Kopf „Bibliothek“ führt auf die Übersicht', () => {
+        expect(lies('Sidebar.svelte')).toMatch(/<SidebarBereich\s+href="\/knowledge"\s+label="Bibliothek"/)
     })
 })

@@ -5,7 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Übersicht der Bibliothek unter `/knowledge`: Suche mit Bausteinart, Fach und Stufe, darunter für
+  Lehrkräfte eine Kachel je Bereich (Meine und Alle Bausteine, Curricula, Bildungspläne,
+  Leitperspektiven, Archiv, Sammlungen). „Bibliothek“ in der Seitenleiste führt dorthin.
+
 ### Geändert
+
+- „Alle Bausteine“ liegt jetzt unter `/knowledge/all`.
+- Das Archiv der Bibliothek ist wieder erreichbar, über die Übersicht.
 
 - Seitenleiste und Verwaltungs-Seitenleiste: Alle Einträge sind Links. Die ganze Zeile ist klickbar,
   Strg-Klick und „In neuem Tab öffnen“ funktionieren. In aufklappbaren Bereichen öffnet der Name die

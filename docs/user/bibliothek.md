@@ -6,6 +6,23 @@
 
 Die Bibliothek ist eine Sammlung von Wissensbausteinen, die du einer Chat-Unterhaltung gezielt hinzufügen kannst. Die KI liest diese Bausteine beim Antworten mit und kann so präzisere, inhaltlich passendere Antworten geben.
 
+## Die Übersicht
+
+Ein Klick auf **Bibliothek** in der Seitenleiste öffnet die Übersicht. Oben steht die Suche mit
+Bausteinart, Fach und Stufe. „Suchen“ führt auf die Ergebnisseite. Als Lehrkraft findest du darunter
+eine Kachel je Bereich:
+
+- Meine Bausteine
+- Alle Bausteine
+- Curricula
+- Bildungspläne
+- Leitperspektiven
+- das Archiv
+- die Sammlungen
+
+Curricula, Bildungspläne und Leitperspektiven erscheinen erst ab der Darstellungsstufe, die sie
+zeigt. Aus den Bereichen führt „Zurück“ wieder auf die Übersicht.
+
 > **Was die Suche zusagt — und was nicht.** Sie antwortet in getrennten Abschnitten, und
 > der Unterschied ist wichtig:
 >

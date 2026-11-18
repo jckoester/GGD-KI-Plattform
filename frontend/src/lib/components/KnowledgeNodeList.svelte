@@ -42,7 +42,7 @@
          * Das Fach, in das Fachbegriffe eingespielt werden dürfen — oder `null`.
          *
          * ⚠️ **Ein Prop, kein fester Einbau.** Dieselbe Komponente steht unter
-         * `/knowledge` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe,
+         * `/knowledge/all` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe,
          * nicht die Fachschaft). Nur die Fachseite gibt es mit; die Regel dahinter
          * steht in `zeigeDateiwerkzeuge()`.
          */

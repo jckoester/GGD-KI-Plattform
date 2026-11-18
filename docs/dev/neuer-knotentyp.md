@@ -360,7 +360,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
   deckt heute alle 42 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
-  der Typ in der freien `/knowledge`-Liste auf.
+  der Typ in der freien Liste `/knowledge/all` auf.
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
   in der Taxonomie (Schritt 3), und `NodeTypeIcon.svelte` liest nur noch die daraus
   erzeugte `node_icons.js`.

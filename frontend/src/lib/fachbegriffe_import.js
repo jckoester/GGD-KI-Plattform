@@ -25,7 +25,7 @@ export const IMPORTIERBARE_TYPEN = ["begriff", "stoffsteckbrief"];
  *
  * 1. **Ein Fach muss feststehen.** Die Werkzeuge gehören einer Fachschaft; ohne Fach
  *    wüsste weder die Oberfläche, wohin, noch das Backend, wessen Rechte zu prüfen
- *    sind. ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge` ganz ohne Fach — dort
+ *    sind. ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge/all` ganz ohne Fach — dort
  *    darf der Knopf nicht auftauchen, und das sieht man der Komponente nicht an.
  * 2. **Lehrkraft.** Die Sammlungen stehen auch Schüler:innen offen; das Einspielen
  *    nicht. (Admin ist eine Erweiterung der Lehrkraft-Rolle, siehe CLAUDE.md — deshalb

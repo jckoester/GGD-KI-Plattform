@@ -16,7 +16,7 @@
      *
      * **Zwei Muster:**
      *
-     * - **`breit`** — Listen über die volle Breite (Vorbild `/knowledge`).
+     * - **`breit`** — Listen über die volle Breite (Vorbild `/knowledge/all`).
      *   Tabellen und Trefferlisten brauchen den Platz.
      * - **Vorgabe (schmal)** — alles, was gelesen oder ausgefüllt wird: Detail,
      *   Editoren, gruppierte Listen wie Leitperspektiven und Bildungsplan

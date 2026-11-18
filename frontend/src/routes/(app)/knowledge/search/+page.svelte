@@ -11,10 +11,8 @@
      */
     import {
         ChevronRight,
-        Loader2,
         MessageSquarePlus,
         Pin,
-        Search,
         Waypoints,
     } from "lucide-svelte";
     import { goto } from "$app/navigation";
@@ -22,6 +20,7 @@
     import { onMount } from "svelte";
 
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
+    import BibliothekSuchformular from "$lib/components/BibliothekSuchformular.svelte";
     import StufenHinweis from '$lib/components/StufenHinweis.svelte';
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -33,10 +32,7 @@
     // Dieselben Abschnittstitel wie im Vorschlagsfenster des Chats: Derselbe Umschlag
     // darf an zwei Stellen nicht verschieden heißen.
     import { ABSCHNITT_TITEL } from "$lib/umschlag.js";
-    import { bibliothekTypLabels } from "$lib/knotentypen.js";
-    import { STUDENT_GRADES } from "$lib/grades.js";
     import { activeConversationId, pageTitle } from "$lib/stores/pageTitle.js";
-    import { subjects } from "$lib/stores/subjects.js";
     import { user } from "$lib/stores/user.js";
 
     pageTitle.set("Suche");
@@ -234,80 +230,15 @@
                 Durchsucht die Bibliothek nach Namen und nach Thema.
             </p>
 
-            <form onsubmit={(e) => { e.preventDefault(); suchen(); }} class="space-y-3">
-                <div class="flex gap-2">
-                    <input
-                        type="search"
-                        bind:value={frage}
-                        placeholder="Suchbegriff oder ganze Frage"
-                        aria-label="Suchbegriff"
-                        class="flex-1 px-3 py-2 rounded-lg text-sm
-                               bg-light-bg-2 dark:bg-dark-bg-2
-                               text-light-tx dark:text-dark-tx
-                               border border-light-ui-3 dark:border-dark-ui-3"
-                    />
-                    <button
-                        type="submit"
-                        disabled={laeuft || !frage.trim()}
-                        class="px-4 py-2 rounded-lg text-sm bg-primary dark:bg-primary-dark text-white
-                               hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed
-                               flex items-center gap-2"
-                    >
-                        {#if laeuft}
-                            <Loader2 class="w-4 h-4 animate-spin" />
-                        {:else}
-                            <Search class="w-4 h-4" />
-                        {/if}
-                        Suchen
-                    </button>
-                </div>
-
-                <!-- Facetten: Verfeinerung des Ergebnisses, nicht Vorbedingung. Sie sind
-                     deshalb optional und lösen zusätzlich die gezählte Aufzählung aus. -->
-                <div class="flex flex-wrap gap-2 text-sm">
-                    <select
-                        bind:value={typ}
-                        onchange={() => gesucht && suchen()}
-                        aria-label="Bausteinart"
-                        class="pl-3 pr-9 py-1.5 text-sm rounded-md
-                               border border-light-ui-3 dark:border-dark-ui-3
-                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
-                    >
-                        <option value="">Alle Bausteinarten</option>
-                        {#each bibliothekTypLabels(typ) as [wert, label]}
-                            <option value={wert}>{label}</option>
-                        {/each}
-                    </select>
-
-                    <select
-                        bind:value={fachId}
-                        onchange={() => gesucht && suchen()}
-                        aria-label="Fach"
-                        class="pl-3 pr-9 py-1.5 text-sm rounded-md
-                               border border-light-ui-3 dark:border-dark-ui-3
-                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
-                    >
-                        <option value="">Alle Fächer</option>
-                        {#each $subjects as fach}
-                            <option value={fach.id}>{fach.name}</option>
-                        {/each}
-                    </select>
-
-                    <select
-                        bind:value={stufe}
-                        onchange={() => gesucht && suchen()}
-                        aria-label="Jahrgangsstufe"
-                        class="pl-3 pr-9 py-1.5 text-sm rounded-md
-                               border border-light-ui-3 dark:border-dark-ui-3
-                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
-                    >
-                        <option value="">Alle Stufen</option>
-                        {#each STUDENT_GRADES as k}
-                            <option value={k}>Klasse {k}</option>
-                        {/each}
-                    </select>
-                </div>
-            </form>
+            <BibliothekSuchformular
+                bind:frage
+                bind:typ
+                bind:fachId
+                bind:stufe
+                {laeuft}
+                onsuchen={suchen}
+                onfacette={() => gesucht && suchen()}
+            />
 
             {#if fehler}
                 <div class="mt-4"><ErrorBanner message={fehler} /></div>
@@ -452,7 +383,7 @@
         </div>
         <!-- Trennlinien statt Abstand: Bei voller Breite laufen die Zeilen sonst
              ineinander, weil zwischen Titel links und Aktionen rechts viel Leere
-             steht. `/knowledge` trennt seine Tabellenzeilen genauso. -->
+             steht. `/knowledge/all` trennt seine Tabellenzeilen genauso. -->
         <ul class="divide-y divide-light-ui-2 dark:divide-dark-ui-2
                    border-y border-light-ui-2 dark:border-dark-ui-2">
             {#each treffer as knoten (knoten.node_id)}

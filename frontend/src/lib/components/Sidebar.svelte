@@ -310,8 +310,8 @@
 
         {/if}
         {#if $zeigtEintrag('knowledge')}
-    <!-- Bibliothek. Der Menüpunkt steht allen offen: Seine Landeseite ist die
-                 Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
+    <!-- Bibliothek. Der Menüpunkt steht allen offen: Seine Landeseite ist seit 0.48 die
+                 Übersicht `/knowledge` (Suche und Kacheln), und die Suche durchsucht denselben Bestand, den Schüler:innen über den
                  Suchknopf im Chat ohnehin erreichen.
 
                  Seit AP7 ist die Sektion **für alle Rollen** aufklappbar. Schüler:innen
@@ -321,7 +321,7 @@
                  Bildungspläne, Leitperspektiven) bleiben Lehrkraft-Sache. -->
               <div class="mt-2">
                 <SidebarBereich
-                    href="/knowledge/search"
+                    href="/knowledge"
                     label="Bibliothek"
                     offen={openSection === 'knowledge'}
                     ontoggle={() => toggle('knowledge')}
@@ -358,7 +358,7 @@
                              Zwei `transition:slide` nebeneinander liefen als zwei
                              Animationen ab und ruckelten sichtbar. -->
                         {#if istLehrkraft}
-                        <SidebarLink href="/knowledge" aktiv={$page.url.pathname === '/knowledge'}>
+                        <SidebarLink href="/knowledge/all" aktiv={$page.url.pathname === '/knowledge/all'}>
                             <Database class="w-4 h-4" />
                             Alle Bausteine
                         </SidebarLink>
