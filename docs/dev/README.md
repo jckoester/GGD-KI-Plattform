@@ -77,4 +77,4 @@ cd frontend && npm install && npm run dev
 - [Vorschaumodus](vorschau.md) — Token mit Schülerrolle, Mitgliedschaften, Schreibsperre, Vorschau-Chats; was eine neue Route beachten muss
 - [Audit-Log](audit-log.md) — Audit-Log oder Logger, Ereignisse schreiben, was nie hineingehört, nur anhängen
 - [Neuen Auth-Adapter implementieren](neuer-auth-adapter.md) — AuthAdapter-Interface
-- [Frontend-Konventionen](frontend-konventionen.md) — CSS-Tokens, Svelte 5, Routing
+- [Frontend-Konventionen](frontend-konventionen.md) — CSS-Tokens, Svelte 5, Routing; seit 0.48 zwei Seitenbreiten, Zurück und Rückweg `?back=`, Pfade der Verwaltung

@@ -120,8 +120,14 @@ Nach der Anmeldung siehst du die Hauptansicht der Plattform:
 
 **Seitenleiste (links)**
 - **Neuer Chat** — startet ein leeres Gespräch
-- **Verlauf** — zeigt deine früheren Gespräche
+- **Letzte Chats** — zeigt deine früheren Gespräche
 - **Assistenten** — öffnet die Liste verfügbarer Assistenten
+
+Jede Zeile ist auf ganzer Breite klickbar. Bei Einträgen mit Pfeil (etwa Bibliothek oder Meine
+Fächer) öffnet der Name die Seite und zeigt die Unterpunkte, der Pfeil klappt sie nur auf oder
+zu. Mit Strg-Klick (Mac: Cmd-Klick) öffnest du einen Eintrag in einem neuen Tab. Seiten, die selbst
+in der Seitenleiste stehen, haben keinen Zurück-Knopf; Unterseiten führen mit „←“ auf ihre
+Oberseite, Profil und Unterricht schließt du mit „Schließen“.
 
 **Hauptbereich (Mitte)**
 - Der Chat-Bereich, in dem Gespräche stattfinden

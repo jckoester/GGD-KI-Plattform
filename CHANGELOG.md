@@ -5,41 +5,39 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.48.0] – 2026-11-18
+
 ### Neu
 
 - Übersicht der Bibliothek unter `/knowledge`: Suche mit Bausteinart, Fach und Stufe, darunter für
   Lehrkräfte eine Kachel je Bereich (Meine und Alle Bausteine, Curricula, Bildungspläne,
   Leitperspektiven, Archiv, Sammlungen). „Bibliothek“ in der Seitenleiste führt dorthin.
-
 - Stundenentwurf: Knöpfe zum vorigen und nächsten Termin der Gruppe, auch für Stunden ohne Einheit.
   Ausfälle werden übersprungen; ein Termin ohne Entwurf lässt sich von dort anlegen. Die Reihenfolge in
   der Einheit bleibt daneben.
 
 ### Geändert
 
-- „Alle Bausteine“ liegt jetzt unter `/knowledge/all`.
-- Wer aus Curriculum, Planer, Werkstatt, Gruppenseite, Archiv, Statistik oder einem Dialog in einen
-  Baustein springt, kommt mit „Zurück“ wieder dorthin, samt Suche und Filtern.
-- Das Archiv der Bibliothek ist wieder erreichbar, über die Übersicht.
-
 - Seitenleiste und Verwaltungs-Seitenleiste: Alle Einträge sind Links. Die ganze Zeile ist klickbar,
   Strg-Klick und „In neuem Tab öffnen“ funktionieren. In aufklappbaren Bereichen öffnet der Name die
   Seite, der Pfeil klappt nur auf und zu. Die aktuelle Seite ist hervorgehoben.
-- Statistik „Costs“ heißt „Kosten“.
 - Zurück führt überall an ein festes, genanntes Ziel statt „dorthin, wo man vorher war“:
   - Unterseiten führen auf ihre Oberseite (Einstellungen, Statistiken, Bibliothek, Curricula, Profil).
   - Die Einsicht in Krisen-Meldungen führt zurück auf Meldungen bzw. Freigaben.
   - Die Infoseiten führen auf die Startseite.
 - Seiten mit eigenem Eintrag in der Seitenleiste (Einstellungen, Budget, Krisen-Meldungen, Statistiken,
   Letzte Chats) haben kein Zurück mehr. Profil und Unterricht haben „Schließen“.
-- Von Baustein zu Baustein führt Zurück Schritt für Schritt zurück.
-- Der Assistenten-Editor heißt am × jetzt „Schließen“.
-- Seitenbreiten vereinheitlicht: Es gibt nur noch zwei, schmal für Formulare, Detail und Einstellungen,
-  breit (höchstens 1280 px) für Listen und Tabellen; auch im Verwaltungsbereich. Hilfe und Infoseiten
-  behalten ihre Lesespalte.
-- Startseite so breit wie die übrigen schmalen Seiten; „Meine Bausteine“ breit wie „Alle Bausteine“.
+- Wer aus Curriculum, Planer, Werkstatt, Gruppenseite, Archiv, Statistik oder einem Dialog in einen
+  Baustein springt, kommt mit „Zurück“ wieder dorthin, samt Suche und Filtern. Von Baustein zu
+  Baustein führt Zurück Schritt für Schritt zurück.
+- „Alle Bausteine“ liegt jetzt unter `/knowledge/all`. Das Archiv der Bibliothek ist wieder
+  erreichbar, über die Übersicht.
+- Seitenbreiten vereinheitlicht: Es gibt nur noch zwei, schmal für Formulare, Detail, Einstellungen und
+  die Startseite, breit (höchstens 1280 px) für Listen und Tabellen; auch im Verwaltungsbereich. Hilfe
+  und Infoseiten behalten ihre Lesespalte.
 - Vorschau: zeigt immer die höchste Darstellungsstufe der Schüler:innen, unabhängig von der eigenen
   Stufe; der Hinweis „Es gibt mehr“ entfällt dort.
+- Der Assistenten-Editor heißt am × jetzt „Schließen“, die Statistik „Costs“ heißt „Kosten“.
 
 ## [0.47.1] – 2026-11-18
 

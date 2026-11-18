@@ -26,7 +26,9 @@ Oben steht ein gelbes Band: „Du siehst die App als Schüler:in — Klasse 9, G
 verbleibende Zeit und der Knopf **Vorschau beenden**. Darunter ist alles wie bei einer
 Schüler:in dieser Klasse:
 
-- die Seitenleiste und die Assistenten, die für diese Klasse freigegeben sind;
+- die Seitenleiste und die Assistenten, die für diese Klasse freigegeben sind; die Seitenleiste
+  im vollen Umfang, den Schüler:innen einblenden können, unabhängig davon, wie viel du selbst
+  eingeblendet hast;
 - mit Gruppe: was du für die Gruppe freigegeben hast, ihre Fachseite und ihr Unterricht
   („Mein Tag“, das aktuelle Thema im Chat, eingeführte Fachbegriffe);
 - die Leitplanken für Schüler:innen, etwa beim Hausversuch oder bei fertigen Lösungen.

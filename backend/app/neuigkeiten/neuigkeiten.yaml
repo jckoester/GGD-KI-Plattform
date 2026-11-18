@@ -465,3 +465,31 @@
     beitrittst. Du kannst ihn auch ansehen — Kasten „Einrichtung“ oben im Profil. Neu ist außerdem
     die Werkstatt in der Seitenleiste: Dort landet, was du aus dem Chat speicherst.
   link: /help/erste-schritte#die-einrichtung-schülerinnen
+
+- id: "0.48-bibliothek-uebersicht"
+  version: "0.48.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-18
+  rollen: [teacher]
+  eintrag: knowledge
+  titel: "Übersicht der Bibliothek, klarere Wege zurück"
+  text: >-
+    „Bibliothek“ in der Seitenleiste öffnet jetzt eine Übersicht: oben die Suche, darunter je
+    Bereich eine Kachel, auch für das Archiv. „Alle Bausteine“ hat einen eigenen Eintrag.
+    „Zurück“ führt überall an ein genanntes Ziel, aus einem Baustein wieder dorthin, woher du
+    kamst, samt Suche und Filtern. Die Einträge der Seitenleiste sind auf ganzer Breite klickbar
+    und lassen sich in einem neuen Tab öffnen.
+  link: /help/bibliothek#die-übersicht
+
+- id: "0.48-stunden-navigation"
+  version: "0.48.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-18
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Von Stunde zu Stunde nach Kalender"
+  text: >-
+    Im Stundenentwurf führen „← Di 11.11.“ und „Do 13.11. →“ zum vorigen und nächsten Termin der
+    Gruppe, auch ohne Unterrichtseinheit. Ausfälle werden übersprungen; hat ein Termin noch keinen
+    Entwurf, legt ein Klick auf „＋“ ihn an.
+  link: /help/unterrichtsplanung#von-stunde-zu-stunde
