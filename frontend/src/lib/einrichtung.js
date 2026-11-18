@@ -297,3 +297,10 @@ export function hinweisText(rolle, daten) {
     const i = startIndex(rolle, seiten, daten)
     return `${i} von ${seiten.length} ${seiten.length === 1 ? 'Schritt' : 'Schritten'} erledigt.`
 }
+
+/** Text im Kasten „Einrichtung“ (Profil, Unterricht), wenn nichts fortzusetzen ist. */
+export function eintragText(rolle) {
+    return rolle === 'student'
+        ? 'Erscheinungsbild, was du wissen solltest, und deine Fächer in einem Durchgang.'
+        : 'Erscheinungsbild, Umfang der Oberfläche, Stundenplan und Gruppen in einem Durchgang.'
+}

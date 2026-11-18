@@ -31,6 +31,26 @@ Erneut durchgehen kannst du die Einrichtung jederzeit über den Kasten **„Einr
 im **Profil** und auf der Seite **Unterricht**. Alles, was sie einstellt, findest du dort auch
 einzeln.
 
+## Die Einrichtung (Schüler:innen)
+
+Meldest du dich als Schüler:in zum ersten Mal an, öffnet sich ebenfalls die **Einrichtung**:
+fünf kurze Seiten, etwa drei Minuten.
+
+1. **Willkommen** — was ki@schule ist, und das Erscheinungsbild: Hell, Dunkel oder wie dein
+   Gerät.
+2. **Gut zu wissen** — keine Namen in den Chat, wer deine Chats sehen kann, wann Chats und
+   Konten gelöscht werden, wie dein Budget wächst. Pflegt deine Schule einen eigenen Hinweis,
+   steht er darunter.
+3. **So hilft dir die KI** — warum die Assistenten oft zurückfragen, wo du die Assistenten für
+   deine Fächer findest, und dass du KI in einer GFS oder Facharbeit angibst.
+4. **Deine Fächer** — die Fächer, die du schon hast. Fehlt eins, trittst du mit dem Code
+   deiner Lehrkraft bei.
+5. **Fertig** — wo du anfängst: Chat, Assistenten, Hilfe.
+
+**„Weiter“** und **„Später“** funktionieren wie bei den Lehrkräften: Nichts geht verloren, und
+auf der Startseite steht dann „Einrichtung fortsetzen“. Noch einmal ansehen kannst du die
+Einrichtung jederzeit über den Kasten **„Einrichtung“** oben im **Profil**.
+
 ## Die Startseite
 
 Nach der Anmeldung landest du auf der Startseite. Oben steht das Eingabefeld für einen

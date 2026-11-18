@@ -100,3 +100,7 @@ schreibt.
 `VorschauBand.svelte` (App-Layout) zeigt Klasse, Gruppe und Restzeit und geht bei Ablauf von
 selbst zurück; das App-Layout tauscht beim Laden ein abgelaufenes Vorschau-Token gegen die alte
 Sitzung. Die Regeln für Band und Dialog stehen in `$lib/vorschau.js`.
+
+Die **Einrichtung der Schüler:innen** (seit 0.47) lässt sich in der Vorschau über den Kasten im
+Profil öffnen, geht aber nie von selbst auf und speichert nichts; `GET /einrichtung` liefert dort
+keinen Stand. Einzelheiten: [Einrichtung](einrichtung.md).

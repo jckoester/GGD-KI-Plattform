@@ -450,3 +450,18 @@
     der Fassung dasselbe für die prozessbezogenen — beides auch als PDF. In der Oberstufe wählst du
     im Editor, ob ein Curriculum zum Basis- oder Leistungsfach gehört.
   link: /help/curriculum#die-liste
+
+- id: "0.47-einrichtung-schueler"
+  version: "0.47.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md), ebenso
+  # EINRICHTUNG_AB["student"] in app/einrichtung/router.py. Gilt dem Bestand (F1 a): Neue Konten
+  # bekommen statt des Hinweises den Dialog selbst.
+  datum: 2026-11-18
+  rollen: [student]
+  titel: "Einrichtung ansehen"
+  text: >-
+    Neue Schüler:innen führt jetzt beim ersten Login ein kurzer Dialog durch das Wichtigste: wer
+    deine Chats sieht, wie lange sie bleiben, wie die Assistenten helfen und wie du einem Fach
+    beitrittst. Du kannst ihn auch ansehen — Kasten „Einrichtung“ oben im Profil. Neu ist außerdem
+    die Werkstatt in der Seitenleiste: Dort landet, was du aus dem Chat speicherst.
+  link: /help/erste-schritte#die-einrichtung-schülerinnen

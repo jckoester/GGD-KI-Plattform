@@ -6,6 +6,10 @@ Die Profilseite erreichst du über das User-Menü oben rechts → **„Profil"**
 > ersten Login noch einmal — Erscheinungsbild, Umfang der Oberfläche, Stundenplan und Gruppen
 > in einem Durchgang. Hast du ihn mit „Später“ verlassen, zeigt der Kasten, wie weit du warst,
 > und setzt dort fort. Siehe [Erste Schritte](erste-schritte.md#die-einrichtung-lehrkräfte).
+>
+> **Einrichtung (Schüler:innen).** Auch für dich steht oben der Kasten „Einrichtung“: Er zeigt
+> die Seiten vom ersten Login noch einmal — Erscheinungsbild, was du wissen solltest, deine
+> Fächer. Siehe [Erste Schritte](erste-schritte.md#die-einrichtung-schülerinnen).
 
 > **Unterricht hat eine eigene Seite.** Dein Kürzel im Stundenplan, der Abgleich und deine
 > Unterrichtsgruppen stehen unter **Unterricht** — im Nutzermenü oben rechts, direkt über

@@ -4,11 +4,11 @@
      *
      * Ein blauer Kasten ohne ×: Als einfache Textzeile wurde er übersehen (Jan, 14.11.2026). Nach
      * „später“ nennt er den Stand und setzt fort; sonst beginnt der Durchgang von vorn. Nur für
-     * Rollen mit Einrichtung (F10) und außerhalb der Vorschau.
+     * Rollen mit Einrichtung (F10); in der Vorschau die der Schüler:innen (0.47, F6 a).
      */
     import { user } from '$lib/stores/user.js'
     import { einrichtung, oeffneEinrichtung } from '$lib/stores/einrichtung.js'
-    import { einrichtungsRolle, hinweisText, hinweisZeigen } from '$lib/einrichtung.js'
+    import { eintragText, einrichtungsRolle, hinweisText, hinweisZeigen } from '$lib/einrichtung.js'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
 
     const rolle = $derived(einrichtungsRolle($user?.roles))
@@ -20,7 +20,7 @@
         title="Einrichtung"
         message={fortsetzen
             ? hinweisText(rolle, $einrichtung.daten)
-            : 'Erscheinungsbild, Umfang der Oberfläche, Stundenplan und Gruppen in einem Durchgang.'}
+            : eintragText(rolle)}
         onaction={oeffneEinrichtung}
         actionLabel={fortsetzen ? 'Fortsetzen' : 'Einrichtung durchgehen'}
     />

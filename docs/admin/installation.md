@@ -365,4 +365,6 @@ Wert dort mindestens so hoch setzen wie `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`, si
    und Nutzungsregeln eingeben (rechtlich erforderlich). Optional der **„Hinweis in der
    Einrichtung“** (seit 0.43): ein Absatz in Markdown, den neue Lehrkräfte beim ersten Login
    auf der Seite „Gut zu wissen“ unter „Von deiner Schule“ lesen — etwa eine Ansprechperson
-   oder schuleigene Regeln. Leer bleibt der Absatz weg.
+   oder schuleigene Regeln. Leer bleibt der Absatz weg. Seit 0.47 gibt es einen eigenen
+   **„Hinweis in der Einrichtung (Schüler:innen)“** für neue Schüler:innen, etwa wen sie bei
+   Fragen ansprechen; Lehrkräfte und Schüler:innen sehen jeweils nur ihren.

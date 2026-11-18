@@ -25,6 +25,9 @@ statt dir die Lösung hinzulegen.
 Wenn du für ein bestimmtes Fach oder eine bestimmte Aufgabe einen **Assistenten** findest
 (in der Seitenleiste), nimm ihn: Er weiß schon, worum es geht.
 
+Beim ersten Login führt dich die **Einrichtung** in fünf kurzen Seiten durch das Wichtigste;
+wiederfinden kannst du sie im Profil ([Die Einrichtung](erste-schritte.md#die-einrichtung-schülerinnen)).
+
 Mehr dazu: [Erste Schritte](erste-schritte.md) · [Chat nutzen](chat.md)
 
 ## Wer sieht meine Chats?

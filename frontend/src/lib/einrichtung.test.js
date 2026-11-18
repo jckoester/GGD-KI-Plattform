@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    budgetText, einrichtungsRolle, fachFehltText, faecherLeerText, gutZuWissenSchueler, hinweisText,
+    budgetText, eintragText, einrichtungsRolle, fachFehltText, faecherLeerText, gutZuWissenSchueler, hinweisText,
     hinweisZeigen, kiHilft, rasterAnbieten, fertigZeilen, fortschritt, gutZuWissen, planungsStufe,
     seitenNummer, sichtbareSeiten, sollAufgehen, startIndex, SEITEN, SEITEN_JE_ROLLE, wegeWeiter,
     wegeWeiterSchueler,
@@ -303,5 +303,13 @@ describe('Dialog der Schüler:innen (0.47, Schritt 5)', () => {
         expect(quelle).toContain('const { gesperrt = false, nachBeitritt = null } = $props()')
         expect(quelle).toContain('nachBeitritt?.()')
         expect(quelle).toContain('disabled={gesperrt || arbeitet || !eingabe.trim()}')
+    })
+})
+
+describe('Kasten „Einrichtung“ (0.47)', () => {
+    it('nennt je Rolle, was der Durchgang enthält', () => {
+        expect(eintragText('teacher')).toMatch(/Stundenplan und Gruppen/)
+        expect(eintragText('student')).toMatch(/deine Fächer/)
+        expect(eintragText('student')).not.toMatch(/Stundenplan|Gruppen|Oberfläche/)
     })
 })

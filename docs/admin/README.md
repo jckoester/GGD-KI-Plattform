@@ -52,7 +52,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [ ] Modell-Freischaltungsmatrix unter `/settings/models` befüllen — **inklusive
       `TITLE_MODEL` in jeder Gruppe**
 - [ ] Texte (Impressum, Datenschutz, Nutzungsregeln) unter `/settings/texts` hinterlegen;
-      optional den „Hinweis in der Einrichtung“ für neue Lehrkräfte
+      optional die „Hinweise in der Einrichtung“ für neue Lehrkräfte und neue Schüler:innen
 - [ ] Reverse Proxy einrichten und HTTPS aktivieren
 
 ---

@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.47.0] – 2026-11-18
+
+### Neu
+
+- Einrichtung für Schüler:innen: Neue Schüler:innen gehen beim ersten Login fünf kurze Seiten durch
+  (Willkommen mit Erscheinungsbild, Gut zu wissen, So hilft dir die KI, Deine Fächer mit Beitritt
+  per Code, Fertig). Bestehende Konten sehen sie über den Kasten „Einrichtung“ im Profil und
+  bekommen eine Neuigkeit.
+- Eigener „Hinweis in der Einrichtung (Schüler:innen)“ unter `/settings/texts`.
+- Lehrkräfte können die Einrichtung der Schüler:innen in der Vorschau über das Profil ansehen; dort
+  wird nichts gespeichert.
+
 ### Geändert
 
 - Schüler:innen sehen die Werkstatt von Anfang an in der Seitenleiste (Stufe 1 „Chatten“);
@@ -15,6 +27,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `alembic upgrade head` (0111).
 - Eigene `config/ui_levels.yaml`: bei `student` den Eintrag `workshop` von Stufe 2 nach Stufe 1
   verschieben (Vorlage `config/ui_levels.example.yaml`), danach Backend neu starten.
+- Optional den Hinweis für Schüler:innen unter `/settings/texts` pflegen.
 
 ## [0.46.0] – 2026-11-17
 
