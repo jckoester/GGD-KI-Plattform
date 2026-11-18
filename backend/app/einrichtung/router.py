@@ -108,6 +108,10 @@ async def einrichtung_lesen_route(
     db: AsyncSession = Depends(get_db),
 ) -> EinrichtungRead:
     stand, kuerzel_gesetzt = await einrichtung_lesen(db, user.sub)
+    if ist_vorschau(user):
+        # Der gespeicherte Stand ist der der Lehrkraft — in der Schülersicht begänne der Durchgang
+        # sonst mitten drin, und die Startseite böte „Einrichtung fortsetzen“ an (0.47, F6 a).
+        stand = None
     rolle = einrichtungs_rolle(user)
     hinweis = None
     if rolle is not None:

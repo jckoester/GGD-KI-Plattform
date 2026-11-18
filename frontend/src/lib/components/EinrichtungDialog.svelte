@@ -1,6 +1,7 @@
 <script>
     /**
-     * Einrichtung beim ersten Login (0.43) — Rahmen: Seiten, Schrittanzeige, Weiter/Zurück/Später.
+     * Einrichtung beim ersten Login (0.43 Lehrkräfte, 0.47 Schüler:innen) — Rahmen: Seiten,
+     * Schrittanzeige, Weiter/Zurück/Später.
      *
      * Welche Seiten, in welcher Reihenfolge und wo ein Wiedereinstieg beginnt, steht in
      * `$lib/einrichtung.js`. Jede Wahl auf einer Seite wird sofort gespeichert; dieser Rahmen
@@ -8,14 +9,19 @@
      * daneben), „erledigt“, sobald die letzte Seite erreicht ist.
      *
      * Props: `daten` (Antwort von `GET /einrichtung`), `rolle`, `onClose(neueDaten?)`.
+     *
+     * **Vorschau** (0.47, F6 a): Die Lehrkraft sieht die Einrichtung ihrer Klasse, aber nichts wird
+     * gespeichert — weder der Stand noch Erscheinungsbild oder Beitritt (die Schreibwege sind dort
+     * gesperrt; das Erscheinungsbild schriebe sonst in ihren eigenen Browser).
      */
     import { untrack } from 'svelte'
     import Dialog from '$lib/components/Dialog.svelte'
     import { Check, Circle } from 'lucide-svelte'
     import { getCalendarTeachers, putEinrichtung } from '$lib/api.js'
     import {
-        ERSCHEINUNGSBILDER, fertigZeilen, fortschritt, gutZuWissen, planungsStufe, SEITEN, seitenNummer,
-        rasterAnbieten, sichtbareSeiten, startIndex, wegeWeiter,
+        ERSCHEINUNGSBILDER, fachFehltText, faecherLeerText, fertigZeilen, fortschritt, gutZuWissen,
+        gutZuWissenSchueler, kiHilft, planungsStufe, SEITEN, seitenNummer, rasterAnbieten,
+        sichtbareSeiten, startIndex, wegeWeiter, wegeWeiterSchueler,
     } from '$lib/einrichtung.js'
     import { renderMarkdown } from '$lib/markdown.js'
     import { themePref } from '$lib/stores/theme.js'
@@ -30,6 +36,9 @@
     import StundenrasterUebernahme from '$lib/components/StundenrasterUebernahme.svelte'
     import { refreshPotentialTeachingGroups } from '$lib/stores/potentialTeachingGroups.js'
     import WarningBanner from '$lib/components/WarningBanner.svelte'
+    import GruppeBeitreten from '$lib/components/GruppeBeitreten.svelte'
+    import { sidebarSubjectSections } from '$lib/stores/sidebarSections.js'
+    import { groupsConfig } from '$lib/stores/groupsConfig.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
 
     const { daten, rolle, onClose } = $props()
@@ -43,10 +52,13 @@
 
     const seite = $derived(seiten[index])
     const letzte = $derived(index === seiten.length - 1)
+    const schueler = untrack(() => rolle === 'student')
+    const vorschau = untrack(() => Boolean($user?.vorschau))
 
     $effect(() => {
         if (letzte && !erledigt) {
             erledigt = true
+            if (vorschau) return
             putEinrichtung('erledigt', seitenNummer(rolle, seite))
                 .then((d) => (neu = d))
                 .catch(() => {})
@@ -54,7 +66,7 @@
     })
 
     async function schliessen() {
-        if (erledigt) return onClose(neu)
+        if (erledigt || vorschau) return onClose(neu)
         try {
             onClose(await putEinrichtung('spaeter', seitenNummer(rolle, seite)))
         } catch {
@@ -64,7 +76,12 @@
     }
 
     // ── Seiteninhalte ──────────────────────────────────────────────────────
-    const absaetze = $derived(gutZuWissen(daten, $budget))
+    // Schüler:innen: in der Vorschau ohne Budget — der Endpunkt nennt dort das der Lehrkraft.
+    const absaetze = $derived(schueler
+        ? gutZuWissenSchueler(daten, vorschau ? null : $budget)
+        : gutZuWissen(daten, $budget))
+    const kiAbsaetze = kiHilft()
+    const erprobung = $derived(Boolean($groupsConfig?.student_subjects_opt_in))
     const abPlanung = $derived(planungsStufe($stufenRegistry))
 
     // Kürzel-Liste erst, wenn die Seite drankommt — der Abruf meldet sich bei der Quelle an.
@@ -89,7 +106,7 @@
     })
     // „Fertig“ zählt die Gruppen: Aus dem Stundenplan angelegte meldet der Baustein dem Store nicht.
     $effect(() => {
-        if (seite === 'fertig') refreshMyGroups()
+        if (seite === 'fertig' || seite === 'faecher') refreshMyGroups()
     })
     const mitRaster = $derived(rasterAnbieten($uiStufe, abPlanung))
     const mitStundenplan = $derived(Boolean(daten?.stundenplan?.configured && $user?.preferences?.webuntis_kuerzel))
@@ -102,7 +119,7 @@
         stundenplan: daten?.stundenplan?.configured,
         gruppen: $aktuelleTeachingGroups.length,
     }))
-    const wege = $derived(wegeWeiter($uiStufe, abPlanung))
+    const wege = $derived(schueler ? wegeWeiterSchueler() : wegeWeiter($uiStufe, abPlanung))
 
     async function wegGehen(weg) {
         await schliessen()
@@ -136,26 +153,42 @@
 
     <div class="flex-1 min-h-0 overflow-y-auto text-sm text-light-tx dark:text-dark-tx">
         {#if seite === 'willkommen'}
-            <p class="mb-2">
-                Hier hast du Zugang zu KI-Modellen für Unterricht und Vorbereitung — über die Schule,
-                ohne dass dein Name den Schulserver verlässt.
-            </p>
-            <p class="mb-4 text-light-tx-2 dark:text-dark-tx-2">
-                In ein paar Minuten richtest du dir die Plattform ein. Jede Wahl gilt sofort, und alles
-                lässt sich später im Profil und unter „Unterricht“ ändern.
-            </p>
+            {#if schueler}
+                <p class="mb-2">
+                    Hier hast du Zugang zu KI — über die Schule, ohne dass dein Name den Schulserver
+                    verlässt. Die KI hilft dir beim Lernen; deine Hausaufgaben erledigt sie nicht.
+                </p>
+                <p class="mb-4 text-light-tx-2 dark:text-dark-tx-2">
+                    In drei Minuten zeigen wir dir das Wichtigste. Was du einstellst, gilt sofort und
+                    lässt sich später im Profil ändern.
+                </p>
+            {:else}
+                <p class="mb-2">
+                    Hier hast du Zugang zu KI-Modellen für Unterricht und Vorbereitung — über die Schule,
+                    ohne dass dein Name den Schulserver verlässt.
+                </p>
+                <p class="mb-4 text-light-tx-2 dark:text-dark-tx-2">
+                    In ein paar Minuten richtest du dir die Plattform ein. Jede Wahl gilt sofort, und alles
+                    lässt sich später im Profil und unter „Unterricht“ ändern.
+                </p>
+            {/if}
             <p class="mb-2 font-medium">Erscheinungsbild</p>
             <div class="flex flex-wrap gap-2" role="group" aria-label="Erscheinungsbild">
                 {#each ERSCHEINUNGSBILDER as e (e.wert)}
                     <button type="button" aria-pressed={$themePref === e.wert} onclick={() => themePref.set(e.wert)}
+                            disabled={vorschau}
                             class="px-4 py-2 rounded-md text-sm font-medium transition-colors
                                    {$themePref === e.wert
                                        ? 'bg-primary dark:bg-primary-dark text-white'
-                                       : 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}">
+                                       : 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}
+                                   disabled:opacity-60">
                         {e.name}
                     </button>
                 {/each}
             </div>
+            {#if vorschau}
+                <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">In der Vorschau lässt sich nichts ändern.</p>
+            {/if}
         {:else if seite === 'gut_zu_wissen'}
             <div class="space-y-4">
                 {#each absaetze as a (a.titel)}
@@ -177,6 +210,38 @@
                     </div>
                 {/if}
             </div>
+        {:else if seite === 'ki_hilft'}
+            <div class="space-y-4">
+                {#each kiAbsaetze as a (a.titel)}
+                    <div>
+                        <p class="font-medium">{a.titel}</p>
+                        <p class="text-light-tx-2 dark:text-dark-tx-2">
+                            {a.text}
+                            {#each a.links ?? [] as l (l.href)}
+                                <a href={l.href} target="_blank" rel="noopener"
+                                   class="ml-1 text-light-bl dark:text-dark-bl hover:underline">{l.text}</a>
+                            {/each}
+                        </p>
+                    </div>
+                {/each}
+            </div>
+        {:else if seite === 'faecher'}
+            <!-- Dieselbe Liste wie Seitenleiste und Fächer-Übersicht (Erprobungsfilter, „Chat oder
+                 Fachassistent“, Fachname statt Gruppe) — sonst nennt die Einrichtung andere Fächer. -->
+            {#if $sidebarSubjectSections.length}
+                <ul class="mb-4 space-y-1.5">
+                    {#each $sidebarSubjectSections as f (f.groupId)}
+                        <li class="flex items-center gap-2">
+                            <Check size={15} class="shrink-0 text-light-gr dark:text-dark-gr" />
+                            <span>{f.name}{#if f.qualifier}<span class="text-light-tx-2 dark:text-dark-tx-2"> · {f.qualifier}</span>{/if}</span>
+                        </li>
+                    {/each}
+                </ul>
+            {:else}
+                <p class="mb-4">{faecherLeerText(erprobung)}</p>
+            {/if}
+            <p class="text-light-tx-2 dark:text-dark-tx-2">{fachFehltText(erprobung)}</p>
+            <GruppeBeitreten gesperrt={vorschau} nachBeitritt={refreshMyGroups} />
         {:else if seite === 'stufe'}
             {#if $stufenRegistry?.stufen?.length}
                 <p class="mb-3 text-light-tx-2 dark:text-dark-tx-2">
@@ -249,21 +314,28 @@
                 {/if}
             {/if}
         {:else if seite === 'fertig'}
-            <ul class="space-y-1.5 mb-5">
-                {#each zeilen as z (z.text)}
-                    <li class="flex items-start gap-2">
-                        {#if z.ok}
-                            <Check size={16} class="mt-0.5 shrink-0 text-light-gr dark:text-dark-gr" />
-                        {:else}
-                            <Circle size={16} class="mt-0.5 shrink-0 text-light-tx-2 dark:text-dark-tx-2" />
-                        {/if}
-                        <span>
-                            {z.text}
-                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">· {z.ok ? 'ändern' : 'nachholen'} unter „{z.nachholen}“</span>
-                        </span>
-                    </li>
-                {/each}
-            </ul>
+            {#if schueler}
+                <p class="mb-5 text-light-tx-2 dark:text-dark-tx-2">
+                    Das war das Wichtigste. Probier es einfach aus — und frag ruhig nach, wenn dir eine
+                    Antwort nicht weiterhilft.
+                </p>
+            {:else}
+                <ul class="space-y-1.5 mb-5">
+                    {#each zeilen as z (z.text)}
+                        <li class="flex items-start gap-2">
+                            {#if z.ok}
+                                <Check size={16} class="mt-0.5 shrink-0 text-light-gr dark:text-dark-gr" />
+                            {:else}
+                                <Circle size={16} class="mt-0.5 shrink-0 text-light-tx-2 dark:text-dark-tx-2" />
+                            {/if}
+                            <span>
+                                {z.text}
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">· {z.ok ? 'ändern' : 'nachholen'} unter „{z.nachholen}“</span>
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
             <p class="mb-2 font-medium">Wie weiter?</p>
             <div class="flex flex-col sm:flex-row gap-2">
                 {#each wege as w (w.text)}
@@ -279,7 +351,9 @@
                 {/each}
             </div>
             <p class="mt-4 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                Die Einrichtung findest du jederzeit wieder unter „Unterricht“ und im Profil.
+                {schueler
+                    ? 'Die Einrichtung findest du jederzeit wieder im Profil.'
+                    : 'Die Einrichtung findest du jederzeit wieder unter „Unterricht“ und im Profil.'}
             </p>
         {/if}
     </div>

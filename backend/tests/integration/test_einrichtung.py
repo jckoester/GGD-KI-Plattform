@@ -241,3 +241,17 @@ async def test_reiner_admin_ohne_hinweis(test_client, konten, jwt_service, auth_
     await test_client.put("/admin/site-texts/einrichtung_hinweis", headers=auth_headers,
                           json={"content": "An Lehrkräfte."})
     assert (await _lesen(test_client, _kopf(jwt_service, ADMIN, ["admin"])))["hinweis"] is None
+
+
+async def test_vorschau_ohne_den_stand_der_lehrkraft(test_client, konten, jwt_service):
+    """F6 a: Hat die Lehrkraft ihre eigene Einrichtung „später“ verlassen, beginnt die Schülersicht
+    trotzdem vorn — und die Startseite bietet dort kein „fortsetzen“ an."""
+    resp = await test_client.put("/einrichtung", headers=_kopf(jwt_service, NEU, ["teacher"]),
+                                 json={"stand": "spaeter", "seite": 4})
+    assert resp.status_code == 200
+    jetzt = int(time.time())
+    kopf = _kopf(jwt_service, NEU, ["student"], "9",
+                 preview=Vorschau(echte_rollen=["teacher"], beginn=jetzt, sitzung_ablauf=jetzt + 3600),
+                 exp=jetzt + 3600)
+    d = await _lesen(test_client, kopf)
+    assert (d["faellig"], d["stand"], d["seite"]) == (False, None, None)

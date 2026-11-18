@@ -271,3 +271,37 @@ describe('Schüler:innen (0.47)', () => {
         expect(hinweisText('student', d)).toBe('3 von 5 Schritten erledigt.')
     })
 })
+
+describe('Dialog der Schüler:innen (0.47, Schritt 5)', () => {
+    const lies = async (p) => {
+        const { readFileSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        return readFileSync(join(__dirname, p), 'utf8')
+    }
+
+    it('jede Seite der Schüler-Liste hat einen Inhalt im Dialog', async () => {
+        const dialog = await lies('components/EinrichtungDialog.svelte')
+        for (const s of SEITEN_JE_ROLLE.student) expect(dialog, s).toContain(`seite === '${s}'`)
+    })
+
+    it('Fächer: dieselbe Liste wie die Seitenleiste, Beitritt eingebettet', async () => {
+        const dialog = await lies('components/EinrichtungDialog.svelte')
+        expect(dialog).toContain('$sidebarSubjectSections')
+        expect(dialog).toContain('<GruppeBeitreten gesperrt={vorschau} nachBeitritt={refreshMyGroups} />')
+    })
+
+    it('Vorschau (F6 a): kein Stand, kein Erscheinungsbild, kein Budget der Lehrkraft', async () => {
+        const dialog = await lies('components/EinrichtungDialog.svelte')
+        expect(dialog).toContain('if (erledigt || vorschau) return onClose(neu)')
+        expect(dialog).toMatch(/erledigt = true\s+if \(vorschau\) return/)
+        expect(dialog).toContain('disabled={vorschau}')
+        expect(dialog).toContain('gutZuWissenSchueler(daten, vorschau ? null : $budget)')
+    })
+
+    it('Beitreten lässt sich sperren und meldet den Beitritt', async () => {
+        const quelle = await lies('components/GruppeBeitreten.svelte')
+        expect(quelle).toContain('const { gesperrt = false, nachBeitritt = null } = $props()')
+        expect(quelle).toContain('nachBeitritt?.()')
+        expect(quelle).toContain('disabled={gesperrt || arbeitet || !eingabe.trim()}')
+    })
+})

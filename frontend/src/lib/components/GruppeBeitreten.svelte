@@ -6,6 +6,9 @@
    * Gruppe ihre Mitglieder nicht aus einer Klasse erbt. Ohne diesen Weg käme in solche
    * Gruppen niemand hinein: Namen zeigt die Plattform nicht, eine Mitgliederliste wäre
    * also nicht bedienbar.
+   *
+   * Props (beide optional, 0.47 für die Einrichtung): `gesperrt` — Feld zeigen, aber abgeschaltet
+   * (Vorschau: dort lässt sich nichts ändern); `nachBeitritt()` — nach erfolgreichem Beitritt.
    */
   import { LogIn } from "lucide-svelte"
   import { invalidateAll } from "$app/navigation"
@@ -14,6 +17,8 @@
   import ErrorBanner from "$lib/components/ErrorBanner.svelte"
   import SuccessBanner from "$lib/components/SuccessBanner.svelte"
 
+  const { gesperrt = false, nachBeitritt = null } = $props()
+
   let eingabe = $state("")
   let arbeitet = $state(false)
   let fehler = $state(null)
@@ -21,7 +26,7 @@
 
   async function beitreten(ev) {
     ev.preventDefault()
-    if (!eingabe.trim()) return
+    if (gesperrt || !eingabe.trim()) return
     arbeitet = true
     fehler = null
     erfolg = null
@@ -32,6 +37,7 @@
       // Neu laden statt lokal ergänzen: Welches Fach die Gruppe trägt und ob sie
       // sichtbar ist, entscheidet der Server — hier zu raten ginge schief.
       await invalidateAll()
+      nachBeitritt?.()
     } catch (e) {
       fehler = beitrittFehler(e.message)
     } finally {
@@ -59,13 +65,14 @@
       autocomplete="off"
       autocapitalize="characters"
       spellcheck="false"
+      disabled={gesperrt}
       class="flex-1 rounded-md border border-light-ui-3 dark:border-dark-ui-3
              bg-light-bg dark:bg-dark-bg px-3 py-1.5 font-mono tracking-widest
              text-light-tx dark:text-dark-tx"
     />
     <button
       type="submit"
-      disabled={arbeitet || !eingabe.trim()}
+      disabled={gesperrt || arbeitet || !eingabe.trim()}
       class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
              bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
     >
@@ -74,6 +81,9 @@
     </button>
   </div>
 
+  {#if gesperrt}
+    <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">In der Vorschau lässt sich nichts ändern.</p>
+  {/if}
   {#if fehler}<div class="mt-2"><ErrorBanner message={fehler} /></div>{/if}
   {#if erfolg}<div class="mt-2"><SuccessBanner message={erfolg} /></div>{/if}
 </form>
