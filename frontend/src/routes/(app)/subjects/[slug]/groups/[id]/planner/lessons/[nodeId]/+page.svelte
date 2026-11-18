@@ -2,6 +2,7 @@
   import { dauerZusatz } from '$lib/phasendauer.js'
   import { neuerChatPfad } from '$lib/chatziel.js'
   import { archivPfad, datumKurz } from '$lib/planung_archiv.js'
+  import { einheitKnopfZeigen, terminKurz, terminTitel } from '$lib/termin_nav.js'
   import { passendeAssistenten } from '$lib/assistentenwahl.js'
   import { mitVerworfen } from '$lib/begriffe_der_stunde.js'
   import { user } from '$lib/stores/user.js'
@@ -18,6 +19,7 @@
     deleteReview,
     getAssistants,
     legeEigenenStundenassistentenAn,
+    createLessonForSlot,
   } from '$lib/api.js'
   import {
     dateLabel,
@@ -311,12 +313,32 @@
   async function eingeplant() {
     try {
       const frisch = await getLesson(nodeId)
-      lesson = { ...lesson, slot: frisch.slot, nav: frisch.nav }
+      lesson = { ...lesson, slot: frisch.slot, nav: frisch.nav, termine: frisch.termine }
     } catch {
       // Eingeplant ist es trotzdem; die Anzeige holt es beim nächsten Laden nach.
     }
   }
   let notizFehler = $state(null)
+
+  // Termin ohne Entwurf (F4 b): anlegen und hineinspringen. Mittelklick und neuer Tab gehen den
+  // `href`-Weg in die Jahresübersicht.
+  let terminFehler = $state(null)
+  let terminLegtAn = $state(false)
+  async function zumTermin(e, t) {
+    if (t.stunde_node_id || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return
+    e.preventDefault()
+    if (terminLegtAn) return
+    terminLegtAn = true
+    terminFehler = null
+    try {
+      const neu = await createLessonForSlot(t.slot_id)
+      await goto(`${plannerBase}/lessons/${neu.id}`)
+    } catch (err) {
+      terminFehler = err.message ?? 'Der Entwurf konnte nicht angelegt werden.'
+    } finally {
+      terminLegtAn = false
+    }
+  }
 
   // Die Nachbereitungsnotiz der Vorlage (S1): nur ein Hinweis, keine Nachbereitung dieser Stunde.
   async function notizEntfernen() {
@@ -474,17 +496,38 @@
         <div class="flex flex-col items-end gap-2 flex-shrink-0">
           <!-- Hauptaktionen -->
           <div class="flex items-center gap-1.5 flex-wrap justify-end">
-            <!-- Navigationsblock: zurück · vor · Übersicht -->
+            <!-- Navigationsblock: Termine der Gruppe · Stunden der Einheit · Übersicht (0.48, F4–F6).
+                 Ein Termin ohne Entwurf ist ein Link in die Jahresübersicht; der Klick legt den
+                 Entwurf an und springt hinein (wie `TagesKachel`). -->
             <div class="flex items-center gap-1">
-              {#if lesson.nav.prev_node_id}
-                <a href="{plannerBase}/lessons/{lesson.nav.prev_node_id}" class={navBtn}>
+              {#if lesson.termine?.vorher}
+                {@const t = lesson.termine.vorher}
+                <a href={t.stunde_node_id ? `${plannerBase}/lessons/${t.stunde_node_id}` : plannerBase}
+                   onclick={(e) => zumTermin(e, t)} class={navBtn} title={terminTitel(t, 'vorher')}>
+                  ← {t.stunde_node_id ? '' : '＋ '}{terminKurz(t)}
+                </a>
+              {/if}
+              {#if lesson.termine?.nachher}
+                {@const t = lesson.termine.nachher}
+                <a href={t.stunde_node_id ? `${plannerBase}/lessons/${t.stunde_node_id}` : plannerBase}
+                   onclick={(e) => zumTermin(e, t)} class={navBtn} title={terminTitel(t, 'nachher')}>
+                  {t.stunde_node_id ? '' : '＋ '}{terminKurz(t)} →
+                </a>
+              {/if}
+              {#if einheitKnopfZeigen(lesson.nav.prev_node_id, lesson.termine?.vorher)}
+                <a href="{plannerBase}/lessons/{lesson.nav.prev_node_id}" class={navBtn}
+                   title="Vorige Stunde dieser Einheit">
                   ← Stunde {lesson.nav.position - 1}
                 </a>
               {/if}
-              {#if lesson.nav.next_node_id}
-                <a href="{plannerBase}/lessons/{lesson.nav.next_node_id}" class={navBtn}>
+              {#if einheitKnopfZeigen(lesson.nav.next_node_id, lesson.termine?.nachher)}
+                <a href="{plannerBase}/lessons/{lesson.nav.next_node_id}" class={navBtn}
+                   title="Nächste Stunde dieser Einheit">
                   Stunde {lesson.nav.position + 1} →
                 </a>
+              {/if}
+              {#if terminFehler}
+                <span class="text-xs text-light-re dark:text-dark-re">{terminFehler}</span>
               {/if}
               <a href={uebersicht} class={navBtn} title={nurLesen ? 'Zurück ins Archiv' : 'Zur Jahresübersicht'}>
                 ↩︎ {nurLesen ? 'Archiv' : 'Übersicht'}

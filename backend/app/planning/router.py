@@ -58,6 +58,7 @@ from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
 from app.planning.begriffe import begriffe_vorschlagen, nur_aliase_des_knotens, vorschlag_zur_anzeige
+from app.planning.termin_nav import termin_nachbarn
 from app.planning.schemas import (
     AbWochenRead,
     BalanceRead,
@@ -71,6 +72,8 @@ from app.planning.schemas import (
     GroupCurriculaRead,
     LessonCreate,
     LessonNav,
+    TerminNachbar,
+    TerminNav,
     LessonRead,
     LessonSlotContext,
     LessonUeContext,
@@ -1289,6 +1292,35 @@ async def _build_lesson_nav(
     )
 
 
+async def _termin_nav(
+    db: AsyncSession,
+    slot: LessonSlot | None,
+    *,
+    darf_bearbeiten: bool,
+    mit_archivierten: bool,
+) -> TerminNav | None:
+    """Voriger und nächster Termin der Gruppe (0.48) — Regel in `termin_nav.py`."""
+    if slot is None:
+        return None
+    termine = (await db.execute(
+        sa.select(LessonSlot).where(LessonSlot.group_id == slot.group_id)
+    )).scalars().all()
+    kandidaten = {t.stunde_node_id for t in termine if t.stunde_node_id is not None}
+    lesbar: set[UUID] = set()
+    if kandidaten:
+        lesbar = set((await db.execute(
+            sa.select(ContextNode.id).where(
+                ContextNode.id.in_(kandidaten),
+                ContextNode.content_type == "unterrichtsstunde",
+                ContextNode.status.in_(LESBAR if mit_archivierten else ("active",)),
+            )
+        )).scalars().all())
+    vorher, nachher = termin_nachbarn(termine, slot.id, lesbar, anlegen_erlaubt=darf_bearbeiten)
+    def lesen(n):
+        return None if n is None else TerminNachbar(**n.__dict__)
+    return TerminNav(vorher=lesen(vorher), nachher=lesen(nachher))
+
+
 # ── Lesen und Ändern einer Stunde (0.42) ─────────────────────────────────────
 
 #: Was die lesenden Planungsrouten zeigen: aktiv und vom Lebenszyklus archiviert (F11).
@@ -1441,6 +1473,8 @@ async def get_lesson(
 
     nav = await _build_lesson_nav(
         db, node_id, unit_id, mit_archivierten=lesson.status == "archived")
+    termine = await _termin_nav(db, slot, darf_bearbeiten=darf_bearbeiten,
+                                mit_archivierten=lesson.status == "archived")
     meta = lesson.metadata_ or {}
 
     # Jahrgang der Gruppe (gleiche Quelle wie die Curriculum-Anzeige) — für die
@@ -1457,6 +1491,7 @@ async def get_lesson(
         ue=ue_ctx,
         slot=slot_ctx,
         nav=nav,
+        termine=termine,
         group_id=group_id,
         subject_id=lesson.subject_id,
         grade=resolved_curricula.grade,

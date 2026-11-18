@@ -301,6 +301,22 @@ class LessonUeContext(BaseModel):
     kapitel_ersetzt: bool = False
 
 
+class TerminNachbar(BaseModel):
+    """Voriger oder nächster Termin der Gruppe (0.48). Ohne `stunde_node_id`: noch kein Entwurf,
+    die Oberfläche legt ihn über `slot_id` an."""
+    slot_id: UUID
+    datum: date
+    start_period: Optional[int]
+    kategorie: str
+    thema: Optional[str]
+    stunde_node_id: Optional[UUID]
+
+
+class TerminNav(BaseModel):
+    vorher: Optional[TerminNachbar] = None
+    nachher: Optional[TerminNachbar] = None
+
+
 class LessonNav(BaseModel):
     prev_node_id: Optional[UUID]
     next_node_id: Optional[UUID]
@@ -318,6 +334,8 @@ class LessonRead(BaseModel):
     ue: Optional[LessonUeContext]
     slot: Optional[LessonSlotContext]
     nav: LessonNav
+    # Nach Terminen der Gruppe, unabhängig von der Einheit (0.48). `None`: Stunde ohne Termin.
+    termine: Optional[TerminNav] = None
     group_id: int
     subject_id: Optional[int]
     grade: Optional[int] = None  # Jahrgang der Gruppe (für editionsbewusste Kompetenz-Auswahl)

@@ -11,6 +11,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Lehrkräfte eine Kachel je Bereich (Meine und Alle Bausteine, Curricula, Bildungspläne,
   Leitperspektiven, Archiv, Sammlungen). „Bibliothek“ in der Seitenleiste führt dorthin.
 
+- Stundenentwurf: Knöpfe zum vorigen und nächsten Termin der Gruppe, auch für Stunden ohne Einheit.
+  Ausfälle werden übersprungen; ein Termin ohne Entwurf lässt sich von dort anlegen. Die Reihenfolge in
+  der Einheit bleibt daneben.
+
 ### Geändert
 
 - „Alle Bausteine“ liegt jetzt unter `/knowledge/all`.

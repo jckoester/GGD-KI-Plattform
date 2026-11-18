@@ -217,6 +217,18 @@ Fachbegriffe“**.
 > 📷 *Screenshot folgt: Stundenentwurf mit Phasentabelle, Zeitbudget-Balken und der Leiste „Kompetenzen und Fachbegriffe“.*
 <!-- Ersetzen durch: ![Stundenentwurf](/help-images/unterrichtsplanung/stundenentwurf.png) -->
 
+### Von Stunde zu Stunde
+
+Oben rechts im Entwurf führen zwei Knöpfe zum vorigen und zum nächsten **Termin der Gruppe**,
+etwa „← Di 11.11.“ und „Do 13.11. →“. Dabei gilt:
+
+- Es zählt der Kalender, nicht die Einheit. Das funktioniert auch für Stunden ohne Einheit.
+- Ausfälle werden übersprungen.
+- Hat ein Termin noch keinen Entwurf, steht ein ＋ davor; ein Klick legt ihn an und öffnet ihn.
+- Liegt die Stunde in einer Einheit, stehen daneben „← Stunde 2“ und „Stunde 4 →“ für die
+  Reihenfolge in der Einheit. Diese Knöpfe erscheinen nur, wenn sie woandershin führen als die
+  Termin-Knöpfe.
+
 Ist die Stunde eine [Kopie](#stunden-und-einheiten-kopieren) und hatte ihre Vorlage eine
 Kurzreflexion aus der Nachbereitung, steht diese über dem Verlaufsplan als **Notiz aus der
 Vorlage**, mit dem Datum der Vorlagenstunde. Sie ist nur ein Hinweis für dich: Sie zählt nicht
