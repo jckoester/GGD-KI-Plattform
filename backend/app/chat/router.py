@@ -56,7 +56,7 @@ from app.chat.image_store import (
 )
 from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
-from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
+from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang, modell_des_assistenten
 from app.assistants import vorschlag as vorschlag_dienst
 from app.context.bausteine import (
     WERKZEUG, Angebot, Baustein, KontextBaustein, aus_treffern, kontext_der_nachrichten,
@@ -2022,8 +2022,8 @@ async def chat(
             # Leeres Assistenten-Modell = „schulweiter Standard" → `model_used` behält den
             # Wert aus CHAT_DEFAULT_MODEL. Ohne die Leerprüfung ginge ein leerer Modellname
             # an LiteLLM (der zweite Zweig weiter unten prüft bereits so).
-            if not request.model_id and assistant.model:
-                model_used = assistant.model
+            if not request.model_id:
+                model_used = modell_des_assistenten(assistant)
         active_assistant = assistant
 
         first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
@@ -2176,8 +2176,8 @@ async def chat(
             conv_assistant_update = (new_assistant.id, new_assistant.system_prompt)
 
             # Assistentenmodell als Fallback wenn kein explizites model_id
-            if not request.model_id and new_assistant.model:
-                model_used = new_assistant.model
+            if not request.model_id:
+                model_used = modell_des_assistenten(new_assistant)
 
         if active_assistant is None and active_assistant_id is not None:
             asst_r = await db.execute(

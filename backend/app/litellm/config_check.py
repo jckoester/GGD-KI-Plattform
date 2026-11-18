@@ -153,6 +153,7 @@ def check_config(
     configured = [
         ("CHAT_DEFAULT_MODEL", settings.chat_default_model, True),
         ("TITLE_MODEL", settings.title_model, False),
+        ("PLANUNG_MODEL", getattr(settings, "planung_model", ""), False),
         # `getattr`: optional und erst seit 0.18 — Aufrufer mit eigenem, verkürztem
         # Settings-Objekt (Tests, Werkzeuge) kennen es nicht.
         ("BEGRIFFE_MODEL", getattr(settings, "begriffe_model", ""), False),
@@ -296,6 +297,20 @@ def check_config(
         if "<" in name or "<" in target or "TODO" in target:
             findings.append(Finding(
                 ERROR, f"'{name}': Platzhalter aus der Vorlage nicht ersetzt ({target!r})."
+            ))
+
+    # ── 6b. Wandernde Kennungen (`-latest`) ───────────────────────────────────────────
+    # Ein `-latest` zeigt auf das jeweils neueste Modell des Anbieters. Er wechselt still —
+    # Verhalten und Preis ändern sich, ohne dass sich hier etwas ändert, und die Preistabelle
+    # von LiteLLM hinkt hinterher. Anlass (18.11.2026): `mistral-medium-latest` war Medium 3.5
+    # (dreifacher Preis), `mistral-large-latest` war Large 4, abgerechnet zum Preis von Large 3.
+    for name, entry in sorted(entries.items()):
+        target = _anbieter_id(entry)
+        if target.endswith("-latest") or "-latest@" in target:
+            findings.append(Finding(
+                WARNING,
+                f"'{name}': '{target}' ist eine wandernde Kennung — Modell und Preis können "
+                "ohne Ankündigung wechseln. Eine feste Version eintragen, mit Preisen.",
             ))
 
     # ── 7. Bildarten gegen die Proxy-Config ──────────────────────────────────────────

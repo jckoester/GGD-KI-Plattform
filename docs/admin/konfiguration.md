@@ -169,6 +169,7 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | Variable | Beschreibung | Beispiel |
 |----------|-------------|---------|
 | `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat. Leer = Chats ohne ausdrückliche Wahl schlagen fehl. Muss Function-Calling beherrschen | `chat-standard` |
+| `PLANUNG_MODEL` | Modell für Assistenten mit Planungs-Fähigkeit (Jahresplanung, Stundenentwurf, Curriculum-Entwurf, eigene Planungsassistenten), wenn der Assistent kein eigenes Modell nennt (seit 0.49). Leer = `CHAT_DEFAULT_MODEL`. Sinnvoll, sobald das Standardmodell ein günstiges ist: Diese Assistenten schreiben über Funktionsaufrufe, und dort scheitern kleine Modelle. **Muss in der Allowlist der Lehrkräfte stehen** | `chat-komplex` |
 | `ASSISTANT_CONTEXT_LIMIT` | Wissensknoten, die die Suche eines Assistenten liefert. **Nicht** die Trefferzahl im Vorschlagsfenster — die stellt jede Nutzer:in im Profil ein (Vorgabe 8). Hier geht es um Kosten und Trefferabdeckung: Jeder Treffer wiegt grob 75–100 Token | `20` |
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel. Leer = keine Titel. **Muss in JEDER Team-Allowlist stehen** — der Aufruf läuft über den Virtual Key der Nutzer:innen | `system-titel` |
 | `BEGRIFFE_MODEL` | Modell, das die Fachbegriffe eines Stundenentwurfs aus seinen Phasentexten vorschlägt. Leer = keine Vorschläge. **Muss in der Allowlist der Lehrkräfte stehen** — der Aufruf läuft über deren Virtual Key | `system-begriffe` |

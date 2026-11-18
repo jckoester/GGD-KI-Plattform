@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- `PLANUNG_MODEL`: Assistenten mit Planungs-Fähigkeit (Jahresplanung, Stundenentwurf, Curriculum-Entwurf,
+  eigene Planungsassistenten) laufen ohne eigenes Modell auf diesem Modell statt auf dem Standardmodell.
+- `check_litellm_config.py` warnt bei `-latest`-Kennungen in der LiteLLM-Config.
+
+### Nach dem Update
+
+- In der `.env` `PLANUNG_MODEL=chat-komplex` setzen (Modell muss für Lehrkräfte freigeschaltet sein),
+  danach Backend neu starten.
+- Wer Mistral direkt nutzt: in der LiteLLM-Config feste Kennungen mit Preisen statt `-latest` eintragen
+  (Beispiel in `docs/admin/modell-szenarien.md`), danach LiteLLM neu starten.
+
 ## [0.48.0] – 2026-11-18
 
 ### Neu

@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -129,9 +130,27 @@ def _ist_eintritt(assistant: Assistant, zugang: Zugang) -> bool:
             and assistant.created_by == zugang.pseudonym)
 
 
+#: Fähigkeiten, die über Funktionsaufrufe schreiben. Ein Assistent mit einer davon und ohne eigenes
+#: Modell läuft auf `PLANUNG_MODEL` statt auf dem Standardmodell (0.49).
+PLANUNGS_FAEHIGKEITEN: frozenset[str] = frozenset({"planning", "lesson_planning", "curriculum_planning"})
+
+
+def plant(assistant: Assistant) -> bool:
+    return bool(PLANUNGS_FAEHIGKEITEN.intersection(assistant.tool_groups or []))
+
+
 def modell_des_assistenten(assistant: Assistant) -> str:
-    """Das Modell, mit dem der Assistent tatsächlich läuft — leer heißt schulweiter Standard."""
-    return assistant.model or settings.chat_default_model
+    """Das Modell, mit dem der Assistent tatsächlich läuft.
+
+    Leer heißt schulweiter Standard (`CHAT_DEFAULT_MODEL`). Ausnahme seit 0.49: Ein Assistent mit
+    einer Planungs-Fähigkeit nimmt `PLANUNG_MODEL`, sofern gesetzt. Ein ausdrücklich gesetztes
+    Modell gilt immer — es ist eine Entscheidung der Schule.
+    """
+    if assistant.model:
+        return assistant.model
+    if settings.planung_model and plant(assistant):
+        return settings.planung_model
+    return settings.chat_default_model
 
 
 def _modell_passt(assistant: Assistant, zugang: Zugang) -> bool:
@@ -342,10 +361,21 @@ def sichtbar_klausel(zugang: Zugang, *, jetzt=None):
         modell = sa.true()
     else:
         erlaubt = sorted(zugang.modelle)
+        leer = or_(Assistant.model.is_(None), Assistant.model == "")
+        if settings.planung_model:
+            # Dieselbe Regel wie `modell_des_assistenten`, in SQL: leer + Planungs-Fähigkeit →
+            # `PLANUNG_MODEL`, sonst das Standardmodell.
+            plant_sql = sa.cast(Assistant.tool_groups, JSONB).op("?|")(
+                sa.cast(sorted(PLANUNGS_FAEHIGKEITEN), ARRAY(sa.Text)))
+            ohne_modell = or_(
+                and_(leer, plant_sql, sa.literal(settings.planung_model in zugang.modelle)),
+                and_(leer, ~plant_sql, sa.literal(settings.chat_default_model in zugang.modelle)),
+            )
+        else:
+            ohne_modell = and_(leer, sa.literal(settings.chat_default_model in zugang.modelle))
         modell = or_(
             and_(Assistant.model.is_not(None), Assistant.model != "", Assistant.model.in_(erlaubt)),
-            and_(or_(Assistant.model.is_(None), Assistant.model == ""),
-                 sa.literal(settings.chat_default_model in zugang.modelle)),
+            ohne_modell,
         )
     # Positivliste, spiegelbildlich zu `darf_nutzen`: `private` steht nicht darin und
     # ist damit ausgeschlossen, ohne dass es eigens verboten werden müsste.

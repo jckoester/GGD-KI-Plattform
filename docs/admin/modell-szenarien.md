@@ -132,36 +132,63 @@ IMAGE_PRICES='{"black-forest-labs/FLUX.1-schnell":0.032}'
 EU-Anbieter (Frankreich), eigener LiteLLM-Provider. **Kein Bildmodell.**
 
 Der Unterschied zu IONOS ist die Anbindung, nicht die Modellqualität: `mistral/<id>` ohne
-`api_base` — damit kommen Preise, Kontextfenster, Function-Calling und Vision aus LiteLLMs
-Tabelle. Der gesamte Preispflege-Aufwand entfällt.
+`api_base`.
+
+> ⚠️ **Feste Kennungen und eigene Preise eintragen, nicht `-latest`** (seit 0.49). Ein `-latest`
+> wechselt still das Modell, und LiteLLMs eingebaute Preistabelle hinkt hinterher. Am 18.11.2026
+> war `mistral-medium-latest` schon Medium 3.5 (dreifacher Preis) und `mistral-large-latest`
+> Large 4, abgerechnet zum Preis von Large 3. Die Budgets rechneten damit falsch.
+> `check_litellm_config.py` warnt seither bei jeder `-latest`-Kennung. Die aktuellen Kennungen
+> nennt `GET https://api.mistral.ai/v1/models` (Feld `aliases`).
+>
+> Die Preise unten gelten für November 2026 und sind je Token angegeben. Mistral nennt sie in €
+> und $ gleich; eingetragen wird in der Währung von `LITELLM_PRICE_CURRENCY`.
 
 ```yaml
 model_list:
   - model_name: chat-schnell
     litellm_params:
-      model: mistral/mistral-small-latest
+      model: mistral/mistral-small-2603     # Mistral Small 4
       api_key: os.environ/MISTRAL_API_KEY
-    # kein model_info nötig — Preise und Fähigkeiten kennt LiteLLM
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 1.5e-07
+      output_cost_per_token: 6.0e-07
 
-  - model_name: chat-standard
+  - model_name: chat-standard               # freier Chat; Planungsassistenten → PLANUNG_MODEL
     litellm_params:
-      model: mistral/mistral-small-latest
+      model: mistral/mistral-small-2603
       api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 1.5e-07
+      output_cost_per_token: 6.0e-07
 
   - model_name: chat-code
     litellm_params:
-      model: mistral/codestral-latest
+      model: mistral/codestral-2508
       api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 3.0e-07
+      output_cost_per_token: 9.0e-07
 
-  - model_name: chat-komplex
+  - model_name: chat-komplex                # auch PLANUNG_MODEL
     litellm_params:
-      model: mistral/mistral-large-latest
+      model: mistral/mistral-large-4-0      # Mistral Large 4
       api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 7.0e-07
+      output_cost_per_token: 2.1e-06
 
   - model_name: system-titel
     litellm_params:
-      model: mistral/mistral-small-latest   # NICHT ministral — siehe unten
+      model: mistral/mistral-small-2603     # NICHT ministral — siehe unten
       api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      input_cost_per_token: 1.5e-07
+      output_cost_per_token: 6.0e-07
 
   - model_name: embedding-standard
     litellm_params:
@@ -301,8 +328,11 @@ Jede Stufe zeigt auf einen eigenen Anbieter.
 model_list:
   - model_name: chat-schnell              # EU, günstig, für alle
     litellm_params:
-      model: mistral/mistral-small-latest
+      model: mistral/mistral-small-2603
       api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      input_cost_per_token: 1.5e-07
+      output_cost_per_token: 6.0e-07
 
   - model_name: chat-komplex              # nur Lehrkräfte
     litellm_params:

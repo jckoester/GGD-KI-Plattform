@@ -214,6 +214,10 @@ bedeutet dort Spend 0 und wirkungslose Budgets. Dieser Aufwand entfällt hier vo
 Gemessen am 28.08.2026 über den Proxy (Titeltreue: viermal der echte Titel-Prompt der
 Anwendung, „maximal 6 Wörter"):
 
+> Gemessen mit den `-latest`-Kennungen, die damals galten. Seit 0.49 werden feste Versionen
+> eingetragen (siehe [Modell-Szenarien](modell-szenarien.md#szenario-b--mistral)); `mistral-small-latest`
+> ist heute `mistral-small-2603` (Small 4).
+
 | Modell (`mistral/…`) | $/M ein | $/M aus | Funktionen | Titel | Erfahrung |
 |---|---|---|---|---|---|
 | `ministral-3b-latest` | 0,10 | 0,10 | ✅ | **3/4** (3–7) | Billigstes Modell, reißt die Grenze knapp. Als Titelmodell grenzwertig. |

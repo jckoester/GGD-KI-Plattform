@@ -308,6 +308,29 @@ def test_unreplaced_placeholders_are_errors(name, target):
     assert any("Platzhalter" in m for m in _levels(findings, ERROR))
 
 
+# ── Wandernde Kennungen (0.49) ──────────────────────────────────────────────
+
+def test_latest_kennung_ist_eine_warnung():
+    """`mistral-large-latest` war am 18.11.2026 Large 4, abgerechnet zum Preis von Large 3."""
+    eintraege = _healthy()
+    eintraege[0] = _entry("chat-standard", target="mistral/mistral-large-latest",
+                          supports_function_calling=True,
+                          input_cost_per_token=5e-7, output_cost_per_token=1.5e-6)
+    findings = check_config(eintraege, _settings(), bildarten=_BILDARTEN)
+    warnungen = _levels(findings, WARNING)
+    assert any("mistral/mistral-large-latest" in m and "wandernde Kennung" in m for m in warnungen)
+    assert not any("wandernde" in m for m in _levels(findings, ERROR))
+
+
+def test_feste_kennung_ohne_warnung():
+    eintraege = _healthy()
+    eintraege[0] = _entry("chat-standard", target="mistral/mistral-small-2603",
+                          supports_function_calling=True,
+                          input_cost_per_token=1.5e-7, output_cost_per_token=6e-7)
+    findings = check_config(eintraege, _settings(), bildarten=_BILDARTEN)
+    assert not any("wandernde" in m for m in _levels(findings, WARNING))
+
+
 # ── Bildarten gegen die Proxy-Config ─────────────────────────────────────────
 #
 # Die Bildarten stehen in einer eigenen Datei; sie kann von der LiteLLM-Config abdriften,

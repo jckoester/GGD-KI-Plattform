@@ -123,6 +123,7 @@ LiteLLM-Config, nicht die Modell-IDs des Anbieters:
 ```bash
 OPENAI_API_KEY=…            # bzw. IONOS_API_KEY / MISTRAL_API_KEY / ANTHROPIC_API_KEY
 CHAT_DEFAULT_MODEL=chat-standard
+PLANUNG_MODEL=chat-komplex   # seit 0.49: Planungsassistenten ohne eigenes Modell
 TITLE_MODEL=system-titel
 BEGRIFFE_MODEL=system-begriffe
 VORSCHLAG_MODEL=system-vorschlag

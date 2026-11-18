@@ -142,6 +142,12 @@ class Settings(BaseSettings):
     # gar nicht kennt (dann: unverständlicher 400er). Fehlt der Wert, meldet das der
     # Startup-Check in app/main.py.
     chat_default_model: str = ""
+    # Modell für Assistenten mit einer Planungs-Fähigkeit (`planning`, `lesson_planning`,
+    # `curriculum_planning`), wenn der Assistent selbst keins nennt (0.49). Leer = wie alle
+    # anderen `CHAT_DEFAULT_MODEL`. Anlass: Diese Assistenten schreiben über Funktionsaufrufe,
+    # und ein günstiges Standardmodell, das im freien Chat genügt, scheitert dort (Mistral Small 4:
+    # 13/30 am Stundenassistenten, Messung 17.11.2026).
+    planung_model: str = ""
     # Leer = keine automatische Titelgenerierung (der Chat-Flow prüft darauf).
     title_model: str = ""
     # Modell für die Begriffsvorschläge aus den Phasentexten (0.18), Alias `system-begriffe`.

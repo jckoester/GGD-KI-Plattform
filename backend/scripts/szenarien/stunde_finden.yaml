@@ -3,8 +3,11 @@
 #   python scripts/stundenassistent_messung.py --datei scripts/szenarien/stunde_finden.yaml
 #
 # „Morgen", „am Montag" hängen am heutigen Tag. Die Fälle sind auf `heute` geschnitten
-# (Samstag, 10.10.2026, Dev-Instanz); an einem anderen Tag bricht die Messung ab, statt
-# stillschweigend etwas anderes zu messen.
+# (Mittwoch, 18.11.2026, Dev-Instanz; bis dahin Samstag, 10.10.2026); an einem anderen Tag bricht
+# die Messung ab, statt stillschweigend etwas anderes zu messen. Neu schneiden: die Termine der
+# Lehrkraft für die nächsten zehn Tage lesen; Fälle mit `waehlt` brauchen am Zieltermin einen
+# Entwurf (am 18.11. für 9C/18.11. und abi28/24.11. leer über `POST /planning/slots/{id}/lesson`
+# angelegt).
 #
 # `waehlt`: Dieser Termin muss danach die Bezugsstunde sein. `nachfrage`: Es darf keine
 # Bezugsstunde gesetzt sein; ob und wie gut nachgefragt wird, sagt die `erwartung`, die Jan im
@@ -12,23 +15,24 @@
 # Zustimmung.
 
 lehrkraft_der_gruppe: 33
-heute: 2026-10-10
+heute: 2026-11-18
 
 faelle:
   - id: ein-treffer-gruppe
     zuege: ["Ich will meine nächste Stunde in der 9C vorbereiten."]
-    waehlt: {gruppe: 36, datum: 2026-10-12}
+    waehlt: {gruppe: 36, datum: 2026-11-18}
     erwartung: >-
-      Wählt die Stunde am 12.10. in der 9C, nennt sie kurz und bietet an, womit es losgeht.
+      Wählt die Stunde heute (18.11., 3. Stunde) in der 9C, nennt sie kurz und bietet an, womit
+      es losgeht.
 
   - id: ein-treffer-wochentag
     zuege: ["Hilf mir mit der Chemie-Stunde am Dienstag."]
-    waehlt: {gruppe: 33, datum: 2026-10-13}
+    waehlt: {gruppe: 33, datum: 2026-11-24}
     erwartung: >-
-      Wählt die Chemiestunde am Dienstag, 13.10. (ch-tl-abi28), und arbeitet mit ihrem Entwurf weiter.
+      Wählt die Chemiestunde am Dienstag, 24.11. (ch-tl-abi28), und arbeitet mit ihrem Entwurf weiter.
 
   - id: mehrdeutig
-    # Montag, 12.10.: drei Gruppen (ch-ks-9d, 9C, ch-tl-abi28)
+    # Montag, 23.11.: drei Gruppen (ch-ks-9d, 9C, ch-tl-abi28)
     zuege: ["Lass uns meine Stunde am Montag planen."]
     nachfrage: true
     erwartung: >-
@@ -43,9 +47,9 @@ faelle:
       oder Datum.
 
   - id: ohne-entwurf
-    # Donnerstag, 15.10.: Chemie nur in ch-tl-abi28, ohne Entwurf
+    # Donnerstag, 19.11.: Chemie nur in ch-tl-abi28, ohne Entwurf (daneben zweimal NwT)
     zuege: ["Plane mit mir die Chemie-Stunde am Donnerstag."]
     nachfrage: true
     erwartung: >-
-      Findet den Termin am 15.10., sagt, dass es noch keinen Entwurf gibt, und fragt, ob einer
+      Findet den Termin am 19.11., sagt, dass es noch keinen Entwurf gibt, und fragt, ob einer
       angelegt werden soll.

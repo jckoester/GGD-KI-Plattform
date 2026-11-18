@@ -349,6 +349,37 @@ class TestModellfreigabe:
             assert aus_der_abfrage == soll, (zugang.modelle, aus_der_abfrage)
 
 
+    async def test_planungsassistent_ohne_modell_braucht_planung_model(
+            self, db_session, welt, monkeypatch):
+        """0.49: Ohne eigenes Modell läuft ein Assistent mit Planungs-Fähigkeit auf
+        `PLANUNG_MODEL`; sichtbar ist er also nur, wo **dieses** Modell frei ist. Funktion und
+        Abfrage müssen dieselbe Antwort geben."""
+        from app.config import settings
+        monkeypatch.setattr(settings, "chat_default_model", "chat-standard")
+        monkeypatch.setattr(settings, "planung_model", "chat-komplex")
+        planer = await _assistent(db_session, scope="all", audience="teacher", model="",
+                                  tool_groups=["lesson_planning"], created_by="wer-anders")
+        schlicht = await _assistent(db_session, scope="all", audience="teacher", model="",
+                                    tool_groups=["context_search"], created_by="wer-anders")
+        gebunden = await _assistent(db_session, scope="all", audience="teacher", model="chat-standard",
+                                    tool_groups=["planning"], created_by="wer-anders")
+        bestand = [planer, schlicht, gebunden]
+        ids = [a.id for a in bestand]
+
+        for frei, soll in (
+            (("chat-standard",), {schlicht.id, gebunden.id}),
+            (("chat-komplex",), {planer.id}),
+            (("chat-standard", "chat-komplex"), {planer.id, schlicht.id, gebunden.id}),
+        ):
+            zugang = self._mit(await _zugang(db_session, ERSTELLERIN, "teacher"), *frei)
+            aus_der_funktion = {a.id for a in bestand if darf_nutzen(a, zugang)}
+            aus_der_abfrage = set((await db_session.execute(
+                sa.select(Assistant.id).where(Assistant.id.in_(ids), sichtbar_klausel(zugang))
+            )).scalars().all())
+            assert aus_der_funktion == soll, (frei, aus_der_funktion)
+            assert aus_der_abfrage == soll, (frei, aus_der_abfrage)
+
+
 class TestChatWeg:
     """Das Gegenstück am Chat — nicht nur an der Liste.
 

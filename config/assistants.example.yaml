@@ -12,11 +12,12 @@ assistants:
     audience: teacher
     scope: teachers
     status: active
-    # model: weglassen = schulweiter Standard (CHAT_DEFAULT_MODEL) — der Assistent folgt
-    # dann automatisch einem Modellwechsel. Nur setzen, wenn er bewusst an ein bestimmtes
-    # Modell gebunden sein soll; dann bricht er, wenn dieses aus der LiteLLM-Config fällt.
-    # Für Tool-Nutzung (planning, context_search, image_generation) muss das Modell
-    # Function-Calling beherrschen.
+    # model: weglassen = PLANUNG_MODEL (seit 0.49, empfohlen `chat-komplex`; ohne diese Variable
+    # CHAT_DEFAULT_MODEL) — der Assistent folgt dann automatisch einem Modellwechsel. Nur setzen,
+    # wenn er bewusst an ein bestimmtes Modell gebunden sein soll; dann bricht er, wenn dieses aus
+    # der LiteLLM-Config fällt. Für Tool-Nutzung (planning, context_search, image_generation)
+    # muss das Modell Function-Calling beherrschen; ein günstiges Standardmodell genügt hier nicht
+    # (Mistral Small 4: 13/30 am Stundenassistenten, 17.11.2026).
     tool_groups:
       - planning
     # Was er herstellt (0.40): Marke und Filter „Werkzeuge“ in der Assistentenliste.
