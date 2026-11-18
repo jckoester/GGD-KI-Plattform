@@ -182,3 +182,26 @@ describe("stufeVon", () => {
     expect(stufeVon(null, "library")).toBeNull()
   })
 })
+
+describe("Vorschau (0.48, Päckchen N Schritt 8)", () => {
+  // In der Vorschau kommt der Zuschnitt der Schüler:innen (`/ui/levels` nach Token-Rolle), die
+  // Stufe aber aus den Einstellungen der Lehrkraft. Festgehalten, wie es ist — Gegenstück im
+  // Backend: `tests/integration/test_vorschau_stufe.py`.
+  const SCHUELER = {
+    rolle: "student",
+    startstufe: 1,
+    hoechste: 2,
+    stufen: [
+      { stufe: 1, name: "Chatten", eintraege: ["chat", "workshop"] },
+      { stufe: 2, name: "Nachschlagen", eintraege: ["knowledge"] },
+    ],
+  }
+
+  it("eine Lehrkraft auf Stufe 4 sieht die höchste Stufe der Schüler:innen", () => {
+    expect(wirksameStufe({ ui_level: 4 }, SCHUELER)).toBe(2)
+  })
+
+  it("eine Lehrkraft auf Stufe 1 sieht die Stufe 1 der Schüler:innen", () => {
+    expect(wirksameStufe({ ui_level: 1 }, SCHUELER)).toBe(1)
+  })
+})

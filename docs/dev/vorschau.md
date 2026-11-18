@@ -104,3 +104,11 @@ Sitzung. Die Regeln für Band und Dialog stehen in `$lib/vorschau.js`.
 Die **Einrichtung der Schüler:innen** (seit 0.47) lässt sich in der Vorschau über den Kasten im
 Profil öffnen, geht aber nie von selbst auf und speichert nichts; `GET /einrichtung` liefert dort
 keinen Stand. Einzelheiten: [Einrichtung](einrichtung.md).
+
+**Darstellungsstufe in der Vorschau** (geprüft 0.48): `GET /ui/levels` liefert den Zuschnitt der
+Schüler:innen (Rolle aus dem Token), die Stufe aber kommt aus den Einstellungen der Lehrkraft
+(`GET /preferences` liest dasselbe Pseudonym). `wirksameStufe` klemmt sie auf die Stufen der
+Schüler:innen: Eine Lehrkraft ab Stufe 2 sieht deren höchste Stufe, eine auf Stufe 1 nur Stufe 1.
+Ändern lässt sie sich in der Vorschau nicht (`PATCH /preferences` gesperrt; „Einblenden“ unter
+„Es gibt mehr“ rollt still zurück). Tests: `tests/integration/test_vorschau_stufe.py`,
+`frontend/src/lib/stores/uiLevel.test.js`.
