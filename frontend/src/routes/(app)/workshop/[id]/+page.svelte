@@ -110,9 +110,9 @@
 
     const knopf = 'inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50';
 </script>
-
 <PageBody breit>
-    <div class="max-w-6xl mx-auto flex flex-col gap-4">
+<PageBody breit>
+    <div class="flex flex-col gap-4">
         <ZurueckLink href={rueckwegAus($page.url.searchParams) ?? "/workshop"} label={rueckwegAus($page.url.searchParams) ? undefined : "Werkstatt"} />
 
         {#if error}<ErrorBanner message={error} />{/if}
@@ -271,3 +271,4 @@
 {#if uebernahmeOffen && info}
     <UebernahmeDialog artefakt={info} onclose={() => (uebernahmeOffen = false)} ongespeichert={laden} />
 {/if}
+</PageBody>

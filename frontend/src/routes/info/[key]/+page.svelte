@@ -45,7 +45,7 @@
     }
 </script>
 
-<div class="max-w-2xl mx-auto py-10 px-4">
+<div class="max-w-4xl mx-auto py-10 px-6">
     <ZurueckLink href="/" />
 
     {#if loading}
@@ -57,7 +57,7 @@
             {LABELS[schluessel] ?? schluessel}
         </h1>
         {#if renderedContent}
-            <div class="prose dark:prose-invert max-w-none">
+            <div class="prose dark:prose-invert max-w-prose">
                 {@html renderedContent}
             </div>
         {:else}

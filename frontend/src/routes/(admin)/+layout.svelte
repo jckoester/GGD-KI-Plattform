@@ -107,7 +107,7 @@
                 "text-light-tx dark:text-light-tx-1"}
         />
         <main
-            class="flex-1 overflow-y-auto bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-4"
+            class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2"
         >
             {@render children()}
         </main>

@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import { onMount } from "svelte";
     import { Bot, Loader2 } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -82,9 +83,7 @@
 
     onMount(loadAllAssistants);
 </script>
-
-<div class="h-full overflow-y-auto p-6">
-    <div class="max-w-4xl mx-auto">
+<PageBody breit>
         <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
             <Bot class="w-6 h-6" />
             <h1 class="text-2xl font-semibold">Assistenten-Freigabe</h1>
@@ -176,5 +175,5 @@
                 </table>
             </div>
         {/if}
-    </div>
-</div>
+    
+</PageBody>

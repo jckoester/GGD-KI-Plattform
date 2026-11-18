@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import {
         Settings,
         CloudCog,
@@ -20,9 +21,7 @@
     // weg statt eine Seite anzubieten, die nur mitteilen kann, dass sie nichts kann.
     onMount(refreshCalendarStatus);
 </script>
-
-
-<div class="max-w-2xl mx-auto py-8">
+<PageBody>
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
         <Settings class="w-6 h-6" />
         <h1 class="text-2xl font-semibold">Einstellungen</h1>
@@ -156,4 +155,4 @@
         </a>
         {/if}
     </div>
-</div>
+</PageBody>

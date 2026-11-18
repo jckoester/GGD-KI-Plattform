@@ -1,4 +1,5 @@
 <script>
+  import PageBody from "$lib/components/PageBody.svelte";
   import { mitRueckweg } from "$lib/rueckweg.js";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
@@ -122,9 +123,8 @@
 
   onMount(load);
 </script>
-
-
-<div class="max-w-4xl mx-auto py-8">
+<PageBody breit>
+<div>
   <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
     <TriangleAlert class="w-6 h-6" />
     <h1 class="text-2xl font-semibold">Krisen-Meldungen</h1>
@@ -378,3 +378,4 @@
     </div>
   </div>
 {/if}
+</PageBody>

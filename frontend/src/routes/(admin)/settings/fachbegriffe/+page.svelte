@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Fachbegriffe in **jedes** Fach einspielen (Admin, 0.15.2).
@@ -49,8 +50,8 @@
         }
     }
 </script>
-
-<div class="max-w-5xl mx-auto p-6">
+<PageBody breit>
+<div>
     <ZurueckLink href="/settings" label="Einstellungen" />
 
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-2 flex items-center gap-2">
@@ -136,3 +137,4 @@
         onfertig={() => (stand += 1)}
     />
 {/if}
+</PageBody>

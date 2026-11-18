@@ -33,9 +33,10 @@
     const inhalt = $derived(nachDatei[data.eintrag.file]);
 </script>
 
-<div class="max-w-2xl mx-auto p-6 md:p-8">
+<!-- Rahmen schmal wie alle Leseseiten (0.48), die Textspalte bleibt auf Lesebreite (G8 a). -->
+<div class="max-w-4xl mx-auto px-6 py-6">
     {#if inhalt}
-        <div class="prose dark:prose-invert max-w-none">
+        <div class="prose dark:prose-invert max-w-prose">
             {@html renderMarkdown(inhalt, { dokuLinks: true })}
         </div>
     {:else}

@@ -88,11 +88,10 @@
         refreshConversations();
     }
 </script>
-
 <PageBody breit>
   <StufenHinweis eintrag="history" />
 
-    <div class="max-w-4xl mx-auto">
+    <div>
         <div
             class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx"
         >

@@ -215,7 +215,8 @@
      sichtbar — sonst müsste man zum Bestätigen erst ans Listenende scrollen. -->
 <div class="h-full flex flex-col">
     <div class="flex-1 overflow-y-auto">
-        <div class="px-6 py-6">
+        <!-- Breit wie alle Listen (0.48); eigener Scrollrahmen wegen der Auswahlleiste darunter. -->
+        <div class="max-w-7xl mx-auto px-6 py-6">
             <StufenHinweis eintrag="knowledge" />
             <UebergangsHinweis
                 neuigkeitId={WERKSTATT_NEUIGKEIT}

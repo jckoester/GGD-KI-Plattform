@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount } from "svelte";
     import { getHeatmap, getStatsTeams, getStatsModels } from "$lib/api.js";
@@ -57,10 +58,10 @@
 <svelte:head>
     <title>Anzahl Prompts</title>
 </svelte:head>
-
+<PageBody breit>
 <ZurueckLink href="/statistics" label="Statistiken" />
 
-<div class="max-w-2xl mx-auto py-8 space-y-6">
+<div class="space-y-6">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
             <ChartColumn class="w-6 h-6" />
@@ -267,3 +268,4 @@
         </div>
     {/if}
 </div>
+</PageBody>

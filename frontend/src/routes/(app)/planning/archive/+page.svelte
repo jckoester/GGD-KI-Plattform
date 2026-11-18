@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     /**
      * Archiv der Planung, Ebene 1: Gruppen (0.42, Päckchen AO, F3/F12).
      *
@@ -32,8 +33,8 @@
 </script>
 
 <svelte:head><title>Archiv der Planung</title></svelte:head>
-
-<div class="max-w-5xl mx-auto p-6 space-y-4">
+<PageBody breit>
+<div class="space-y-4">
     <div class="flex items-center justify-between gap-3 flex-wrap">
         <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">Archiv der Planung</h1>
         <ArchivAnsicht bind:ansicht />
@@ -84,3 +85,4 @@
         </div>
     {/if}
 </div>
+</PageBody>

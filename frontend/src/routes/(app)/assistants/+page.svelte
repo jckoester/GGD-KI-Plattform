@@ -67,9 +67,7 @@
         }
     })
 </script>
-
 <PageBody breit>
-    <div class="max-w-4xl mx-auto">
         <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
             <Bot class="w-6 h-6" />
             <h1 class="text-2xl font-semibold">Assistenten</h1>
@@ -199,5 +197,5 @@
             </div>
           {/each}
         {/if}
-    </div>
+    
 </PageBody>

@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     /**
      * Sichtung der Rückmeldungen (ADR-020, AP4).
      *
@@ -169,8 +170,7 @@
             minute: "2-digit",
         });
 </script>
-
-<div class="max-w-4xl mx-auto">
+<PageBody breit>
     {#if fehler}
         <ErrorBanner message={fehler} />
     {/if}
@@ -483,4 +483,4 @@
             {/each}
         </ul>
     {/if}
-</div>
+</PageBody>

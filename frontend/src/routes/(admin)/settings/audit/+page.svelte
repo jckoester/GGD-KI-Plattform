@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Audit-Log lesen (0.28, Plan Schritt 6, F5 „einfach halten“).
@@ -100,10 +101,10 @@
     const feld =
         "bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3 rounded px-2 py-1 text-light-tx dark:text-dark-tx";
 </script>
-
+<PageBody breit>
 <ZurueckLink href="/settings" label="Einstellungen" />
 
-<div class="max-w-6xl mx-auto py-4 space-y-5">
+<div class="space-y-5">
     <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
         <ScrollText class="w-6 h-6" />
         <h1 class="text-2xl font-semibold">Audit-Log</h1>
@@ -258,3 +259,4 @@
         {/if}
     {/if}
 </div>
+</PageBody>

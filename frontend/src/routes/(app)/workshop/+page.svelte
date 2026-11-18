@@ -605,7 +605,7 @@
 
 <PageBody breit>
   <StufenHinweis eintrag="workshop" />
-    <div class="max-w-5xl mx-auto">
+    <div>
         <UebergangsHinweis
             neuigkeitId={WERKSTATT_NEUIGKEIT}
             message="Hier liegen jetzt deine gespeicherten Bilder, Diagramme und Dokumente — bisher hieß dieser Bereich „Bibliothek“."

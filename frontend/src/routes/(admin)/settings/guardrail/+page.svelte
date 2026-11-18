@@ -1,4 +1,5 @@
 <script>
+  import PageBody from "$lib/components/PageBody.svelte";
   import ZurueckLink from "$lib/components/ZurueckLink.svelte";
   import { onMount } from "svelte";
   import { ShieldCheck } from "lucide-svelte";
@@ -104,10 +105,10 @@
     }
   }
 </script>
-
+<PageBody>
 <ZurueckLink href="/settings" label="Einstellungen" />
 
-<div class="max-w-3xl mx-auto py-8">
+<div>
   <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
     <ShieldCheck class="w-6 h-6" />
     <h1 class="text-2xl font-semibold">Schulweiter Guardrail-Prompt</h1>
@@ -360,3 +361,4 @@
     </div>
   {/if}
 </div>
+</PageBody>

@@ -14,23 +14,27 @@
      * sieht nicht kaputt aus — man merkt ihn erst, wenn der Inhalt lang wird.
      * Steckt er in dieser Komponente, kann er einer Seite nicht mehr passieren.
      *
-     * **Zwei Muster:**
+     * **Zwei Breiten, sonst keine** (seit 0.48, Päckchen N — vorher gab es neun):
      *
-     * - **`breit`** — Listen über die volle Breite (Vorbild `/knowledge/all`).
-     *   Tabellen und Trefferlisten brauchen den Platz.
-     * - **Vorgabe (schmal)** — alles, was gelesen oder ausgefüllt wird: Detail,
+     * - **`breit`** (`max-w-7xl`) — Tabellen, Listen, Kachelraster (Vorbild
+     *   `/knowledge/all`). Begrenzt, weil eine Tabellenzeile über einen 27-Zoll-Schirm
+     *   nicht mehr zu lesen ist.
+     * - **Vorgabe (schmal, `max-w-4xl`)** — alles, was gelesen oder ausgefüllt wird: Detail,
      *   Editoren, gruppierte Listen wie Leitperspektiven und Bildungsplan
      *   (Vorbild `/knowledge/mine`). Zentriert, weil eine Textspalte am linken
      *   Rand eines 27-Zoll-Schirms unlesbar ist.
      *
      * Seiten mit eigener Flex-Struktur (Chat, Graph, Curriculum-Editor, Planer)
      * benutzen sie **nicht** — sie verwalten ihren Scrollbereich selbst.
+     *
+     * Seit 0.48 auch im Admin-Bereich: Dessen Layout scrollt nicht mehr selbst, sondern
+     * gibt `<main>` dasselbe `overflow-hidden` wie die App.
      */
     let { breit = false, children } = $props()
 </script>
 
 <div class="h-full overflow-y-auto">
-    <div class={breit ? 'px-6 py-6' : 'max-w-4xl mx-auto px-4 py-6'}>
+    <div class="{breit ? 'max-w-7xl' : 'max-w-4xl'} mx-auto px-6 py-6">
         {@render children()}
     </div>
 </div>

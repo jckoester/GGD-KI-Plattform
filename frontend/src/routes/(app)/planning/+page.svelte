@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     /**
      * Übersicht „Planung“ (0.42.2): je aktuelle Unterrichtsgruppe eine Kachel in ihren Planer,
      * abgesetzt darunter das Archiv. Dieselben Gruppen und Beschriftungen wie im Menü
@@ -40,8 +41,8 @@
 </script>
 
 <svelte:head><title>Planung</title></svelte:head>
-
-<div class="max-w-5xl mx-auto p-6 space-y-4">
+<PageBody breit>
+<div class="space-y-4">
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">Planung</h1>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
         Deine Unterrichtsgruppen in diesem Schuljahr. Eine Kachel öffnet die Jahresübersicht der Gruppe.
@@ -85,3 +86,4 @@
         </a>
     </div>
 </div>
+</PageBody>

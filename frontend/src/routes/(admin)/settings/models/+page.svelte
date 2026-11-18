@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import { onMount } from "svelte";
     import {
         getModelMatrix,
@@ -57,7 +58,7 @@
         }
     });
 </script>
-
+<PageBody breit>
 <div class="p-6 space-y-10">
     <!-- Kopfzeile -->
     <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
@@ -116,3 +117,4 @@
         />
     {/if}
 </div>
+</PageBody>

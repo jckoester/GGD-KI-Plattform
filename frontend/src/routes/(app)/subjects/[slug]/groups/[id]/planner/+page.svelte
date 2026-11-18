@@ -743,7 +743,7 @@
 {#if ansicht === EINHEITEN}
   <!-- Einheitenansicht (0.42.3) -->
   <div class="flex-1 overflow-y-auto">
-    <div class="max-w-5xl mx-auto p-6 space-y-4">
+    <div class="max-w-7xl mx-auto px-6 py-6 space-y-4">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <nav class="text-sm text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1.5 flex-wrap">
           {#if einheitSchluessel}

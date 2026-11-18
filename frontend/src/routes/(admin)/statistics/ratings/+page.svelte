@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     /**
      * Antwortbewertung (0.31, Päckchen T, ADR-020): Daumen je Assistent oder Modell.
@@ -72,10 +73,10 @@
 <svelte:head>
     <title>Antwortbewertung</title>
 </svelte:head>
-
+<PageBody breit>
 <ZurueckLink href="/statistics" label="Statistiken" />
 
-<div class="max-w-5xl mx-auto py-8 space-y-6 text-light-tx dark:text-dark-tx">
+<div class="space-y-6 text-light-tx dark:text-dark-tx">
     <div class="flex items-center gap-2">
         <ThumbsUp class="w-6 h-6" />
         <h1 class="text-2xl font-semibold">Antwortbewertung</h1>
@@ -202,3 +203,4 @@
         {/if}
     {/if}
 </div>
+</PageBody>

@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     /**
      * Archiv der Planung, Ebenen 2 und 3: Einheiten einer Gruppe, Stunden einer Einheit
      * (0.42, Päckchen AO, F3). Die Einheit steht in der Adresse (`?einheit=`), „Stunden ohne
@@ -52,8 +53,8 @@
 </script>
 
 <svelte:head><title>Archiv der Planung{inhalt ? ` – ${inhalt.gruppe.name}` : ''}</title></svelte:head>
-
-<div class="max-w-5xl mx-auto p-6 space-y-4">
+<PageBody breit>
+<div class="space-y-4">
     <nav class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1.5 flex-wrap">
         <a href={archivPfad()} class="hover:text-light-bl dark:hover:text-dark-bl">Archiv</a>
         {#if inhalt}
@@ -115,3 +116,4 @@
     fachId={inhalt?.gruppe?.fach?.id ?? null}
     onClose={() => (kopieren = null)}
 />
+</PageBody>

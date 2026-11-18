@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount } from "svelte";
     import { page } from "$app/stores";
@@ -95,10 +96,10 @@
         return edited[key] !== undefined && edited[key] !== texts[key];
     }
 </script>
-
+<PageBody>
 <ZurueckLink href="/settings" label="Einstellungen" />
 
-<div class="max-w-4xl mx-auto py-8">
+<div>
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
         <h1 class="text-2xl font-semibold">Site-Texte bearbeiten</h1>
     </div>
@@ -209,3 +210,4 @@
         </div>
     {/if}
 </div>
+</PageBody>

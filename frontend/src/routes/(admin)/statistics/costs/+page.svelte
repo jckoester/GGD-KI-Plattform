@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount, onDestroy, tick } from "svelte";
     import { getSpend, getStatsTeams, getStatsModels } from "$lib/api.js";
@@ -164,10 +165,10 @@
 <svelte:head>
     <title>Kosten</title>
 </svelte:head>
-
+<PageBody breit>
 <ZurueckLink href="/statistics" label="Statistiken" />
 
-<div class="max-w-4xl mx-auto py-8 space-y-6">
+<div class="space-y-6">
     <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
         <ReceiptEuro class="w-6 h-6" />
         <h1 class="text-2xl font-semibold">Kosten</h1>
@@ -371,3 +372,4 @@
         {/if}
     {/if}
 </div>
+</PageBody>

@@ -1,9 +1,8 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import { ChartNoAxesCombined, ChartColumn, ReceiptEuro, ScanSearch, ThumbsUp } from "lucide-svelte";
 </script>
-
-
-<div class="max-w-2xl mx-auto py-8">
+<PageBody>
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
         <ChartNoAxesCombined class="w-6 h-6" />
         <h1 class="text-2xl font-semibold">Statistics</h1>
@@ -58,4 +57,4 @@
             </div>
         </a>
     </div>
-</div>
+</PageBody>

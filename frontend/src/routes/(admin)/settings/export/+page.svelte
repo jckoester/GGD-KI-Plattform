@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte';
     import ZurueckLink from '$lib/components/ZurueckLink.svelte';
     import { onMount } from 'svelte';
     import { FileText, Upload, Trash2, Loader2 } from 'lucide-svelte';
@@ -80,8 +81,7 @@
         { fmt: 'odt', label: 'OpenDocument (ODT)', accept: '.odt' },
     ];
 </script>
-
-<div class="max-w-2xl mx-auto py-8 px-4">
+<PageBody>
     <ZurueckLink href="/settings" label="Einstellungen" />
 
     <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
@@ -200,4 +200,4 @@
             </div>
         </section>
     {/if}
-</div>
+</PageBody>

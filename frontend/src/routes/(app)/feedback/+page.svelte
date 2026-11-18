@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     /**
      * „Feedback & Neuigkeiten“ — der Rückweg des Feedback-Kanals (ADR-020). Bis 0.30 hieß
      * die Seite „Meine Meldungen“; das ist jetzt ihr letzter Abschnitt.
@@ -76,9 +77,7 @@
             year: "numeric",
         });
 </script>
-
-<div class="h-full overflow-y-auto">
-    <div class="max-w-3xl mx-auto px-4 py-6">
+<PageBody>
         {#if fehler}
             <ErrorBanner message={fehler} />
         {/if}
@@ -195,5 +194,5 @@
                 {/each}
             </ul>
         {/if}
-    </div>
-</div>
+    
+</PageBody>

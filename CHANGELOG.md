@@ -34,6 +34,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Letzte Chats) haben kein Zurück mehr. Profil und Unterricht haben „Schließen“.
 - Von Baustein zu Baustein führt Zurück Schritt für Schritt zurück.
 - Der Assistenten-Editor heißt am × jetzt „Schließen“.
+- Seitenbreiten vereinheitlicht: Es gibt nur noch zwei, schmal für Formulare, Detail und Einstellungen,
+  breit (höchstens 1280 px) für Listen und Tabellen; auch im Verwaltungsbereich. Hilfe und Infoseiten
+  behalten ihre Lesespalte.
 - Vorschau: zeigt immer die höchste Darstellungsstufe der Schüler:innen, unabhängig von der eigenen
   Stufe; der Hinweis „Es gibt mehr“ entfällt dort.
 

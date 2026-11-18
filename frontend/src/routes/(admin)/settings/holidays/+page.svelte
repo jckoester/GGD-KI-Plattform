@@ -1,4 +1,5 @@
 <script>
+    import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { CalendarDays, Copy, RefreshCw, Save } from "lucide-svelte";
     import { getHolidayProposal, applyHolidayProposal } from "$lib/api.js";
@@ -83,8 +84,7 @@
             .join(" · ");
     }
 </script>
-
-<div class="max-w-4xl mx-auto p-6">
+<PageBody breit>
     <ZurueckLink href="/settings" label="Einstellungen" />
 
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-2 flex items-center gap-2">
@@ -241,4 +241,4 @@
             </section>
         </div>
     {/if}
-</div>
+</PageBody>
