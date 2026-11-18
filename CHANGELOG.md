@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.47.1] – 2026-11-18
+
+### Behoben
+
+- Sicherheit: Der Rückweg `?back=` in der Bibliothek (Baustein, neuer Baustein, Sammlungen) wird
+  geprüft; nur Pfade der Plattform gelten, sonst der übliche Rückweg. Vorher ließ sich über einen
+  präparierten Link beim Klick auf „Zurück“ Skript ausführen.
+
 ## [0.47.0] – 2026-11-18
 
 ### Neu

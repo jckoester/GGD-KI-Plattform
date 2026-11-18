@@ -1,4 +1,5 @@
 <script>
+    import { rueckwegAus } from "$lib/rueckweg.js";
     import { page } from "$app/stores";
     import { getContextNode } from "$lib/api.js";
     import CollectionEditor from "$lib/components/CollectionEditor.svelte";
@@ -6,7 +7,7 @@
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
 
     const typ = $derived($page.params.type);
-    const back = $derived($page.url.searchParams.get("back"));
+    const back = $derived(rueckwegAus($page.url.searchParams));
     let node = $state(null);
     let error = $state(null);
 

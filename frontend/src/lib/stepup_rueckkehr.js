@@ -6,6 +6,8 @@
 //   - was die Lehrkraft eingegeben hatte: Ein Formular merkt sich seine Eingaben vorher im
 //     Sitzungsspeicher und holt sie danach einmal zurück.
 
+import { sichererRueckweg } from "./rueckweg.js";
+
 export const STEPUP_FEHLER_PARAM = "stepup_fehler";
 
 // Wie lange gemerkte Eingaben gelten. Die Anmeldung beim Schulkonto dauert Sekunden bis
@@ -37,12 +39,10 @@ export function stepupFehlerText(code, jetzt = new Date()) {
 }
 
 /** Ein Rücksprungziel aus der Adresse — nur lokale Pfade, sonst null (gegen Open-Redirect;
- *  dieselbe Regel wie `_safe_return_to` im Backend). */
+ *  dieselbe Regel wie `_safe_return_to` im Backend). Seit 0.47.1 eine Regel für alle
+ *  Rückwege: `sichererRueckweg` in `rueckweg.js`. */
 export function lokalesZiel(wert) {
-  if (!wert || !wert.startsWith("/") || ["/", "\\"].includes(wert[1])) return null;
-  // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f]/.test(wert)) return null;
-  return wert;
+  return sichererRueckweg(wert);
 }
 
 /** Fehlercode aus einem Query-String (`?…`), oder null. */

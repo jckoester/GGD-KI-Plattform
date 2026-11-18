@@ -1,4 +1,5 @@
 <script>
+    import { sichererRueckweg } from "$lib/rueckweg.js";
     import { untrack } from "svelte";
     /**
      * Sammlungs-Editor (UI-Notiz A2) — eigene Seite, kein Modal.
@@ -32,7 +33,8 @@
      * gefilterten Ausschnitt, aus dem man kam — dieselbe Lücke, die der Zurück-Button
      * der Detailansicht hatte.
      */
-    const zurueck = $derived(back || `/knowledge/collections/${typ}`);
+    // `back` prüfen die Seiten schon; hier noch einmal, weil die Komponente es nicht weiß.
+    const zurueck = $derived(sichererRueckweg(back) ?? `/knowledge/collections/${typ}`);
 
     const config = $derived(sammlung(typ));
     const schema = $derived(feldSchema(typ));

@@ -1,4 +1,5 @@
 <script>
+    import { rueckwegAus } from "$lib/rueckweg.js";
     import { bearbeitenZiel } from "$lib/bearbeiten.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { page } from "$app/stores";
@@ -37,7 +38,7 @@
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
     let loadingNode = $state(true);
-    const backParam = $derived($page.url.searchParams.get("back"));
+    const backParam = $derived(rueckwegAus($page.url.searchParams));
     // „Zurück"/„Abbrechen" führen zur Leseansicht des Knotens; der ursprüngliche
     // back-Parameter (z. B. die Liste) wird durchgereicht.
     const readUrl = $derived(

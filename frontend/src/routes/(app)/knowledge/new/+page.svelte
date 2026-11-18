@@ -1,4 +1,5 @@
 <script>
+  import { rueckwegAus } from '$lib/rueckweg.js'
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
   import {
@@ -171,7 +172,7 @@
         abgrenzung_zu: abgrenzungZu,
       }
       const created = await createContextNode(payload)
-      const backUrl = $page.url.searchParams.get('back')
+      const backUrl = rueckwegAus($page.url.searchParams)
       goto(backUrl ?? `/knowledge/${created.id}`)
     } catch (e) {
       if (e.status === 409 && e.detail?.grund === 'kollision') {
@@ -674,7 +675,7 @@
         {saving ? 'Speichern…' : 'Speichern'}
       </button>
       <a
-        href={$page.url.searchParams.get('back') ?? '/knowledge'}
+        href={rueckwegAus($page.url.searchParams) ?? '/knowledge'}
         class="px-4 py-2 text-sm rounded-md text-light-tx dark:text-dark-tx
                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
       >

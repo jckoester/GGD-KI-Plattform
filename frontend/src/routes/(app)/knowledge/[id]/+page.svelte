@@ -1,4 +1,5 @@
 <script>
+    import { rueckwegAus } from "$lib/rueckweg.js";
     import { untrack } from "svelte";
     import { getNeighborhood, deleteContextEdge } from "$lib/api.js";
     import { kannVerknuepfen, istStub } from "$lib/collections.js";
@@ -92,15 +93,15 @@
     }
 
     const backUrl = $derived(
-        $page.url.searchParams.get("back") ?? "/knowledge",
+        rueckwegAus($page.url.searchParams) ?? "/knowledge",
     );
 
     // Die Graphansicht ebenso: Von dort führt „Zurück zum Knoten" hierher, und von hier
     // muss der Weg zur Ausgangsliste offen bleiben.
     const graphUrl = $derived(
         `/knowledge/${$page.params.id}/graph` +
-            ($page.url.searchParams.get("back")
-                ? `?back=${encodeURIComponent($page.url.searchParams.get("back"))}`
+            (rueckwegAus($page.url.searchParams)
+                ? `?back=${encodeURIComponent(rueckwegAus($page.url.searchParams))}`
                 : ""),
     );
 
@@ -112,7 +113,7 @@
         bearbeitenZiel(
             node,
             node?.subject_id ? ($subjectMap[node.subject_id] ?? null) : null,
-            $page.url.searchParams.get("back"),
+            rueckwegAus($page.url.searchParams),
         ),
     );
 

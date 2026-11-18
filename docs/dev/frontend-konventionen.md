@@ -118,6 +118,16 @@ info/[key]/     → statische Texte (impressum, datenschutz, regeln)
 
 Die vollständige Routen-Tabelle steht in `CLAUDE.md`.
 
+### Rückweg `?back=`
+
+Eine Seite, die den Weg zurück aus der Adresse übernimmt, liest `back` **nur** über
+`rueckwegAus($page.url.searchParams)` aus `$lib/rueckweg.js` und setzt ihren Rückfall mit `??`.
+Der Wert stammt von wem auch immer den Link gebaut hat. Ungeprüft im `href` war
+`?back=javascript:…` ausführbar, und `//fremde.seite` war eine offene Weiterleitung (behoben 0.47.1).
+Durchgelassen werden nur Pfade der Plattform. Der Wächter in `rueckweg.test.js` findet jedes
+ungeprüfte `searchParams.get('back')`. `lokalesZiel` (Rücksprung nach dem Login) folgt derselben
+Regel.
+
 Neue Routen brauchen eine `+page.js` (oder `+page.server.js`) mit mindestens:
 ```js
 export function load() {

@@ -1,4 +1,5 @@
 <script>
+  import { rueckwegAus } from '$lib/rueckweg.js'
   import { page } from '$app/stores'
   import GraphExplorer from '$lib/components/GraphExplorer.svelte'
 
@@ -7,8 +8,8 @@
   // und der Suchzustand ist verloren.
   const zumKnoten = $derived(
     `/knowledge/${$page.params.id}` +
-      ($page.url.searchParams.get('back')
-        ? `?back=${encodeURIComponent($page.url.searchParams.get('back'))}`
+      (rueckwegAus($page.url.searchParams)
+        ? `?back=${encodeURIComponent(rueckwegAus($page.url.searchParams))}`
         : ''),
   )
 </script>
