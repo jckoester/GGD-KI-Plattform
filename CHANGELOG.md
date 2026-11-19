@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.49.0] – 2026-11-19
+
 ### Neu
 
 - `PLANUNG_MODEL`: Assistenten mit Planungs-Fähigkeit (Jahresplanung, Stundenentwurf, Curriculum-Entwurf,
@@ -16,8 +18,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Schrift auf gefüllten Farbflächen über das Token `--color-on-fill` (Klasse `text-on-fill`) statt `text-white`;
   die Knöpfe im Konversationsmenü nutzen die Farb-Tokens.
 - Alle Chips über dem Chat-Eingabefeld (Assistent, Fach, Bausteine, Produkte aus der Werkstatt, hochgeladene
-  Dateien) in einer Form: links gerade mit Akzentrand,
-  rechts rund, getönter Grund, Fachfarbe bzw. Kategoriefarbe; der Assistent wird im Chip entfernt.
+  Dateien) in einer Form: links gerade mit Akzentrand, rechts rund, getönter Grund, Fachfarbe bzw.
+  Kategoriefarbe; der Assistent wird im Chip entfernt.
 - Chips am Chat-Eingabefeld neu angeordnet: Assistent und Fach darüber, Bausteine, Produkte aus der Werkstatt
   und hochgeladene Dateien darunter in einer Reihe; bei wenig Platz (etwa mit offener Bildschirmtastatur) klappt
   sie auf zwei Zeilen ein.
