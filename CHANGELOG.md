@@ -18,6 +18,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Alle Chips über dem Chat-Eingabefeld (Assistent, Fach, Bausteine, Produkte aus der Werkstatt, hochgeladene
   Dateien) in einer Form: links gerade mit Akzentrand,
   rechts rund, getönter Grund, Fachfarbe bzw. Kategoriefarbe; der Assistent wird im Chip entfernt.
+- Chips am Chat-Eingabefeld neu angeordnet: Assistent und Fach darüber, Bausteine, Produkte aus der Werkstatt
+  und hochgeladene Dateien darunter in einer Reihe; bei wenig Platz (etwa mit offener Bildschirmtastatur) klappt
+  sie auf zwei Zeilen ein.
 
 ### Nach dem Update
 

@@ -3,7 +3,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AKZENT_BLAU, CHIP_AKZENT, CHIP_FORM, CHIP_ICON, chipKlasse, fachAkzentStil } from "./chip_form.js";
+import {
+    AKZENT_BLAU, CHIP_AKZENT, CHIP_FORM, CHIP_ICON, ZWEI_ZEILEN_PX, chipKlasse, fachAkzentStil, versteckteChips,
+} from "./chip_form.js";
 
 describe("fachAkzentStil", () => {
     it("Rand links voll, rundum zart, Grund zu 10 % getönt", () => {
@@ -105,7 +107,64 @@ describe("Chat-Seite", () => {
         expect(SEITE.match(/style=\{fachAkzentStil\(/g)).toHaveLength(2);
     });
 
+    it("Anordnung (0.49, Jan 19.11.2026): Chat-Bezug über, Nachrichtenbezug unter der Eingabe", () => {
+        const eingabe = SEITE.indexOf("<textarea");
+        expect(eingabe).toBeGreaterThan(0);
+        // über der Eingabe: Assistent und Fach
+        expect(SEITE.indexOf("<Bot size={CHIP_ICON}")).toBeLessThan(eingabe);
+        expect(SEITE.indexOf("class={chipKlasse(subj?.color)}")).toBeLessThan(eingabe);
+        // darunter: Bausteine, Produkte, Uploads
+        expect(SEITE.indexOf("<NachrichtenChips")).toBeGreaterThan(eingabe);
+        expect(SEITE.split("<NachrichtenChips")).toHaveLength(2);
+        for (const teil of ["<ContextChips", "<ProduktChips", "<AttachmentChip"]) {
+            expect(SEITE).not.toContain(teil);
+        }
+    });
+
     it("keine Tailwind-Klassen als CSS-Wert im `style`", () => {
         expect(SEITE).not.toMatch(/style="[^"]*border-light-ui-3/);
+    });
+});
+
+describe("NachrichtenChips (Jan 19.11.2026: eine Reihe, eingeklappt drei Zeilen)", () => {
+    const lies = (name) => readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), "components", name), "utf8",
+    );
+    const Q = lies("NachrichtenChips.svelte");
+
+    it("Bausteine, Produkte und Anhänge stehen in einem Rahmen", () => {
+        const rahmen = Q.slice(Q.indexOf("bind:this={feld}"), Q.indexOf("{#if hatMehr}"));
+        for (const teil of ["<ContextChips", "<ProduktChips", "<AttachmentChip"]) {
+            expect(rahmen).toContain(teil);
+        }
+    });
+
+    it("die Teile bringen keinen eigenen Rahmen mit (sonst bricht die Reihe)", () => {
+        for (const name of ["ContextChips.svelte", "ProduktChips.svelte"]) {
+            const markup = lies(name).split("</script>")[1];
+            expect(markup.trim()).toMatch(/^(<!--[\s\S]*?-->\s*)?\{#each/);
+        }
+    });
+
+    it("klappt nur ein, wenn es knapp ist (Jan 19.11.2026)", () => {
+        expect(Q).toMatch(/einklappen && !offen\s*\?\s*'max-h-\[3\.75rem\] overflow-hidden'/);
+        expect(Q).toContain("hatMehr = einklappen && ");
+        const SEITE = readFileSync(
+            join(dirname(fileURLToPath(import.meta.url)), "..", "routes", "(app)", "chat", "+page.svelte"),
+            "utf8",
+        );
+        expect(SEITE).toContain("einklappen={kompakt}");
+    });
+
+    it("eingeklappt zwei Zeilen hoch, passend zu ZWEI_ZEILEN_PX", () => {
+        expect(Q).toContain("max-h-[3.75rem] overflow-hidden");
+        expect(3.75 * 16).toBe(ZWEI_ZEILEN_PX);
+    });
+
+    it("versteckteChips zählt die Kinder unterhalb des Rahmens", () => {
+        const kind = (offsetTop) => ({ offsetTop });
+        const feld = { clientHeight: 60, children: [kind(0), kind(0), kind(32), kind(64), kind(96)] };
+        expect(versteckteChips(feld)).toBe(2);
+        expect(versteckteChips(null)).toBe(0);
     });
 });

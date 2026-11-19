@@ -23,11 +23,10 @@
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { mentionAnfrage, ohneMentionFragment } from "$lib/mention.js";
     import { uebernehmen } from "$lib/context_handover.js";
-    import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
-    import ContextChips from "$lib/components/ContextChips.svelte";
+    import NachrichtenChips from "$lib/components/NachrichtenChips.svelte";
     import { CHIP_ICON, chipKlasse, fachAkzentStil } from "$lib/chip_form.js";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
@@ -66,7 +65,6 @@
         removeChatProdukt,
     } from "$lib/api.js";
     import { mentionEintraege, mitProdukt, produkteUebernehmen } from "$lib/produkt_im_chat.js";
-    import ProduktChips from "$lib/components/ProduktChips.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
@@ -1695,14 +1693,16 @@
                 </div>
             {/if}
 
-            <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
-            {#if selectedAssistant && !conversationId && !conversationAssistant}
-                {@const chipColor =
-                    selectedAssistant.subject_id != null
-                        ? ($subjectMap[selectedAssistant.subject_id]?.color ??
-                          null)
-                        : null}
-                <div class="flex">
+            <!-- Über der Eingabe, was für den ganzen Chat gilt (0.49): Assistent (nur bei
+                 neuer Konversation mit gewähltem Assistenten) und Fach bzw. Gruppe. -->
+            {#if (selectedAssistant && !conversationId && !conversationAssistant) || activeSubjectId || activeGroupId}
+                <div class="flex flex-wrap gap-1.5">
+                {#if selectedAssistant && !conversationId && !conversationAssistant}
+                    {@const chipColor =
+                        selectedAssistant.subject_id != null
+                            ? ($subjectMap[selectedAssistant.subject_id]?.color ??
+                              null)
+                            : null}
                     <span
                         class={chipKlasse(chipColor)}
                         style={fachAkzentStil(chipColor)}
@@ -1721,6 +1721,35 @@
                             <X class="w-3 h-3" />
                         </button>
                     </span>
+                {/if}
+                {#if activeSubjectId || activeGroupId}
+                    {@const subj = $subjectMap[activeSubjectId]}
+                    <div
+                        class={chipKlasse(subj?.color)}
+                        style={fachAkzentStil(subj?.color)}
+                    >
+                        <SubjectIcon
+                            name={subj?.icon ?? null}
+                            color={subj?.color ?? null}
+                            size={CHIP_ICON}
+                            class="shrink-0"
+                        />
+                        <span>
+                            {#if activeGroupId}
+                                <!-- Lehrkraft: die Gruppe; Schüler:in: das Fach,
+                                     wie in der Fachauswahl (gruppenmarke.js) -->
+                                {chatKontextText(activeGroupId, {
+                                    istLehrkraft,
+                                    gruppen: $myGroups,
+                                    schuelerAuswahl: $studentPickerItems,
+                                    fachName: subj?.name ?? null,
+                                })}
+                            {:else}
+                                {subj?.name ?? ""}
+                            {/if}
+                        </span>
+                    </div>
+                {/if}
                 </div>
             {/if}
 
@@ -1733,18 +1762,6 @@
                     {assistantSwitchHint}
                 </p>
             {/if}
-
-            <!-- Kontext-Knoten-Chips -->
-            <ContextChips
-                nodes={displayContextNodes}
-                onremove={handleRemoveContextNode}
-                disabled={isStreaming}
-            />
-            <ProduktChips
-                produkte={displayProdukte}
-                onremove={handleRemoveProdukt}
-                disabled={isStreaming}
-            />
 
             <!-- Kontext-Vorschläge aus LLM-Tool-Call -->
             {#if pendingSuggestions !== null}
@@ -1930,50 +1947,19 @@
                 </button>
                 {/if}
             </div>
-            {#if activeSubjectId || activeGroupId || attachments.length > 0}
-                <div class="flex flex-wrap gap-1.5">
-                    <!-- Fach-Kontext-Chip (wenn Kontext aktiv ist) -->
-                    {#if activeSubjectId || activeGroupId}
-                        {@const subj = $subjectMap[activeSubjectId]}
-                        <div
-                            class={chipKlasse(subj?.color)}
-                            style={fachAkzentStil(subj?.color)}
-                        >
-                            <SubjectIcon
-                                name={subj?.icon ?? null}
-                                color={subj?.color ?? null}
-                                size={CHIP_ICON}
-                                class="shrink-0"
-                            />
-                            <span>
-                                {#if activeGroupId}
-                                    <!-- Lehrkraft: die Gruppe; Schüler:in: das Fach,
-                                         wie in der Fachauswahl (gruppenmarke.js) -->
-                                    {chatKontextText(activeGroupId, {
-                                        istLehrkraft,
-                                        gruppen: $myGroups,
-                                        schuelerAuswahl: $studentPickerItems,
-                                        fachName: subj?.name ?? null,
-                                    })}
-                                {:else}
-                                    {subj?.name ?? ""}
-                                {/if}
-                            </span>
-                        </div>
-                    {/if}
-                    <!-- Attachment-Chips (nur wenn Anhänge vorhanden) -->
-                    {#if attachments.length > 0}
-                        {#each attachments as att (att.id)}
-                            <AttachmentChip
-                                filename={att.filename}
-                                status={att.status}
-                                error={att.error}
-                                onremove={() => removeAttachment(att.id)}
-                            />
-                        {/each}
-                    {/if}
-                </div>
-            {/if}
+            <!-- Unter der Eingabe, was an der nächsten Nachricht hängt (0.49): Bausteine,
+                 Produkte aus der Werkstatt, hochgeladene Dateien. Fach und Assistent gelten
+                 für den ganzen Chat und stehen über der Eingabe. -->
+            <NachrichtenChips
+                nodes={displayContextNodes}
+                produkte={displayProdukte}
+                anhaenge={attachments}
+                onremoveNode={handleRemoveContextNode}
+                onremoveProdukt={handleRemoveProdukt}
+                onremoveAnhang={removeAttachment}
+                disabled={isStreaming}
+                einklappen={kompakt}
+            />
             <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte.
                  Verdichtet ausgeblendet: Mit offener Tastatur wählt niemand ein Modell,
                  und jede Zeile hier fehlt der Antwort darüber. -->

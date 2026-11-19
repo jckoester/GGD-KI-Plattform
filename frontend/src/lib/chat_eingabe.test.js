@@ -160,7 +160,7 @@ describe("Chatseite", () => {
 
 describe("Höhendeckel an der sichtbaren Höhe", () => {
     it.each([
-        ["lib/components/ContextChips.svelte"],
+        ["lib/components/NachrichtenChips.svelte"],
         ["lib/components/ContextSuggestions.svelte"],
     ])("%s rechnet mit --sichtbare-hoehe statt dvh", (pfad) => {
         const quelle = lies(pfad)

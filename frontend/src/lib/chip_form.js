@@ -54,3 +54,20 @@ export function fachAkzentStil(farbe) {
 export function chipKlasse(farbe) {
     return fachAkzentStil(farbe) ? CHIP_FORM : `${CHIP_FORM} ${AKZENT_BLAU}`;
 }
+
+/**
+ * Höhe von zwei Chip-Zeilen samt Abstand (`NachrichtenChips` eingeklappt, `max-h-[3.75rem]`):
+ * Chip 26 px (py-1, text-xs, Rand), Abstand 6 px → 58 px; 60 lässt Luft für Rundung.
+ */
+export const ZWEI_ZEILEN_PX = 60;
+
+/**
+ * Wie viele Chips liegen unterhalb des sichtbaren Rahmens? Gezählt werden die direkten
+ * Kinder, deren Oberkante nicht mehr hineinpasst (`feld` ist `relative`, also ihr
+ * `offsetParent`).
+ */
+export function versteckteChips(feld) {
+    if (!feld) return 0;
+    const hoehe = feld.clientHeight;
+    return [...feld.children].filter((k) => k.offsetTop >= hoehe).length;
+}
