@@ -74,8 +74,14 @@ async def _run_chat(assistant, *, model_id=None, default_model="chat-standard"):
         assistant_id=assistant.id,
         model_id=model_id,
     )
+    # Der Rückfall auf den Standard steht seit 0.49 in `modell_des_assistenten`
+    # (`app.assistants.sichtbarkeit`), das `settings` selbst importiert. Ohne eigenen Patch
+    # dort griffe der Wert aus der lokalen `.env` — grün auf dem Rechner, rot in CI.
     with patch("app.chat.router.httpx.AsyncClient", return_value=http), \
+         patch("app.assistants.sichtbarkeit.settings") as mock_sicht, \
          patch("app.chat.router.settings") as mock_settings:
+        mock_sicht.chat_default_model = default_model
+        mock_sicht.planung_model = ""
         mock_settings.chat_default_model = default_model
         mock_settings.litellm_verify_ssl = True
         mock_settings.title_model = ""
