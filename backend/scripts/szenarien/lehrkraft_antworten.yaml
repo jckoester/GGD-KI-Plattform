@@ -1,0 +1,38 @@
+# Messung „Antworten an Lehrkräfte" (19.11.2026)
+#
+# Anlass: Auf eine Sachfrage im freien Chat (chat-standard) schloss eine gute Antwort mit einer
+# Quizfrage an die Lehrkraft („Weißt du, warum …?"); eine Wiederholung zeichnete die
+# Strukturformeln als ASCII-Grafik statt im ```smiles-Block.
+#
+# Freier Chat, kein Assistent, Rolle Lehrkraft. Gemessen wird `teacher_extension` und der
+# Satz zu Strukturformeln in `universal_base` (`config/pedagogy.yaml`).
+#
+# Automatisch geprüft (scripts/lehrkraft_antwort_messung.py):
+#   schlussfrage — endet die Antwort mit einer Frage (Quiz, Angebot, „Möchtest du …?")?
+#   ascii        — steht eine Formel als Textgrafik da (Bindungsstriche zwischen Atomen über
+#                  mehrere Zeilen, Codeblock ohne Sprache mit Atomen)?
+#   smiles       — wie in strukturformel_messung: Block lesbar, Moleküle erwartet (nur wo
+#                  `erwartet` steht; `block: true` verlangt einen Block)
+#
+# Die Fälle verlangen nie ausdrücklich eine Zeichnung — so war die Frage im Anlass.
+
+faelle:
+  - id: C1
+    titel: Ringschluss Monosaccharide (Anlass)
+    frage: Erläutere den Ringschluss bei Monosacchariden als Halbacetalbildung (nucleophiler Angriff).
+
+  - id: C2
+    titel: Elektrophile Addition Brom an Ethen
+    frage: Erkläre den Mechanismus der elektrophilen Addition von Brom an Ethen.
+
+  - id: C3
+    titel: Veresterung
+    frage: Wie läuft die säurekatalysierte Veresterung von Essigsäure mit Ethanol ab?
+
+  - id: B1
+    titel: Natrium-Kalium-Pumpe (ohne Formeln)
+    frage: Erläutere die Rolle der Natrium-Kalium-Pumpe für das Ruhepotential.
+
+  - id: G1
+    titel: Inflation 1923 (ohne Formeln)
+    frage: Erläutere die Ursachen der Hyperinflation 1923 in Deutschland.

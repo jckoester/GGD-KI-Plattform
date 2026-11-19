@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Antworten an Lehrkräfte enden nicht mehr mit Verständnis- oder Quizfragen; Rückfragen nur, wenn
+  Wesentliches fehlt (`config/pedagogy.yaml`).
+
+### Nach dem Update
+
+- `config/pedagogy.yaml` auf Prod übernehmen (Punkt 6 in `teacher_extension`), Backend neu starten.
+
 ## [0.49.0] – 2026-11-19
 
 ### Neu
