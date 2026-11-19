@@ -6,6 +6,7 @@
     import { ChartColumn, ChevronLeft, ChevronRight } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
+    import { bereichText, stufe, stufenBereiche, zellenText } from "$lib/heatmap_stufen.js";
 
     const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
@@ -62,53 +63,10 @@
 <ZurueckLink href="/statistics" label="Statistiken" />
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center">
         <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
             <ChartColumn class="w-6 h-6" />
             <h1 class="text-2xl font-semibold">Anzahl Prompts</h1>
-        </div>
-
-        <!-- Wochennavigation -->
-        <div class="flex items-center gap-1">
-            <button
-                onclick={() => { weekOffset -= 1; reload() }}
-                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
-                       text-light-tx-2 dark:text-dark-tx-2 transition-colors"
-                title="Vorherige Woche"
-            >
-                <ChevronLeft class="w-4 h-4" />
-            </button>
-
-            <span class="px-2 text-sm text-light-tx-2 dark:text-dark-tx-2 min-w-[11rem] text-center">
-                {#if data}
-                    {formatWeek(data.week_start, data.week_end)}
-                {:else}
-                    …
-                {/if}
-            </span>
-
-            <button
-                onclick={() => { weekOffset += 1; reload() }}
-                disabled={weekOffset >= 0}
-                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
-                       text-light-tx-2 dark:text-dark-tx-2 transition-colors
-                       disabled:opacity-30 disabled:cursor-not-allowed"
-                title="Nächste Woche"
-            >
-                <ChevronRight class="w-4 h-4" />
-            </button>
-
-            {#if weekOffset < 0}
-                <button
-                    onclick={() => { weekOffset = 0; reload() }}
-                    class="ml-1 px-2 py-0.5 rounded text-xs
-                           border border-light-tx-2 dark:border-dark-tx-2
-                           text-light-tx-2 dark:text-dark-tx-2
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    Heute
-                </button>
-            {/if}
         </div>
     </div>
 
@@ -172,27 +130,74 @@
         </div>
     {/if}
 
+    <!-- Zentriert, Wochennavigation direkt über der Heatmap (Jan, 19.11.2026): Breiter ziehen
+         lässt sich die Heatmap nicht, ohne dass sie leidet. Die Navigation bleibt auch beim
+         Laden und bei Fehlern stehen, damit man weiterblättern kann. -->
+    <div class="flex flex-col items-center gap-3">
+        <div class="flex items-center gap-1">
+            <button
+                onclick={() => { weekOffset -= 1; reload() }}
+                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                       text-light-tx-2 dark:text-dark-tx-2 transition-colors"
+                title="Vorherige Woche"
+            >
+                <ChevronLeft class="w-4 h-4" />
+            </button>
+
+            <span class="px-2 text-sm text-light-tx-2 dark:text-dark-tx-2 min-w-[11rem] text-center">
+                {#if data}
+                    {formatWeek(data.week_start, data.week_end)}
+                {:else}
+                    …
+                {/if}
+            </span>
+
+            <button
+                onclick={() => { weekOffset += 1; reload() }}
+                disabled={weekOffset >= 0}
+                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                       text-light-tx-2 dark:text-dark-tx-2 transition-colors
+                       disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Nächste Woche"
+            >
+                <ChevronRight class="w-4 h-4" />
+            </button>
+
+            {#if weekOffset < 0}
+                <button
+                    onclick={() => { weekOffset = 0; reload() }}
+                    class="ml-1 px-2 py-0.5 rounded text-xs
+                           border border-light-tx-2 dark:border-dark-tx-2
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    Heute
+                </button>
+            {/if}
+        </div>
+
     {#if error}
-        <ErrorBanner message={error} />
+        <div class="w-full"><ErrorBanner message={error} /></div>
     {:else if loading}
-        <LoadingBanner />
+        <div class="w-full"><LoadingBanner /></div>
     {:else if data}
         <div
-            class="rounded border border-light-tx-2 dark:border-dark-tx-2 inline-block
+            class="rounded border border-light-ui-3 dark:border-dark-tx-2 inline-block
                    bg-light-bg-2 dark:bg-dark-bg-2"
         >
             <table class="border-collapse text-xs">
                 <thead>
                     <tr>
                         <!-- leere Ecke über der Stunden-Spalte -->
-                        <th
-                            class="w-6 border-b border-r border-light-tx-2 dark:border-dark-tx-2"
-                        ></th>
+                        <td
+                            class="w-6 border-b border-r border-light-ui-3 dark:border-dark-tx-2"
+                        ></td>
                         {#each DAY_NAMES as dayName}
                             <th
+                                scope="col"
                                 class="px-3 py-2 text-center font-medium
                          text-light-tx dark:text-dark-tx
-                         border-b border-r border-light-tx-2 dark:border-dark-tx-2
+                         border-b border-r border-light-ui-3 dark:border-dark-tx-2
                          min-w-[2.75rem]"
                             >
                                 {dayName}
@@ -206,15 +211,17 @@
                             <!-- Stunden-Label: nur für die erste Stunde jeder 3er-Gruppe,
                    rowspan=3, Zahl am unteren Rand ausgerichtet -->
                             {#if hour % 3 === 0}
-                                <td
+                                <th
+                                    scope="row"
                                     rowspan="3"
                                     class="align-bottom text-right pr-1 pb-0.5 w-6
                          text-light-tx-2 dark:text-dark-tx-2
-                         border-r border-b-2 border-light-tx-2 dark:border-dark-tx-2
+                         border-r border-b-2 border-light-ui-3 dark:border-dark-tx-2
                          {hour < 21 ? 'border-b' : ''}"
                                 >
-                                    {hour + 3}
-                                </td>
+                                    <span aria-hidden="true">{hour + 3}</span>
+                                    <span class="sr-only">{hour}–{hour + 3} Uhr</span>
+                                </th>
                             {/if}
                             <!-- Zellen pro Wochentag -->
                             {#each { length: 7 } as _, dow}
@@ -222,24 +229,19 @@
                                     (c) => c.dow === dow && c.hour === hour,
                                 )}
                                 {@const count = cell?.count ?? 0}
-                                {@const opacity =
-                                    count === 0
-                                        ? 0
-                                        : Math.max(0.15, count / maxCount)}
+                                {@const s = stufe(count, maxCount)}
                                 <td
-                                    title="{count} Nachricht{count !== 1
-                                        ? 'en'
-                                        : ''}"
-                                    class="h-3 border-r border-light-tx-2 dark:border-dark-tx-2
+                                    title={zellenText(DAY_NAMES[dow], hour, count)}
+                                    class="h-3 border-r border-light-ui-3 dark:border-dark-tx-2
                          {hour % 3 === 2 ? 'border-b-2' : 'border-b'}
-                         border-light-tx-2 dark:border-dark-tx-2
-                         {count === 0
-                                        ? ''
-                                        : 'bg-light-gr-2 dark:bg-dark-gr-2'}"
-                                    style={count > 0
-                                        ? `opacity: ${opacity.toFixed(2)}`
+                         border-light-ui-3 dark:border-dark-tx-2"
+                                    style={s > 0
+                                        ? `background-color: var(--diagramm-stufe-${s})`
                                         : ""}
                                 >
+                                    <!-- Für Bildschirmleser der Wert in der Zelle (ein
+                                         `aria-label` an `<td>` lesen nicht alle vor) -->
+                                    <span class="sr-only">{zellenText(DAY_NAMES[dow], hour, count)}</span>
                                 </td>
                             {/each}
                         </tr>
@@ -248,24 +250,22 @@
             </table>
         </div>
 
+        <!-- Legende: feste Stufen mit ihren Grenzen (Nachrichten je Stunde) -->
         <div
-            class="flex items-center gap-4 text-xs text-light-tx-2 dark:text-dark-tx-2"
+            class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-light-tx-2 dark:text-dark-tx-2"
         >
-            <span class="flex items-center gap-1">
-                <span
-                    class="inline-block w-4 h-4 rounded bg-light-gr-2 dark:bg-dark-gr-2"
-                    style="opacity: 0.2"
-                ></span>
-                wenige Nachrichten
-            </span>
-            <span class="flex items-center gap-1">
-                <span
-                    class="inline-block w-4 h-4 rounded bg-light-gr-2 dark:bg-dark-gr-2"
-                    style="opacity: 1.0"
-                ></span>
-                viele Nachrichten
-            </span>
+            <span>Nachrichten je Stunde:</span>
+            {#each stufenBereiche(maxCount) as b (b.stufe)}
+                <span class="flex items-center gap-1">
+                    <span
+                        class="inline-block w-4 h-4 rounded"
+                        style="background-color: var(--diagramm-stufe-{b.stufe})"
+                    ></span>
+                    {bereichText(b)}
+                </span>
+            {/each}
         </div>
     {/if}
+    </div>
 </div>
 </PageBody>

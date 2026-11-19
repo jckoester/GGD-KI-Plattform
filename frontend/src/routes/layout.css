@@ -312,6 +312,15 @@ html.dark {
     --diagramm-text: var(--color-light-tx-2);
     --diagramm-gitter: var(--color-light-ui-3);
     --diagramm-flaeche: var(--color-light-bg-2);
+
+    /* Mengenstufen (Heatmap `statistics/prompts`, 0.49): eine Farbe, hell → dunkel, feste
+       Stufen statt Deckkraft. Mit `validate_palette.js --ordinal` gegen `bg-2` geprüft
+       (19.11.2026); blue-150/200 fielen am Kontrast zur Fläche durch, darum ab 300. */
+    --diagramm-stufe-1: var(--color-blue-300);
+    --diagramm-stufe-2: var(--color-blue-400);
+    --diagramm-stufe-3: var(--color-blue-600);
+    --diagramm-stufe-4: var(--color-blue-800);
+    --diagramm-stufe-5: var(--color-blue-900);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
@@ -336,6 +345,13 @@ html.dark {
     --diagramm-text: var(--color-dark-tx-2);
     --diagramm-gitter: var(--color-dark-ui-3);
     --diagramm-flaeche: var(--color-dark-bg-2);
+
+    /* Mengenstufen, dunkel: eigens gewählt (mehr = heller), ebenfalls geprüft. */
+    --diagramm-stufe-1: var(--color-blue-600);
+    --diagramm-stufe-2: var(--color-blue-400);
+    --diagramm-stufe-3: var(--color-blue-300);
+    --diagramm-stufe-4: var(--color-blue-200);
+    --diagramm-stufe-5: var(--color-blue-100);
 }
 
 .planner-ferien-band {

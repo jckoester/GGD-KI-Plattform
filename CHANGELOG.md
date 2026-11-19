@@ -21,6 +21,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Chips am Chat-Eingabefeld neu angeordnet: Assistent und Fach darüber, Bausteine, Produkte aus der Werkstatt
   und hochgeladene Dateien darunter in einer Reihe; bei wenig Platz (etwa mit offener Bildschirmtastatur) klappt
   sie auf zwei Zeilen ein.
+- Heatmap unter Statistik → Anzahl Prompts: fünf feste Blaustufen statt Grün mit Deckkraft, Legende mit den
+  Grenzen je Stufe, Werte für Bildschirmleser lesbar; mittig mit der Wochennavigation direkt darüber, Linien im
+  hellen Modus zarter.
 
 ### Nach dem Update
 
