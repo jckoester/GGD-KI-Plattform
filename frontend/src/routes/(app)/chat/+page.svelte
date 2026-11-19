@@ -27,6 +27,7 @@
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import NachrichtenChips from "$lib/components/NachrichtenChips.svelte";
+    import { blasenSchluessel, mitSchluessel } from "$lib/chat_schluessel.js";
     import { CHIP_ICON, chipKlasse, fachAkzentStil } from "$lib/chip_form.js";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
@@ -714,16 +715,16 @@
         // Neu: message-Objekt mit Attachment-Metadaten für Anzeige
         messages = [
             ...messages,
-            {
+            mitSchluessel({
                 role: "user",
                 content: userMessage,
                 uploadedAttachments: snapshotAttachments,
-            },
+            }),
         ];
 
         // Assistent-Placeholder
         let assistantIndex = messages.length;
-        messages = [...messages, { role: "assistant", content: "" }];
+        messages = [...messages, mitSchluessel({ role: "assistant", content: "" })];
 
         isStreaming = true;
         abbruch = new AbortController();
@@ -808,7 +809,7 @@
                             item.assistantId != null &&
                             item.assistantId !== prev.assistantId;
                         if (modelChanged || assistantChanged) {
-                            const separator = {
+                            const separator = mitSchluessel({
                                 role: "change",
                                 model: item.model,
                                 assistantId: item.assistantId,
@@ -816,7 +817,7 @@
                                     selectedAssistant?.name ??
                                     conversationAssistant?.name ??
                                     null,
-                            };
+                            });
                             messages = [
                                 ...messages.slice(0, assistantIndex),
                                 separator,
@@ -1012,7 +1013,7 @@
 
             messages = [
                 ...messages,
-                { role: "error", content: chatFehlertext(err) },
+                mitSchluessel({ role: "error", content: chatFehlertext(err) }),
             ];
         } finally {
             if (meineNummer === streamNummer) {
@@ -1341,7 +1342,7 @@
                     werkzeuge_mit_wirkung: m.werkzeuge_mit_wirkung ?? [],
                     rating: m.rating ?? null,
                 }));
-                messages = insertSeparators(rawMessages);
+                messages = insertSeparators(rawMessages).map(mitSchluessel);
                 conversationId = data.id;
                 // Daumen an den Antworten (0.31) — der Server kennt Test- und Vorschau-Chats.
                 bewertbar = data.bewertbar ?? false;
@@ -1600,7 +1601,7 @@
             </div>
         {:else}
             <div class="space-y-4 max-w-4xl mx-auto">
-                {#each messages as message, i}
+                {#each messages as message, i (blasenSchluessel(message, i))}
                     <MessageBubble
                         {message}
                         userPrompt={messages[i - 1]?.role === "user"

@@ -25,6 +25,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Grenzen je Stufe, Werte für Bildschirmleser lesbar; mittig mit der Wochennavigation direkt darüber, Linien im
   hellen Modus zarter.
 
+### Behoben
+
+- Chat: Aufgeklappter Kontext, Herkunft und Bildstatus einer Antwort blieben beim Wechsel in einen anderen Chat an
+  derselben Stelle stehen.
+- Letzte Chats: Nach dem Löschen konnte das Menü einer Zeile auf die nächste rutschen; beim Nachladen erschien ein
+  Chat unter Umständen doppelt.
+
 ### Nach dem Update
 
 - In der `.env` `PLANUNG_MODEL=chat-komplex` setzen (Modell muss für Lehrkräfte freigeschaltet sein),

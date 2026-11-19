@@ -55,9 +55,11 @@
     // Sofort anzeigen, beim Fehlschlag zurücknehmen: Ein Daumen, der eine Sekunde auf den
     // Server wartet, fühlt sich kaputt an.
     //
-    // ⚠️ **Je Nachrichten-ID gemerkt, nicht als einfacher Zustand.** Der Chat legt die
-    // Blasen ohne Schlüssel an und verwendet sie je Position weiter; ein `$state` mit dem
-    // Anfangswert behielte beim Wechsel in einen anderen Chat den Daumen der vorigen Antwort.
+    // ⚠️ **Je Nachrichten-ID gemerkt, nicht als einfacher Zustand.** Bis 0.48 legte der Chat
+    // die Blasen ohne Schlüssel an und verwendete sie je Position weiter; ein `$state` mit dem
+    // Anfangswert behielt beim Wechsel in einen anderen Chat den Daumen der vorigen Antwort.
+    // Seit 0.49 haben die Blasen Schlüssel (`chat_schluessel.js`); die Merkung je ID bleibt,
+    // weil sie auch ohne sie richtig ist.
     let geklickt = $state({});
     // Kennung der Antwort, deren Bewertung zuletzt scheiterte — aus demselben Grund je ID.
     let fehlerBei = $state(null);

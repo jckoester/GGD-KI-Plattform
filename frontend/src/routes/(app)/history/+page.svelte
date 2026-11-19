@@ -42,7 +42,14 @@
             const data = liste === "vorschau"
                 ? await getVorschauChats(limit, offset)
                 : await getRecentConversations(limit, offset);
-            conversations = [...conversations, ...data.items];
+            // Ohne Doppelte (0.49): Die Seiten kommen nach Offset; entsteht zwischendurch ein
+            // neuer Chat, rutscht die Liste und die nächste Seite wiederholt einen. Mit
+            // Schlüssel im `{#each}` wäre das ein Laufzeitfehler.
+            const bekannt = new Set(conversations.map((c) => c.id));
+            conversations = [
+                ...conversations,
+                ...data.items.filter((c) => !bekannt.has(c.id)),
+            ];
             total = data.total;
             hasMore = offset + data.items.length < data.total;
         } catch (err) {
@@ -156,7 +163,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {#each conversations as conv}
+                        <!-- Schlüssel (0.49): Jede Zeile trägt ein `ConversationMenu` mit eigenem
+                             Zustand (offen, umbenennen, löschen); ohne Schlüssel rutschte er
+                             nach dem Löschen einer Zeile auf die nächste. -->
+                        {#each conversations as conv (conv.id)}
                             <tr
                                 class=" border-b border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors cursor-pointer"
                                 onclick={() => navigateToChat(conv.id)}
