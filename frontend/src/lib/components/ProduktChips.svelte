@@ -3,6 +3,8 @@
     // den Bausteinen (`ContextChips`), in derselben Form, mit dem Werkstatt-Symbol.
     import { Hammer, X } from "lucide-svelte";
     import { kindLabel } from "$lib/library.js";
+    import { CATEGORY_COLORS } from "$lib/taxonomy.js";
+    import { CHIP_AKZENT, CHIP_FORM, CHIP_ICON } from "$lib/chip_form.js";
 
     let { produkte = [], onremove, disabled = false } = $props();
 </script>
@@ -10,13 +12,12 @@
 {#if produkte.length > 0}
     <div class="flex flex-wrap gap-1.5">
         {#each produkte as p (p.artifact_id)}
+            <!-- Akzent wie die Kategorie „Material“ (`artifact`) bei den Bausteinen -->
             <span
-                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
-                       border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2
-                       bg-light-bg-2 dark:bg-dark-bg-2"
+                class="{CHIP_FORM} {CHIP_AKZENT[CATEGORY_COLORS.artifact]}"
                 title="{kindLabel(p.kind)} aus deiner Werkstatt"
             >
-                <Hammer class="w-3 h-3 shrink-0" />
+                <Hammer size={CHIP_ICON} class="shrink-0" />
                 <a href="/workshop/{p.artifact_id}" class="max-w-[200px] truncate hover:underline">{p.title}</a>
                 {#if !disabled}
                     <button

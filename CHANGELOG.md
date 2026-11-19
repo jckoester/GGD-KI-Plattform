@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Schrift auf gefüllten Farbflächen über das Token `--color-on-fill` (Klasse `text-on-fill`) statt `text-white`;
   die Knöpfe im Konversationsmenü nutzen die Farb-Tokens.
+- Alle Chips über dem Chat-Eingabefeld (Assistent, Fach, Bausteine, Produkte aus der Werkstatt, hochgeladene
+  Dateien) in einer Form: links gerade mit Akzentrand,
+  rechts rund, getönter Grund, Fachfarbe bzw. Kategoriefarbe; der Assistent wird im Chip entfernt.
 
 ### Nach dem Update
 

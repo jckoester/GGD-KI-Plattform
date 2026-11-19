@@ -28,6 +28,7 @@
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import ContextChips from "$lib/components/ContextChips.svelte";
+    import { CHIP_ICON, chipKlasse, fachAkzentStil } from "$lib/chip_form.js";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
     import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
@@ -1701,28 +1702,25 @@
                         ? ($subjectMap[selectedAssistant.subject_id]?.color ??
                           null)
                         : null}
-                <div class="flex items-center gap-1.5">
+                <div class="flex">
                     <span
-                        class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                                 {chipColor
-                            ? 'text-light-tx dark:text-dark-tx border'
-                            : 'bg-light-bl/15 dark:bg-dark-bl/15 text-light-bl dark:text-dark-bl border border-light-bl/30 dark:border-dark-bl/30'}"
-                        style={chipColor
-                            ? `background-color: ${chipColor}1a; border-color: ${chipColor}40; border-left: 3px solid ${chipColor}`
-                            : ""}
+                        class={chipKlasse(chipColor)}
+                        style={fachAkzentStil(chipColor)}
                     >
-                        <Bot class="w-3 h-3" />
+                        <Bot size={CHIP_ICON} class="shrink-0" />
                         {selectedAssistant.name}
+                        <button
+                            type="button"
+                            onclick={() => {
+                                selectedAssistant = null;
+                            }}
+                            class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx ml-0.5"
+                            title="Assistenten entfernen"
+                            aria-label="Assistent {selectedAssistant.name} entfernen"
+                        >
+                            <X class="w-3 h-3" />
+                        </button>
                     </span>
-                    <button
-                        onclick={() => {
-                            selectedAssistant = null;
-                        }}
-                        class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
-                        title="Assistenten entfernen"
-                    >
-                        <X class="w-3 h-3" />
-                    </button>
                 </div>
             {/if}
 
@@ -1938,15 +1936,13 @@
                     {#if activeSubjectId || activeGroupId}
                         {@const subj = $subjectMap[activeSubjectId]}
                         <div
-                            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
-                      border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2"
-                            style="border-color:{subj?.color ??
-                                'border-light-ui-3 dark:border-dark-ui-3'}"
+                            class={chipKlasse(subj?.color)}
+                            style={fachAkzentStil(subj?.color)}
                         >
                             <SubjectIcon
                                 name={subj?.icon ?? null}
                                 color={subj?.color ?? null}
-                                size={16}
+                                size={CHIP_ICON}
                                 class="shrink-0"
                             />
                             <span>

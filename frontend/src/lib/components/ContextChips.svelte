@@ -3,14 +3,8 @@
     import { CATEGORY_COLORS } from "$lib/taxonomy.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import ContextNodeLabel from "./ContextNodeLabel.svelte";
+    import { CHIP_AKZENT, CHIP_FORM, CHIP_ICON } from "$lib/chip_form.js";
 
-    // Vollständige Tailwind-Klassen müssen literal im Quelltext stehen (kein Purging)
-    const CHIP_ACCENT = {
-        bl: "border-l-2 border-l-light-bl dark:border-l-dark-bl bg-light-bl/10 dark:bg-dark-bl/10",
-        gr: "border-light-gr dark:border-dark-gr",
-        or: "border-l-2 border-l-light-or dark:border-l-dark-or bg-light-or/10 dark:bg-dark-or/10",
-        pu: "border-l-2 border-l-light-pu dark:border-l-dark-pu bg-light-pu/10 dark:bg-dark-pu/10",
-    };
 
     let { nodes = $bindable([]), onremove, disabled = false } = $props();
 
@@ -43,14 +37,12 @@
     >
         {#each sichtbar as node (node.node_id)}
             {@const colorToken = CATEGORY_COLORS[node.category] ?? ""}
-            {@const accentClass = CHIP_ACCENT[colorToken] ?? ""}
-            <span
-                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2 {accentClass}"
-            >
+            {@const accentClass = CHIP_AKZENT[colorToken] ?? CHIP_AKZENT.bl}
+            <span class="{CHIP_FORM} {accentClass}">
                 <ContextNodeLabel
                     {node}
                     fassung={fassungen.get(node.node_id)}
-                    iconSize={12}
+                    iconSize={CHIP_ICON}
                     titleClass="max-w-[200px] truncate"
                 />
                 {#if !disabled}

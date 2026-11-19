@@ -1,22 +1,20 @@
 <script>
   import { Loader2, Paperclip, X, AlertCircle } from 'lucide-svelte'
+  import { CHIP_AKZENT, CHIP_FORM, CHIP_ICON } from '$lib/chip_form.js'
 
   let { filename, status, error = null, onremove } = $props()
 </script>
 
 <div
-  class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
-         {status === 'error'
-           ? 'border-light-re dark:border-dark-re text-light-re dark:text-dark-re bg-light-re-bg dark:bg-dark-re-bg'
-           : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2'}"
+  class="{CHIP_FORM} {status === 'error' ? CHIP_AKZENT.re : CHIP_AKZENT.neutral}"
   title={error ?? filename}
 >
   {#if status === 'uploading'}
-    <Loader2 class="w-3 h-3 animate-spin shrink-0" />
+    <Loader2 size={CHIP_ICON} class="animate-spin shrink-0" />
   {:else if status === 'error'}
-    <AlertCircle class="w-3 h-3 shrink-0" />
+    <AlertCircle size={CHIP_ICON} class="shrink-0 text-light-re dark:text-dark-re" />
   {:else}
-    <Paperclip class="w-3 h-3 shrink-0" />
+    <Paperclip size={CHIP_ICON} class="shrink-0" />
   {/if}
 
   <span class="max-w-[120px] truncate">{filename}</span>
