@@ -565,7 +565,7 @@
       <a
         href={neuerChatPfad({ groupId, faehigkeit: 'planning' })}
         class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
-               bg-primary dark:bg-primary-dark text-white font-medium
+               bg-primary dark:bg-primary-dark text-on-fill font-medium
                hover:opacity-90 transition-opacity"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -642,7 +642,7 @@
       <a
         href={dragDeepLink(dragReflow)}
         class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
-               text-white font-medium hover:opacity-90 transition-opacity"
+               text-on-fill font-medium hover:opacity-90 transition-opacity"
       >Umplanen (Assistent)</a>
       <button
         onclick={() => { dragReflow = null }}
@@ -667,7 +667,7 @@
         <a
           href={parkplatzDeepLink()}
           class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
-                 text-white font-medium hover:opacity-90 transition-opacity"
+                 text-on-fill font-medium hover:opacity-90 transition-opacity"
         >Beim Eingliedern helfen</a>
       {/if}
       <button
@@ -715,7 +715,7 @@
       <a
         href={reflowDeepLink(reflowBanner)}
         class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
-               text-white font-medium hover:opacity-90 transition-opacity"
+               text-on-fill font-medium hover:opacity-90 transition-opacity"
       >Inhalte verschieben (Assistent)</a>
       <button
         onclick={() => { reflowBanner = null }}

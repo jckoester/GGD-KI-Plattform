@@ -364,7 +364,7 @@
                     type="button"
                     onclick={neuerChat}
                     class="px-3 py-1.5 rounded-lg text-sm flex items-center gap-2
-                           bg-primary dark:bg-primary-dark text-white hover:opacity-90"
+                           bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90"
                 >
                     <MessageSquarePlus class="w-4 h-4" />
                     Neuen Chat damit starten

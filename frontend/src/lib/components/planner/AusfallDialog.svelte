@@ -125,7 +125,7 @@
         <button
           onclick={bestaetigen}
           disabled={arbeitet}
-          class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
+          class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-on-fill
                  hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {arbeitet ? 'Einen Moment…' : zuruecknehmen ? 'Zurücknehmen' : 'Eintragen'}

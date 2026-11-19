@@ -244,7 +244,7 @@
                         rueckweg,
                     )}{fachId ? `&subject_id=${fachId}` : ''}"
                     class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
-                           bg-primary dark:bg-primary-dark text-white hover:opacity-90"
+                           bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90"
                 >
                     <Plus size="16" /> Neuer Eintrag
                 </a>

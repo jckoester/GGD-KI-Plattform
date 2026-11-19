@@ -169,7 +169,7 @@
                         onclick={veroeffentlichen}
                         disabled={laeuft || !uebersicht.darf_veroeffentlichen}
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-                               text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                               text-on-fill font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                         <Send class="w-4 h-4" />
                         {laeuft ? "Wird veröffentlicht…" : "Veröffentlichen"}

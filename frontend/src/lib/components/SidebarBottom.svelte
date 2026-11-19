@@ -75,7 +75,7 @@
                    text-left border border-light-ui-3 dark:border-dark-ui-3 mb-3"
         >
             <div
-                class="relative w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold mr-3"
+                class="relative w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-fill text-xs font-bold mr-3"
             >
                 {getInitials($user?.display_name)}
                 {#if $crisisAlertTotal > 0}

@@ -316,7 +316,7 @@
       <button
         onclick={() => goto(neuerChatPfad({ subjectId: subject?.id, groupId: group?.id }))}
         class="text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
-               text-white font-medium hover:opacity-90 transition-opacity"
+               text-on-fill font-medium hover:opacity-90 transition-opacity"
       >
         + Neuer Chat
       </button>

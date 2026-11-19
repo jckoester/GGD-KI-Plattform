@@ -224,7 +224,7 @@
         {:else}
             <div
                 class="w-8 h-8 rounded-full bg-primary flex items-center justify-center
-                       text-white text-xs font-bold select-none"
+                       text-on-fill text-xs font-bold select-none"
             >
                 {initials(branding.name)}
             </div>

@@ -235,7 +235,7 @@
             <button
               onclick={remove}
               disabled={deleting}
-              class="px-4 py-2 text-sm rounded-lg font-medium bg-light-re dark:bg-dark-re text-white
+              class="px-4 py-2 text-sm rounded-lg font-medium bg-light-re dark:bg-dark-re text-on-fill
                      hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {deleting ? 'Löschen…' : 'Endgültig löschen'}
@@ -274,7 +274,7 @@
             <button
               onclick={save}
               disabled={saving || !titel.trim()}
-              class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
+              class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-on-fill
                      hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Speichern…' : isEdit ? 'Speichern' : 'Anlegen'}

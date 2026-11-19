@@ -308,7 +308,7 @@
                     <button
                         class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                         {$themePref === value
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-on-fill'
                             : 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
                         onclick={() => { themePref.set(value); quittiere('theme'); }}
                     >

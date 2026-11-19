@@ -137,7 +137,7 @@
         {/if}
         {#if link}
           <a href={link} onclick={onClose} data-autofocus
-             class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-white hover:opacity-90">
+             class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90">
             {istStunde ? 'Kopie öffnen' : 'Zur Einheit'}
           </a>
         {/if}
@@ -198,7 +198,7 @@
           Abbrechen
         </button>
         <button type="button" onclick={kopieren} disabled={!anfrage || laeuft}
-                class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-white hover:opacity-90
+                class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90
                        disabled:opacity-50 disabled:cursor-not-allowed">
           {laeuft ? 'Wird kopiert …' : 'Kopieren'}
         </button>

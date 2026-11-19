@@ -1147,7 +1147,7 @@
                         type="submit"
                         disabled={saving}
                         class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-                   text-white font-medium hover:opacity-90 transition-opacity
+                   text-on-fill font-medium hover:opacity-90 transition-opacity
                    disabled:opacity-50"
                     >
                         {saving ? "Speichern…" : "Speichern"}
@@ -1242,7 +1242,7 @@
                         <button
                             onclick={archive}
                             disabled={archiveLoading}
-                            class="px-3 py-1.5 rounded-md bg-light-re dark:bg-dark-re text-white text-sm
+                            class="px-3 py-1.5 rounded-md bg-light-re dark:bg-dark-re text-on-fill text-sm
                      hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                             {archiveLoading
@@ -1312,7 +1312,7 @@
                         <button
                             onclick={confirmCopy}
                             disabled={copyLoading}
-                            class="px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark text-white text-sm
+                            class="px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark text-on-fill text-sm
                      hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                             {copyLoading ? "Wird kopiert…" : "Kopie erstellen"}

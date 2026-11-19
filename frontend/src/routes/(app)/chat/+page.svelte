@@ -1906,7 +1906,7 @@
                     onclick={stoppen}
                     title="Antwort stoppen"
                     aria-label="Antwort stoppen"
-                    class="p-2 bg-primary text-white rounded-lg hover:bg-primary-dark
+                    class="p-2 bg-primary text-on-fill rounded-lg hover:bg-primary-dark
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
                     <Square class="w-5 h-5" />
@@ -1920,7 +1920,7 @@
                         attachments.some((a) => a.status === "uploading") ||
                         (!input.trim() &&
                             !attachments.some((a) => a.status === "ready"))}
-                    class="p-2 bg-primary text-white rounded-lg
+                    class="p-2 bg-primary text-on-fill rounded-lg
                          hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >

@@ -131,7 +131,7 @@
 
     const knopf = 'px-3 py-1.5 text-sm rounded-md'
     const nebenKnopf = `${knopf} text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2`
-    const hauptKnopf = `${knopf} bg-primary dark:bg-primary-dark text-white hover:opacity-90`
+    const hauptKnopf = `${knopf} bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90`
 </script>
 
 <Dialog open onClose={schliessen} titelId="einrichtung-titel" breite="max-w-2xl max-h-[90dvh] flex flex-col">
@@ -179,7 +179,7 @@
                             disabled={vorschau}
                             class="px-4 py-2 rounded-md text-sm font-medium transition-colors
                                    {$themePref === e.wert
-                                       ? 'bg-primary dark:bg-primary-dark text-white'
+                                       ? 'bg-primary dark:bg-primary-dark text-on-fill'
                                        : 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}
                                    disabled:opacity-60">
                         {e.name}

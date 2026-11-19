@@ -11,6 +11,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   eigene Planungsassistenten) laufen ohne eigenes Modell auf diesem Modell statt auf dem Standardmodell.
 - `check_litellm_config.py` warnt bei `-latest`-Kennungen in der LiteLLM-Config.
 
+### Geändert
+
+- Schrift auf gefüllten Farbflächen über das Token `--color-on-fill` (Klasse `text-on-fill`) statt `text-white`;
+  die Knöpfe im Konversationsmenü nutzen die Farb-Tokens.
+
 ### Nach dem Update
 
 - In der `.env` `PLANUNG_MODEL=chat-komplex` setzen (Modell muss für Lehrkräfte freigeschaltet sein),

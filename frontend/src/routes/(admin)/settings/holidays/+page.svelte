@@ -102,7 +102,7 @@
         onclick={laden}
         disabled={laedt}
         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary dark:bg-primary-dark
-               text-white disabled:opacity-50"
+               text-on-fill disabled:opacity-50"
     >
         <RefreshCw class="w-4 h-4" />
         {vorschlag ? "Erneut abrufen" : "Kalender abrufen"}
@@ -200,7 +200,7 @@
                         onclick={uebernehmen}
                         disabled={uebernehme || !!vorschlag.schreibschutz}
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
-                               bg-primary dark:bg-primary-dark text-white
+                               bg-primary dark:bg-primary-dark text-on-fill
                                disabled:opacity-50"
                     >
                         <Save class="w-4 h-4" /> In school_year.yaml übernehmen

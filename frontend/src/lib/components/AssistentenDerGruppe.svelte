@@ -105,7 +105,7 @@
         <button
             onclick={ansehen}
             class="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg
-                   bg-primary dark:bg-primary-dark text-white"
+                   bg-primary dark:bg-primary-dark text-on-fill"
         >
             <Eye size={16} /> Als Schüler:in ansehen
         </button>

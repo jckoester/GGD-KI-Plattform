@@ -543,7 +543,7 @@
                 </button>
                 <button
                     onclick={executeDelete}
-                    class="px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-white
+                    class="px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-on-fill
                            hover:opacity-90"
                 >
                     Löschen

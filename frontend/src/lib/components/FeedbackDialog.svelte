@@ -138,7 +138,7 @@
                 </a>
                 <button
                     onclick={schliessen}
-                    class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white"
+                    class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-on-fill"
                 >
                     Schließen
                 </button>
@@ -250,7 +250,7 @@
                     onclick={absenden}
                     disabled={!absendbar}
                     class="px-3 py-1.5 text-sm rounded-lg inline-flex items-center gap-2
-                           bg-primary dark:bg-primary-dark text-white
+                           bg-primary dark:bg-primary-dark text-on-fill
                            disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {#if laeuft}<Loader2 class="w-4 h-4 animate-spin" />{/if}

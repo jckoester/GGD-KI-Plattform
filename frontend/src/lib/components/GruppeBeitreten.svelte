@@ -74,7 +74,7 @@
       type="submit"
       disabled={gesperrt || arbeitet || !eingabe.trim()}
       class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
-             bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+             bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-50"
     >
       <LogIn size={15} />
       {arbeitet ? "…" : "Beitreten"}

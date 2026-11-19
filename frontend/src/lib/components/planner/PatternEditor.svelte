@@ -278,7 +278,7 @@
             onclick={() => { halbjahr = hj }}
             class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
                    {halbjahr === hj
-                     ? 'bg-primary dark:bg-primary-dark text-white'
+                     ? 'bg-primary dark:bg-primary-dark text-on-fill'
                      : 'bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
           >
             {hj}. Halbjahr
@@ -507,7 +507,7 @@
           <button
             onclick={speichernUndErzeugen}
             disabled={saving || generating || rows.length === 0}
-            class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
+            class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving

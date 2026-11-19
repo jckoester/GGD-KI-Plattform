@@ -172,7 +172,7 @@
             onclick={bestaetigen}
             disabled={gewaehlt.size === 0}
             class="px-3 py-1.5 rounded text-xs
-                   bg-primary dark:bg-primary-dark text-white
+                   bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90
                    disabled:opacity-40 disabled:cursor-not-allowed"
         >

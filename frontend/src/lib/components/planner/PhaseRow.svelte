@@ -59,7 +59,7 @@
         title="Priorität ändern"
         onclick={() => { prioOpen = !prioOpen }}
         class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-               text-white whitespace-nowrap hover:opacity-90 transition-opacity"
+               text-on-fill whitespace-nowrap hover:opacity-90 transition-opacity"
         style="background-color: {prioColor[0]}"
         aria-label="Priorität: {PRIO_LABELS[phase.prio]}"
       >{PRIO_LABELS[phase.prio]}</button>

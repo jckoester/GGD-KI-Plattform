@@ -469,7 +469,7 @@
                                         onclick={() => speichern(e)}
                                         disabled={speichert || brauchtBegruendung || !!titelFehlt}
                                         class="px-3 py-1.5 text-sm rounded-lg inline-flex items-center gap-2
-                                               bg-primary dark:bg-primary-dark text-white
+                                               bg-primary dark:bg-primary-dark text-on-fill
                                                disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {#if speichert}<Loader2 class="w-4 h-4 animate-spin" />{/if}

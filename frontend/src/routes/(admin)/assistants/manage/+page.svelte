@@ -319,7 +319,7 @@
             </button>
             <button
                 onclick={() => goto('/assistants/manage/neu')}
-                class="px-4 py-2 bg-primary text-white rounded-lg
+                class="px-4 py-2 bg-primary text-on-fill rounded-lg
                        hover:bg-primary-dark transition-colors flex items-center gap-2"
             >
                 <Plus class="w-4 h-4" />
@@ -640,7 +640,7 @@
             <button
                 onclick={doImport}
                 disabled={importing || !importFile}
-                class="px-4 py-2 bg-primary text-white rounded-lg
+                class="px-4 py-2 bg-primary text-on-fill rounded-lg
                        hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
             >
                 {#if importing}
@@ -696,7 +696,7 @@
             <button
                 onclick={confirmDelete}
                 disabled={deleting}
-                class="px-4 py-2 bg-light-re dark:bg-dark-re text-white rounded-lg
+                class="px-4 py-2 bg-light-re dark:bg-dark-re text-on-fill rounded-lg
                        hover:bg-light-re-2 dark:hover:bg-dark-re-2 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
                 {#if deleting}

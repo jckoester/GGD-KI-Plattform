@@ -158,7 +158,7 @@
         </label>
         <button
             type="submit"
-            class="px-3 py-1.5 rounded bg-primary dark:bg-primary-dark text-white"
+            class="px-3 py-1.5 rounded bg-primary dark:bg-primary-dark text-on-fill"
         >
             Filtern
         </button>

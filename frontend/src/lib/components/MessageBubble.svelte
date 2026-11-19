@@ -372,7 +372,7 @@
 
 {#if message.role === 'user'}
     <div class="flex justify-end">
-        <div class="bg-primary dark:bg-primary-dark text-white rounded-xl rounded-br-none px-4 py-2 max-w-[80%]">
+        <div class="bg-primary dark:bg-primary-dark text-on-fill rounded-xl rounded-br-none px-4 py-2 max-w-[80%]">
             {#if message.content}
                 <!-- Nur Formeln gerendert (0.38), der übrige Text bleibt Text: renderInlineMath escapt ihn -->
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->

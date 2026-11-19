@@ -294,7 +294,7 @@
       <button
         onclick={() => goto("/assistants/my/neu")}
         class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
-               bg-primary dark:bg-primary-dark text-white
+               bg-primary dark:bg-primary-dark text-on-fill
                hover:opacity-90 transition-opacity"
       >
         <Plus size={16} />
@@ -344,7 +344,7 @@
       </p>
       <button
         onclick={() => goto("/assistants/my/neu")}
-        class="mt-4 px-4 py-2 rounded-md bg-primary dark:bg-primary-dark text-white
+        class="mt-4 px-4 py-2 rounded-md bg-primary dark:bg-primary-dark text-on-fill
                text-sm font-medium hover:opacity-90 transition-opacity"
       >
         Ersten Assistenten anlegen
@@ -546,7 +546,7 @@
             onclick={() => confirmDelete(deleteTarget)}
             disabled={deleteLoading}
             class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                   bg-light-re dark:bg-dark-re text-white
+                   bg-light-re dark:bg-dark-re text-on-fill
                    hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {#if deleteLoading}
@@ -598,7 +598,7 @@
             onclick={confirmSubmit}
             disabled={submitLoading}
             class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                   bg-primary dark:bg-primary-dark text-white
+                   bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {#if submitLoading}
@@ -718,7 +718,7 @@
         onclick={doImport}
         disabled={importingFile || !importFile}
         class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-               bg-primary dark:bg-primary-dark text-white
+               bg-primary dark:bg-primary-dark text-on-fill
                hover:opacity-90 transition-opacity disabled:opacity-50"
       >
         {#if importingFile}

@@ -354,7 +354,7 @@
                             onclick={saveTitle}
                             disabled={savingTitle}
                             title="Speichern"
-                            class="shrink-0 p-2 rounded-md bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+                            class="shrink-0 p-2 rounded-md bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-50"
                         >
                             <Check class="w-4 h-4" />
                         </button>
@@ -453,7 +453,7 @@
                 <a
                     href={ziel.url}
                     class="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm rounded-md
-                           bg-primary dark:bg-primary-dark text-white font-medium
+                           bg-primary dark:bg-primary-dark text-on-fill font-medium
                            hover:opacity-90 transition-opacity"
                 >
                     <Pencil class="w-4 h-4" /> {ziel.label}

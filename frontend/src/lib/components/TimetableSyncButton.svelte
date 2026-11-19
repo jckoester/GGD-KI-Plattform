@@ -100,7 +100,7 @@
         onclick={abgleichen}
         disabled={laeuft}
         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
-               bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+               bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-50"
       >
         <RefreshCw class="w-4 h-4 {laeuft ? 'animate-spin' : ''}" />
         Jetzt abgleichen

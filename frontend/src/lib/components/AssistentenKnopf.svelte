@@ -58,7 +58,7 @@
     if (offen && ereignis.key === 'Escape') offen = false
   }
 
-  const voll = 'h-8 inline-flex items-center gap-1.5 text-sm font-medium text-white bg-primary dark:bg-primary-dark hover:opacity-90 transition-opacity disabled:opacity-60'
+  const voll = 'h-8 inline-flex items-center gap-1.5 text-sm font-medium text-on-fill bg-primary dark:bg-primary-dark hover:opacity-90 transition-opacity disabled:opacity-60'
   const umrandet = 'inline-flex items-center gap-1.5 py-2 text-sm font-medium border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
   const haupt = $derived(rahmen ? `${umrandet} px-4` : `${voll} px-3`)
   const pfeil = $derived(rahmen ? `${umrandet} px-2 rounded-r-md -ml-px` : `${voll} px-1.5 rounded-r-md border-l border-white/30`)

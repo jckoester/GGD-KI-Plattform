@@ -658,7 +658,7 @@
                         onclick={save}
                         disabled={saving || !dirty}
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-                               text-white font-medium hover:opacity-90 transition-opacity
+                               text-on-fill font-medium hover:opacity-90 transition-opacity
                                disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Save class="w-4 h-4" />
@@ -753,7 +753,7 @@
                 onclick={save}
                 disabled={saving || !dirty}
                 class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
-                       text-white font-medium hover:opacity-90 transition-opacity
+                       text-on-fill font-medium hover:opacity-90 transition-opacity
                        disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <Save class="w-4 h-4" />

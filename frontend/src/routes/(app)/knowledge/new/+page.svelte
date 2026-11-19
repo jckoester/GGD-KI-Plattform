@@ -669,7 +669,7 @@
         type="submit"
         disabled={saving}
         class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-               text-white font-medium hover:opacity-90 transition-opacity
+               text-on-fill font-medium hover:opacity-90 transition-opacity
                disabled:opacity-50"
       >
         {saving ? 'Speichern…' : 'Speichern'}

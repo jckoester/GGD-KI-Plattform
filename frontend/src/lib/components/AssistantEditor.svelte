@@ -1188,7 +1188,7 @@
                     !dirty ||
                     !form.name.trim() ||
                     !form.system_prompt.trim()}
-                class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
+                class="px-4 py-2 bg-primary dark:bg-primary-dark text-on-fill rounded-lg
                hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
                 {#if saving}
@@ -1348,7 +1348,7 @@
                             onclick={loeschungBeantragen}
                             disabled={submitting}
                             class="px-3 py-1.5 text-sm rounded-lg font-medium bg-primary
-                                   dark:bg-primary-dark text-white hover:opacity-90
+                                   dark:bg-primary-dark text-on-fill hover:opacity-90
                                    transition-opacity disabled:opacity-50"
                         >
                             Antrag stellen
@@ -2513,7 +2513,7 @@
                             <button
                                 onclick={sendTestMessage}
                                 disabled={testIsStreaming || !testInput.trim()}
-                                class="p-2 bg-primary dark:bg-primary-dark text-white rounded-lg
+                                class="p-2 bg-primary dark:bg-primary-dark text-on-fill rounded-lg
                        hover:opacity-90 transition-opacity disabled:opacity-50
                        flex items-center justify-center min-w-[44px]"
                             >
@@ -2581,7 +2581,7 @@
             <button
                 onclick={rejectInEditor}
                 disabled={rejecting}
-                class="px-4 py-2 bg-light-re dark:bg-dark-re text-white rounded-lg
+                class="px-4 py-2 bg-light-re dark:bg-dark-re text-on-fill rounded-lg
                        hover:bg-light-re-2 dark:hover:bg-dark-re-2 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
                 {#if rejecting}

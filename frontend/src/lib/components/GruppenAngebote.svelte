@@ -139,7 +139,7 @@
                   onclick={() => zuordnen(a)}
                   disabled={arbeitet === a.id || !wahl[a.id]}
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
-                         bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+                         bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-50"
                 >
                   <Link2 size={13} /> Zuordnen
                 </button>

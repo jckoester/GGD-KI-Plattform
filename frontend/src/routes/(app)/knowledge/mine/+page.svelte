@@ -303,7 +303,7 @@
           onclick={warnFilterUmschalten}
           class="text-sm px-3 py-1 rounded-lg border transition-colors
                  {nurWarnungen
-                   ? 'bg-primary dark:bg-primary-dark text-white border-transparent'
+                   ? 'bg-primary dark:bg-primary-dark text-on-fill border-transparent'
                    : 'border-light-ye/50 dark:border-dark-ye/50 text-light-tx dark:text-dark-tx hover:bg-light-ye/20 dark:hover:bg-dark-ye/20'}"
         >
           {nurWarnungen ? 'Alle anzeigen' : 'Nur diese anzeigen'}
@@ -317,7 +317,7 @@
           onclick={() => (typFilter = '')}
           class="px-3 py-1 text-sm rounded-full border transition-colors
                  {typFilter === ''
-                   ? 'bg-primary dark:bg-primary-dark text-white border-transparent'
+                   ? 'bg-primary dark:bg-primary-dark text-on-fill border-transparent'
                    : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
         >
           Alle ({basis.gesamt})
@@ -327,7 +327,7 @@
             onclick={() => (typFilter = typFilter === t.typ ? '' : t.typ)}
             class="px-3 py-1 text-sm rounded-full border transition-colors flex items-center gap-1.5
                    {typFilter === t.typ
-                     ? 'bg-primary dark:bg-primary-dark text-white border-transparent'
+                     ? 'bg-primary dark:bg-primary-dark text-on-fill border-transparent'
                      : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
           >
             <NodeTypeIcon contentType={t.typ} size={14} />
@@ -348,7 +348,7 @@
             onclick={() => (ortFilter = ortFilter === o.id ? '' : o.id)}
             class="px-2.5 py-1 text-xs rounded-full border transition-colors flex items-center gap-1
                    {ortFilter === o.id
-                     ? 'bg-primary dark:bg-primary-dark text-white border-transparent'
+                     ? 'bg-primary dark:bg-primary-dark text-on-fill border-transparent'
                      : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
           >
             <MapPin class="w-3 h-3" />
@@ -517,7 +517,7 @@
                         />
                         <button onclick={() => ablaufSpeichern(b)} disabled={laeuft}
                                 class="text-xs px-2 py-1 rounded
-                                       bg-primary dark:bg-primary-dark text-white
+                                       bg-primary dark:bg-primary-dark text-on-fill
                                        disabled:opacity-40">
                           Übernehmen
                         </button>
@@ -657,12 +657,12 @@
           <button onclick={() => { const b = loeschKandidat.baustein; loeschKandidat = null; archivieren(b) }}
                   disabled={laeuft}
                   class="px-3 py-1.5 text-sm rounded-lg
-                         bg-primary dark:bg-primary-dark text-white disabled:opacity-40">
+                         bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-40">
             Stattdessen archivieren
           </button>
         {:else}
           <button onclick={loeschenBestaetigen} disabled={laeuft}
-                  class="px-3 py-1.5 text-sm rounded-lg text-white disabled:opacity-40
+                  class="px-3 py-1.5 text-sm rounded-lg text-on-fill disabled:opacity-40
                          bg-light-re dark:bg-dark-re">
             Endgültig löschen
           </button>

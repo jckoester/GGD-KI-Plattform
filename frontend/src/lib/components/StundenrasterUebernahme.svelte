@@ -236,7 +236,7 @@
     {:else}
       <div class="mt-3 flex gap-2">
         <button
-          class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white
+          class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-on-fill
                  disabled:opacity-50"
           disabled={schreibt}
           onclick={uebernehmen}
@@ -302,7 +302,7 @@
               onclick={() => anlegen(g)}
               disabled={legtAn === g.gruppe || schreibt}
               class="flex-shrink-0 px-2.5 py-1 rounded-md text-xs font-medium
-                     bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+                     bg-primary dark:bg-primary-dark text-on-fill disabled:opacity-50"
             >
               {legtAn === g.gruppe ? "Legt an …" : "Anlegen"}
             </button>

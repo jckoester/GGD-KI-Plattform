@@ -116,7 +116,7 @@
           Abbrechen
         </button>
         <button type="button" onclick={einplanen} disabled={!wahl || laeuft}
-                class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-white hover:opacity-90
+                class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90
                        disabled:opacity-50 disabled:cursor-not-allowed">
           {laeuft ? 'Wird eingeplant …' : 'Einplanen'}
         </button>

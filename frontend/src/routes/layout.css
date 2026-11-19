@@ -151,6 +151,9 @@
 @theme inline {
     --color-primary: var(--color-blue-600);
     --color-primary-dark: var(--color-blue-400);
+    /* Schrift auf jeder gefüllten Farbfläche (Primär, Rot, Prioritäts-Pille …), hell und
+     * dunkel gleich. Ersetzt `text-white` (0.49); Wächter in `lib/farbregeln.test.js`. */
+    --color-on-fill: var(--color-white);
     --color-light-bg: var(--color-base-100);
     --color-light-bg-2: var(--color-base-50);
     --color-light-secondary: var(--color-base-200);

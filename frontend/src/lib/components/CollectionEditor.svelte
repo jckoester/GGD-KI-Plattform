@@ -377,7 +377,7 @@
                 onclick={speichern}
                 disabled={speichert || !bereit}
                 class="px-4 py-2 rounded-md text-sm bg-primary dark:bg-primary-dark
-                       text-white hover:opacity-90 disabled:opacity-50"
+                       text-on-fill hover:opacity-90 disabled:opacity-50"
             >
                 {speichert ? "Speichert…" : "Speichern"}
             </button>

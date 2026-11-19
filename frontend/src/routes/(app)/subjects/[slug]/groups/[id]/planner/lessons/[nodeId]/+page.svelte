@@ -768,7 +768,7 @@
               onclick={proceedToRefs}
               disabled={reviewLoading}
               class="px-4 py-1.5 text-sm font-medium rounded-lg bg-primary dark:bg-primary-dark
-                     text-white hover:opacity-90 disabled:opacity-50"
+                     text-on-fill hover:opacity-90 disabled:opacity-50"
             >Abschließen</button>
             <button
               onclick={cancelReview}
@@ -825,7 +825,7 @@
               onclick={submitReview}
               disabled={reviewLoading}
               class="px-4 py-1.5 text-sm font-medium rounded-lg bg-primary dark:bg-primary-dark
-                     text-white hover:opacity-90 disabled:opacity-50"
+                     text-on-fill hover:opacity-90 disabled:opacity-50"
             >{reviewLoading ? 'Speichern …' : 'Abschließen'}</button>
             <button
               onclick={() => { reviewStep = 'phases' }}
@@ -848,7 +848,7 @@
             <button
               onclick={openReflowDialog}
               class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
-                     bg-primary dark:bg-primary-dark text-white font-medium
+                     bg-primary dark:bg-primary-dark text-on-fill font-medium
                      hover:opacity-90 transition-opacity"
             >↪ Verschiebe-Dialog starten</button>
           {/if}

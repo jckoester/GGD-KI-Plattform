@@ -226,7 +226,7 @@
                                 e.stopPropagation();
                                 confirmRename();
                             }}
-                            class="flex-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                            class="flex-1 px-3 py-1 bg-primary dark:bg-primary-dark text-on-fill text-sm rounded hover:opacity-90 transition-opacity"
                         >
                             Speichern
                         </button>
@@ -254,7 +254,7 @@
                                 e.stopPropagation();
                                 confirmDelete();
                             }}
-                            class="flex-1 px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                            class="flex-1 px-3 py-1 bg-light-re dark:bg-dark-re text-on-fill text-sm rounded hover:opacity-90 transition-opacity"
                         >
                             Ja
                         </button>

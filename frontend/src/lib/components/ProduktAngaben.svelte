@@ -109,7 +109,7 @@
         <button
             type="submit"
             disabled={speichert}
-            class="text-xs px-3 py-1 rounded bg-primary dark:bg-primary-dark text-white
+            class="text-xs px-3 py-1 rounded bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90 disabled:opacity-50"
         >
             Speichern

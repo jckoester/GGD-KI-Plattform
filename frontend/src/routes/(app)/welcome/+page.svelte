@@ -201,7 +201,7 @@
             <button
                 onclick={startChat}
                 class="absolute bottom-3 right-3 p-2 rounded-lg
-                       bg-primary dark:bg-primary-dark text-white
+                       bg-primary dark:bg-primary-dark text-on-fill
                        hover:opacity-90 transition-opacity disabled:opacity-40"
                 disabled={!inputText.trim()}
                 aria-label="Chat starten"

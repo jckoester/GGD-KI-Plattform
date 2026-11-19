@@ -55,7 +55,7 @@
     const liste = 'divide-y divide-light-ui-2 dark:divide-dark-ui-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3'
     const loeschKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded border border-light-ui-3 dark:border-dark-ui-3 ' +
         'text-light-tx-2 dark:text-dark-tx-2 bg-light-bg dark:bg-dark-bg hover:text-light-re dark:hover:text-dark-re transition-colors'
-    const einplanKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded bg-primary dark:bg-primary-dark text-white ' +
+    const einplanKnopf = 'flex-shrink-0 px-2 py-1 text-xs rounded bg-primary dark:bg-primary-dark text-on-fill ' +
         'hover:opacity-90 transition-opacity'
     const ohneMarke = 'inline-block px-1.5 py-0.5 text-xs rounded border border-dashed border-light-ui-3 ' +
         'dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2'

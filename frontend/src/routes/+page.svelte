@@ -79,7 +79,7 @@
             {:else}
                 <div
                     class="w-14 h-14 rounded-full bg-primary flex items-center justify-center
-                    text-white text-xl font-bold select-none"
+                    text-on-fill text-xl font-bold select-none"
                 >
                     {initials(branding.name)}
                 </div>
@@ -99,7 +99,7 @@
             <a
                 href={challenge.redirect_url}
                 class="block w-full text-center py-2.5 px-4 rounded-lg bg-primary
-                hover:bg-primary-dark text-white font-medium transition-colors"
+                hover:bg-primary-dark text-on-fill font-medium transition-colors"
             >
                 Anmelden mit IServ
             </a>
@@ -156,7 +156,7 @@
                     type="submit"
                     disabled={loading}
                     class="w-full py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-dark
-                       text-white font-medium transition-colors disabled:opacity-50
+                       text-on-fill font-medium transition-colors disabled:opacity-50
                        disabled:cursor-not-allowed"
                 >
                     {loading ? "Bitte warten…" : "Anmelden"}

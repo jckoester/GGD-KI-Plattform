@@ -150,7 +150,7 @@
                     onclick={saveCss}
                     disabled={saving || !cssDirty}
                     class="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg
-                           bg-primary dark:bg-primary-dark text-white
+                           bg-primary dark:bg-primary-dark text-on-fill
                            hover:opacity-90 transition-opacity disabled:opacity-40"
                 >
                     CSS speichern

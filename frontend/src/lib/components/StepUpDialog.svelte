@@ -74,7 +74,7 @@
       {/if}
       <button
         onclick={goRedirect}
-        class="w-full py-2.5 px-4 rounded-lg bg-primary dark:bg-primary-dark text-white
+        class="w-full py-2.5 px-4 rounded-lg bg-primary dark:bg-primary-dark text-on-fill
                font-medium hover:bg-primary-dark dark:hover:bg-primary transition-colors"
       >
         Erneut anmelden
@@ -121,7 +121,7 @@
           <button
             type="submit"
             disabled={submitting || !username || !password}
-            class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
+            class="px-4 py-2 bg-primary dark:bg-primary-dark text-on-fill rounded-lg
                    hover:bg-primary-dark dark:hover:bg-primary transition-colors
                    disabled:opacity-50 disabled:cursor-not-allowed"
           >

@@ -203,7 +203,7 @@
                         <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"
                             class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-                               text-white font-medium hover:opacity-90 transition-opacity"
+                               text-on-fill font-medium hover:opacity-90 transition-opacity"
                         >
                             <Pencil class="w-4 h-4" /> Bearbeiten
                         </a>
@@ -303,7 +303,7 @@
                 <a
                     href="/knowledge/curriculum/{curriculum.id}/edit"
                     class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
-                           text-white font-medium hover:opacity-90 transition-opacity"
+                           text-on-fill font-medium hover:opacity-90 transition-opacity"
                 >
                     <Pencil class="w-4 h-4" /> Bearbeiten
                 </a>
@@ -389,7 +389,7 @@
                 <button
                     onclick={handleDelete}
                     disabled={deleting}
-                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-white
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-on-fill
                            hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Trash2 class="w-4 h-4" /> {deleting ? "Wird gelöscht…" : "Löschen"}
@@ -453,7 +453,7 @@
                     <button
                         onclick={handleRelinkApply}
                         disabled={relinkBusy}
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark text-white
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark text-on-fill
                                hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     ><RefreshCw class="w-4 h-4" /> {relinkBusy ? "Wird angewendet…" : (relinkPreview.mode === "duplicate" ? "Kopie anlegen" : "Aktualisieren")}</button>
                 </div>

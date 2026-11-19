@@ -48,7 +48,7 @@
       <button
         onclick={onCreateUnit}
         class="px-2.5 py-1 rounded-md text-xs font-medium
-               bg-primary dark:bg-primary-dark text-white hover:opacity-90 transition-opacity"
+               bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90 transition-opacity"
       >
         + UE
       </button>

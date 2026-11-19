@@ -86,7 +86,7 @@
                         <button
                             onclick={() => bestaetigen(pot.class_group_id, pot.subject_id)}
                             class="px-3 py-1.5 rounded-lg bg-primary dark:bg-primary-dark
-                   text-white text-sm font-medium hover:opacity-90 transition-opacity
+                   text-on-fill text-sm font-medium hover:opacity-90 transition-opacity
                    flex items-center gap-1.5"
                             title="Ich unterrichte dieses Fach in dieser Klasse"
                         >

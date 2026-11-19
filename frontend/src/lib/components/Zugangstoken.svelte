@@ -281,7 +281,7 @@
                         nach der Anmeldung anlegen. Deine Eingaben bleiben erhalten.
                     </p>
                     <button
-                        class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-white"
+                        class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-on-fill"
                         onclick={kurzNeuAnmelden}>Kurz neu anmelden</button
                     >
                 </div>
@@ -289,7 +289,7 @@
 
             <div class="flex gap-2">
                 <button
-                    class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-white disabled:opacity-50"
+                    class="rounded bg-primary dark:bg-primary-dark px-3 py-1 text-sm text-on-fill disabled:opacity-50"
                     disabled={!kannAnlegen}
                     onclick={anlegen}
                 >

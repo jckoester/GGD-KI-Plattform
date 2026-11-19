@@ -388,7 +388,7 @@
                     onclick={() => lauf(false)}
                     disabled={laeuft || !bericht || !lohntSich(bericht, ueberschreiben)}
                     class="px-3 py-1.5 rounded-md text-sm bg-primary dark:bg-primary-dark
-                           text-white disabled:opacity-50 inline-flex items-center gap-1.5"
+                           text-on-fill disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
                     <Upload size="14" /> Einspielen
                 </button>

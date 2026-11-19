@@ -171,7 +171,7 @@
                 <button
                     onclick={onclose}
                     class="px-3 py-1.5 text-sm rounded-lg
-                           bg-primary dark:bg-primary-dark text-white"
+                           bg-primary dark:bg-primary-dark text-on-fill"
                 >
                     Fertig
                 </button>
@@ -441,7 +441,7 @@
                         type="submit"
                         disabled={laeuft || !contentType}
                         class="px-3 py-1.5 text-sm rounded-lg
-                               bg-primary dark:bg-primary-dark text-white
+                               bg-primary dark:bg-primary-dark text-on-fill
                                disabled:opacity-40"
                     >
                         {laeuft ? "Speichert…" : knopfBeschriftung(vorschlag)}

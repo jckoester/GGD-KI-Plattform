@@ -206,7 +206,7 @@
       <button
         onclick={handleSave}
         disabled={saving || !isChanged}
-        class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
+        class="px-4 py-2 bg-primary dark:bg-primary-dark text-on-fill rounded-lg
                hover:bg-primary-dark dark:hover:bg-primary transition-colors
                disabled:opacity-50 disabled:cursor-not-allowed"
       >

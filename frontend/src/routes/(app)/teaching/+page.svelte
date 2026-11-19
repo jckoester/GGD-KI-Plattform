@@ -329,7 +329,7 @@
                                     excl.subject_id,
                                 )}
                             class="px-3 py-1.5 rounded-lg bg-primary dark:bg-primary-dark
-                     text-white text-sm font-medium hover:opacity-90 disabled:opacity-50
+                     text-on-fill text-sm font-medium hover:opacity-90 disabled:opacity-50
                      transition-opacity flex items-center gap-1.5"
                         >
                             <Check size={14} />

@@ -119,7 +119,7 @@
         <button
             onclick={einfuegen}
             disabled={!bereit || !!vorschau?.fehler || (!tex && !aendern)}
-            class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white
+            class="px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-on-fill
                    disabled:opacity-50 disabled:cursor-not-allowed"
         >
             {aendern && !tex ? "Formel entfernen" : aendern ? "Übernehmen" : "Einfügen"}

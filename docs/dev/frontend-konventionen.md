@@ -92,6 +92,7 @@ Regeln.
 | Sekundärer Text | `text-light-tx-2` | `dark:text-dark-tx-2` |
 | Rahmen / UI-Elemente | `border-light-ui-3` | `dark:border-dark-ui-3` |
 | Primärfarbe (Buttons) | `bg-primary` | `dark:bg-primary-dark` |
+| Schrift auf gefüllter Farbfläche (Primär, Rot, Pille per `style`) | `text-on-fill` | (gleich, ohne `dark:`) |
 | Links / Akzent | `text-light-bl` | `dark:text-dark-bl` |
 | Fehler | `text-light-re` | `dark:text-dark-re` |
 

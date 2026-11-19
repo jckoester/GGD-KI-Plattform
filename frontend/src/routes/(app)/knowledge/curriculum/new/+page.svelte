@@ -244,7 +244,7 @@
                     type="submit"
                     disabled={!canSubmit}
                     class="px-4 py-2 rounded text-sm font-medium transition-colors
-                           bg-primary dark:bg-primary-dark text-white
+                           bg-primary dark:bg-primary-dark text-on-fill
                            disabled:opacity-50 disabled:cursor-not-allowed
                            hover:opacity-90"
                 >

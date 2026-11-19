@@ -166,7 +166,7 @@
               <button
                 onclick={() => doAction(req.id, "approve")}
                 disabled={processing === req.id}
-                class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg text-sm
+                class="px-4 py-2 bg-primary dark:bg-primary-dark text-on-fill rounded-lg text-sm
                        hover:bg-primary-dark dark:hover:bg-primary transition-colors
                        disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -196,7 +196,7 @@
               </div>
               <button
                 onclick={() => goto(mitRueckweg(`/access-requests/${req.id}`, $page.url))}
-                class="shrink-0 px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white
+                class="shrink-0 px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-on-fill
                        hover:bg-primary-dark dark:hover:bg-primary transition-colors"
               >
                 Öffnen

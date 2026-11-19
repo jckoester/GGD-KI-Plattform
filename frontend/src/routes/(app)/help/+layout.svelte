@@ -34,7 +34,7 @@
                             href={item.path}
                             class="flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors
                                 {$page.url.pathname === item.path
-                                    ? 'bg-primary text-white dark:bg-primary-dark'
+                                    ? 'bg-primary text-on-fill dark:bg-primary-dark'
                                     : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
                                 }"
                         >
@@ -74,7 +74,7 @@
                                 }}
                                 class="flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors
                                     {$page.url.pathname === item.path
-                                        ? 'bg-primary text-white dark:bg-primary-dark'
+                                        ? 'bg-primary text-on-fill dark:bg-primary-dark'
                                         : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
                                     }"
                             >

@@ -172,7 +172,7 @@
                 class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 disabled:opacity-50">Abbrechen</button>
             <button onclick={ablehnenBestaetigen} disabled={lehntAb}
-                class="px-4 py-2 bg-light-re dark:bg-dark-re text-white rounded-lg flex items-center gap-2 disabled:opacity-50">
+                class="px-4 py-2 bg-light-re dark:bg-dark-re text-on-fill rounded-lg flex items-center gap-2 disabled:opacity-50">
                 {#if lehntAb}<Loader2 class="w-4 h-4 animate-spin" /> Wird abgelehnt…{:else}<X class="w-4 h-4" /> Ablehnen{/if}
             </button>
         </div>

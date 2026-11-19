@@ -106,6 +106,24 @@ describe("Farbregeln", () => {
     // `routes/layout.css` sagt, welche Schrift daraufgehört — dort liest ihn, wer
     // das Token verwendet.
 
+    it("Schrift auf Farbflächen über `text-on-fill`, nie `text-white` (0.49, F1 c)", () => {
+        // Ein Token für jede gefüllte Farbfläche (Primär, Rot, Prioritäts-Pille …).
+        // `text-white` umging die Token-Ebene; gab es neben der Primärfläche auch auf
+        // rohen Palettenwerten (`bg-blue-500` im Konversationsmenü). Ohne Ausnahme
+        // verboten, damit die Regel nicht an der Erkennung „was ist eine Fläche“ hängt.
+        const treffer = [];
+        for (const pfad of quelldateien(SRC)) {
+            const inhalt = ohneKommentare(readFileSync(pfad, "utf8"));
+            if (/\btext-white\b/.test(inhalt)) treffer.push(pfad.replace(SRC, "src"));
+        }
+        expect(treffer).toEqual([]);
+    });
+
+    it("`--color-on-fill` ist als Token definiert", () => {
+        const css = readFileSync(join(SRC, "routes", "layout.css"), "utf8");
+        expect(css).toMatch(/--color-on-fill:\s*var\(--color-white\)/);
+    });
+
     it("die Suche greift überhaupt in Klassenlisten", () => {
         // Gegenprobe gegen den stummen Fehlschlag: Wenn das Muster für Klassenlisten
         // nicht mehr passt (andere Schreibweise, anderes Anführungszeichen), fände

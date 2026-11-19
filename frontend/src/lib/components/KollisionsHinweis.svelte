@@ -47,7 +47,7 @@
                     type="button"
                     onclick={onabgrenzen}
                     disabled={saving}
-                    class="px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark text-white
+                    class="px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark text-on-fill
                            disabled:opacity-50"
                 >
                     Mit Abgrenzung speichern

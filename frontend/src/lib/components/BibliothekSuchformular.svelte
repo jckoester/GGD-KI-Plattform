@@ -42,7 +42,7 @@
         <button
             type="submit"
             disabled={laeuft || !frage.trim()}
-            class="px-4 py-2 rounded-lg text-sm bg-primary dark:bg-primary-dark text-white
+            class="px-4 py-2 rounded-lg text-sm bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed
                    flex items-center gap-2"
         >

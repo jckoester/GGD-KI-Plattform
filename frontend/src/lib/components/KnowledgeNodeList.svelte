@@ -437,7 +437,7 @@
         <a
             href={newUrl}
             class="{dateiwerkzeuge ? '' : 'ml-auto'} px-3 py-1.5 text-sm rounded-md
-             bg-primary dark:bg-primary-dark text-white font-medium
+             bg-primary dark:bg-primary-dark text-on-fill font-medium
              hover:opacity-90 transition-opacity whitespace-nowrap"
         >
             + Neuer Baustein

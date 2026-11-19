@@ -175,7 +175,7 @@
                                             <button
                                                 onclick={() => revoke(u.pseudonym)}
                                                 disabled={revoking === u.pseudonym}
-                                                class="text-xs px-2 py-1 rounded bg-light-re dark:bg-dark-re text-white disabled:opacity-50"
+                                                class="text-xs px-2 py-1 rounded bg-light-re dark:bg-dark-re text-on-fill disabled:opacity-50"
                                             >
                                                 {revoking === u.pseudonym ? "…" : "Ja, beenden"}
                                             </button>

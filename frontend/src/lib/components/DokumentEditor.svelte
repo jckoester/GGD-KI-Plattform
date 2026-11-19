@@ -106,7 +106,7 @@
             onclick={save}
             disabled={saving || !dirty}
             class="inline-flex items-center gap-1 text-sm px-3 py-1 rounded-lg shrink-0
-                   bg-primary dark:bg-primary-dark text-white
+                   bg-primary dark:bg-primary-dark text-on-fill
                    hover:opacity-90 transition-opacity disabled:opacity-40"
         >
             <Save class="w-4 h-4" /> Speichern

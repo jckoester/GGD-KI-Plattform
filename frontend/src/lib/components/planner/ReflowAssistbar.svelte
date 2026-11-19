@@ -51,7 +51,7 @@
         <button
           onclick={() => open(f, true)}
           class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
-                 text-white font-medium hover:opacity-90 transition-opacity"
+                 text-on-fill font-medium hover:opacity-90 transition-opacity"
         >Übernehmen</button>
         <button
           onclick={() => dismiss(f.ue_node_id)}

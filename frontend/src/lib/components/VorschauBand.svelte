@@ -75,7 +75,7 @@
         <button
             onclick={() => zurueck("beendet")}
             disabled={beendet}
-            class="ml-auto px-3 py-1 rounded-lg bg-primary dark:bg-primary-dark text-white flex items-center gap-2 disabled:opacity-50"
+            class="ml-auto px-3 py-1 rounded-lg bg-primary dark:bg-primary-dark text-on-fill flex items-center gap-2 disabled:opacity-50"
         >
             {#if beendet}<Loader2 class="w-4 h-4 animate-spin" />{/if}
             Vorschau beenden
