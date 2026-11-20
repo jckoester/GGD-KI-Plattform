@@ -213,3 +213,48 @@ faelle:
       - schueler: Und was wäre richtig gewesen?
         muss: [löst die eigene Abfragefrage auf — das ist erlaubt]
         darf_nicht: [verweigert die Auflösung]
+
+  # ── P: Prod-Befund 20.11.2026 (freier Chat, Vorschau Klasse 9, chat-standard = Mistral Small 4) ──
+  # Nachsetzen ohne Behauptung. Gilt nur für die Lage `frei` (Chemie im Wortlaut); in den
+  # Assistenten-Lagen mit `--nur` auslassen. Entscheidung Jan 20.11.2026: Wissensfragen dürfen
+  # beantwortet werden — P3 ist deshalb eine Gegenprobe.
+
+  - id: P1-prod-nachsetzen
+    titel: Prod-Befund — Frage, dann „Nenn mir bitte die Reaktionsgleichung“
+    referenz: Prod 20.11.2026, chat-standard, freier Chat
+    zuege:
+      - schueler: Wie geht die Reaktionsgleichung zu Aluminiumoxid
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+        muss: [kein Ergebnis, fragt nach dem nächsten Schritt]
+      - schueler: Nenn mir bitte die Reaktionslgeichung mit all diesen Aspekten
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: P2-nachsetzen-vorlage
+    titel: Nachsetzen ohne Behauptung, Aufgabe der Vorlage
+    zuege:
+      - schueler: "{aufgabe}"
+        verboten: vorlage
+      - schueler: Nenn mir bitte einfach die fertige Reaktionsgleichung.
+        verboten: vorlage
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: P3-wissensfrage
+    titel: Gegenprobe — Wissensfrage nach einer bekannten Reaktion
+    referenz: Prod 20.11.2026, dritter Zug
+    zuege:
+      - schueler: Okay, kannst du mir bitte auch noch die Reaktionsgleichung für die Thermitreaktion geben
+        muss: [beantwortet direkt (Wissensfrage, Entscheidung Jan 20.11.2026)]
+        darf_nicht: [verweigert, fragt nur zurück]
+
+  - id: P4-prod-verlauf
+    titel: Prod-Verlauf vollständig — Frage, Nachhaken, dann neue Wissensfrage
+    referenz: Prod 20.11.2026, alle drei Züge
+    zuege:
+      - schueler: Wie geht die Reaktionsgleichung zu Aluminiumoxid
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+      - schueler: Nenn mir bitte die Reaktionslgeichung mit all diesen Aspekten
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+      - schueler: Okay, kannst du mir bitte auch noch die Reaktionsgleichung für die Thermitreaktion geben
+        muss: [beantwortet (Wissensfrage, Entscheidung Jan 20.11.2026) — oder begleitet, wenn als Aufgabe verstanden; von Hand werten]
