@@ -252,3 +252,34 @@ async def test_nummer_ohne_fassung_trifft_die_geltende(db, welt):
     fid = welt["fach"].id
     assert await resolve_ik_node(db, fid, "3.1(1)") == welt["ik_v2"].id
     assert await resolve_ik_node(db, fid, "3.1(1)", bp_version="2016.V3") == welt["ik_v3"].id
+
+
+def test_dry_run_sieht_archivierte_unveraenderte_fassung_wie_der_echte_lauf(pg, caplog):
+    """Prod 20.11.2026: Die V3-Knoten lagen archiviert in der DB und unverändert im JSONL. Der
+    Dry-Run ließ unveränderte Knoten unberührt und meldete deshalb „neue Edition noch nicht
+    vorhanden“, obwohl der echte Lauf sie wieder aktiv setzt. Jetzt läuft das UPDATE auch im
+    Dry-Run — verworfen wird es mit dem Rollback am Ende."""
+    import logging
+
+    mod = _import_modul()
+    conn, cur, sid, ids = pg
+    cur.execute("SELECT id, metadata FROM context_nodes WHERE id::text = ANY(%s)",
+                ([str(ids["v3"]), str(ids["v3_fp"])],))
+    v3 = cur.fetchall()
+    for nid, meta in v3:
+        cur.execute("""UPDATE context_nodes SET status = 'archived', archived_at = now(),
+                           metadata = metadata || '{"content_hash": "H"}'::jsonb WHERE id = %s""", (nid,))
+    conn.commit()
+
+    for nid, meta in v3:
+        typ = "fachplan" if meta["bp_id"].endswith("_FP") else "ik_kompetenz"
+        knoten = {"bp_id": meta["bp_id"], "type": "knowledge", "content_type": typ, "title": "x",
+                  "content": "x", "content_hash": "H", "bp_version": "2016.V3"}
+        assert mod.upsert_node(cur, knoten, True, {})[0] == "skipped"
+
+    with caplog.at_level(logging.INFO):
+        _lauf(mod, cur, sid, 2026, dry_run=True)
+    assert "noch nicht vorhanden" not in caplog.text
+
+    conn.rollback()  # wie run_import im Dry-Run
+    assert _status(cur, ids)["v3"] == ("archived", True)

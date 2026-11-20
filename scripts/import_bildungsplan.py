@@ -352,6 +352,9 @@ def upsert_node(
     """
     Fuehrt INSERT oder UPDATE durch je nach Idempotenz-Status.
     Gibt ('inserted'|'updated'|'skipped', node_uuid) zurueck.
+
+    ``dry_run`` ändert hier nichts (seit 20.11.2026): Alle Schreibvorgänge laufen auch im
+    Dry-Run, ``run_import`` verwirft sie am Ende per Rollback.
     """
     bp_id = node["bp_id"]
     category = node.get("type", "knowledge")
@@ -421,6 +424,11 @@ def upsert_node(
         return "inserted", node_id
 
     existing_id, existing_hash = row
+    # ⚠️ **Auch im Dry-Run ausgeführt** (wie das INSERT oben; seit 20.11.2026). Der Rollback am
+    # Ende verwirft es. Erst damit sieht die Archivierung danach denselben Stand wie ein echter
+    # Lauf: Archivierte, aber unveränderte Knoten (etwa eine Fassung nach dem Schuljahreswechsel)
+    # setzt dieses UPDATE wieder aktiv. Ohne es meldete der Dry-Run „neue Edition noch nicht
+    # vorhanden“, obwohl der echte Lauf sie fand (Prod, 20.11.2026).
     if existing_hash == new_hash:
         # Content unverändert — abgeleitete Felder trotzdem aktualisieren, damit
         # Scraper-Korrekturen (z. B. das Jahrgangsband der Kursstufen-Basisfächer, Todo B1)
@@ -428,60 +436,58 @@ def upsert_node(
         # deterministisch scraper-/config-abgeleitet → der NEUE Wert gewinnt, sofern gesetzt;
         # ein NULL aus dem Scrape überschreibt einen vorhandenen DB-Wert NICHT
         # (`COALESCE(neu, alt)` — Reihenfolge wichtig).
-        if not dry_run:
-            cur.execute(
-                """
-                UPDATE context_nodes
-                SET title      = CASE WHEN title_locked THEN title ELSE %s END,
-                    metadata   = %s,
-                    subject_id = COALESCE(%s, subject_id),
-                    min_grade  = COALESCE(%s, min_grade),
-                    max_grade  = COALESCE(%s, max_grade),
-                    niveau     = %s,
-                    bp_version = %s,
-                    status      = 'active',
-                    archived_at = NULL
-                WHERE id = %s
-                """,
-                (title, json.dumps(metadata), subject_id, min_grade, max_grade,
-                 niveau, bp_version, existing_id),
-            )
-            # Auch hier ergänzen, obwohl der Hash die Aliase enthält: Ein Import zwischen
-            # 0.9.0 (Migration 0057) und 0.13.0 legte sie ins tote `metadata.aliase`, die
-            # Tabelle blieb leer — und das Metadaten-UPDATE oben räumt dieses Feld gerade
-            # weg. Ohne das Ergänzen wären sie danach verloren. Geändert hat sich nur
-            # etwas, wenn die Tabelle vorher lückenhaft war; nur dann ist der Vektor alt.
-            if aliase is not None and ergaenze_aliase(cur, existing_id, aliase):
-                cur.execute(
-                    "UPDATE context_nodes SET embedding = NULL WHERE id = %s",
-                    (existing_id,),
-                )
-        return "skipped", UUID(str(existing_id))
-
-    # UPDATE (Hash geaendert -> embedding zuruecksetzen, auch neue Felder aktualisieren)
-    if not dry_run:
         cur.execute(
             """
             UPDATE context_nodes
-            SET content = %s,
-                title = CASE WHEN title_locked THEN title ELSE %s END,
-                metadata = %s,
-                subject_id = %s,
-                min_grade = %s,
-                max_grade = %s,
-                niveau = %s,
+            SET title      = CASE WHEN title_locked THEN title ELSE %s END,
+                metadata   = %s,
+                subject_id = COALESCE(%s, subject_id),
+                min_grade  = COALESCE(%s, min_grade),
+                max_grade  = COALESCE(%s, max_grade),
+                niveau     = %s,
                 bp_version = %s,
-                embedding = NULL,
-                status = 'active',
-                archived_at = NULL,
-                updated_at = now()
+                status      = 'active',
+                archived_at = NULL
             WHERE id = %s
-        """,
-            (content, title, json.dumps(metadata, ensure_ascii=False),
-             subject_id, min_grade, max_grade, niveau, bp_version, existing_id),
+            """,
+            (title, json.dumps(metadata), subject_id, min_grade, max_grade,
+             niveau, bp_version, existing_id),
         )
-        if aliase is not None:
-            ergaenze_aliase(cur, existing_id, aliase)
+        # Auch hier ergänzen, obwohl der Hash die Aliase enthält: Ein Import zwischen
+        # 0.9.0 (Migration 0057) und 0.13.0 legte sie ins tote `metadata.aliase`, die
+        # Tabelle blieb leer — und das Metadaten-UPDATE oben räumt dieses Feld gerade
+        # weg. Ohne das Ergänzen wären sie danach verloren. Geändert hat sich nur
+        # etwas, wenn die Tabelle vorher lückenhaft war; nur dann ist der Vektor alt.
+        if aliase is not None and ergaenze_aliase(cur, existing_id, aliase):
+            cur.execute(
+                "UPDATE context_nodes SET embedding = NULL WHERE id = %s",
+                (existing_id,),
+            )
+        return "skipped", UUID(str(existing_id))
+
+    # UPDATE (Hash geaendert -> embedding zuruecksetzen, auch neue Felder aktualisieren)
+    cur.execute(
+        """
+        UPDATE context_nodes
+        SET content = %s,
+            title = CASE WHEN title_locked THEN title ELSE %s END,
+            metadata = %s,
+            subject_id = %s,
+            min_grade = %s,
+            max_grade = %s,
+            niveau = %s,
+            bp_version = %s,
+            embedding = NULL,
+            status = 'active',
+            archived_at = NULL,
+            updated_at = now()
+        WHERE id = %s
+    """,
+        (content, title, json.dumps(metadata, ensure_ascii=False),
+         subject_id, min_grade, max_grade, niveau, bp_version, existing_id),
+    )
+    if aliase is not None:
+        ergaenze_aliase(cur, existing_id, aliase)
     return "updated", UUID(str(existing_id))
 
 

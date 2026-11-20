@@ -137,8 +137,16 @@ Die Ausgabe prüfen:
 
 - `[DRY RUN] N insertiert, 0 aktualisiert, ...` → Erstimport
 - `[DRY RUN] 0 insertiert, M aktualisiert, ...` → Re-Import mit Änderungen
-- `[DRY RUN] 0 insertiert, 0 aktualisiert, K unverändert` → keine Änderung, Import
-  nicht nötig
+- `[DRY RUN] 0 insertiert, 0 aktualisiert, K unverändert` → kein neuer Inhalt. Der Import
+  kann trotzdem etwas bewirken: Er setzt unveränderte, aber archivierte Knoten wieder aktiv,
+  etwa eine Fassung, die nach dem Schuljahreswechsel oder nach einer Änderung an
+  `subjects.yaml` archiviert lag.
+
+Die Zeilen `archive_superseded: …` zeigen, welche Fassungen je Fach aktiv bleiben, künftig
+werden oder archiviert würden. Der Dry-Run rechnet dabei mit demselben Stand wie der echte
+Lauf, archivierte unveränderte Knoten also schon wieder aktiv; verworfen wird alles am Ende.
+Meldet er „neue Edition noch nicht vorhanden“, fehlt die Fassung tatsächlich in den
+JSONL-Dateien.
 
 ---
 
