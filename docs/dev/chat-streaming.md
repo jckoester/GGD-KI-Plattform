@@ -68,6 +68,46 @@ Drei Response-Header begleiten den Stream:
 
 Das Frontend kann die URL aktualisieren, bevor der erste Token eintrifft, und den Modell-/Assistent-Wechsel im UI anzeigen.
 
+## Modellwahl (`app/chat/modellwahl.py`, seit 0.51)
+
+Welches Modell eine Antwort schreibt, entscheiden drei Stellen nacheinander:
+
+1. **Wer darf wählen.** `wahl_im_assistenten(model_id, user, assistant_id)`: Bei aktivem
+   Assistenten zählt ein mitgeschicktes `model_id` nur, wenn `darf_im_assistenten_waehlen`
+   gilt (`"teacher" in roles` — Admins eingeschlossen, die Vorschau nicht, ihr Token trägt
+   `["student"]`). Sonst wird es **still verworfen** und ins Log geschrieben, nicht ins Audit.
+   Ohne Assistenten gilt `model_id` für alle Rollen wie bisher.
+2. **Vorliebe bei neuen Chats.** `vorliebe_anwenden` läuft nur bei einer neuen Konversation
+   **ohne** `model_id`. Freier Chat → `modell_frei`; Assistent, der plant (`plant()` in
+   `app/assistants/sichtbarkeit.py`) → `modell_planung`, auch gegen ein fest gesetztes Modell
+   des Assistenten; andere Assistenten → keine Vorliebe. Ist die Vorliebe nicht mehr
+   freigeschaltet oder kann sie keine Funktionen aufrufen, bleibt es bei der Vorgabe, und das Backend sendet `event: modell_hinweis`.
+   Eine bestehende Konversation behält ihr Modell — auch wenn derselbe Assistent erneut
+   mitgeschickt wird.
+3. **⚙-Pflicht.** `fehlen_funktionen`: Ein **gewähltes** Modell ohne
+   `supports_function_calling` bei einem Assistenten mit `tool_groups` → 403 mit
+   `braucht_funktionen_text`. Das eigene Modell des Assistenten wird nie abgewiesen; `None`
+   (Angabe fehlt in der LiteLLM-Config) gilt als unbekannt und sperrt nicht.
+
+Danach greift wie immer die Freischaltungsmatrix (`/settings/models`).
+
+**Vorlieben speichern.** `PATCH /preferences` prüft `modell_frei` und `modell_planung` mit
+`pruefe_bevorzugtes_modell`: nur Lehrkräfte, kein ausgeblendetes Präfix
+(`MODEL_PICKER_HIDDEN_PREFIXES`), freigeschaltet, für `modell_planung` mit Funktionen. Ein
+leerer Wert entfernt den Schlüssel (`patch_preferences(..., entfernen=...)`); gelesen wird über
+`bevorzugte_modelle()` in `app/preferences/service.py`.
+
+**Frontend.** `src/lib/modellwahl_chat.js` spiegelt die Regeln für den Wähler:
+`startModellFrei` (Vorliebe → zuletzt gewählt → Vorgabe), `startModellAssistent`,
+`modelleFuerAssistent` (bei Fähigkeiten nur ⚙), `zuSendendesModell` (der Eintrag „wie der
+Assistent“ schickt kein `model_id`) und die Kostenschätzung `kostenMitAssistent` aus
+`token_zusatz`/`token_dokumente` der Assistentenliste und `usd_je_eingabetoken` der
+Modellliste. Die Liste der Planungs-Fähigkeiten (`PLANUNGS_FAEHIGKEITEN`) prüft ein
+Wächtertest gegen das Backend.
+
+Tests: `tests/integration/test_chat_modellwahl.py`, `tests/unit/test_modellwahl.py`,
+`frontend/src/lib/modellwahl_chat.test.js`.
+
 ## SSE-Eventformat
 
 Alle Events folgen dem Standard-SSE-Format (`event: <typ>\ndata: <json>\n\n`). Die
@@ -80,6 +120,7 @@ Ereignisgrenze ist die Leerzeile: Ein Block ohne `event:`-Zeile ist ein Token.
 | `tool_status` | `{"tool": "finde_stunde", "round": 1}` | vor jedem Werkzeugaufruf; die Oberfläche wertet es nicht aus |
 | `image` | `{"image_id", "size", "bildart", "provider_model", "prompt"}` | ein Werkzeug hat ein Bild erzeugt |
 | `bezug` | `{"group_id", "subject_id", "stunde_node_id"}` | ein Werkzeug hat Stunde oder Gruppe gesetzt (`waehle_stunde`) |
+| `modell_hinweis` | `{"detail": "Dein bevorzugtes Modell …", "modell": "chat-komplex"}` | neuer Chat: die Vorliebe ließ sich nicht anwenden (s. „Modellwahl“) |
 | `title` | `{"title": "Fotosynthese erklärt"}` | neuer Titel, sofern er binnen 3 s kam |
 | `kontext` | `{"bausteine": [...]}` | nach dem Speichern: die Bausteine, die beim Antworten vorlagen |
 | `message` | `{"message_id": "uuid"}` | nach dem Speichern — belegt später die Herkunft gespeicherter Diagramme |
@@ -97,6 +138,7 @@ async generator und liefert vereinheitlichte Objekte:
 { type: 'crisis',  crisis: {...} }
 { type: 'image',   image_id, size, bildart, provider_model, prompt }
 { type: 'bezug',   groupId, subjectId, stundeId }
+{ type: 'modell_hinweis', detail: '...', modell: '...' }
 { type: 'title',   title: '...' }
 { type: 'kontext', bausteine: [...] }
 { type: 'message', message_id: '...' }
@@ -195,4 +237,3 @@ Bei einer **neuen** Konversation, deren erste Nachricht länger als 20 Zeichen i
 parallel zum Stream eine Titelgenerierung (`_generate_title`) mit dem Modell aus
 `TITLE_MODEL`. Sie schreibt den Titel selbst in die Datenbank. Das Backend wartet nach dem
 Antworttext höchstens 3 Sekunden darauf; kommt er rechtzeitig, geht er als `event: title`
-hinaus, sonst erscheint er beim nächsten Laden der Seitenleiste.

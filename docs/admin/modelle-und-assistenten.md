@@ -77,6 +77,67 @@ Als Einstiegspunkt empfiehlt es sich, zunächst ein einzelnes,
 kostengünstiges Modell für alle Gruppen freizuschalten und die Matrix
 später gezielt zu erweitern.
 
+### Standardmodelle für Schüler:innen
+
+Die Prompts der mitgelieferten Assistenten sind an `chat-schnell`, `chat-standard` und
+`chat-komplex` gemessen. Bekommt ein Jahrgang in der Matrix ein anderes Chat-Modell, zeigt
+`/settings/models` einen Hinweis: „Für Schüler:innen sind die Prompts der Assistenten an den
+Standardmodellen gemessen.“ Gesperrt wird nichts — die Entscheidung bleibt bei der Schule.
+Welche Modelle als Standard gelten, steht in `SCHUELER_STANDARDMODELLE` (siehe
+[Konfiguration](konfiguration.md)); wer die Staffel anders benennt, passt die Liste an.
+
+### Modellwahl im Assistenten-Chat (seit 0.51)
+
+Ein Assistent läuft mit seinem eigenen Modell (bei Planungs-Assistenten ohne eigenes Modell
+mit `PLANUNG_MODEL`, sonst mit `CHAT_DEFAULT_MODEL`). Was Nutzer:innen daran ändern können,
+hängt von der Rolle ab:
+
+| | Schüler:innen (und Vorschau) | Lehrkräfte |
+|---|---|---|
+| Modell im Assistenten-Chat umstellen | nein — ein mitgeschicktes Modell wird verworfen (nur im Log vermerkt) | ja, für die eine Unterhaltung, bei allen Assistenten |
+| Bevorzugtes Modell im Profil | — | je eins für freie Chats und für Planungs-Assistenten |
+
+Zwei Regeln gelten dabei für Lehrkräfte:
+
+- **Nur freigeschaltete Modelle.** Auch das bevorzugte Modell muss in der Matrix für
+  Lehrkräfte freigeschaltet sein. Entfällt die Freischaltung später, läuft ein neuer Chat
+  mit dem Modell des Assistenten, und die Lehrkraft sieht einen Hinweis.
+- **Fähigkeiten brauchen Funktionsaufrufe.** Hat ein Assistent Fähigkeiten (`tool_groups`),
+  sind nur Modelle mit `supports_function_calling: true` wählbar (im Wähler `⚙`). Andere
+  weist das Backend mit einer lesbaren Meldung ab. Das Modell des Assistenten selbst wird
+  nie abgewiesen. Fehlt die Angabe in der LiteLLM-Config, gilt das Modell als unbekannt
+  und wird nicht gesperrt — es fehlt dann aber das `⚙`.
+
+### Ein stärkeres Modell für Lehrkräfte anbieten
+
+Ein zusätzliches Modell — etwa ein großes Modell eines weiteren Anbieters für die
+Curriculum-Arbeit — ist reine Konfiguration:
+
+1. **Vertrag zuerst.** Ein neuer Anbieter ist ein weiterer Auftragsverarbeiter: AVV,
+   Serverstandort, Eintrag im Verarbeitungsverzeichnis (siehe
+   [Modell-Szenarien → Mischbetrieb](modell-szenarien.md#szenario-e--mischbetrieb)). Die
+   Pseudonymisierung gilt auch dort.
+2. **Eintrag in der LiteLLM-Config** mit Anbieter-Präfix im Namen und vollständigem
+   `model_info` — ohne Preise keine Kostenschätzung im Wähler, ohne
+   `supports_function_calling` kein Einsatz bei Planungs-Assistenten:
+
+   ```yaml
+   - model_name: anbieter-gross            # Anbieter-Präfix + Aufgabe
+     litellm_params:
+       model: <anbieter>/<modell-id>
+       api_key: os.environ/ANBIETER_API_KEY
+     model_info:
+       supports_function_calling: true
+       input_cost_per_token: <Preis aus der Preisliste des Anbieters>
+       output_cost_per_token: <ebenso>
+   ```
+3. **Nur für Lehrkräfte freischalten** in `/settings/models`. Für Jahrgänge erschiene der
+   Hinweis zu den Standardmodellen.
+4. Proxy neu starten; `check_litellm_config.py` meldet fehlende Angaben.
+
+**Zu den Kosten:** Ein großes Modell kostet pro Nachricht ein Vielfaches von `chat-komplex`.
+Das Budget der Lehrkräfte sollte zu einem solchen Angebot passen ([Budget](budget.md)).
+
 ### Interne Modelle aus dem Modellwähler ausblenden
 
 Neben den Chat-Modellen stehen in LiteLLM auch Modelle, die **niemand manuell wählen soll**:

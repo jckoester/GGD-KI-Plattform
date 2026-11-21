@@ -26,6 +26,14 @@ Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten
 
 Ein einmal gewähltes Modell wird gespeichert und beim nächsten Chat automatisch vorausgewählt. Du kannst es jederzeit wieder ändern.
 
+**Lehrkräfte: bevorzugtes Modell.** Hast du im Profil ein [bevorzugtes Modell](profil.md#bevorzugte-modelle-nur-lehrkräfte) für freie Chats gewählt, beginnt jeder neue Chat damit — es geht dem zuletzt gewählten vor.
+
+### Modell im Assistenten-Chat
+
+Ein Assistent bringt sein Modell mit. **Schüler:innen** arbeiten immer mit diesem Modell; im Assistenten-Chat gibt es für sie keine Modellauswahl.
+
+**Lehrkräfte** können auch im Assistenten-Chat umstellen. Der erste Eintrag der Auswahl heißt „wie der Assistent“ und nennt dessen Modell. Die Wahl gilt für diese eine Unterhaltung; neben jedem Modell steht, was eine Nachricht an diesen Assistenten damit ungefähr kostet. Kann der Assistent etwas, das Funktionen braucht — etwa im Wissensspeicher suchen oder in die Planung schreiben —, stehen nur Modelle mit `⚙` zur Wahl. Bei Planungs-Assistenten startet die Auswahl mit deinem bevorzugten Modell für die Planung, falls du eins gewählt hast. Ist es nicht mehr freigeschaltet, läuft der Chat mit dem Modell des Assistenten, und ein Hinweis sagt dir das.
+
 Modelle unterscheiden sich in Geschwindigkeit, Qualität und Kosten. Für die meisten Aufgaben reicht das voreingestellte Modell aus. Wenn du sehr lange Texte verarbeitest oder besonders anspruchsvolle Aufgaben stellst, kann ein leistungsstärkeres Modell besser geeignet sein.
 
 **Was neben dem Namen steht.** `~7 🪙` schätzt, wie viele Einheiten eine gewöhnliche Nachricht mit diesem Modell kostet; abgerechnet wird nach dem tatsächlichen Verbrauch. Was eine Einheit ist, erklärt [Profil & Budget](profil.md). Das Zahnrad `⚙` heißt: Das Modell kann die Fähigkeiten eines Assistenten nutzen, etwa im Wissensspeicher suchen oder Unterricht planen. Fehlt es, ist das nicht der Fall oder nicht bekannt — für einfache Fragen spielt es keine Rolle.

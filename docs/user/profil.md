@@ -133,6 +133,15 @@ Was die Enter-Taste beim Schreiben im Chat tut:
 Ob am Tablet eine Tastatur angeschlossen ist, kann die Plattform nicht erkennen. Schreibst
 du am iPad mit Tastaturhülle, wähle **„Enter sendet"**, wenn Enter abschicken soll.
 
+## Bevorzugte Modelle (nur Lehrkräfte)
+
+Hier legst du fest, mit welchem Modell neue Chats beginnen — getrennt für zwei Fälle:
+
+- **Für freie Chats** — Chats ohne Assistenten. „Vorgabe der Schule“ heißt: kein eigenes bevorzugtes Modell.
+- **Für Planungs-Assistenten** — neue Chats mit Jahresplanung, Stundenentwurf oder Curriculum-Entwurf. Zur Wahl stehen nur Modelle mit `⚙`, denn nur sie können die Planung lesen und schreiben. „Modell des Assistenten“ heißt: Der Assistent nimmt sein eigenes.
+
+Die Einstellung gilt für **neue** Chats. In einem laufenden Chat stellst du über die Modellauswahl um; das gilt dann nur für diese Unterhaltung. Ein leistungsstärkeres Modell kostet mehr — die Schätzung steht neben jedem Eintrag.
+
 ## Kontext-Suche
 
 Wenn du den Suche-Button im Chat nutzt, werden standardmäßig bis zu **8 Treffer** aus der Bibliothek angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen kannst du diesen Wert erhöhen:

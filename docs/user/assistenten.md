@@ -31,7 +31,7 @@ Wenn du den Assistenten während eines Gesprächs wechselst, bleibt der bisherig
 | | Normaler Chat | Assistent |
 |---|---|---|
 | Rolle der KI | Allgemein | Vorgegeben (z. B. Tutor, Korrektor) |
-| Modell | Frei wählbar | Ggf. vom Assistenten vorgegeben |
+| Modell | Frei wählbar | Vom Assistenten vorgegeben; Lehrkräfte können umstellen ([mehr](chat.md#modell-im-assistenten-chat)) |
 | Einstieg | Freie Frage | Thema ist bereits gesetzt |
 | Wechsel im Chat | Modell jederzeit wechselbar | Assistent jederzeit per `/` wechselbar |
 
