@@ -228,3 +228,17 @@ async def test_get_model_matrix_returns_structure():
     
     # Prüfe Allowlists
     assert isinstance(data["allowlists"], dict)
+
+
+@pytest.mark.asyncio
+async def test_matrix_nennt_die_standardmodelle_fuer_schuelerinnen(monkeypatch):
+    """(0.51, AV F1) Die Matrix liefert `SCHUELER_STANDARDMODELLE` mit — daran misst der Hinweis."""
+    from app.api.admin import models as modul
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "schueler_standardmodelle", ["chat-a", "chat-b"])
+    monkeypatch.setattr(modul._client, "list_models", AsyncMock(return_value=["chat-a", "x"]))
+    monkeypatch.setattr(modul._client, "get_image_model_ids", AsyncMock(return_value=[]))
+    monkeypatch.setattr(modul._client, "get_team_info", AsyncMock(return_value={"models": ["x"]}))
+    matrix = await modul._fetch_matrix()
+    assert matrix.standard_schueler == ["chat-a", "chat-b"]

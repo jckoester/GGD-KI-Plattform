@@ -2188,8 +2188,12 @@ async def chat(
             # Conversation-Update vormerken (atomar mit _persist geschrieben)
             conv_assistant_update = (new_assistant.id, new_assistant.system_prompt)
 
-            # Assistentenmodell als Fallback wenn kein explizites model_id
-            if not wahl_im_assistenten(request.model_id, current_user, new_assistant.id):
+            # Assistentenmodell als Fallback wenn kein explizites model_id — nur bei einem
+            # **Wechsel**. Derselbe Assistent noch einmal mitgeschickt (die Oberfläche tut das
+            # nach dem ersten Zug, Messskripte in jedem) ist kein Wechsel: Die Konversation
+            # behält ihr Modell, sonst setzte jeder Zug eine Wahl oder Vorliebe zurück (0.51, AV).
+            if (not wahl_im_assistenten(request.model_id, current_user, new_assistant.id)
+                    and new_assistant.id != existing.assistant_id):
                 model_used = modell_des_assistenten(new_assistant)
 
         if active_assistant is None and active_assistant_id is not None:

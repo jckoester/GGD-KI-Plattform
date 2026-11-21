@@ -82,9 +82,10 @@
         {#snippet intro()}
             Hier kannst du die Modelle für Lehrkräfte und Schüler:innen
             freischalten. Die Modelle selbst müssen in LiteLLM konfiguriert sein,
-            damit sie in dieser Auflistung auftreten. Die Freigabe betrifft nur die
-            Chatfunktion, Assistenten können unabhängig von den hier getroffenen
-            Einstellung auch andere Modelle nutzen.
+            damit sie in dieser Auflistung auftreten. Die Freigabe gilt auch für
+            Assistenten: Ein Assistent, dessen Modell für einen Jahrgang nicht
+            freigeschaltet ist, erscheint dort nicht. Lehrkräfte können im Chat
+            zwischen ihren freigeschalteten Modellen wechseln, auch bei einem Assistenten.
         {/snippet}
     </ModelMatrixTable>
 

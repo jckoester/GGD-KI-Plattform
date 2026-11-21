@@ -11,15 +11,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Assistenten mit Fähigkeiten stehen nur Modelle mit ⚙ zur Wahl. Schüler:innen sehen das Modell des Assistenten.
 - Profil: „Bevorzugte Modelle“ für Lehrkräfte — je ein Modell für neue freie Chats und für Planungs-Assistenten
   (nur Modelle mit ⚙). Ist es nicht mehr freigegeben, läuft der Chat mit der Vorgabe und sagt das.
+- Modell-Freischaltung: Hinweis, wenn ein Jahrgang ein Modell außerhalb der Standardmodelle für Schüler:innen bekommt
+  (`SCHUELER_STANDARDMODELLE`, Vorgabe `chat-schnell`, `chat-standard`, `chat-komplex`); gesperrt wird nichts.
 - Kosten im Assistenten-Chat: Der Modellwähler zeigt die Kosten je Nachricht mit diesem Assistenten (samt Prompt
   und Dokumenten), die Angabe am Assistenten folgt dem gewählten Modell.
 
 ### Geändert
 
+- Curriculum-Assistent: Nach dem Anlegen des Gerüsts fragt er, mit welchem Kapitel es weitergeht, statt eines von
+  sich aus zu füllen.
 - Im Chat mit einem Assistenten gilt für Schüler:innen und in der Vorschau immer das Modell des Assistenten,
   auch wenn eine Anfrage ein anderes mitschickt.
 - Ein Assistent mit Fähigkeiten lässt sich nur mit einem Modell nutzen, das Funktionen aufrufen kann (⚙); ein
   anderes gewähltes Modell wird mit einem Hinweis abgewiesen, statt still ohne Funktionen zu laufen.
+
+### Nach dem Update
+
+- Prompt des Assistenten „Curriculum-Entwurf“ im Editor durch `config/prompts/curriculum_assistent.md` ersetzen (der
+  Seed ändert vorhandene Assistenten nicht).
 
 ## [0.50.0] – 2026-11-21
 

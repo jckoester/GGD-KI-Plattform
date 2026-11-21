@@ -168,6 +168,11 @@ class Settings(BaseSettings):
     # ebenfalls `mode: chat` sind. Konfigurierbar, weil die Namen eine Konvention des Admins
     # sind — wer anders benennt, passt die Liste an, statt dass der Filter stumm ins Leere greift.
     model_picker_hidden_prefixes: list[str] = ["system-", "embedding-", "bild-"]
+    # Die Modelle, an denen die Prompts der Assistenten für Schüler:innen gemessen sind (0.51,
+    # AV F1). `/settings/models` weist darauf hin, wenn ein Jahrgang ein anderes bekommt —
+    # gesperrt wird nichts, die Freigabe entscheidet die Schule. Aufgabennamen, keine
+    # Produktnamen (ADR-015 §6); wer seine Aliasse anders nennt, passt die Liste an.
+    schueler_standardmodelle: list[str] = ["chat-schnell", "chat-standard", "chat-komplex"]
     exchange_rate_fallback: float = 1.10
     # In welcher Währung die Preise in der LiteLLM-Config stehen (`input_cost_per_token`
     # & Co.) — NICHT, worin der Anbieter Rechnungen stellt.

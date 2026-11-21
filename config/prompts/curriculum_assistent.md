@@ -31,6 +31,7 @@ Kapitel → Lernsequenzen → Einträge. Stunden stehen nur an der Lernsequenz; 
 Das Gerüst sind die Kapitel in ihrer Reihenfolge und je Kapitel die Lernsequenzen mit Titel und Stunden — noch ohne Einträge. Nenn je Kapitel die Bereiche des Bildungsplans, die es bedient; ein Kapitel bedient oft mehrere.
 - Ruf vor dem Zeigen `preview_curriculum_operations` auf — die Vorschau rechnet die Stunden aus. Zeig den Vorschlag dann als Tabelle und nenn darunter `verplant`, `verplanbar` und `rest` aus der Antwort.
 - Warte auf Zustimmung. Dann schreib den Vorschlag aus der Vorschau: `apply_curriculum_operations` **ohne** `operations` — die Funktion hat ihn sich gemerkt.
+- Nach dem Anlegen des Gerüsts frag, mit welchem Kapitel es weitergeht. Füll keines von dir aus — auch nicht als Vorschlag in derselben Antwort.
 
 **3. Kapitel für Kapitel füllen**
 - Hol mit `get_bp_competences` (mit `bereich`) die Kompetenzen, die das Kapitel braucht. Prozessbezogene Kompetenzen kommen nur mit `typ='pk'`.

@@ -20,6 +20,7 @@
 #                      Rahmenangaben nach dem Zug gegenüber vorher
 #   muss_mit           Liste {tool, <Argument>: <Wert>}: Aufruf mit genau diesen Argumenten
 #                      (0.50, etwa get_bp_competences mit typ: lp)
+#   hoechstens         {Funktion: n}: höchstens n Aufrufe in diesem Zug (0.51)
 # Felder je Fall unter `ende` (Stand nach dem letzten Zug):
 #   rahmen_enthaelt    Teilmenge der Rahmenangaben
 #   kapitel_weg        kein Kapitel mit diesem Titel mehr
@@ -31,6 +32,7 @@
 #   hinweise_enthaelt  reguläre Ausdrücke, die in den Hinweisen der Einträge vorkommen (0.50)
 #   hinweise_nicht     … die dort nicht vorkommen
 #   hinweise_anteil_max  {muster, anteil}: höchstens dieser Anteil der Einträge trägt das Muster
+#   keine_eintraege    true: keine Lernsequenz trägt Einträge (0.51, Gerüst ohne Füllen)
 #
 # Fälle `leitlinie-*` und `lp-aspekte` (0.50, Päckchen AT) setzen die Testleitlinie Weltethos
 # (Kürzel WE, Aspekte WEH, WEGR, WE1–WE5) im Dev-Bestand voraus.
@@ -361,3 +363,27 @@ faelle:
       Holt die Aspekte der Leitperspektive und schlägt einzelne Aspekte vor (etwa PG 1
       Wahrnehmung und Empfindung, PG 8 Sicherheit und Unfallschutz beim Lärm), nicht nur die
       Leitperspektive als Ganzes. Ändert nur das Kapitel Akustik; vorhandene Hinweise bleiben.
+
+  # ── Nach dem Gerüst nicht ungefragt weiter (0.51, Päckchen AV Schritt 9) ────────
+  # Befund 21.11.2026 (`leitlinie-abgelehnt`, chat-komplex 2/4): Nach „leg das Gerüst an“ füllte
+  # er gleich Kapitel 1 und schrieb es ohne Zustimmung.
+  - id: geruest-dann-fragen
+    vorlage: leer_mit_stunden
+    zuege:
+      - text: >-
+          Schlag mir ein Gerüst für unser Curriculum vor. Lehrwerk und Beschlüsse trage ich später
+          nach, eine alte Kapitelfolge gibt es nicht, Leitlinien der Schule brauchen wir hier nicht.
+        muss: [preview_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Passt, leg das Gerüst an.
+        muss: [apply_curriculum_operations]
+        hoechstens: {apply_curriculum_operations: 1}
+        antwort: [Kapitel]
+        inhalt: geaendert
+    ende:
+      keine_eintraege: true
+    erwartung: >-
+      Legt nach „leg das Gerüst an“ genau das Gerüst an, nennt verplant und rest und fragt, mit
+      welchem Kapitel es weitergeht. Kein Kapitel gefüllt, auch kein Vorschlag mit Einträgen in
+      derselben Antwort.

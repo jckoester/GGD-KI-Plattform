@@ -311,14 +311,18 @@ def aufbauen(cfg: dict, vorlage: dict, pseudonym: str) -> str:
 # ── Lauf ─────────────────────────────────────────────────────────────────────
 
 
-def lauf(client, conn, fall: dict, assistent: int, cid: str) -> tuple[list[dict], str | None]:
+def lauf(client, conn, fall: dict, assistent: int, cid: str, modell: str | None = None) -> tuple[list[dict], str | None]:
     verlauf: list[dict] = []
     konversation = None
     zuege = []
     vorher = baum(conn, cid)
     for nr, zug_def in enumerate(fall["zuege"], 1):
         zug = chat_probe.frage_stellen(
+            # ``modell`` ausdrücklich (0.51): Die Mess-Lehrkraft kann ein bevorzugtes Modell für
+            # Planungs-Assistenten haben (AV), das sonst den ersten Zug übernähme — gemessen
+            # 21.11.2026, lauf7 lief im ersten Zug mit der Vorliebe statt mit `--modell`.
             client, zug_def["text"], assistent=assistent, gruppe=None, verlauf=verlauf, konversation=konversation,
+            modell=modell,
             curriculum=cid if nr == 1 and fall.get("bezug", True) else None)
         konversation = zug["konversation"]
         verlauf += [{"role": "user", "content": zug_def["text"]}, {"role": "assistant", "content": zug["antwort"]}]
@@ -398,6 +402,9 @@ def bewerte(fall: dict, zuege: list[dict], *, band: set[str], ende: dict) -> tup
         if d.get("muss") or d.get("nicht") or d.get("muss_eine"):
             k[f"Z{n} Aufrufe"] = (set(d.get("muss") or []) <= namen and not (set(d.get("nicht") or []) & namen)
                                   and (not d.get("muss_eine") or bool(set(d["muss_eine"]) & namen)))
+        # Höchstens so viele Aufrufe einer Funktion (0.51, AV Schritt 9): `hoechstens: {apply…: 1}`
+        for tool, n_max in (d.get("hoechstens") or {}).items():
+            k[f"Z{n} {tool} höchstens {n_max}×"] = z["namen"].count(tool) <= n_max
         # Aufruf mit bestimmten Argumenten (0.50, AT): `muss_mit: [{tool: …, typ: lp}]`
         for i, soll in enumerate(d.get("muss_mit") or [], 1):
             werte = {f: v for f, v in soll.items() if f != "tool"}
@@ -516,6 +523,9 @@ def ende_pruefen(fall: dict, zuege: list[dict], ende: dict) -> dict[str, bool]:
         k[f"Ende Hinweise enthalten {muster}"] = bool(re.search(muster, alle))
     for muster in e.get("hinweise_nicht") or []:
         k[f"Ende Hinweise ohne {muster}"] = not re.search(muster, alle)
+    if e.get("keine_eintraege"):  # (0.51, AV Schritt 9) Gerüst ohne ungefragt gefüllte Kapitel
+        k["Ende keine Einträge"] = not any(ls["eintraege"] for kap in stand["kapitel"]
+                                           for ls in kap["lernsequenzen"])
     if (anteil := e.get("hinweise_anteil_max")) is not None:
         muster, grenze = anteil["muster"], anteil["anteil"]
         mit = sum(1 for h in hinweise if re.search(muster, h))
@@ -672,6 +682,7 @@ def selbsttest(daten: dict, conn) -> bool:
     for fall in daten["faelle"]:
         namen = {n for d in fall["zuege"] for f in ("muss", "nicht", "muss_eine") for n in d.get(f) or []}
         namen |= {m["tool"] for d in fall["zuege"] for m in d.get("muss_mit") or []}
+        namen |= {t for d in fall["zuege"] for t in d.get("hoechstens") or {}}
         pruefe(fall["vorlage"] in daten["vorlagen"] and namen <= set(FUNKTIONEN)
                and all(d.get(f) in (None, GLEICH, GEAENDERT) for d in fall["zuege"] for f in ("inhalt", "rahmen")),
                f"Fall {fall['id']}")
@@ -773,7 +784,7 @@ def main() -> None:
                     cid = aufbauen(cfg, daten["vorlagen"][fall["vorlage"]], pseudonym)
                     konversation = None
                     try:
-                        zuege, konversation = lauf(client, conn, fall, assistent, cid)
+                        zuege, konversation = lauf(client, conn, fall, assistent, cid, args.modell)
                     except (httpx.HTTPError, SystemExit) as fehler:
                         grund = f"{type(fehler).__name__}: {str(fehler)[:200]}"
                         print(f"{fall['id']:<28} Lauf {nr}  ✗  abgebrochen — {grund}", flush=True)

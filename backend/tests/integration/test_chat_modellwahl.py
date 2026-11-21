@@ -296,3 +296,22 @@ async def test_schuelerin_bekommt_keine_vorliebe(test_client, jwt_service, ohne_
     kopf = _kopf(jwt_service, STUDENT_PSEUDO, ["student"], grade="8")
     from app.config import settings
     assert await _modell(test_client, kopf) == settings.chat_default_model
+
+
+
+# ── Derselbe Assistent noch einmal mitgeschickt ist kein Wechsel ─────────────
+
+
+async def test_selber_assistent_erneut_behaelt_das_modell(test_client, jwt_service, fabrik):
+    """Die Konversation läuft mit einem gewählten Modell; der nächste Zug schickt den Assistenten
+    noch einmal, aber kein Modell. Bis 0.51 setzte das auf das Modell des Assistenten zurück."""
+    cid = await _bestehender_chat(fabrik, TEACHER1_PSEUDO, modell="chat-komplex")
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    assert await _modell(test_client, kopf, conversation_id=cid, assistant_id=ASSISTENT) == "chat-komplex"
+
+
+async def test_echter_wechsel_nimmt_das_modell_des_neuen_assistenten(test_client, jwt_service, fabrik, planender):
+    cid = await _bestehender_chat(fabrik, TEACHER1_PSEUDO, modell="chat-schnell")
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    with patch("app.chat.router._get_model_info", AsyncMock(return_value={})):
+        assert await _modell(test_client, kopf, conversation_id=cid, assistant_id=planender) == "chat-komplex"

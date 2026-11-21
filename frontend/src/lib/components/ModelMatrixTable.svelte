@@ -3,6 +3,8 @@
     import { Info, Save } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import { hinweisSchuelerModelle } from "$lib/modellfreigabe.js";
 
     let {
         title,
@@ -19,6 +21,11 @@
     let saving = $state(false);
     let error = $state(null);
     let saveError = $state(null);
+    // Jahrgänge mit Modellen außerhalb der Standardmodelle (0.51, AV F1) — nach dem Stand der
+    // Kästchen, nicht erst nach dem Speichern. Nur, wenn der Server eine Liste liefert (Chat-Matrix).
+    const schuelerHinweis = $derived(
+        matrix ? hinweisSchuelerModelle(dirty, matrix.standard_schueler ?? [], matrix.models) : null,
+    );
 
     function formatTeamLabel(teamId) {
         if (teamId === "lehrkraefte") return "Lehrkräfte";
@@ -84,6 +91,7 @@
         </div>
     {:else}
         {#if saveError}<ErrorBanner message={saveError} />{/if}
+        {#if schuelerHinweis}<WarningBanner message={schuelerHinweis} />{/if}
 
         <button
             onclick={save}
@@ -143,12 +151,13 @@
                                         type="checkbox"
                                         checked={dirty[team]?.has(model)}
                                         onchange={(e) => {
-                                            if (e.target.checked) {
-                                                dirty[team].add(model);
-                                            } else {
-                                                dirty[team].delete(model);
-                                            }
-                                            dirty = dirty; // Reaktivität triggern
+                                            // Neuer Stand statt Änderung am Set: `dirty = dirty` löst in
+                                            // Svelte 5 nichts aus, und der Hinweis zu den Standardmodellen
+                                            // (0.51) käme sonst erst nach dem Speichern.
+                                            const neu = new Set(dirty[team]);
+                                            if (e.target.checked) neu.add(model);
+                                            else neu.delete(model);
+                                            dirty = { ...dirty, [team]: neu };
                                         }}
                                         class="w-5 h-5 text-light-gr dark:text-dark-gr border-light-tx-3 dark:border-dark-tx-3"
                                     />

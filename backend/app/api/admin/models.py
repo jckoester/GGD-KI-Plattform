@@ -26,6 +26,9 @@ class ModelMatrixResponse(BaseModel):
     models: list[str]  # alle Modell-IDs aus LiteLLM
     teams: list[str]  # Phase-1-Teams in fester Reihenfolge
     allowlists: dict[str, list[str]]  # team_id -> freigeschaltete Modell-IDs
+    #: Standardmodelle für Schüler:innen (0.51, `SCHUELER_STANDARDMODELLE`) — für den Hinweis
+    #: in der Matrix, wenn ein Jahrgang ein anderes freigegeben bekommt.
+    standard_schueler: list[str] = []
 
 
 class ModelMatrixUpdate(BaseModel):
@@ -58,7 +61,10 @@ async def _fetch_matrix() -> ModelMatrixResponse:
         if team_models == _NO_DEFAULT:
             team_models = []
         allowlists[team_id] = [m for m in team_models if m not in image_set]
-    return ModelMatrixResponse(models=chat_models, teams=teams, allowlists=allowlists)
+    from app.config import settings
+
+    return ModelMatrixResponse(models=chat_models, teams=teams, allowlists=allowlists,
+                               standard_schueler=list(settings.schueler_standardmodelle))
 
 
 @router.get("/matrix", response_model=ModelMatrixResponse)
