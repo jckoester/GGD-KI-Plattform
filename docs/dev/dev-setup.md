@@ -401,8 +401,10 @@ versioniert, `core.hooksPath` zeigt deshalb auf ein Verzeichnis im Repo):
 git config core.hooksPath .githooks
 ```
 
-Danach läuft die Prüfung vor jedem `git push`. Bewusst umgehen geht mit
-`git push --no-verify`; rückgängig machen mit `git config --unset core.hooksPath`.
+Danach läuft die Prüfung vor jedem `git push`. Ausgenommen ist ein Push nur von Tags
+(`git push --tags`, seit 0.50): Der getaggte Commit ist mit dem Branch schon geprüft
+worden. Ob er wirklich schon auf dem Remote liegt, prüft der Hook nicht. Bewusst umgehen
+geht mit `git push --no-verify`; rückgängig machen mit `git config --unset core.hooksPath`.
 
 > **Warum vor dem Push und nicht vor jedem Commit:** Zuerst hing der Lauf am
 > Commit. Bei rund neun Commits am Tag (Spitzen über dreißig) summierte sich das

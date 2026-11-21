@@ -19,6 +19,25 @@
 # Steht diese Stufe, kann der Hook ersatzlos weg.
 #
 # Git reicht Remote-Name und URL als Argumente und die zu pushenden Refs über
-# stdin herein. Beides braucht der Prüflauf nicht — er prüft den Arbeitsbaum.
+# stdin herein (je Zeile: lokale Ref, lokaler SHA, entfernte Ref, entfernter SHA).
+# Der Prüflauf selbst prüft den Arbeitsbaum; die Refs entscheiden nur, ob er läuft.
+#
+# Nur Tags (oder Löschungen) → kein Prüflauf (0.50): Der Commit hinter einem
+# Release-Tag ist mit dem Branch schon gepusht und geprüft worden. `git push --tags`
+# läuft damit ohne Prüflauf, `git push --follow-tags` mit Branch weiter mit.
+# ⚠️ Nicht geprüft wird, ob der getaggte Commit schon auf dem Remote liegt — wer einen
+# nie gepushten Commit taggt und nur den Tag pusht, pusht ungeprüft.
+
+nur_tags=ja
+while read -r lokal _ _ _; do
+    case "$lokal" in
+        refs/tags/*|"(delete)") ;;
+        *) nur_tags=nein ;;
+    esac
+done
+if [ "$nur_tags" = ja ]; then
+    echo "pre-push: nur Tags — Prüflauf übersprungen."
+    exit 0
+fi
 
 exec "$(git rev-parse --show-toplevel)/scripts/test.sh"
