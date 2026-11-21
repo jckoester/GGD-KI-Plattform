@@ -12,6 +12,7 @@ from sqlalchemy import and_, or_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.assistants import ausloeser, produkte
+from app.assistants.sichtbarkeit import modell_des_assistenten
 from app.assistants.bausteine import SCHLUESSEL as BAUSTEIN_SCHLUESSEL
 
 from app.auth.dependencies import get_current_user, require_any_role
@@ -87,6 +88,9 @@ class AssistantSummary(BaseModel):
     token_dokumente: int = 0
     #: Kontext-Dokumente, die der Assistent bei jeder Nachricht mitbekommt (F9).
     dokumente: list[DokumentKurz] = []
+    #: Das Modell, mit dem der Assistent läuft (`modell_des_assistenten`, 0.51): Der Modellwähler
+    #: im Assistenten-Chat zeigt es bei „wie der Assistent“.
+    modell: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -943,6 +947,7 @@ async def list_assistants(
             "usd_dokumente": kosten[a.id].usd_dokumente,
             "token_zusatz": kosten[a.id].token_zusatz,
             "token_dokumente": kosten[a.id].token_dokumente,
+            "modell": modell_des_assistenten(a),
             "dokumente": [DokumentKurz(name=d.name, groesse_bytes=d.groesse_bytes)
                           for d in kosten[a.id].dokumente],
         })

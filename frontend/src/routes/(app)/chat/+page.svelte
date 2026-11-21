@@ -46,7 +46,7 @@
     } from "$lib/assistentenwahl.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
-    import { tick } from "svelte";
+    import { tick, untrack } from "svelte";
     import {
         streamChat,
         ApiError,
@@ -89,6 +89,10 @@
         assistentMitModell,
         modelleFuerAssistent,
         modelleMitAssistentenKosten,
+        startModellAssistent,
+        startModellFrei,
+        voraussichtlichesModell,
+        vorgabeText,
         zuSendendesModell,
     } from "$lib/modellwahl_chat.js";
     import {
@@ -221,11 +225,28 @@
         const m = modelleFuerAssistent({ istLehrkraft, assistent: aktiverAssistent, modelle: availableModels });
         return m && modelleMitAssistentenKosten(m, aktiverAssistent);
     });
+    // Startwert im neuen Chat mit Assistent: bei Planungs-Assistenten die Vorliebe (Schritt 7).
+    // Läuft auch, wenn der Assistent über die Adresse kommt, nicht über die Auswahl.
+    $effect(() => {
+        const assistent = aktiverAssistent;
+        const modelle = assistentenModelle;
+        if (!assistent || untrack(() => conversationId)) return;
+        assistentenModell = startModellAssistent({
+            assistent,
+            vorlieben: untrack(() => $user?.preferences),
+            modelle,
+        });
+    });
     const assistentFuerInfo = $derived(
         assistentenModelle
             ? assistentMitModell(
                   availableAssistants.find((a) => a.id === aktiverAssistent?.id),
-                  availableModels.find((m) => m.id === assistentenModell),
+                  // Vor der ersten Antwort mit der Vorliebe für Planungs-Assistenten (Schritt 7).
+                  availableModels.find((m) => m.id === voraussichtlichesModell({
+                      gewaehlt: assistentenModell,
+                      assistent: aktiverAssistent,
+                      vorlieben: $user?.preferences,
+                  })),
               )
             : availableAssistants.find((a) => a.id === aktiverAssistent?.id),
     );
@@ -525,19 +546,16 @@
             const data = await getModels();
             availableModels = data.models ?? [];
 
-            const modelIds = availableModels.map((m) => m.id).filter(Boolean);
             const savedModel = sessionStorage.getItem(MODEL_STORAGE_KEY);
 
-            if (savedModel && modelIds.includes(savedModel)) {
-                selectedModelId = savedModel;
-            } else if (
-                data.default_model &&
-                modelIds.includes(data.default_model)
-            ) {
-                selectedModelId = data.default_model;
-            } else {
-                selectedModelId = modelIds[0] ?? "";
-            }
+            // Vorliebe der Lehrkraft vor der Wahl in diesem Tab (0.51, AV F4) — für neue Chats;
+            // eine geladene Konversation stellt den Wähler danach auf ihr Modell.
+            selectedModelId = startModellFrei({
+                vorlieben: $user?.preferences,
+                verfuegbar: availableModels,
+                gespeichert: savedModel,
+                vorgabe: data.default_model,
+            });
 
             if (selectedModelId) {
                 sessionStorage.setItem(MODEL_STORAGE_KEY, selectedModelId);
@@ -1294,7 +1312,8 @@
         }
         selectedAssistant = assistant;
         // Neuer Assistent: wieder „wie der Assistent“ (0.51) — eine Wahl gilt je Konversation.
-        if (assistant.id !== conversationAssistant?.id) assistentenModell = "";
+        // In einem neuen Chat setzt der Effekt unten den Startwert (Vorliebe bei Planung).
+        if (conversationId && assistant.id !== conversationAssistant?.id) assistentenModell = "";
         pickerOpen = false;
         textarea?.focus();
     }
@@ -1477,6 +1496,13 @@
             conversationAssistant = null;
             assistentenModell = "";
             modellHinweis = null;
+            // Neuer Chat beginnt mit der Vorliebe (0.51, F4), nicht mit dem Modell des letzten.
+            selectedModelId = startModellFrei({
+                vorlieben: $user?.preferences,
+                verfuegbar: availableModels,
+                gespeichert: selectedModelId,
+                vorgabe: selectedModelId,
+            });
             pickerOpen = false;
             subjectPickerOpen = false;
             pendingSubjectId = null;
@@ -2040,7 +2066,7 @@
                             modelle={assistentenModelle}
                             bind:wert={assistentenModell}
                             disabled={isStreaming || modelsLoading}
-                            vorgabe="wie der Assistent"
+                            vorgabe={vorgabeText(aktiverAssistent)}
                             leerText="Kein passendes Modell"
                         />
                     {:else if assistentenModell}

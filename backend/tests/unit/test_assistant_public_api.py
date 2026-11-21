@@ -106,6 +106,9 @@ def _make_assistant_ns(
         min_grade=min_grade,
         max_grade=max_grade,
         created_by=created_by,
+        # Seit 0.51 nennt die Liste das wirksame Modell (`modell_des_assistenten`).
+        model="",
+        tool_groups=[],
     )
 
 

@@ -152,6 +152,7 @@
     let zuschlag = $derived(zuschlagText($budget));
     let kennungAnzeige = $derived(eigeneKennung($user));
     import EinrichtungEintrag from "$lib/components/EinrichtungEintrag.svelte";
+    import BevorzugteModelle from "$lib/components/BevorzugteModelle.svelte";
 </script>
 
 <ZurueckLink href="/welcome" schliessen />
@@ -416,6 +417,17 @@
                 </p>
             </div>
         </section>
+
+        <!-- Bevorzugte Modelle (0.51, AV Schritt 7): nur Lehrkräfte (F8). -->
+        {#if $user?.roles?.includes('teacher')}
+            <BevorzugteModelle
+                {preferences}
+                {loading}
+                speichern={updatePreference}
+                {quittung}
+                {quittungFehler}
+            />
+        {/if}
 
         <section class="mb-8">
             <h2

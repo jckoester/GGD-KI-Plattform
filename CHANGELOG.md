@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Lehrkräfte wählen das Modell auch im Chat mit einem Assistenten, vorbelegt mit „wie der Assistent“; bei
   Assistenten mit Fähigkeiten stehen nur Modelle mit ⚙ zur Wahl. Schüler:innen sehen das Modell des Assistenten.
+- Profil: „Bevorzugte Modelle“ für Lehrkräfte — je ein Modell für neue freie Chats und für Planungs-Assistenten
+  (nur Modelle mit ⚙). Ist es nicht mehr freigegeben, läuft der Chat mit der Vorgabe und sagt das.
 - Kosten im Assistenten-Chat: Der Modellwähler zeigt die Kosten je Nachricht mit diesem Assistenten (samt Prompt
   und Dokumenten), die Angabe am Assistenten folgt dem gewählten Modell.
 

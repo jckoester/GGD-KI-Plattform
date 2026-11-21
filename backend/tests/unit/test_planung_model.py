@@ -50,3 +50,15 @@ def test_der_chat_nimmt_das_modell_ueber_dieselbe_regel():
     assert quelle.count("model_used = modell_des_assistenten(") == 2
     assert "model_used = assistant.model" not in quelle
     assert "model_used = new_assistant.model" not in quelle
+
+
+def test_frontend_kennt_dieselben_planungs_faehigkeiten():
+    """`modellwahl_chat.js` (0.51) rechnet vor der ersten Antwort mit der Vorliebe für
+    Planungs-Assistenten — mit einer eigenen Liste. Läuft sie auseinander, zeigt der Info-Knopf
+    die Kosten eines Modells, das der Server gar nicht nimmt."""
+    import re
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[3] / "frontend" / "src" / "lib" / "modellwahl_chat.js").read_text()
+    liste = re.search(r"PLANUNGS_FAEHIGKEITEN = \[([^\]]*)\]", js).group(1)
+    assert set(re.findall(r"'([a-z_]+)'", liste)) == set(PLANUNGS_FAEHIGKEITEN)

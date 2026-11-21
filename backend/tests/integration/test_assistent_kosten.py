@@ -67,6 +67,7 @@ async def test_feste_token_fuer_die_rechnung_mit_anderem_modell(test_client, aut
     je_name = {a["name"]: a for a in resp.json()["items"] if a["name"].startswith("KOS ")}
     mit = je_name["KOS Mit Dokument"]
     assert (mit["token_zusatz"], mit["token_dokumente"]) == (400 // 4 + 1000, 1000)
+    assert mit["modell"] == "kosten-modell"  # für „wie der Assistent (…)“ im Wähler
 
     modell = Eigenschaften(preis_ein_usd=PREIS_EIN, preis_aus_usd=PREIS_AUS)
     assert modell.usd_je_nachricht + mit["token_zusatz"] * PREIS_EIN == pytest.approx(mit["usd_je_nachricht"])

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  assistentMitModell, kostenMitAssistent, modelleFuerAssistent, modelleMitAssistentenKosten, zuSendendesModell,
+  assistentMitModell, kostenMitAssistent, plant, startModellAssistent, startModellFrei, voraussichtlichesModell, vorgabeText, modelleFuerAssistent, modelleMitAssistentenKosten, zuSendendesModell,
 } from './modellwahl_chat.js'
 
 const MODELLE = [
@@ -58,5 +58,41 @@ describe('Kosten mit Assistent', () => {
     expect(assistentMitModell(assistent, modell).usd_je_nachricht).toBeCloseTo(0.0031)
     expect(assistentMitModell(assistent, null)).toBe(assistent)
     expect(assistentMitModell(assistent, { id: 'x' })).toBe(assistent)
+  })
+})
+
+
+describe('voraussichtlichesModell', () => {
+  const planer = { tool_groups: ['curriculum_planning'] }
+  it('Wahl im Chat geht vor', () => {
+    expect(voraussichtlichesModell({ gewaehlt: 'a', assistent: planer, vorlieben: { modell_planung: 'b' } })).toBe('a')
+  })
+  it('Planungs-Assistent ohne Wahl: die Vorliebe', () => {
+    expect(voraussichtlichesModell({ gewaehlt: '', assistent: planer, vorlieben: { modell_planung: 'b' } })).toBe('b')
+  })
+  it('andere Assistenten oder ohne Vorliebe: das Modell des Assistenten', () => {
+    expect(voraussichtlichesModell({ gewaehlt: '', assistent: { tool_groups: ['bilder'] }, vorlieben: { modell_planung: 'b' } })).toBeNull()
+    expect(voraussichtlichesModell({ gewaehlt: '', assistent: planer, vorlieben: {} })).toBeNull()
+    expect(plant({ tool_groups: ['lesson_planning'] })).toBe(true)
+  })
+})
+
+
+describe('Startwerte', () => {
+  const liste = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+  it('freier Chat: Vorliebe vor Tab vor Vorgabe', () => {
+    expect(startModellFrei({ vorlieben: { modell_frei: 'c' }, verfuegbar: liste, gespeichert: 'b', vorgabe: 'a' })).toBe('c')
+    expect(startModellFrei({ vorlieben: { modell_frei: 'weg' }, verfuegbar: liste, gespeichert: 'b', vorgabe: 'a' })).toBe('b')
+    expect(startModellFrei({ vorlieben: {}, verfuegbar: liste, vorgabe: 'a' })).toBe('a')
+  })
+  it('Assistent: Vorliebe nur bei Planung und nur, wenn wählbar', () => {
+    const planer = { tool_groups: ['lesson_planning'] }
+    expect(startModellAssistent({ assistent: planer, vorlieben: { modell_planung: 'b' }, modelle: liste })).toBe('b')
+    expect(startModellAssistent({ assistent: planer, vorlieben: { modell_planung: 'x' }, modelle: liste })).toBe('')
+    expect(startModellAssistent({ assistent: {}, vorlieben: { modell_planung: 'b' }, modelle: liste })).toBe('')
+  })
+  it('Vorgabe-Eintrag nennt das Modell des Assistenten', () => {
+    expect(vorgabeText({ modell: 'chat-komplex' })).toBe('wie der Assistent (chat-komplex)')
+    expect(vorgabeText(null)).toBe('wie der Assistent')
   })
 })
