@@ -497,6 +497,24 @@ faelle:
       Einzelbestand im Dev-System; im Physik-Chat darf er trotzdem nicht nach vorn
       kommen. Erwartet wird ein Physik-Knoten, nicht ein Chemie-Begriff.
 
+  # ── Leitlinien der Schule (0.50, Päckchen AT) ────────────────────────────────
+  # ⚠️ Setzen die Testleitlinie „Weltethos“ (Kürzel WE, 7 Aspekte) voraus — angelegt im
+  # Dev-Bestand am 21.11.2026. Ohne sie messen die Fälle nichts. Gegenprobe: In keinem der
+  # übrigen Fälle steht ein Aspekt unter den Treffern (gemessen 21.11.2026, 0 von 57).
+  - frage: Ist Lügen manchmal erlaubt?
+    knoten: Toleranz und Wahrhaftigkeit
+    notiz: Schülerfrage zu einem Aspekt; am 21.11.2026 Rang 1.
+
+  - frage: Fairer Handel und gerechte Löhne
+    knoten: Solidarität und gerechte Wirtschaftsordnung
+    notiz: Thema aus Wirtschaft und Religion; am 21.11.2026 Rang 1.
+
+  - frage: Warum soll ich andere so behandeln, wie ich selbst behandelt werden will?
+    knoten: Goldene Regel
+    notiz: >-
+      Am 21.11.2026 erst Rang 5, hinter Ethik-Kompetenzen. Ob der Aspekt damit noch in die
+      Vorab-Suche kommt, hängt an deren Schwelle.
+
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #
 # Eine andere Frageklasse und deshalb ein eigener Abschnitt: „alle, die …" verlangt

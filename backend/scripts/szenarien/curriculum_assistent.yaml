@@ -18,6 +18,8 @@
 #   antwort / antwort_nicht   reguläre Ausdrücke (ohne Groß-/Kleinschreibung) für den Text
 #   inhalt / rahmen    `gleich` oder `geaendert` — Kapitel/Lernsequenzen/Einträge bzw.
 #                      Rahmenangaben nach dem Zug gegenüber vorher
+#   muss_mit           Liste {tool, <Argument>: <Wert>}: Aufruf mit genau diesen Argumenten
+#                      (0.50, etwa get_bp_competences mit typ: lp)
 # Felder je Fall unter `ende` (Stand nach dem letzten Zug):
 #   rahmen_enthaelt    Teilmenge der Rahmenangaben
 #   kapitel_weg        kein Kapitel mit diesem Titel mehr
@@ -26,6 +28,12 @@
 #   getauscht          [a, b]: Kapitel a und b des letzten Prüflaufs aus Zug 1 stehen vertauscht
 #   bezug              Die Konversation hängt am Mess-Curriculum
 #   kopie              Ein Entwurf als Kopie ist entstanden
+#   hinweise_enthaelt  reguläre Ausdrücke, die in den Hinweisen der Einträge vorkommen (0.50)
+#   hinweise_nicht     … die dort nicht vorkommen
+#   hinweise_anteil_max  {muster, anteil}: höchstens dieser Anteil der Einträge trägt das Muster
+#
+# Fälle `leitlinie-*` und `lp-aspekte` (0.50, Päckchen AT) setzen die Testleitlinie Weltethos
+# (Kürzel WE, Aspekte WEH, WEGR, WE1–WE5) im Dev-Bestand voraus.
 # `alte_nummern: true`: Kompetenznummern aus den Texten der Lehrkraft dürfen in keinem Aufruf
 # stehen (eingefügtes altes Curriculum).
 #
@@ -265,3 +273,91 @@ faelle:
       Erklärt, dass das Curriculum veröffentlicht ist und nur über eine Kopie als Entwurf geändert
       wird, und fragt. Legt die Kopie erst nach „ja“ an und arbeitet dann in der Kopie weiter
       (Vorschlag mit Prüflauf, noch ohne Schreiben).
+
+  # ── Leitlinien der Schule (0.50, Päckchen AT) ───────────────────────────────
+  - id: leitlinie-gewuenscht
+    vorlage: leer_mit_stunden
+    zuege:
+      - text: >-
+          Hilf mir, das Physik-Curriculum für Klasse 7/8 aufzubauen. Lehrwerk und Beschlüsse
+          trage ich später nach, eine alte Kapitelfolge gibt es nicht.
+        nicht: [apply_curriculum_operations]
+        antwort: [Weltethos]
+        inhalt: gleich
+      # Keine Zustimmung zum Gerüst: In Lauf 2 vom 21.11.2026 stand das Gerüst schon in der
+      # ersten Antwort, und „Ja, das Weltethos …“ galt als Zustimmung. Ob er vorher eine
+      # Vorschau gemacht hat, prüft „Vorschlag geprüft“.
+      - text: >-
+          Ja, das Weltethos soll vorkommen. Zeig mir das Gerüst, bevor du etwas anlegst — ich
+          will es erst ansehen.
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Passt, leg das Gerüst an.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+      - text: Füll jetzt bitte das erste Kapitel mit Einträgen.
+        muss: [preview_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+      - text: Ja, so übernehmen.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      hinweise_enthaelt: ["\\(lba:"]
+      hinweise_anteil_max: {muster: "\\(lba?:", anteil: 0.75}
+    erwartung: >-
+      Fragt in der ersten Antwort einmal, ob Leitlinien der Schule (Weltethos) berücksichtigt
+      werden sollen — neben Lehrwerk usw., ohne zu drängen. Fragt danach nicht noch einmal.
+      Beim Füllen schlägt er Aspekte des Weltethos nur dort vor, wo sie fachlich tragen (etwa
+      Wahrhaftigkeit beim Messen, Nachhaltigkeit bei Energie, Sicherheit bei Lärm), mit Titel im
+      Vorschlag, nicht in jedem Eintrag; im Aufruf als Kürzel.
+
+  - id: leitlinie-abgelehnt
+    vorlage: leer_mit_stunden
+    zuege:
+      - text: >-
+          Hilf mir, das Physik-Curriculum für Klasse 7/8 aufzubauen. Lehrwerk und Beschlüsse
+          trage ich später nach, eine alte Kapitelfolge gibt es nicht.
+        nicht: [apply_curriculum_operations]
+        antwort: [Weltethos]
+        inhalt: gleich
+      - text: >-
+          Nein, Leitlinien brauchen wir hier nicht. Zeig mir das Gerüst, bevor du etwas anlegst —
+          ich will es erst ansehen.
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Passt, leg das Gerüst an.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+      - text: Füll jetzt bitte das erste Kapitel mit Einträgen.
+        muss: [preview_curriculum_operations]
+        nicht: [apply_curriculum_operations]
+        antwort_nicht: [Weltethos]
+      - text: Ja, so übernehmen.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      hinweise_nicht: ["\\(lba?:"]
+    erwartung: >-
+      Fragt einmal nach Leitlinien; nach dem Nein kommen sie weder in Vorschlägen noch in den
+      Einträgen vor, und er fragt nicht noch einmal. Leitperspektiven darf er weiter vorschlagen.
+
+  - id: lp-aspekte
+    vorlage: bestehend
+    zuege:
+      - text: >-
+          Verknüpf im Kapitel Akustik bitte die passenden Aspekte der Leitperspektive Prävention
+          und Gesundheitsförderung.
+        muss: [preview_curriculum_operations]
+        muss_mit: [{tool: get_bp_competences, typ: lp}]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+      - text: Ja, so übernehmen.
+        muss: [apply_curriculum_operations]
+        inhalt: geaendert
+    ende:
+      nur_kapitel: "Einführung: Akustik"
+      hinweise_enthaelt: ["\\(lpa:"]
+    erwartung: >-
+      Holt die Aspekte der Leitperspektive und schlägt einzelne Aspekte vor (etwa PG 1
+      Wahrnehmung und Empfindung, PG 8 Sicherheit und Unfallschutz beim Lärm), nicht nur die
+      Leitperspektive als Ganzes. Ändert nur das Kapitel Akustik; vorhandene Hinweise bleiben.

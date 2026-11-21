@@ -398,6 +398,12 @@ def bewerte(fall: dict, zuege: list[dict], *, band: set[str], ende: dict) -> tup
         if d.get("muss") or d.get("nicht") or d.get("muss_eine"):
             k[f"Z{n} Aufrufe"] = (set(d.get("muss") or []) <= namen and not (set(d.get("nicht") or []) & namen)
                                   and (not d.get("muss_eine") or bool(set(d["muss_eine"]) & namen)))
+        # Aufruf mit bestimmten Argumenten (0.50, AT): `muss_mit: [{tool: …, typ: lp}]`
+        for i, soll in enumerate(d.get("muss_mit") or [], 1):
+            werte = {f: v for f, v in soll.items() if f != "tool"}
+            k[f"Z{n} {soll['tool']} mit {werte}"] = any(
+                a["tool"] == soll["tool"] and all((a.get("args") or {}).get(f) == v for f, v in werte.items())
+                for a in z["aufrufe"])
         if d.get("antwort") or d.get("antwort_nicht"):
             k[f"Z{n} Antwort"] = (all(re.search(m, z["antwort"], re.I) for m in d.get("antwort") or [])
                                   and not any(re.search(m, z["antwort"], re.I) for m in d.get("antwort_nicht") or []))
@@ -502,6 +508,18 @@ def ende_pruefen(fall: dict, zuege: list[dict], ende: dict) -> dict[str, bool]:
         k["Ende getauscht"] = bool(vorschlag) and len(vorschlag) >= max(a, b) and all(
             t in ohne_nr for t in (vorschlag[a - 1], vorschlag[b - 1])) and \
             ohne_nr.index(vorschlag[b - 1]) < ohne_nr.index(vorschlag[a - 1])
+    # Verweise in den Hinweisen (0.50, AT): Leitlinien `lb`/`lba`, Leitperspektiven `lp`/`lpa`.
+    hinweise = [x.get("hinweise") or "" for kap in stand["kapitel"] for ls in kap["lernsequenzen"]
+                for x in ls["eintraege"] if isinstance(x, dict)]
+    alle = "\n".join(hinweise)
+    for muster in e.get("hinweise_enthaelt") or []:
+        k[f"Ende Hinweise enthalten {muster}"] = bool(re.search(muster, alle))
+    for muster in e.get("hinweise_nicht") or []:
+        k[f"Ende Hinweise ohne {muster}"] = not re.search(muster, alle)
+    if (anteil := e.get("hinweise_anteil_max")) is not None:
+        muster, grenze = anteil["muster"], anteil["anteil"]
+        mit = sum(1 for h in hinweise if re.search(muster, h))
+        k[f"Ende höchstens {grenze:.0%} der Einträge mit {muster}"] = bool(hinweise) and mit / len(hinweise) <= grenze
     if "bezug" in e:
         k["Ende Bezug"] = ende["bezug"] == ende["cid"]
     if "kopie" in e:
@@ -653,6 +671,7 @@ def selbsttest(daten: dict, conn) -> bool:
         pruefe(nrn <= band, f"Vorlage {name}: Nummern im Band" + (f" — fremd: {sorted(nrn - band)}" if nrn - band else ""))
     for fall in daten["faelle"]:
         namen = {n for d in fall["zuege"] for f in ("muss", "nicht", "muss_eine") for n in d.get(f) or []}
+        namen |= {m["tool"] for d in fall["zuege"] for m in d.get("muss_mit") or []}
         pruefe(fall["vorlage"] in daten["vorlagen"] and namen <= set(FUNKTIONEN)
                and all(d.get(f) in (None, GLEICH, GEAENDERT) for d in fall["zuege"] for f in ("inhalt", "rahmen")),
                f"Fall {fall['id']}")
