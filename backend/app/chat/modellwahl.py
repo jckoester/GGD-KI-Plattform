@@ -91,3 +91,42 @@ async def pruefe_bevorzugtes_modell(schluessel: str, wert, user: JwtPayload) -> 
             raise ValueError(braucht_funktionen_text(modell).replace("Dieser Assistent braucht",
                                                                      "Planungs-Assistenten brauchen"))
     return modell
+
+
+
+async def vorliebe_anwenden(db, user: JwtPayload, assistant, vorgabe: str,
+                            funktionsaufrufe: dict) -> tuple[str, str | None]:
+    """Das Modell eines **neuen** Chats ohne ausdrückliche Wahl, mit der Vorliebe der Lehrkraft.
+
+    (AV Schritt 4.) Im freien Chat gilt ``modell_frei``, bei einem Planungs-Assistenten
+    (`plant`) ``modell_planung`` — auch gegen ein fest gesetztes Modell des Assistenten (F7).
+    Andere Assistenten behalten ihr Modell. Nur für neue Konversationen (F9); der Aufrufer
+    ruft nur dann.
+
+    Gilt die Vorliebe nicht mehr — nicht mehr freigeschaltet, oder ein Planungs-Assistent
+    und das Modell kann keine Funktionen —, bleibt es bei ``vorgabe``, und der zweite Wert
+    erklärt warum (für einen Hinweis im Chat). Rückgabe: (Modell, Hinweis oder ``None``).
+    """
+    from app.assistants.sichtbarkeit import plant
+    from app.litellm.team_models import erlaubte_modelle_fuer
+    from app.preferences.service import bevorzugte_modelle
+
+    if not darf_im_assistenten_waehlen(user):
+        return vorgabe, None
+    if assistant is None:
+        schluessel = BEVORZUGT_FREI
+    elif plant(assistant):
+        schluessel = BEVORZUGT_PLANUNG
+    else:
+        return vorgabe, None
+    wunsch = (await bevorzugte_modelle(db, user.sub)).get(schluessel)
+    if not wunsch or wunsch == vorgabe:
+        return vorgabe, None
+    erlaubt = await erlaubte_modelle_fuer(user.roles, getattr(user, "grade", None))
+    if erlaubt is not None and wunsch not in erlaubt:
+        return vorgabe, (f"Dein bevorzugtes Modell „{wunsch}“ ist nicht mehr freigeschaltet — "
+                         f"dieser Chat läuft mit „{vorgabe}“.")
+    if assistant is not None and funktionsaufrufe.get(wunsch) is False:
+        return vorgabe, (f"Dein bevorzugtes Modell „{wunsch}“ kann keine Funktionen aufrufen — "
+                         f"dieser Chat läuft mit „{vorgabe}“.")
+    return wunsch, None

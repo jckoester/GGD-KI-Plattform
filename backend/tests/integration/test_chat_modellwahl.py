@@ -236,3 +236,63 @@ async def test_keine_vorliebe_entfernt_den_schluessel(test_client, ohne_vorliebe
         await test_client.patch("/preferences", headers=ohne_vorliebe, json={"modell_frei": "chat-schnell"})
     r = await test_client.patch("/preferences", headers=ohne_vorliebe, json={"modell_frei": ""})
     assert "modell_frei" not in r.json()
+
+
+# ── Schritt 4: Vorliebe beim Anlegen ─────────────────────────────────────────
+
+
+async def _vorliebe(client, kopf, **werte):
+    with patch("app.litellm.modell_eigenschaften.alle_eigenschaften", AsyncMock(return_value={})):
+        r = await client.patch("/preferences", headers=kopf, json=werte)
+    assert r.status_code == 200, r.text
+
+
+async def test_vorliebe_im_freien_chat(test_client, ohne_vorliebe):
+    await _vorliebe(test_client, ohne_vorliebe, modell_frei="chat-schnell")
+    assert await _modell(test_client, ohne_vorliebe) == "chat-schnell"
+    # Ausdrückliche Wahl schlägt die Vorliebe.
+    assert await _modell(test_client, ohne_vorliebe, model_id="chat-komplex") == "chat-komplex"
+
+
+async def test_vorliebe_fuer_planungs_assistenten_auch_gegen_sein_modell(test_client, ohne_vorliebe, planender):
+    await _vorliebe(test_client, ohne_vorliebe, modell_planung="ant-sonnet")
+    with patch("app.chat.router._get_model_info", AsyncMock(return_value={"ant-sonnet": True})):
+        assert await _modell(test_client, ohne_vorliebe, assistant_id=planender) == "ant-sonnet"
+
+
+async def test_andere_assistenten_behalten_ihr_modell(test_client, ohne_vorliebe):
+    await _vorliebe(test_client, ohne_vorliebe, modell_frei="chat-schnell", modell_planung="ant-sonnet")
+    assert await _modell(test_client, ohne_vorliebe, assistant_id=ASSISTENT) == SEIN_MODELL
+
+
+async def test_vorliebe_ohne_funktionen_faellt_zurueck(test_client, ohne_vorliebe, planender):
+    """Die Eigenschaft hat sich seit dem Speichern geändert: Modell des Assistenten, mit Hinweis."""
+    await _vorliebe(test_client, ohne_vorliebe, modell_planung="ant-sonnet")
+    from app.chat.modellwahl import vorliebe_anwenden
+
+    gesehen = []
+    echt = vorliebe_anwenden
+
+    async def mitschreiben(*a, **k):
+        ergebnis = await echt(*a, **k)
+        gesehen.append(ergebnis)
+        return ergebnis
+
+    with patch("app.chat.router._get_model_info", AsyncMock(return_value={"ant-sonnet": False})), \
+         patch("app.chat.router.vorliebe_anwenden", mitschreiben):
+        assert await _modell(test_client, ohne_vorliebe, assistant_id=planender) == "chat-komplex"
+    assert gesehen and "keine Funktionen" in gesehen[0][1]
+
+
+async def test_bestehende_konversation_behaelt_ihr_modell(test_client, ohne_vorliebe, fabrik):
+    await _vorliebe(test_client, ohne_vorliebe, modell_frei="chat-schnell")
+    cid = await _bestehender_chat(fabrik, TEACHER1_PSEUDO, assistant_id=None, modell="chat-standard")
+    assert await _modell(test_client, ohne_vorliebe, conversation_id=cid) == "chat-standard"
+
+
+async def test_schuelerin_bekommt_keine_vorliebe(test_client, jwt_service, ohne_vorliebe):
+    # Die Lehrkraft hat eine — für Schüler:innen gibt es keine (F8), und ihre gilt nicht für andere.
+    await _vorliebe(test_client, ohne_vorliebe, modell_frei="chat-schnell")
+    kopf = _kopf(jwt_service, STUDENT_PSEUDO, ["student"], grade="8")
+    from app.config import settings
+    assert await _modell(test_client, kopf) == settings.chat_default_model

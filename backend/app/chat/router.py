@@ -32,7 +32,7 @@ from app.chat.tools import (
     tools_for,
 )
 from app.chat.image_moderation import image_prompt_block_reason
-from app.chat.modellwahl import braucht_funktionen_text, fehlen_funktionen, wahl_im_assistenten
+from app.chat.modellwahl import braucht_funktionen_text, fehlen_funktionen, vorliebe_anwenden, wahl_im_assistenten
 from app.litellm.team_models import erlaubte_modelle_fuer
 from app.litellm.deployments import anbietermodell
 from app.chat.image_models import (
@@ -2005,6 +2005,9 @@ async def chat(
     schon_vorgeschlagen: set[int] = set()
     ruheregel_leeren = False
 
+    # Hinweis, wenn das bevorzugte Modell nicht greifen konnte (0.51, AV Schritt 4).
+    modell_hinweis: Optional[str] = None
+
     # Für Assistentenwechsel mid-Chat
     active_assistant_id: Optional[int] = None
     conv_assistant_update: Optional[tuple[Optional[int], Optional[str]]] = None
@@ -2026,6 +2029,12 @@ async def chat(
             if not wahl_im_assistenten(request.model_id, current_user, assistant.id):
                 model_used = modell_des_assistenten(assistant)
         active_assistant = assistant
+
+        # Bevorzugtes Modell der Lehrkraft (0.51, AV Schritt 4) — nur ohne ausdrückliche Wahl,
+        # nur hier beim Anlegen (F9). Vor dem Anlegen der Konversation, damit sie es trägt.
+        if not request.model_id:
+            model_used, modell_hinweis = await vorliebe_anwenden(
+                db, current_user, assistant, model_used, await _get_model_info())
 
         first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
 
@@ -2586,6 +2595,10 @@ async def chat(
         if is_new and (conversation_stunde_id is not None or gruppe_abgeleitet
                        or conversation_curriculum_id is not None):
             yield await _bezug_ereignis()
+
+        # Das bevorzugte Modell griff nicht (0.51, AV): eigenes Ereignis, die Oberfläche zeigt es.
+        if modell_hinweis:
+            yield f"event: modell_hinweis\ndata: {json.dumps({'detail': modell_hinweis, 'modell': model_used})}\n\n"
 
         full_content: list[str] = []
         usage: dict = {}
