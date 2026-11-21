@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Im Chat mit einem Assistenten gilt für Schüler:innen und in der Vorschau immer das Modell des Assistenten,
+  auch wenn eine Anfrage ein anderes mitschickt.
+
 ## [0.50.0] – 2026-11-21
 
 ### Neu

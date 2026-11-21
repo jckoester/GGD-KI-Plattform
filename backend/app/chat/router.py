@@ -32,6 +32,7 @@ from app.chat.tools import (
     tools_for,
 )
 from app.chat.image_moderation import image_prompt_block_reason
+from app.chat.modellwahl import wahl_im_assistenten
 from app.litellm.team_models import erlaubte_modelle_fuer
 from app.litellm.deployments import anbietermodell
 from app.chat.image_models import (
@@ -2022,7 +2023,7 @@ async def chat(
             # Leeres Assistenten-Modell = „schulweiter Standard" → `model_used` behält den
             # Wert aus CHAT_DEFAULT_MODEL. Ohne die Leerprüfung ginge ein leerer Modellname
             # an LiteLLM (der zweite Zweig weiter unten prüft bereits so).
-            if not request.model_id:
+            if not wahl_im_assistenten(request.model_id, current_user, assistant.id):
                 model_used = modell_des_assistenten(assistant)
         active_assistant = assistant
 
@@ -2176,7 +2177,7 @@ async def chat(
             conv_assistant_update = (new_assistant.id, new_assistant.system_prompt)
 
             # Assistentenmodell als Fallback wenn kein explizites model_id
-            if not request.model_id:
+            if not wahl_im_assistenten(request.model_id, current_user, new_assistant.id):
                 model_used = modell_des_assistenten(new_assistant)
 
         if active_assistant is None and active_assistant_id is not None:
@@ -2200,9 +2201,14 @@ async def chat(
             schon_vorgeschlagen = set()
             ruheregel_leeren = True
 
-        # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
-        if request.model_id:
-            model_used = request.model_id
+        # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell).
+        # Mit Assistent nur für Lehrkräfte (0.51, AV): Schüler:innen und die Vorschau bleiben
+        # beim Modell des Assistenten, ein mitgeschicktes wird verworfen (`chat/modellwahl.py`).
+        if active_assistant is None:
+            if request.model_id:
+                model_used = request.model_id
+        elif gewaehlt := wahl_im_assistenten(request.model_id, current_user, active_assistant.id):
+            model_used = gewaehlt
 
     # Modell-Freigabe durchsetzen (0.27, Plan Schritt 6). ⚠️ Der Proxy tut es nicht: Die
     # Schlüssel der Nutzer:innen tragen kein Team, LiteLLM prüft die Team-Modelle dann nicht —
