@@ -52,6 +52,8 @@ EXPECTED_EMBEDDING_TYPES = frozenset({
     'operator',
     # LFDB (aus PDF): Themenblock + Kompetenz sind inhaltstragend; Baustein ist Container.
     'lfdb_themenblock', 'lfdb_kompetenz',
+    # Leitlinien der Schule (0.50): der Aspekt trägt Text; die Leitlinie ist Behälter.
+    'leitbild_aspekt',
     # Nutzererzeugte Inhalte. Ohne sie konnte thematisch nur der Bildungsplan gefunden
     # werden — und jede Gewichtung nach Rolle lief ins Leere, weil die gewichteten Typen
     # in der Ähnlichkeitssuche gar nicht vorkamen.

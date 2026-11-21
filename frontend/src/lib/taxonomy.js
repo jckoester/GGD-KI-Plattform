@@ -25,6 +25,8 @@ export const CONTENT_TYPES = {
     "lfdb_baustein",
     "lfdb_themenblock",
     "lfdb_kompetenz",
+    "leitbild",
+    "leitbild_aspekt",
     "curriculum",
     "kapitel",
     "lernsequenz",
@@ -61,6 +63,7 @@ export const SCOPE_ANCHOR_CONTENT_TYPES = new Set([
   "themengebiet",
   "leitidee",
   "pk_gruppe",
+  "leitbild",
   "curriculum",
   "kapitel",
   "unterrichtsstunde",
@@ -82,6 +85,8 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
   "lfdb_baustein",
   "lfdb_themenblock",
   "lfdb_kompetenz",
+  "leitbild",
+  "leitbild_aspekt",
   "kapitel",
   "lernsequenz"
 ]
@@ -157,6 +162,43 @@ export const COLLECTIONS = {
     "content": {
       "label": "Inhalt des Blattes",
       "pflicht": false
+    }
+  },
+  "leitbild": {
+    "beschreibung": "Rahmenwerke der Schule, die in den Curricula vorkommen sollen — etwa die Nachhaltigkeitsziele oder das Weltethos. Die Administration pflegt sie.",
+    "spalten": [
+      "titel",
+      "kuerzel",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Beschreibung",
+      "pflicht": false
+    }
+  },
+  "leitbild_aspekt": {
+    "beschreibung": "Die einzelnen Punkte der Leitlinien der Schule — etwa „SDG 13 Klimaschutz“ oder „Wahrhaftigkeit“.",
+    "spalten": [
+      "titel",
+      "leitlinie",
+      "kuerzel",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "status",
+      "titel",
+      "leitlinie"
+    ],
+    "schueler": true,
+    "content": {
+      "label": "Beschreibung",
+      "pflicht": true
     }
   },
   "methode": {
@@ -310,6 +352,25 @@ export const COLLECTIONS = {
 // Metadaten-Feldschema je Typ — dieselbe Beschreibung, aus der das Backend prüft
 // (app/context/metadata.py). Der Editor baut sein Formular daraus.
 export const FELD_SCHEMATA = {
+  "leitbild": {
+    "kuerzel": {
+      "typ": "text",
+      "label": "Kürzel",
+      "hinweis": "Kurz und dauerhaft, etwa „SDG“ oder „WE“. Darüber verweisen Export und Assistent auf die Leitlinie; ändere es nicht mehr, wenn Curricula sie nutzen."
+    }
+  },
+  "leitbild_aspekt": {
+    "leitlinie": {
+      "typ": "text",
+      "label": "Leitlinie (Kürzel)",
+      "hinweis": "Das Kürzel der Leitlinie, zu der der Aspekt gehört, etwa „SDG“."
+    },
+    "kuerzel": {
+      "typ": "text",
+      "label": "Kürzel",
+      "hinweis": "Kurz und dauerhaft, etwa „SDG13“. Eindeutig über alle Leitlinien."
+    }
+  },
   "kapitel": {
     "std": {
       "typ": "int",
@@ -499,6 +560,8 @@ export const CONTENT_TYPE_LABELS = {
   "lfdb_baustein": "LFDB-Baustein",
   "lfdb_themenblock": "LFDB-Themenblock",
   "lfdb_kompetenz": "LFDB-Kompetenz",
+  "leitbild": "Leitlinie der Schule",
+  "leitbild_aspekt": "Aspekt einer Leitlinie",
   "curriculum": "Schulcurriculum",
   "kapitel": "Kapitel",
   "lernsequenz": "Lernsequenz",
@@ -597,6 +660,14 @@ export const SCOPE_DEFAULTS = {
   "lfdb_kompetenz": [
     "global",
     "global"
+  ],
+  "leitbild": [
+    "school",
+    "school"
+  ],
+  "leitbild_aspekt": [
+    "school",
+    "school"
   ],
   "curriculum": [
     "school",

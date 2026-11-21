@@ -24,7 +24,7 @@
     import PageBody from '$lib/components/PageBody.svelte'
     import AliasFeld from "$lib/components/AliasFeld.svelte";
 
-    let { typ, node = null, vorgabeFachId = null, vorgabeTitel = null, back = null } = $props();
+    let { typ, node = null, vorgabeFachId = null, vorgabeTitel = null, vorgabeFelder = {}, back = null } = $props();
 
     /**
      * Wohin „Abbrechen" und der Kopf-Link führen.
@@ -62,7 +62,9 @@
         Object.fromEntries(
             Object.keys(feldSchema(typ)).map((name) => [
                 name,
-                (node?.metadata ?? {})[name] ?? (feldSchema(typ)[name].typ === "liste" ? [] : ""),
+                // Vorgaben aus der Adresse (0.50: „Aspekt hinzufügen“ setzt die Leitlinie).
+                (node?.metadata ?? {})[name] ?? vorgabeFelder[name]
+                    ?? (feldSchema(typ)[name].typ === "liste" ? [] : ""),
             ]),
         ),
     ));

@@ -22,6 +22,10 @@ oder anderer Fassung (etwa nach einem Fassungswechsel). `fremdes_fach`: Kompeten
 **anderen Fachs** in den Spalten IK und PK — ein Fehler, kein Bezug: Bis 25.08.2026 löste der
 Import PK-Nummern ohne Fach auf (`resolve_pk_node`), ein Mathematik-Curriculum hing danach an
 den PK von Kunst, Geographie, Chemie … Reparatur: `scripts/curriculum_kompetenzen_reparieren.py`.
+
+**Leitlinien der Schule** (0.50, Päckchen AT): je Leitlinie, welche ihrer Aspekte in welchen
+Lernsequenzen vorkommen — aus den Verweisen `lb:`/`lba:` **in den Hinweisen**. Nur zur
+Information, ohne Pflicht (Plan F5): Eine Leitlinie muss nicht in jedem Curriculum stehen.
 """
 from __future__ import annotations
 
@@ -169,12 +173,47 @@ def verknuepfungen(tree: dict) -> tuple[dict[UUID, set[str]], dict[UUID, set[str
     return voll, teil, gefoerdert
 
 
+_LB_VERWEIS = re.compile(r"@\[[^\]]*\]\((lba|lb):([0-9a-f-]{36})\)")
+
+
+async def leitlinien_abdeckung(db: AsyncSession, tree: dict) -> list[dict]:
+    """Je aktive Leitlinie der Schule: ihre Aspekte mit den Lernsequenzen, die auf sie verweisen.
+
+    `ganz`: Lernsequenzen, die auf die Leitlinie als Ganzes verweisen (`lb:`). Ohne Leitlinien
+    eine leere Liste — die Oberfläche zeigt dann nichts.
+    """
+    from app.context.leitlinien import alle_leitlinien
+
+    leitlinien = await alle_leitlinien(db)
+    if not leitlinien:
+        return []
+    ls_titel = _lernsequenzen(tree)
+    treffer: dict[str, set[str]] = {}
+    for ls_id, eintraege in _eintraege(tree):
+        for e in eintraege:
+            for m in _LB_VERWEIS.finditer(e.get("hinweise") or ""):
+                treffer.setdefault(m.group(2), set()).add(ls_id)
+
+    def lss(node_id) -> list[str]:
+        return sorted(ls_titel[i] for i in treffer.get(str(node_id), ()))
+
+    aus = []
+    for l in leitlinien:
+        aspekte = [{"node_id": str(a.id), "kuerzel": a.kuerzel, "titel": a.titel,
+                    "lernsequenzen": lss(a.id)} for a in l.aspekte]
+        aus.append({"node_id": str(l.id), "kuerzel": l.kuerzel, "titel": l.titel,
+                    "ganz": lss(l.id), "aspekte": aspekte,
+                    "vorkommend": sum(1 for a in aspekte if a["lernsequenzen"])})
+    return aus
+
+
 async def abdeckung(db: AsyncSession, tree: dict) -> dict:
     """Die Abdeckung für einen Baum aus `load_curriculum_tree` (Rechte prüft der Aufrufer)."""
     cur = await db.get(ContextNode, tree["id"])
     bp = _bp_version(cur)
     ls_titel = _lernsequenzen(tree)
-    leer = {"bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
+    leer = {"leitlinien": await leitlinien_abdeckung(db, tree),
+            "bp_version": bp, "min_grade": cur.min_grade, "max_grade": cur.max_grade,
             "ik": {"gesamt": 0, VERKNUEPFT: 0, PARTIELL: 0, FEHLT: 0, "fehlt_anderswo": 0, "gruppen": []},
             "pk": {"gesamt": 0, "genutzt": 0, "gruppen": []}, "ausserhalb": [], "fremdes_fach": [],
             "band": None, "baender_zur_wahl": [], "hinweis": None}

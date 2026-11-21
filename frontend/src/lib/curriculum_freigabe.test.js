@@ -29,3 +29,10 @@ describe('uebersichtZeilen', () => {
     expect(z.at(-1)).toEqual({ text: 'Eine Einheit von 9a Mathe hängt an „Quadratische Funktionen“, das es im Entwurf nicht mehr gibt — sie behält das alte Kapitel.', warnung: true })
   })
 })
+
+describe("Leitlinien der Schule (0.50)", () => {
+  it("eine Zeile je Leitlinie, ohne Warnung", () => {
+    const z = uebersichtZeilen({ ...basis, leitlinien: [{ kuerzel: "SDG", titel: "Nachhaltigkeitsziele", aspekte: 17, vorkommend: 3 }] })
+    expect(z).toContainEqual({ text: "Nachhaltigkeitsziele: 3 von 17 Aspekten kommen vor", warnung: false })
+  })
+})

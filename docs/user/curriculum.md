@@ -197,11 +197,16 @@ musst dich also nicht darum kümmern, ob eine Kompetenz zur richtigen Edition ge
 Das ist kein Schönheitsfehler, sondern die ehrliche Auskunft: Dieselbe Kompetenz taucht
 dann an mehreren Stellen auf, und keine behauptet, sie allein abzudecken.
 
-### Hinweise und Leitperspektiven
+### Hinweise, Leitperspektiven und Leitlinien
 
 Im Feld **Hinweise** schreibst du Freitext. Mit `@` verweist du zusätzlich auf
 **Leitperspektiven** und ihre Aspekte, mit `#` auf Kompetenzen **anderer Fächer** — das ist
 der Weg, fächerverbindende Bezüge sichtbar zu machen.
+
+Hat die Schule eigene **Leitlinien** hinterlegt, etwa die Nachhaltigkeitsziele oder das
+Weltethos, stehen sie in derselben Auswahl nach `@`, unter den Leitperspektiven. Du verweist
+auf die Leitlinie als Ganzes oder auf einen ihrer Aspekte. Im Curriculum erscheinen sie in
+einer eigenen Farbe, damit Bildungsplan und Schule unterscheidbar bleiben.
 
 ### Material
 
@@ -229,6 +234,9 @@ nicht die Verweise in den Hinweisen.
 - **Aus einem anderen Fach:** Erscheint dieser Abschnitt, hängt das Curriculum an Kompetenzen
   eines anderen Fachs — meist ein Überbleibsel eines alten Imports. Ersetze sie im Editor oder
   bitte die Schul-IT um die Reparatur.
+- **Leitlinien der Schule:** Je Leitlinie steht, welche Aspekte in welchen Lernsequenzen
+  vorkommen und welche nicht. Das ist eine Information, keine Pflicht — eine Leitlinie muss
+  nicht in jedem Curriculum stehen. Auch die Übersicht vor dem Veröffentlichen nennt es.
 - Die Abdeckung zeigt den **gespeicherten** Stand; im Editor lädt sie nach dem Speichern neu.
 
 ### Abdeckung über das Band
@@ -286,6 +294,9 @@ das die Zustimmung; er sagt danach, was mit verschwunden ist.
   Kapitel und Reihenfolge.
 - Eine alte Kapitelfolge kannst du in den Chat einfügen. Er übernimmt Reihenfolge und Stunden,
   aber keine alten Kompetenznummern.
+- Hat die Schule Leitlinien hinterlegt, fragt er zu Beginn, ob das Curriculum sie
+  berücksichtigen soll. Aspekte der Leitperspektiven und der Leitlinien schlägt er dort vor, wo
+  sie fachlich passen, und trägt sie in die Hinweise ein.
 - Bei großen Vorschlägen dauert eine Antwort manchmal eine Minute.
 
 Veröffentlichen kann er nicht — das geschieht wie immer in der Ansicht.

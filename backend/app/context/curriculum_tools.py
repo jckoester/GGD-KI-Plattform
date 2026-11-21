@@ -68,7 +68,9 @@ _registriere(
     "Nummern (ik, ik_teilweise, pk); Begriffe mit zustand (gefunden, fehlt, mehrdeutig — dann "
     "fassungen: die wählbaren; gewählt wird im Editor). "
     "Kennungen (id) und Eintragsnummern brauchst du für apply_curriculum_operations. "
-    "status 'draft' = Entwurf; in andere schreibst du nicht.",
+    "status 'draft' = Entwurf; in andere schreibst du nicht. leitperspektiven und "
+    "leitlinien_der_schule (falls vorhanden) nennen die Kürzel, auf die Einträge verweisen können; "
+    "die Aspekte der Leitperspektiven liefert get_bp_competences mit typ='lp'.",
 )
 
 
@@ -76,6 +78,8 @@ async def _get_bp_competences(args: dict, ctx: ToolContext) -> dict:
     cur = await _curriculum(args, ctx, schreiben=False)
     if isinstance(cur, str):
         return {"error": cur}
+    if args.get("typ") == "lp":  # Leitperspektiven mit Aspekten (0.50, AT)
+        return await ca.leitperspektiven_lesen(ctx.db, args.get("bereich"))
     typ = "pk" if args.get("typ") == "pk" else "ik"
     return await ca.kompetenzen_lesen(ctx.db, cur, args.get("bereich"), typ)
 
@@ -89,8 +93,9 @@ _registriere(
         "bereich": {"type": "string", "description": (
             "Name eines Bereichs aus der Übersicht (ein Teil genügt), ein Nummernpräfix wie "
             "'3.2.1' oder 'alle'. Ein Kapitel bedient oft Kompetenzen aus mehreren Bereichen.")},
-        "typ": {"type": "string", "enum": ["ik", "pk"], "description": (
-            "ik = inhaltsbezogene Kompetenzen (Vorgabe), pk = prozessbezogene (gelten fürs ganze Fach).")},
+        "typ": {"type": "string", "enum": ["ik", "pk", "lp"], "description": (
+            "ik = inhaltsbezogene Kompetenzen (Vorgabe), pk = prozessbezogene (gelten fürs ganze Fach), "
+            "lp = Leitperspektiven mit ihren Aspekten (Kürzel wie BNE_03; bereich = Kürzel wie 'BNE').")},
     },
 )
 
@@ -106,7 +111,8 @@ _registriere(
     "get_curriculum_coverage", _get_curriculum_coverage,
     "Abdeckung des Bands: wie viele IK verknüpft, nur teilweise oder gar nicht; welche fehlen "
     "(mit in_anderem_curriculum, wenn ein anderes Curriculum des Bands sie abdeckt); welche PK "
-    "ungenutzt sind. Nenne Zahlen nur aus dieser Funktion.",
+    "ungenutzt sind; leitlinien: welche Aspekte der Leitlinien der Schule vorkommen. Nenne "
+    "Zahlen nur aus dieser Funktion.",
 )
 
 
@@ -143,9 +149,10 @@ OPERATIONEN = {
         "kapitel_id verschiebt in ein anderes Kapitel\n"
         "- lernsequenz_loeschen{lernsequenz_id}\n"
         "- eintrag_anlegen{lernsequenz_id, ik?, ik_teilweise?, pk?, konkretisierung?, "
-        "hinweise?, material?, begriffe?, fachmethoden?, position?}: ik, ik_teilweise, pk als "
-        "Listen von Nummern aus get_bp_competences; begriffe und fachmethoden als Listen von "
-        "Namen\n"
+        "hinweise?, material?, begriffe?, fachmethoden?, leitperspektiven?, leitlinien?, position?}: "
+        "ik, ik_teilweise, pk als Listen von Nummern aus get_bp_competences; begriffe und "
+        "fachmethoden als Listen von Namen; leitperspektiven (BNE oder Aspekt BNE_03) und "
+        "leitlinien als Listen von Kürzeln\n"
         "- eintrag_aendern{lernsequenz_id, eintrag, …}: eintrag = Nummer ab 1; genannte Felder "
         "ersetzen die bisherigen, andere bleiben\n"
         "- eintrag_loeschen{lernsequenz_id, eintrag}")},

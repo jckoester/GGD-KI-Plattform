@@ -42,6 +42,19 @@
             text: 'text-light-pu dark:text-dark-pu',
             border: 'border-light-pu/30 dark:border-dark-pu/30'
         },
+        // Leitlinien der Schule (0.50): eigene Farbe neben den Leitperspektiven des Bildungsplans
+        leitlinie: {
+            prefix: '',
+            bg: 'bg-light-or/20 dark:bg-dark-or/20',
+            text: 'text-light-or dark:text-dark-or',
+            border: 'border-light-or/30 dark:border-dark-or/30'
+        },
+        leitlinie_aspekt: {
+            prefix: '▸',
+            bg: 'bg-light-or/20 dark:bg-dark-or/20',
+            text: 'text-light-or dark:text-dark-or',
+            border: 'border-light-or/30 dark:border-dark-or/30'
+        },
         didaktik: {
             prefix: '⚙',
             bg: 'bg-light-ui-3/50 dark:bg-dark-ui-3/50',

@@ -45,7 +45,7 @@
   import { assistants } from '$lib/stores/assistants.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { refreshConversationCounts } from '$lib/stores/conversationCounts.js'
-  import { fachSammlungen, schuelerSammlungen } from '$lib/collections.js'
+  import { fachSammlungen, sammlungsAdresse, schuelerSammlungen } from '$lib/collections.js'
   import AssistantCard from './AssistantCard.svelte'
   import ConversationMenu from './ConversationMenu.svelte'
   import NodeTypeIcon from './NodeTypeIcon.svelte'
@@ -453,7 +453,7 @@
   <div class="flex flex-wrap gap-2">
     {#each istLehrkraft ? fachSammlungen() : schuelerSammlungen() as sammlung (sammlung.typ)}
       <a
-        href="/knowledge/collections/{sammlung.typ}?subject_id={subject?.id}"
+        href={sammlungsAdresse(sammlung.typ, subject?.id)}
         title={sammlung.beschreibung}
         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md
                border border-light-ui-3 dark:border-dark-ui-3

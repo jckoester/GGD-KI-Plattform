@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseHinweise, serializeHinweise, extractEdgeTargets, getActiveTrigger } from './hinweise.js'
+import { parseHinweise, serializeHinweise, extractEdgeTargets, getActiveTrigger, leitlinienAuswahl } from './hinweise.js'
 
 const LP = '11111111-1111-1111-1111-111111111111'
 const LPA = '22222222-2222-2222-2222-222222222222'
@@ -50,11 +50,13 @@ describe('extractEdgeTargets', () => {
         expect(extractEdgeTargets(TEXT)).toEqual({
             lp: [LP],
             lpa: [LPA],
+            lb: [],
+            lba: [],
             ik: [IK],
         })
     })
     it('leerer Text → leere Listen', () => {
-        expect(extractEdgeTargets('')).toEqual({ lp: [], lpa: [], ik: [] })
+        expect(extractEdgeTargets('')).toEqual({ lp: [], lpa: [], lb: [], lba: [], ik: [] })
     })
 })
 
@@ -124,5 +126,59 @@ describe('getActiveTrigger', () => {
         const text = 'Vorher #SPA3 2.1'
         const t = getActiveTrigger(text, text.length)
         expect(text.slice(t.matchStart)).toBe('#SPA3 2.1')
+    })
+})
+
+// ── Leitlinien der Schule (0.50, AT) ────────────────────────────────────────
+
+const LB = '44444444-4444-4444-4444-444444444444'
+const LBA = '55555555-5555-5555-5555-555555555555'
+
+describe('Leitlinien-Token lb/lba', () => {
+    const text = `Bezug @[Nachhaltigkeitsziele](lb:${LB}) und @[SDG13: Klimaschutz](lba:${LBA}).`
+
+    it('zerlegt lb und lba, ohne sie mit lp/lpa zu verwechseln', () => {
+        const parts = parseHinweise(text)
+        expect(parts.map((p) => p.kind)).toEqual(['text', 'lb', 'text', 'lba', 'text'])
+        expect(parts[1]).toMatchObject({ label: 'Nachhaltigkeitsziele', node_id: LB })
+        expect(parts[3]).toMatchObject({ label: 'SDG13: Klimaschutz', node_id: LBA })
+    })
+
+    it('Round-Trip verlustfrei, auch gemischt mit LP', () => {
+        const gemischt = TEXT + ' ' + text
+        expect(serializeHinweise(parseHinweise(gemischt))).toBe(gemischt)
+    })
+
+    it('Kantenziele getrennt nach Art', () => {
+        expect(extractEdgeTargets(text)).toMatchObject({ lb: [LB], lba: [LBA], lp: [], lpa: [] })
+    })
+})
+
+describe('leitlinienAuswahl', () => {
+    const nodes = [
+        { id: 'a', title: 'Nachhaltigkeitsziele', content_type: 'leitbild', metadata: { kuerzel: 'SDG' } },
+        { id: 'b', title: 'Weltethos', content_type: 'leitbild', metadata: { kuerzel: 'WE' } },
+        { id: 'c', title: 'Klimaschutz', content_type: 'leitbild_aspekt', metadata: { kuerzel: 'SDG13', leitlinie: 'SDG' } },
+        { id: 'd', title: 'Keine Armut', content_type: 'leitbild_aspekt', metadata: { kuerzel: 'SDG1', leitlinie: 'sdg' } },
+        { id: 'e', title: 'Wahrhaftigkeit', content_type: 'leitbild_aspekt', metadata: { kuerzel: 'WE3', leitlinie: 'WE' } },
+    ]
+
+    it('ohne Suchwort: Köpfe nach Kürzel, Aspekte natürlich geordnet', () => {
+        const items = leitlinienAuswahl(nodes, '')
+        expect(items.map((i) => i.node_id)).toEqual(['a', 'd', 'c', 'b', 'e'])
+        expect(items[0]).toMatchObject({ kind: 'lb', isHead: true, serialized: '@[Nachhaltigkeitsziele](lb:a)' })
+        expect(items[1]).toMatchObject({ kind: 'lba', indented: true, serialized: '@[SDG1: Keine Armut](lba:d)' })
+    })
+
+    it('Suchwort im Aspekt: nur dessen Leitlinie mit dem passenden Aspekt', () => {
+        expect(leitlinienAuswahl(nodes, 'klima').map((i) => i.node_id)).toEqual(['a', 'c'])
+    })
+
+    it('Suchwort im Kopf: alle Aspekte der Leitlinie', () => {
+        expect(leitlinienAuswahl(nodes, 'welt').map((i) => i.node_id)).toEqual(['b', 'e'])
+    })
+
+    it('ohne Leitlinien: leer', () => {
+        expect(leitlinienAuswahl([], 'x')).toEqual([])
     })
 })

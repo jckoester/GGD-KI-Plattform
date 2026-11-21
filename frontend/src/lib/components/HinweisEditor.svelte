@@ -2,14 +2,14 @@
     /**
      * HinweisEditor — Textarea mit @/# Inline-Autocomplete für Hinweise-Tokens.
      *
-     * @ → Leitperspektive-Suche (global)
+     * @ → Leitperspektiven und Leitlinien der Schule (0.50)
      * #FACH query → Cross-Fach-IK-Suche im Zielfach
      *
      * Props:
      *   value    — gebundener Textwert (zwei-Wege: bind:value)
      *   onchange — Callback bei Änderung
      */
-    import { getActiveTrigger, parseHinweise } from "$lib/hinweise.js";
+    import { getActiveTrigger, leitlinienAuswahl, parseHinweise } from "$lib/hinweise.js";
     import HinweisChip from "./HinweisChip.svelte";
 
     let { value = $bindable(""), onchange = () => {} } = $props();
@@ -20,7 +20,7 @@
     let dropdownIndex = $state(0);
 
     // Cache für LP+Aspekte (einmaliger Abruf pro Editor-Instanz)
-    let lpCache = null; // { lps: Node[], aspekte: Node[] } | null
+    let lpCache = null; // { lps: Node[], aspekte: Node[], leitlinien: Node[] } | null
 
     // Für # Cross-Fach: welches Fach wurde erkannt?
     let resolvedFachCode = $state(null); // z.B. 'ETH'
@@ -47,6 +47,8 @@
                     const params = new URLSearchParams({ limit: "200" });
                     params.append("content_type", "leitperspektive");
                     params.append("content_type", "leitperspektive_aspekt");
+                    params.append("content_type", "leitbild");
+                    params.append("content_type", "leitbild_aspekt");
                     const res = await fetch(`/api/context/nodes?${params}`, {
                         credentials: "include",
                     });
@@ -55,9 +57,10 @@
                     lpCache = {
                         lps: nodes.filter((n) => n.content_type === "leitperspektive"),
                         aspekte: nodes.filter((n) => n.content_type === "leitperspektive_aspekt"),
+                        leitlinien: nodes.filter((n) => n.content_type.startsWith("leitbild")),
                     };
                 } catch {
-                    lpCache = { lps: [], aspekte: [] };
+                    lpCache = { lps: [], aspekte: [], leitlinien: [] };
                 }
             }
 
@@ -105,6 +108,9 @@
                     });
                 }
             }
+
+            // Leitlinien der Schule hinter den Leitperspektiven (0.50, AT)
+            items.push(...leitlinienAuswahl(lpCache.leitlinien, trigger.query));
 
             dropdownItems = items;
             dropdownOpen = items.length > 0;
@@ -252,7 +258,7 @@
                 }, 200);
             }}
             rows="5"
-            placeholder="Hinweise: @LP für Leitperspektive, #ETH 3.1 für Fachbezug, freier Text für alles andere etc."
+            placeholder="Hinweise: @LP für Leitperspektive oder Leitlinie der Schule, #ETH 3.1 für Fachbezug, freier Text für alles andere etc."
             class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2 resize-none
                    focus:outline-none focus:border-primary dark:focus:border-primary-dark"
@@ -281,9 +287,11 @@
                             class="shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium
                                      {item.kind === 'lp' || item.kind === 'lpa'
                                 ? 'bg-light-pu/20 dark:bg-dark-pu/20 text-light-pu dark:text-dark-pu'
-                                : 'bg-light-ui-3/50 dark:bg-dark-ui-3/50 text-light-tx dark:text-dark-tx'}"
+                                : item.kind === 'lb' || item.kind === 'lba'
+                                  ? 'bg-light-or/20 dark:bg-dark-or/20 text-light-or dark:text-dark-or'
+                                  : 'bg-light-ui-3/50 dark:bg-dark-ui-3/50 text-light-tx dark:text-dark-tx'}"
                         >
-                            {item.kind === "lp" ? "LP" : item.kind === "lpa" ? "Asp." : "IK"}
+                            {item.kind === "lp" ? "LP" : item.kind === "lb" ? "Schule" : item.kind === "lpa" || item.kind === "lba" ? "Asp." : "IK"}
                         </span>
                         <div class="min-w-0 flex-1">
                             <div
@@ -316,6 +324,10 @@
                     <HinweisChip typ="leitperspektive" lp_code={part.label} />
                 {:else if part.kind === "lpa"}
                     <HinweisChip typ="leitperspektive_aspekt" lp_code={part.label} />
+                {:else if part.kind === "lb"}
+                    <HinweisChip typ="leitlinie" lp_code={part.label} />
+                {:else if part.kind === "lba"}
+                    <HinweisChip typ="leitlinie_aspekt" lp_code={part.label} />
                 {:else if part.kind === "ik"}
                     <HinweisChip typ="fach_bezug" fach={part.label} />
                 {:else if part.label.trim()}

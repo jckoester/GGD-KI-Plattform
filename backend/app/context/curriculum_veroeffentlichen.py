@@ -118,6 +118,9 @@ async def uebersicht(db: AsyncSession, tree: dict, user) -> dict:
         "veraltet": _veraltet(tree),
         "begriffe_fehlend": len(begriffe["fehlend"]),
         "begriffe_mehrdeutig": len(begriffe["mehrdeutig"]),
+        # Leitlinien der Schule (0.50, AT): nur zur Information, keine Pflicht.
+        "leitlinien": [{"kuerzel": l["kuerzel"], "titel": l["titel"], "aspekte": len(l["aspekte"]),
+                        "vorkommend": l["vorkommend"]} for l in a["leitlinien"]],
         "vorgaenger": None,
         "einheiten_umgehaengt": 0,
         "einheiten_ohne_kapitel": [],

@@ -137,6 +137,9 @@
   .badge-lp   { background: #e4d0f5; color: #5c2d91; }
   .badge-ik   { background: #d0e8f5; color: #1b5e8a; }
   .badge-node { background: #d0f5e4; color: #1b5e3a; }
+  /* Leitlinie der Schule (0.50): eigene Farbe, damit Schule und Bildungsplan unterscheidbar bleiben */
+  .badge-lb   { background: #f5e6c8; color: #7a4b00; }
+  .lb-aspekt  { color: #7a4b00; }
   /* LP-Aspekt: Volltext kann lang sein → kein Chip, nur farbiger Fließtext */
   .lp-aspekt  { color: #5c2d91; }
 </style>
@@ -234,6 +237,8 @@
           {% elif part.kind == 'text' %}<span>{{ part.text }}</span>
           {% elif part.kind == 'lp' %}<span class="badge badge-lp">{{ part.label }}</span>
           {% elif part.kind == 'lpa' %}<span class="lp-aspekt">{{ part.label }}</span>
+          {% elif part.kind == 'lb' %}<span class="badge badge-lb">{{ part.label }}</span>
+          {% elif part.kind == 'lba' %}<span class="lb-aspekt">{{ part.label }}</span>
           {% elif part.kind == 'ik' %}<span class="badge badge-ik">{{ part.label }}</span>
           {% endif %}
         {% endfor %}

@@ -1120,6 +1120,12 @@
                                                             lp_code={part.label}
                                                             href={bausteinPfad(part.node_id, $page.url)}
                                                         />
+                                                    {:else if part.kind === "lb" || part.kind === "lba"}
+                                                        <HinweisChip
+                                                            typ={part.kind === "lb" ? "leitlinie" : "leitlinie_aspekt"}
+                                                            lp_code={part.label}
+                                                            href={bausteinPfad(part.node_id, $page.url)}
+                                                        />
                                                     {:else if part.kind === "ik"}
                                                         <HinweisChip
                                                             typ="fach_bezug"

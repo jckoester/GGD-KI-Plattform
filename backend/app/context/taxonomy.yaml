@@ -250,6 +250,55 @@ categories:
         icon: Target
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
+      # Leitlinien der Schule (0.50, Päckchen AT): eigene Rahmenwerke wie die SDGs oder das
+      # Weltethos, zwei Ebenen wie die Leitperspektiven. Klasse K3 (kuratiert, pflegen nur
+      # Admins: write_scope school). Existenz: eigener Pflegeweg und eigenes Auswahlfeld im
+      # Curriculum (Hinweise-Token `lb:`/`lba:`). Ein Kürzel ist Pflicht und je Typ eindeutig
+      # (`app/context/leitlinien.py`) — es trägt den portablen Export und den Assistenten.
+      - key: leitbild
+        label_de: "Leitlinie der Schule"
+        icon: Flag
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        scope_anchor: true
+        # Behälter: gesucht werden die Aspekte, nicht der Ordner.
+        felder:
+          kuerzel:
+            typ: text
+            label: "Kürzel"
+            hinweis: >-
+              Kurz und dauerhaft, etwa „SDG“ oder „WE“. Darüber verweisen Export und
+              Assistent auf die Leitlinie; ändere es nicht mehr, wenn Curricula sie nutzen.
+        collection:
+          beschreibung: >-
+            Rahmenwerke der Schule, die in den Curricula vorkommen sollen — etwa die
+            Nachhaltigkeitsziele oder das Weltethos. Die Administration pflegt sie.
+          spalten: [titel, kuerzel, status, geaendert]
+          filter: [status, titel]
+          content: {label: "Beschreibung", pflicht: false}
+      - key: leitbild_aspekt
+        label_de: "Aspekt einer Leitlinie"
+        icon: Flag
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        # Kurzer Text, der thematisch gefunden werden soll („Klimaschutz“ → SDG 13).
+        embedding: true
+        felder:
+          leitlinie:
+            typ: text
+            label: "Leitlinie (Kürzel)"
+            hinweis: "Das Kürzel der Leitlinie, zu der der Aspekt gehört, etwa „SDG“."
+          kuerzel:
+            typ: text
+            label: "Kürzel"
+            hinweis: "Kurz und dauerhaft, etwa „SDG13“. Eindeutig über alle Leitlinien."
+        collection:
+          beschreibung: >-
+            Die einzelnen Punkte der Leitlinien der Schule — etwa „SDG 13 Klimaschutz“
+            oder „Wahrhaftigkeit“.
+          spalten: [titel, leitlinie, kuerzel, status, geaendert]
+          filter: [status, titel, leitlinie]
+          # Auch für Schüler:innen (AT F6) und damit in der Vorab-Suche (F9).
+          schueler: true
+          content: {label: "Beschreibung", pflicht: true}
       - key: curriculum
         label_de: "Schulcurriculum"
         icon: Library
@@ -811,5 +860,8 @@ bp_curriculum_content_types:
   - lfdb_baustein
   - lfdb_themenblock
   - lfdb_kompetenz
+  # Leitlinien der Schule (0.50, AT F2): wie die Leitperspektiven nur auf ihrer Seite.
+  - leitbild
+  - leitbild_aspekt
   - kapitel
   - lernsequenz

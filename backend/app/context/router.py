@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.auth.dependencies import get_current_user, require_any_role, require_role
 from app.auth.jwt import JwtPayload
+from app.context.leitlinien import LEITLINIEN_TYPEN, pruefe_leitlinie
 from app.context.schemas import (
     ContextAnchorCreate,
     ContextAnchorRead,
@@ -827,6 +828,14 @@ async def create_node(
     if payload.status == ENTWURF:  # Teil eines Curriculum-Entwurfs (0.45)
         pruefe_anlegen(payload.content_type, payload.status)
         await pruefe_entwurf(db, payload.subject_id, user)
+    # Leitlinien der Schule (0.50, AT F2): nur Admins legen an; Kürzel Pflicht und eindeutig.
+    if payload.content_type in LEITLINIEN_TYPEN:
+        if "admin" not in user.roles:
+            raise HTTPException(status_code=403, detail="Leitlinien der Schule pflegt die Administration.")
+        try:
+            payload.metadata_ = await pruefe_leitlinie(db, payload.content_type, payload.metadata_)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     # Scope und Trägergruppe müssen zusammenpassen — Pflicht **und** Art. Die Regel
     # steht in `scope_gruppen.py`, weil sie hier und beim Ändern gilt; bis 09/2026
@@ -1030,6 +1039,19 @@ async def update_node(
             )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+    # Leitlinien der Schule (0.50, AT F2): Auch wer einen eigenen Baustein in eine Leitlinie
+    # umwandelt, braucht die Admin-Rolle; das Kürzel gilt nach der Änderung.
+    if typ_danach in LEITLINIEN_TYPEN:
+        if "admin" not in user.roles:
+            raise HTTPException(status_code=403, detail="Leitlinien der Schule pflegt die Administration.")
+        if "metadata_" in update_data or typ_danach != node.content_type:
+            try:
+                update_data["metadata_"] = await pruefe_leitlinie(
+                    db, typ_danach, update_data.get("metadata_", node.metadata_), node.id,
+                    vorher=node.metadata_ if node.content_type == typ_danach else None)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
 
     # Scope und Trägergruppe müssen auch nach einer Teiländerung zusammenpassen.
     # Maßgeblich ist der Stand **danach**: Wer nur den Scope schickt, behält die

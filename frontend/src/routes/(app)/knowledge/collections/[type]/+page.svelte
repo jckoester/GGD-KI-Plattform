@@ -13,7 +13,7 @@
     import { goto } from "$app/navigation";
     import { Plus, Archive, Pencil } from "lucide-svelte";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
-    import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
+    import { CONTENT_TYPE_LABELS, SCOPE_DEFAULTS } from "$lib/taxonomy.js";
     import {
         sammlung,
         spalten,
@@ -170,6 +170,10 @@
 
     // Admin ist eine Erweiterung der Lehrkraft-Rolle (CLAUDE.md, Rollenmodell).
     const istLehrkraft = $derived($user?.roles?.includes("teacher") ?? false);
+    // Schulweit gepflegte Typen (`write_scope: school`, etwa die Leitlinien, 0.50) legt nur
+    // die Administration an — für sie gilt die Vermutung unten nur mit Admin-Rolle.
+    const nurAdmin = $derived(SCOPE_DEFAULTS[typ]?.[1] === "school");
+    const istAdmin = $derived($user?.roles?.includes("admin") ?? false);
 
     /**
      * Darf hier angelegt werden?
@@ -185,7 +189,7 @@
      * einen Knopf gezeigt, der mit 403 antwortet.
      */
     const darfAnlegen = $derived(
-        nodes.some((n) => n.darf_schreiben) || (nodes.length === 0 && istLehrkraft),
+        nodes.some((n) => n.darf_schreiben) || (nodes.length === 0 && (nurAdmin ? istAdmin : istLehrkraft)),
     );
     const unvollstaendige = $derived(nodes.filter(istStub).length);
 

@@ -357,10 +357,11 @@
                 if (pk.node_id) pkSet.add(pk.node_id);
             }
 
-            // Hinweise: Token-Notation @[Label](lp:uuid), @[Label](lpa:uuid), #[Label](ik:uuid)
+            // Hinweise: Token-Notation @[Label](lp:uuid), @[Label](lpa:uuid), #[Label](ik:uuid);
+            // Leitlinien der Schule (lb/lba, 0.50) werden wie Leitperspektiven `references`.
             const hinweiseText = eintrag.hinweise || "";
             for (const m of hinweiseText.matchAll(
-                /@\[[^\]]*\]\(lpa:([0-9a-f-]{36})\)/g,
+                /@\[[^\]]*\]\((?:lpa|lba|lb):([0-9a-f-]{36})\)/g,
             )) {
                 lpSet.add(m[1]);
             }

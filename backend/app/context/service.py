@@ -1058,6 +1058,10 @@ async def resolve_ik_node_by_fach_code(
 
 _LP_CODE_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lp:([^)]+)\)')
 _LPA_CODE_TOKEN = re.compile(r'@\[([^\]]*)\]\(lpa:([^)]+)\)')
+# Leitlinien der Schule (0.50): `lb:<kuerzel>`, `lba:<kuerzel>`. Ein UUID-Token passt hier
+# auch — er wird wie ein Kürzel gesucht, findet nichts und bleibt stehen (wie bei LP).
+_LB_CODE_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lb:([^)]+)\)')
+_LBA_CODE_TOKEN = re.compile(r'@\[([^\]]*)\]\(lba:([^)]+)\)')
 
 # Die Kompetenznummer darf selbst Klammern enthalten — in Mathematik und Physik ist
 # `3.4.3(2)` die Regel, nicht die Ausnahme. Ein einfaches `[^)]+` endet dann an der
@@ -1080,7 +1084,7 @@ async def hinweise_code_to_uuid(
 ) -> str:
     """Übersetzt Code-Token im Hinweise-Feld zurück in UUID-Token.
 
-    Verarbeitet: lp:<code>, lpa:<bp_id>, ik:<fach>:<nr>.
+    Verarbeitet: lp:<code>, lpa:<bp_id>, lb:<kuerzel>, lba:<kuerzel>, ik:<fach>:<nr>.
     node:<uuid> (Material) bleibt unverändert.
     Unbekannte Tokens werden als Freitext belassen + Warnung.
     """
@@ -1091,6 +1095,8 @@ async def hinweise_code_to_uuid(
     for pattern, kind in [
         (_LP_CODE_TOKEN, "lp"),
         (_LPA_CODE_TOKEN, "lpa"),
+        (_LB_CODE_TOKEN, "lb"),
+        (_LBA_CODE_TOKEN, "lba"),
         (_IK_CODE_TOKEN, "ik"),
     ]:
         for m in pattern.finditer(text):
@@ -1119,6 +1125,17 @@ async def hinweise_code_to_uuid(
                 parts.append(f"@[{label}](lpa:{uid})")
             else:
                 warnings.append(f"LP-Aspekt '{bp_id}' nicht gefunden{' in ' + context_label if context_label else ''}")
+                parts.append(m.group(0))
+        elif kind in ("lb", "lba"):
+            from app.context.leitlinien import aspekt_zum_kuerzel, leitlinie_zum_kuerzel
+
+            kuerzel = m.group(2)
+            ziel = await (leitlinie_zum_kuerzel if kind == "lb" else aspekt_zum_kuerzel)(db, kuerzel)
+            if ziel is not None:
+                parts.append(f"@[{label}]({kind}:{ziel.id})")
+            else:
+                art = "Leitlinie" if kind == "lb" else "Aspekt einer Leitlinie"
+                warnings.append(f"{art} '{kuerzel}' nicht gefunden{' in ' + context_label if context_label else ''}")
                 parts.append(m.group(0))
         elif kind == "ik":
             fach_code = m.group(2)
@@ -1692,6 +1709,8 @@ async def import_curriculum_from_draft(
                 for muster, art in (
                     (r'@\[[^\]]*\]\(lp:([0-9a-f-]{36})\)', "LP"),
                     (r'@\[[^\]]*\]\(lpa:([0-9a-f-]{36})\)', "LP-Aspekt"),
+                    (r'@\[[^\]]*\]\(lb:([0-9a-f-]{36})\)', "Leitlinien"),
+                    (r'@\[[^\]]*\]\(lba:([0-9a-f-]{36})\)', "Leitlinien-Aspekt"),
                     (r'#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)', "Cross-Fach-IK"),
                 ):
                     for uid_str in re.findall(muster, hinweise_uuid):

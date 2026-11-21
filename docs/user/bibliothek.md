@@ -23,6 +23,13 @@ eine Kachel je Bereich:
 Curricula, Bildungspläne und Leitperspektiven erscheinen erst ab der Darstellungsstufe, die sie
 zeigt. Aus den Bereichen führt „Zurück“ wieder auf die Übersicht.
 
+Unter **Leitperspektiven** stehen auch die **Leitlinien der Schule** — eigene Rahmenwerke wie
+die Nachhaltigkeitsziele oder das Weltethos, mit ihren Aspekten. Sie pflegt die
+Administration. Im Curriculum verweist du auf sie wie auf eine Leitperspektive (siehe
+[Curriculum](curriculum.md#hinweise-leitperspektiven-und-leitlinien)). Als Schüler:in findest
+du die Aspekte auf der Seite deines Fachs unter **Nachschlagen**, und der Chat bezieht sie ein,
+wenn deine Frage dazu passt.
+
 > **Was die Suche zusagt — und was nicht.** Sie antwortet in getrennten Abschnitten, und
 > der Unterschied ist wichtig:
 >

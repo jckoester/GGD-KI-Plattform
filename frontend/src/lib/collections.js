@@ -83,6 +83,18 @@ export function schuelerSammlungen() {
   return alleSammlungen().filter((s) => COLLECTIONS[s.typ].schueler === true)
 }
 
+/**
+ * Adresse einer Sammlung aus einer Fach- oder Gruppenansicht.
+ *
+ * Das Fach kommt nur bei **fachgebundenen** Sammlungen mit: Die Liste filtert danach
+ * streng, und fachunabhängige Einträge (die Leitlinien der Schule, 0.50) hätten unter
+ * `?subject_id=` eine leere Seite ergeben.
+ */
+export function sammlungsAdresse(typ, subjectId) {
+  const fachgebunden = (COLLECTIONS[typ]?.filter ?? []).includes("fach")
+  return `/knowledge/collections/${typ}` + (fachgebunden && subjectId != null ? `?subject_id=${subjectId}` : "")
+}
+
 /** Die Konfiguration eines Typs, oder `null` — für unbekannte Typen und 404-Fälle. */
 export function sammlung(typ) {
   return COLLECTIONS[typ] ?? null

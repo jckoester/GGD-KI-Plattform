@@ -107,6 +107,9 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "lfdb_baustein": None,
     "lfdb_themenblock": None,
     "lfdb_kompetenz": None,
+    # Leitlinien der Schule (0.50): gelten, bis die Schule sie archiviert.
+    "leitbild": None,
+    "leitbild_aspekt": None,
     # artifact — zeitlich begrenzte Inhalte
     "unterrichtseinheit": None,   # Lehrkraft setzt manuell
     "unterrichtsstunde": None,    # Lehrkraft setzt manuell
@@ -561,6 +564,10 @@ MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
     # Modell nur über `get_operatoren` (rohe Metadaten, entfernt 0.23): Über die Aufzählung beantwortet,
     # riet es bei „Welche Operatoren gehören zu AFB III?“ (Werkzeugwahl-Messung).
     "operator": ("afb",),
+    # Leitlinien der Schule (0.50, AT): Über das Kürzel trägt der Curriculum-Assistent einen
+    # Aspekt ein; die Leitlinie nennt, zu welchem Rahmenwerk ein Aspekt gehört.
+    "leitbild": ("kuerzel",),
+    "leitbild_aspekt": ("leitlinie", "kuerzel"),
 }
 
 

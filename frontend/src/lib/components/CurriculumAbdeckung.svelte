@@ -160,6 +160,27 @@
                     {/each}
                 </div>
             {/if}
+            {#each abdeckung.leitlinien ?? [] as l (l.node_id)}
+                <!-- Leitlinien der Schule (0.50, AT): nur zur Information, keine Pflicht -->
+                <div data-leitlinie={l.kuerzel}>
+                    <p class="text-xs font-medium text-light-tx dark:text-dark-tx">
+                        {l.titel} — {l.vorkommend} von {l.aspekte.length} Aspekten kommen vor
+                    </p>
+                    {#if l.ganz.length}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Als Ganzes in: {l.ganz.join(", ")}
+                        </p>
+                    {/if}
+                    <ul class="text-xs space-y-0.5">
+                        {#each l.aspekte as x (x.node_id)}
+                            <li class={x.lernsequenzen.length ? "text-light-tx dark:text-dark-tx" : "text-light-tx-2 dark:text-dark-tx-2"}>
+                                <span class="font-medium">{x.kuerzel}</span> {x.titel}
+                                {#if x.lernsequenzen.length}— {x.lernsequenzen.join(", ")}{:else}— kommt nicht vor{/if}
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            {/each}
         </div>
     </details>
 {/if}

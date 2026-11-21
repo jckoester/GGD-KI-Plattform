@@ -68,6 +68,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Modelle freischalten, Assistenten verwalten
 - [Antworten der Assistenten verbessern](assistenten-verbessern.md) — Modell, Schulinhalt, Schlagwörter und Bausteine, Zug-Auslöser
 - [Embedding-Modell wechseln](../runbooks/modellwechsel.md) — Runbook: Schema angleichen + Re-Embedding
+- [Leitlinien der Schule](leitlinien.md) — Eigene Rahmenwerke (SDGs, Weltethos) anlegen, Kürzel, wo sie erscheinen
 - [Bildungsplan-Import](bildungsplan-import.md) — Fachkontext in das Docker-Produktivsystem importieren
 - [Schuljahreswechsel](../runbooks/schuljahreswechsel.md) — Runbook: `school_year.yaml`, Unterrichtswochen prüfen, Budget-Rücksetzung
 - [Curricula übertragen](../runbooks/curriculum-transfer.md) — Runbook: Schulcurricula exportieren und in promptLab/Dev einspielen

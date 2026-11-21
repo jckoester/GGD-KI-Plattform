@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 _LP_TOKEN   = re.compile(r'@\[([^\]]*)\]\(lp:([0-9a-f-]{36})\)')
 _LPA_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lpa:([0-9a-f-]{36})\)')
+# Leitlinien der Schule (0.50, AT): Behälter und Aspekt, portabel über ihr Kürzel.
+_LB_TOKEN   = re.compile(r'@\[([^\]]*)\]\(lb:([0-9a-f-]{36})\)')
+_LBA_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lba:([0-9a-f-]{36})\)')
 _IK_TOKEN   = re.compile(r'#\[([^\]]*)\]\(ik:([0-9a-f-]{36})\)')
 _NODE_TOKEN = re.compile(r'@\[([^\]]*)\]\(node:([0-9a-f-]{36})\)')
 
@@ -44,6 +47,8 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
 
     lp:<uuid>  → lp:<code>
     lpa:<uuid> → lpa:<bp_id>
+    lb:<uuid>  → lb:<kuerzel>   (Leitlinie der Schule, 0.50)
+    lba:<uuid> → lba:<kuerzel>  (ihr Aspekt)
     ik:<uuid>  → ik:<fach_code>:<nr>
     node:<uuid> bleibt unverändert (Material, nicht portabel).
     """
@@ -73,6 +78,19 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
         if meta and meta.get("bp_id"):
             return f"@[{label}](lpa:{meta['bp_id']})"
         logger.warning("LPA-Knoten %s hat kein 'bp_id'-Feld – Token bleibt als UUID", uid)
+        return m.group(0)
+
+    async def replace_lb(m: re.Match, art: str) -> str:
+        # Das Kürzel ist Pflicht (AT F8); fehlt der Knoten, bleibt die UUID — wie bei LP.
+        label, uid = m.group(1), m.group(2)
+        try:
+            node = await db.get(ContextNode, UUID(uid))
+        except ValueError:
+            node = None
+        kuerzel = (node.metadata_ or {}).get("kuerzel") if node and node.status != "deleted" else None
+        if kuerzel:
+            return f"@[{label}]({art}:{kuerzel})"
+        logger.warning("Leitlinien-Knoten %s ohne Kürzel – Token bleibt als UUID", uid)
         return m.group(0)
 
     async def replace_ik(m: re.Match) -> str:
@@ -108,7 +126,7 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
     last = 0
     # Alle Matches aller Patterns sammeln und nach Position sortieren
     all_matches = []
-    for pattern in (_LP_TOKEN, _LPA_TOKEN, _IK_TOKEN):
+    for pattern in (_LP_TOKEN, _LPA_TOKEN, _LB_TOKEN, _LBA_TOKEN, _IK_TOKEN):
         for m in pattern.finditer(text):
             all_matches.append(m)
     all_matches.sort(key=lambda m: m.start())
@@ -119,6 +137,10 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
             result_parts.append(await replace_lp(m))
         elif m.re is _LPA_TOKEN:
             result_parts.append(await replace_lpa(m))
+        elif m.re is _LB_TOKEN:
+            result_parts.append(await replace_lb(m, "lb"))
+        elif m.re is _LBA_TOKEN:
+            result_parts.append(await replace_lb(m, "lba"))
         elif m.re is _IK_TOKEN:
             result_parts.append(await replace_ik(m))
         last = m.end()
@@ -272,7 +294,8 @@ def _parse_hinweise_for_pdf(text: str) -> list[dict]:
     parts = []
     last = 0
     all_matches = []
-    for pattern, kind in [(_LP_TOKEN, "lp"), (_LPA_TOKEN, "lpa"), (_IK_TOKEN, "ik")]:
+    for pattern, kind in [(_LP_TOKEN, "lp"), (_LPA_TOKEN, "lpa"), (_LB_TOKEN, "lb"),
+                          (_LBA_TOKEN, "lba"), (_IK_TOKEN, "ik")]:
         for m in pattern.finditer(text):
             all_matches.append((m, kind))
     all_matches.sort(key=lambda x: x[0].start())
@@ -490,7 +513,7 @@ def _formel_inlines(bloecke: list[dict], roh: str) -> list[dict]:
 
 def _hinweise_bloecke(hinweise: str, material: str, formeln: dict | None = None) -> list[dict]:
     """Hinweise und Material als Klartext wie im PDF: Verweise mit ihrer Beschriftung —
-    Leitperspektive und Kompetenz fett, LP-Aspekt kursiv, Material fett. Kein Markdown —
+    Leitperspektive, Leitlinie und Kompetenz fett, Aspekte kursiv, Material fett. Kein Markdown —
     außer in Textstücken mit Formel (`formeln`: Text → Inlines, 0.44): Die gehen durch Pandoc,
     damit die Formel als Formel ankommt statt als TeX."""
     from app.export import office as o
@@ -501,7 +524,7 @@ def _hinweise_bloecke(hinweise: str, material: str, formeln: dict | None = None)
     for teil in _parse_hinweise_for_pdf(hinweise):
         if teil["kind"] == "text":
             teile += formeln.get(teil["text"]) or o.text(teil["text"])
-        elif teil["kind"] == "lpa":
+        elif teil["kind"] in ("lpa", "lba"):
             teile.append({"t": "Emph", "c": o.text(teil["label"])})
         else:
             teile.append(o.fett(o.text(teil["label"])))

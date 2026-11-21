@@ -32,6 +32,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context.curriculum_abdeckung import (
     FEHLT, PARTIELL, _sortschluessel, _text, abdeckung, bereich_von, kompetenzen_des_bands,
 )
+from app.context.leitlinien import (
+    Verweisziele,
+    kuerzel_der_tokens,
+    leitlinien_tokens,
+    leitperspektiven_tokens,
+    tokens_trennen,
+    tokens_zusammen,
+    verweisziele,
+)
 from app.context.curriculum_begriffe import begriffe_aufloesen, eintrag_felder, namen_normalisieren
 from app.context.curriculum_entwurf import ENTWURF
 from app.context.curriculum_rahmen import (
@@ -86,7 +95,8 @@ def _fassungen(kandidaten: list[dict]) -> list[str]:
             for k in kandidaten]
 
 
-def _eintrag_kompakt(e: dict, i: int, zustand: dict, kandidaten: dict | None = None) -> dict:
+def _eintrag_kompakt(e: dict, i: int, zustand: dict, kandidaten: dict | None = None,
+                     ziele: Verweisziele | None = None) -> dict:
     ik = [r for r in (e.get("ik") or []) if isinstance(r, (dict, str))]
     aus: dict[str, Any] = {"eintrag": i}
     if voll := [n for r in ik if not (isinstance(r, dict) and r.get("partiell")) and (n := _nr(r, "nr"))]:
@@ -98,6 +108,18 @@ def _eintrag_kompakt(e: dict, i: int, zustand: dict, kandidaten: dict | None = N
     for f in ("konkretisierung", "hinweise", "material"):
         if e.get(f):
             aus[f] = e[f]
+    # Leitlinien und Leitperspektiven (0.50, AT): als Kürzel, nicht als Token im Text.
+    if ziele is not None and e.get("hinweise"):
+        text, lb, lp = tokens_trennen(e["hinweise"])
+        if lb or lp:
+            if text:
+                aus["hinweise"] = text
+            else:
+                aus.pop("hinweise", None)
+            if lb:
+                aus["leitlinien"] = kuerzel_der_tokens(lb, ziele)
+            if lp:
+                aus["leitperspektiven"] = kuerzel_der_tokens(lp, ziele)
     if b := namen_normalisieren(e.get("begriffe")):
         aus["begriffe"] = []
         for x in b:
@@ -119,6 +141,7 @@ def _verplant(tree: dict) -> int:
 
 async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
     tree = await load_curriculum_tree(db, cur.id)
+    ziele = await verweisziele(db)
     aufl = await begriffe_aufloesen(db, tree, user)
     zustand = {(a["name"], a.get("fassung")): a["zustand"] for a in aufl}
     kandidaten = {(a["name"], a.get("fassung")): a["kandidaten"] for a in aufl if a.get("kandidaten")}
@@ -130,7 +153,7 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
             lm = ls.get("metadata") or {}
             lss.append({"id": str(ls["id"]), "position": l_pos, "titel": ls.get("title") or "",
                         "std": als_stundenzahl(lm.get("std")),
-                        "eintraege": [_eintrag_kompakt(e, i, zustand, kandidaten)
+                        "eintraege": [_eintrag_kompakt(e, i, zustand, kandidaten, ziele)
                                       for i, e in enumerate(lm.get("eintraege") or [], 1) if isinstance(e, dict)]})
         km = k.get("metadata") or {}
         kapitel.append({"id": str(k["id"]), "position": k_pos, "titel": k.get("title") or "",
@@ -144,7 +167,31 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
         "jahrgangsstufe": meta.get("jahrgangsstufe"),
         "bp_version": meta.get("bp_version"), "rahmen": meta.get("rahmen") or {},
         "verplant": _verplant(tree), "kapitel": kapitel,
+        # Worauf Einträge verweisen können (0.50, AT): Kürzel für `leitperspektiven` und
+        # `leitlinien` der Operationen. Leitlinien nur, wenn die Schule welche hat.
+        # Nur die Köpfe; ihre Aspekte („BNE_03“) holt das Modell mit get_bp_competences, typ='lp'.
+        "leitperspektiven": [{"kuerzel": e["kuerzel"], "titel": e["titel"], "aspekte": len(e["aspekte"])}
+                             for e in ziele.lp_liste],
+        **({"leitlinien_der_schule": [
+            {"kuerzel": l.kuerzel, "titel": l.titel,
+             "aspekte": [{"kuerzel": a.kuerzel, "titel": a.titel} for a in l.aspekte]}
+            for l in ziele.liste]} if ziele.liste else {}),
     }
+
+
+async def leitperspektiven_lesen(db: AsyncSession, bereich: str | None) -> dict:
+    """Leitperspektiven mit ihren Aspekten (0.50, AT) — Kürzel für das Feld `leitperspektiven`.
+
+    Mit `bereich` (Kürzel oder Teil des Titels) nur die passenden; sonst alle.
+    """
+    ziele = await verweisziele(db)
+    liste = ziele.lp_liste
+    if b := (bereich or "").strip():
+        if b.lower() != "alle":
+            liste = [e for e in liste if e["kuerzel"] == b.upper() or b.casefold() in e["titel"].casefold()]
+    return {"leitperspektiven": liste,
+            "hinweis": "Im Eintrag als Kürzel in leitperspektiven: die Leitperspektive (BNE) oder, "
+                       "meist treffender, ein Aspekt (BNE_03)."}
 
 
 def _bereich_von_bis(nrs: list[str]) -> str:
@@ -221,6 +268,11 @@ async def abdeckung_kompakt(db: AsyncSession, cur: ContextNode) -> dict:
         **({"ausserhalb_des_bands": [k["nr"] for k in a["ausserhalb"]]} if a["ausserhalb"] else {}),
         **({"fremdes_fach": len(a["fremdes_fach"])} if a["fremdes_fach"] else {}),
         **({"hinweis": a["hinweis"]} if a["hinweis"] else {}),
+        # Leitlinien der Schule (0.50, AT): je Leitlinie, welche Aspekte vorkommen und welche nicht.
+        **({"leitlinien": [
+            {"kuerzel": l["kuerzel"], "aspekte_gesamt": len(l["aspekte"]), "vorkommend": l["vorkommend"],
+             "nicht_vorkommend": [x["kuerzel"] for x in l["aspekte"] if not x["lernsequenzen"]]}
+            for l in a["leitlinien"]]} if a["leitlinien"] else {}),
     }
 
 
@@ -297,7 +349,9 @@ def _std(wert) -> int | None:
 
 
 class _Plan:
-    def __init__(self, tree: dict, iks: list[ContextNode], pks: list[ContextNode]):
+    def __init__(self, tree: dict, iks: list[ContextNode], pks: list[ContextNode],
+                 ziele: Verweisziele | None = None):
+        self.ziele = ziele
         self.kapitel = [
             _Kap(id=UUID(str(k["id"])), titel=k.get("title") or "", meta=dict(k.get("metadata") or {}),
                  lss=[_Ls(id=UUID(str(ls["id"])), titel=ls.get("title") or "", meta=dict(ls.get("metadata") or {}))
@@ -370,6 +424,19 @@ class _Plan:
                 if op[f] is not None and not isinstance(op[f], str):
                     raise _Fehler(f"{f} muss Text sein")
                 e[f] = op[f] or ""
+        if self.ziele is not None and any(f in op for f in ("hinweise", "leitlinien", "leitperspektiven")):
+            # Genannte Felder ersetzen, andere bleiben: Wer nur `hinweise` schreibt, behält die
+            # Verweise; wer `leitlinien` schreibt, ersetzt nur diese (0.50, AT).
+            _, alt_lb, alt_lp = tokens_trennen((alt or {}).get("hinweise"))
+            text, im_text_lb, im_text_lp = tokens_trennen(e.get("hinweise"))
+            try:
+                lb = (leitlinien_tokens(op["leitlinien"], self.ziele) if "leitlinien" in op
+                      else alt_lb + [t for t in im_text_lb if t not in alt_lb])
+                lp = (leitperspektiven_tokens(op["leitperspektiven"], self.ziele) if "leitperspektiven" in op
+                      else alt_lp + [t for t in im_text_lp if t not in alt_lp])
+            except ValueError as fehler:
+                raise _Fehler(str(fehler))
+            e["hinweise"] = tokens_zusammen(text, lp + lb)
         if "begriffe" in op or "fachmethoden" in op:
             felder = eintrag_felder(op.get("begriffe", e.get("begriffe")), op.get("fachmethoden", e.get("fachmethoden")))
             e = {k: v for k, v in e.items() if k not in ("begriffe", "fachmethoden")} | felder
@@ -478,7 +545,8 @@ class _Plan:
 
 # ── Schreiben: Kanten wie im Editor ──────────────────────────────────────────
 
-_HINWEIS_TOKEN = re.compile(r"(?:@\[[^\]]*\]\((?:lpa|lp)|#\[[^\]]*\]\(ik):([0-9a-f-]{36})\)")
+# Leitperspektiven (`lp`/`lpa`), Leitlinien der Schule (`lb`/`lba`, 0.50) und fremde IK.
+_HINWEIS_TOKEN = re.compile(r"(?:@\[[^\]]*\]\((?:lpa|lp|lba|lb)|#\[[^\]]*\]\(ik):([0-9a-f-]{36})\)")
 _MATERIAL_TOKEN = re.compile(r"@\[[^\]]*\]\(node:([0-9a-f-]{36})\)")
 
 
@@ -536,7 +604,7 @@ async def _planen(db: AsyncSession, cur: ContextNode, ops) -> _Plan | list[str]:
         return ["operations ist leer"]
     tree = await load_curriculum_tree(db, cur.id)
     iks, pks = await kompetenzen_des_bands(db, cur)
-    plan = _Plan(tree, iks, pks)
+    plan = _Plan(tree, iks, pks, await verweisziele(db))
     fehler = []
     for i, op in enumerate(ops, 1):
         if not isinstance(op, dict):

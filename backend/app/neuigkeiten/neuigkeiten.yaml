@@ -493,3 +493,17 @@
     Gruppe, auch ohne Unterrichtseinheit. Ausfälle werden übersprungen; hat ein Termin noch keinen
     Entwurf, legt ein Klick auf „＋“ ihn an.
   link: /help/unterrichtsplanung#von-stunde-zu-stunde
+
+- id: "0.50-leitlinien"
+  version: "0.50.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-20
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Leitlinien der Schule im Curriculum"
+  text: >-
+    Die Schule kann eigene Leitlinien hinterlegen, etwa die Nachhaltigkeitsziele oder das
+    Weltethos. Im Curriculum verweist du mit @ im Feld Hinweise auf sie, so wie auf eine
+    Leitperspektive. Die Abdeckung zeigt, welche Aspekte vorkommen, und der Curriculum-Assistent
+    schlägt passende vor.
+  link: /help/curriculum#hinweise-leitperspektiven-und-leitlinien

@@ -8,6 +8,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import LfdbTree from '$lib/components/LfdbTree.svelte'
+    import LeitlinienAbschnitt from '$lib/components/LeitlinienAbschnitt.svelte'
     import { TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
     import PageBody from '$lib/components/PageBody.svelte'
 
@@ -35,6 +36,8 @@
                 content_type: [
                     'leitperspektive', 'leitperspektive_aspekt',
                     'lfdb_baustein', 'lfdb_themenblock', 'lfdb_kompetenz',
+                    // Leitlinien der Schule (0.50, AT)
+                    'leitbild', 'leitbild_aspekt',
                 ]
             })
             // getContextNodes liefert ein Array (response_model=list[...]),
@@ -197,5 +200,14 @@
                     </div>
                 {/each}
             </div>
+        {/if}
+
+        {#if !loading && !error}
+            <LeitlinienAbschnitt
+                nodes={nodes.filter((n) => n.content_type === 'leitbild' || n.content_type === 'leitbild_aspekt')}
+                istAdmin={userHasAnyRole($user, ['admin'])}
+                {nodeHref}
+                zurueck={$page.url.pathname}
+            />
         {/if}
 </PageBody>

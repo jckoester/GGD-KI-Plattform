@@ -23,6 +23,10 @@ export function uebersichtZeilen(u) {
   if (u.veraltet) zeilen.push({ text: `${u.veraltet} als veraltet markierte Kompetenzen`, warnung: true })
   if (u.begriffe_fehlend) zeilen.push({ text: `${u.begriffe_fehlend} Begriffe fehlen in der Bibliothek`, warnung: true })
   if (u.begriffe_mehrdeutig) zeilen.push({ text: `${u.begriffe_mehrdeutig} Begriffe ohne gewählte Fassung`, warnung: true })
+  // Leitlinien der Schule (0.50, AT): nur zur Information — keine Leitlinie ist Pflicht.
+  for (const l of u.leitlinien ?? []) {
+    zeilen.push({ text: `${l.titel}: ${l.vorkommend} von ${l.aspekte} Aspekten kommen vor`, warnung: false })
+  }
   if (u.vorgaenger) {
     zeilen.push({
       text: `Ersetzt „${u.vorgaenger.title}“ — es wird archiviert. ${u.einheiten_umgehaengt} Einheiten dieses Schuljahrs wandern auf die neuen Kapitel.`,

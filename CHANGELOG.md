@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Leitlinien der Schule: eigene Rahmenwerke (etwa SDGs, Weltethos) mit Aspekten, gepflegt von Admins im Abschnitt
+  „Leitlinien der Schule“ unter Bibliothek → Leitperspektiven. Kürzel sind Pflicht und eindeutig.
+- Curriculum: Verweise auf Leitlinien und ihre Aspekte im Feld Hinweise (Auswahl nach `@`), in eigener Farbe; im
+  Export als Kürzel. Die Abdeckung und die Übersicht vor dem Veröffentlichen zeigen, welche Aspekte vorkommen.
+- Curriculum-Assistent: liest Leitlinien und Leitperspektiven samt ihren Aspekten und trägt sie über Kürzel ein
+  (etwa `BNE_03`); fragt zu Beginn, ob das Curriculum Leitlinien berücksichtigen soll.
+- Schüler:innen finden die Aspekte unter „Nachschlagen“; der Chat bezieht sie ein, wenn eine Frage passt.
+
 ### Geändert
 
 - Antworten an Lehrkräfte enden nicht mehr mit Verständnis- oder Quizfragen; Rückfragen nur, wenn
@@ -18,6 +28,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Nach dem Update
 
 - `config/pedagogy.yaml` auf Prod übernehmen (Punkt 6 in `teacher_extension`), Backend neu starten.
+- Backend und Frontend neu bauen und starten. Keine Migration.
+- Prompt des Assistenten „Curriculum-Entwurf“ im Editor durch `config/prompts/curriculum_assistent.md` ersetzen (der
+  Seed ändert vorhandene Assistenten nicht).
 
 ## [0.49.0] – 2026-11-19
 

@@ -960,7 +960,7 @@ async def identifikation(
     anderen Aufrufer bleibt sie aus, damit der Prüfsatz vergleichbar bleibt.
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
-    verglichen, nicht eingebettet — und 14 der 42 Knotentypen tragen laut
+    verglichen, nicht eingebettet — und 15 der 44 Knotentypen tragen laut
     ``taxonomy.yaml`` bewusst kein Embedding (Fachpläne, Curricula, Methoden,
     Leitperspektiven …). Bliebe der Filter hier stehen, wären diese Knoten unter ihrem
     eigenen Namen unauffindbar, während die Aufzählung sie zählt: zwei Grundmengen in

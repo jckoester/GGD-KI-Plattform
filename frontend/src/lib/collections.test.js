@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  sammlungsAdresse,
   alleSammlungen,
   fachSammlungen,
   schuelerSammlungen,
@@ -19,11 +20,14 @@ import {
 } from "./collections.js"
 
 describe("alleSammlungen", () => {
-  it("liefert die sechs Sammlungen mit Label und Beschreibungssatz", () => {
+  it("liefert die acht Sammlungen mit Label und Beschreibungssatz", () => {
     const typen = alleSammlungen().map((s) => s.typ)
     expect(typen).toEqual([
       "methodenblatt",
       "operatorenblatt",
+      // Leitlinien der Schule (0.50, AT): Behälter und Aspekt.
+      "leitbild",
+      "leitbild_aspekt",
       "methode",
       "sozialform",
       "begriff",
@@ -311,6 +315,8 @@ describe("schuelerSammlungen", () => {
     expect(schuelerSammlungen().map((s) => s.typ)).toEqual([
       "methodenblatt",
       "operatorenblatt",
+      // Die Aspekte der Leitlinien der Schule (0.50, AT F6): Schüler:innen lesen sie auch.
+      "leitbild_aspekt",
       "begriff",
       // „Was ist das für ein Stoff?" ist eine Schülerfrage — dieselbe Art wie der
       // Fachbegriff.
@@ -327,11 +333,15 @@ describe("schuelerSammlungen", () => {
     expect(typen).not.toContain("sozialform")
   })
 
-  it("ist eine Teilmenge der fachgebundenen Sammlungen", () => {
+  it("ist eine Teilmenge der fachgebundenen Sammlungen — bis auf die Leitlinien", () => {
     // Der Abschnitt „Nachschlagen" filtert aufs Fach der Gruppe — eine Sammlung
     // ohne Fachfilter stünde dort ungefiltert und wäre eine andere Ansicht.
+    // **Gewollte Ausnahme** (0.50, AT F4): Leitlinien der Schule gelten für alle Fächer;
+    // sie stehen ungefiltert dort, `sammlungsAdresse` lässt das Fach weg.
+    const AUSNAHMEN = ["leitbild_aspekt"]
     const fach = fachSammlungen().map((s) => s.typ)
     for (const s of schuelerSammlungen()) {
+      if (AUSNAHMEN.includes(s.typ)) continue
       expect(fach, s.typ).toContain(s.typ)
     }
   })
@@ -406,5 +416,22 @@ describe("istStub", () => {
     expect(istStub({ metadata: {}, content: "" })).toBe(false)
     expect(istStub({})).toBe(false)
     expect(istStub(null)).toBe(false)
+  })
+})
+
+describe("sammlungsAdresse", () => {
+  it("fachgebundene Sammlung: mit Fach", () => {
+    expect(sammlungsAdresse("methodenblatt", 7)).toBe("/knowledge/collections/methodenblatt?subject_id=7")
+  })
+  it("fachunabhängige Sammlung (Leitlinien, 0.50): ohne Fach, sonst bliebe die Liste leer", () => {
+    expect(sammlungsAdresse("leitbild_aspekt", 7)).toBe("/knowledge/collections/leitbild_aspekt")
+  })
+})
+
+describe("Leitlinien der Schule (0.50)", () => {
+  it("Aspekte bekommen einen Einstieg für Schüler:innen, die Leitlinie selbst nicht", () => {
+    const typen = schuelerSammlungen().map((s) => s.typ)
+    expect(typen).toContain("leitbild_aspekt")
+    expect(typen).not.toContain("leitbild")
   })
 })

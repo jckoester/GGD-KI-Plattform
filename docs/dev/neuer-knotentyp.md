@@ -168,7 +168,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 09/2026: 28 von 42 Typen mit Embedding.
+`taxonomy.yaml`. Stand 11/2026: 29 von 44 Typen mit Embedding.
 
 ### 5. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -358,7 +358,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 ### 14. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
-  deckt heute alle 42 Typen ab, das soll so bleiben). Bei importierten
+  deckt heute alle 44 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien Liste `/knowledge/all` auf.
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
@@ -493,6 +493,11 @@ flowchart LR
     lfdbk["lfdb_kompetenz ◆"]:::emb
   end
 
+  subgraph LL["Leitlinien der Schule (school, 0.50)"]
+    lb[leitbild]:::plain
+    lba["leitbild_aspekt ◆"]:::emb
+  end
+
   subgraph CURR["Schulcurriculum (subject/school)"]
     curriculum[curriculum]:::plain
     kapitel["kapitel ◆"]:::emb
@@ -547,6 +552,11 @@ flowchart LR
   lernsequenz -->|part_of| kapitel
   lernsequenz -->|references| ik
   lernsequenz -->|develops| pk
+  %% Verweise in den Hinweisen (Editor, Assistent, Import): Leitperspektiven und Leitlinien
+  lernsequenz -->|references| lp
+  lernsequenz -->|references| lpa
+  lernsequenz -->|references| lb
+  lernsequenz -->|references| lba
 
   %% Unterrichtsplanung (planning/service.py, router.py, assistant_tools.py)
   ue -->|part_of| jahresplan
@@ -593,6 +603,8 @@ flowchart LR
   `sozialform`, `pruefungsanforderung` ◆. Wer einem von ihnen Kanten gibt, trägt ihn in
   den Graphen ein. (Drei davon tragen ein Embedding — auffindbar sind sie also, nur nicht
   verknüpft.)
+- **Aspekt ↔ Leitlinie** (`leitbild_aspekt` → `leitbild`) ist **keine Kante**, sondern das
+  Kürzel in `metadata.leitlinie` (0.50). Begründung in `app/context/leitlinien.py`.
 - **`supersedes`** verbindet Fassungen **desselben** Typs (Bildungsplan-Editionen) und ist
   deshalb keine Typ-zu-Typ-Kante.
 - **`requires`** (kuratierte didaktische Voraussetzung, Kompetenz → Kompetenz) hat laut
