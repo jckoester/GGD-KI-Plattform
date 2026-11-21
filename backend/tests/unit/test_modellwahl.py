@@ -104,3 +104,58 @@ async def test_nicht_freigegeben_und_ohne_funktionen_fuer_planung():
 async def test_freigaben_unbekannt_sperren_nicht():
     # Proxy nicht erreichbar: wie überall nicht sperren.
     assert await _pruefe(BEVORZUGT_FREI, "ant-opus", _u("teacher"), erlaubt=None) == "ant-opus"
+
+
+# ── Schritt 12: Vorliebe beim Anlegen, alle Zweige ───────────────────────────
+
+from types import SimpleNamespace
+
+from app.chat.modellwahl import vorliebe_anwenden
+
+
+async def _anwenden(user, assistant=None, vorlieben=None, erlaubt=frozenset({"chat-schnell", "chat-komplex", "ant-sonnet"}),
+                    funktionsaufrufe=None, plant=False, vorgabe="chat-standard"):
+    with patch("app.preferences.service.bevorzugte_modelle", AsyncMock(return_value=vorlieben or {})), \
+         patch("app.litellm.team_models.erlaubte_modelle_fuer",
+               AsyncMock(return_value=None if erlaubt is None else set(erlaubt))), \
+         patch("app.assistants.sichtbarkeit.plant", lambda a: plant):
+        return await vorliebe_anwenden(None, user, assistant, vorgabe, funktionsaufrufe or {})
+
+
+ASSI = SimpleNamespace(id=7)
+
+
+@pytest.mark.asyncio
+async def test_vorliebe_nicht_mehr_freigeschaltet_faellt_zurueck_mit_hinweis():
+    modell, hinweis = await _anwenden(_u("teacher"), vorlieben={"modell_frei": "ant-opus"})
+    assert modell == "chat-standard"
+    assert "nicht mehr freigeschaltet" in hinweis and "chat-standard" in hinweis
+
+
+@pytest.mark.asyncio
+async def test_freier_chat_braucht_keine_funktionen():
+    # ⚙ gilt nur bei Assistenten — im freien Chat zählt die Vorliebe auch ohne Funktionen.
+    modell, hinweis = await _anwenden(_u("teacher"), vorlieben={"modell_frei": "chat-schnell"},
+                                      funktionsaufrufe={"chat-schnell": False})
+    assert (modell, hinweis) == ("chat-schnell", None)
+
+
+@pytest.mark.asyncio
+async def test_planung_nimmt_modell_planung_nicht_modell_frei():
+    vorlieben = {"modell_frei": "chat-schnell", "modell_planung": "ant-sonnet"}
+    assert await _anwenden(_u("teacher"), ASSI, vorlieben, plant=True, vorgabe="chat-komplex") == ("ant-sonnet", None)
+    # Planungs-Assistent ohne eigene Planungs-Vorliebe: kein Rückgriff auf die für freie Chats.
+    assert await _anwenden(_u("teacher"), ASSI, {"modell_frei": "chat-schnell"}, plant=True,
+                           vorgabe="chat-komplex") == ("chat-komplex", None)
+
+
+@pytest.mark.asyncio
+async def test_vorliebe_gleich_vorgabe_ohne_hinweis_und_unbekannte_freigabe_sperrt_nicht():
+    assert await _anwenden(_u("teacher"), vorlieben={"modell_frei": "chat-standard"}, erlaubt=set()) == ("chat-standard", None)
+    assert await _anwenden(_u("teacher"), vorlieben={"modell_frei": "ant-opus"}, erlaubt=None) == ("ant-opus", None)
+
+
+@pytest.mark.asyncio
+async def test_schuelerin_und_admin_bei_vorliebe():
+    assert await _anwenden(_u("student"), vorlieben={"modell_frei": "chat-schnell"}) == ("chat-standard", None)
+    assert await _anwenden(_u("teacher", "admin"), vorlieben={"modell_frei": "chat-schnell"}) == ("chat-schnell", None)
