@@ -32,7 +32,7 @@ from app.chat.tools import (
     tools_for,
 )
 from app.chat.image_moderation import image_prompt_block_reason
-from app.chat.modellwahl import wahl_im_assistenten
+from app.chat.modellwahl import braucht_funktionen_text, fehlen_funktionen, wahl_im_assistenten
 from app.litellm.team_models import erlaubte_modelle_fuer
 from app.litellm.deployments import anbietermodell
 from app.chat.image_models import (
@@ -2222,6 +2222,14 @@ async def chat(
     if _erlaubte_modelle is not None and model_used not in _erlaubte_modelle:
         await client.aclose()
         raise HTTPException(status_code=403, detail=modell_gesperrt_text(current_user, active_assistant))
+
+    # Assistent mit Fähigkeiten braucht ⚙ (0.51, AV F3) — vor Krisenerkennung und Suche, damit
+    # eine Ablehnung nichts angestoßen hat; die geflushte Konversation rollt mit zurück.
+    if active_assistant is not None and fehlen_funktionen(
+        active_assistant, model_used, modell_des_assistenten(active_assistant), await _get_model_info()
+    ):
+        await client.aclose()
+        raise HTTPException(status_code=403, detail=braucht_funktionen_text(model_used))
 
     # Letzte Nachricht bearbeiten (0.19): Welche Zeilen die neue ersetzt, steht **vor** der
     # Krisen-Erkennung fest — die schreibt die neue Nachricht womöglich schon, und dann wäre

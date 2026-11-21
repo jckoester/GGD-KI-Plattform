@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Im Chat mit einem Assistenten gilt für Schüler:innen und in der Vorschau immer das Modell des Assistenten,
   auch wenn eine Anfrage ein anderes mitschickt.
+- Ein Assistent mit Fähigkeiten lässt sich nur mit einem Modell nutzen, das Funktionen aufrufen kann (⚙); ein
+  anderes gewähltes Modell wird mit einem Hinweis abgewiesen, statt still ohne Funktionen zu laufen.
 
 ## [0.50.0] – 2026-11-21
 

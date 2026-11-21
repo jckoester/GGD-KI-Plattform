@@ -32,3 +32,24 @@ def wahl_im_assistenten(model_id: str | None, user: JwtPayload, assistant_id=Non
     logger.info("Modellwahl im Assistenten-Chat verworfen (keine Lehrkraft) assistant_id=%s model_id=%s",
                 assistant_id, model_id)
     return None
+
+
+def braucht_funktionen_text(modell: str) -> str:
+    return (f"Dieser Assistent braucht ein Modell mit Funktionen (⚙). „{modell}“ kann keine "
+            "Funktionen aufrufen — wähle ein Modell mit ⚙.")
+
+
+def fehlen_funktionen(assistant, modell: str, des_assistenten: str, funktionsaufrufe: dict) -> bool:
+    """Hat jemand für einen Assistenten mit Fähigkeiten ein Modell gewählt, das keine Funktionen kann?
+
+    (AV F3.) Bis 0.51 schickte der Chat die Funktionen dann einfach nicht mit: Ein Planungs-
+    oder Curriculum-Assistent lief ohne Lesen und Schreiben, ohne Hinweis.
+
+    - Nur ein **gewähltes** Modell zählt. Läuft der Assistent mit seinem eigenen Modell, bleibt
+      es beim bisherigen Verhalten — sonst bräche ein so eingerichteter Assistent für alle,
+      auch für Schüler:innen, die nichts wählen können.
+    - ``None`` (unbekannt) sperrt nicht, wie überall bei den Modell-Eigenschaften.
+    """
+    if assistant is None or not (assistant.tool_groups or []) or modell == des_assistenten:
+        return False
+    return funktionsaufrufe.get(modell) is False

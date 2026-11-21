@@ -2,7 +2,9 @@
 import logging
 
 from app.auth.jwt import JwtPayload
-from app.chat.modellwahl import darf_im_assistenten_waehlen, wahl_im_assistenten
+from types import SimpleNamespace
+
+from app.chat.modellwahl import darf_im_assistenten_waehlen, fehlen_funktionen, wahl_im_assistenten
 
 
 def _u(*rollen):
@@ -30,3 +32,22 @@ def test_ohne_wahl_nichts_zu_verwerfen(caplog):
 
 def test_lehrkraft_behaelt_ihre_wahl():
     assert wahl_im_assistenten("chat-komplex", _u("teacher")) == "chat-komplex"
+
+
+F = {"chat-komplex": True, "chat-schnell": False, "neu": None}
+PLANER = SimpleNamespace(tool_groups=["lesson_planning"])
+
+
+def test_gewaehltes_modell_ohne_funktionen_fehlt():
+    assert fehlen_funktionen(PLANER, "chat-schnell", "chat-komplex", F)
+
+
+def test_eigenes_modell_des_assistenten_bleibt_wie_bisher():
+    # Auch wenn es keine Funktionen kann: kein Bruch für Assistenten, die so eingerichtet sind.
+    assert not fehlen_funktionen(PLANER, "chat-schnell", "chat-schnell", F)
+
+
+def test_unbekannt_und_ohne_faehigkeiten_sperren_nicht():
+    assert not fehlen_funktionen(PLANER, "neu", "chat-komplex", F)
+    assert not fehlen_funktionen(SimpleNamespace(tool_groups=[]), "chat-schnell", "chat-komplex", F)
+    assert not fehlen_funktionen(None, "chat-schnell", "chat-komplex", F)

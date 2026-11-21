@@ -282,10 +282,16 @@ def seed_test_assistant(db_url, run_migrations):
         # Sequenz nachziehen: Der Seed setzt die ID explizit und laesst die
         # Sequenz sonst auf 1 stehen — ein spaeteres INSERT ohne ID kollidiert
         # dann mit genau diesem Datensatz.
-        cur.execute("""
-            SELECT setval(pg_get_serial_sequence('assistants', 'id'),
-                          (SELECT MAX(id) FROM assistants))
-        """)
+        # ⚠️ Nur vorwärts (0.51): `setval(MAX(id))` setzte die Folge zurück, wenn der
+        # Assistent mit der höchsten ID gelöscht worden war. Der nächste Lauf vergab dessen
+        # ID neu — und das Audit-Log (nur anhängen) trug zu ihr noch die Ereignisse des
+        # Vorgängers (`test_audit_ereignisse_verwaltung`, jeder zweite Lauf rot).
+        cur.execute("SELECT pg_get_serial_sequence('assistants', 'id')")
+        folge = cur.fetchone()[0]
+        cur.execute(f"""
+            SELECT setval(%s, GREATEST((SELECT MAX(id) FROM assistants),
+                                       (SELECT last_value FROM {folge})))
+        """, (folge,))
     conn.commit()
     conn.close()
     return 1

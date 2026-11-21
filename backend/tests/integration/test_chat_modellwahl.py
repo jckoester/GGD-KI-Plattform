@@ -17,7 +17,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.jwt import Vorschau
-from app.db.models import Conversation, Message
+from app.db.models import Assistant, Conversation, Message
 
 from .conftest import STUDENT_PSEUDO, TEACHER1_PSEUDO
 
@@ -132,3 +132,57 @@ async def test_schuelerin_wechselt_assistent_mit_modell(test_client, jwt_service
     kopf = _kopf(jwt_service, STUDENT_PSEUDO, ["student"], grade="8")
     assert await _modell(test_client, kopf, conversation_id=cid, assistant_id=ASSISTENT,
                          model_id=GEWAEHLT) == SEIN_MODELL
+
+
+# ── Schritt 2: Assistent mit Fähigkeiten braucht ⚙ (F3) ──────────────────────
+
+FAEHIGKEITEN = {"chat-komplex": True, "chat-schnell": False}
+
+
+@pytest_asyncio.fixture
+async def planender(fabrik):
+    async with fabrik() as db:
+        a = Assistant(name=f"Planer {uuid.uuid4().hex[:6]}", system_prompt="P", model="chat-komplex",
+                      status="active", audience="teacher", scope="teachers", creator_role="admin",
+                      created_by="admin", tool_groups=["lesson_planning"])
+        db.add(a)
+        await db.commit()
+        aid = a.id
+    yield aid
+    # Wieder weg: Ein aktiver Stundenassistent für Lehrkräfte gälte sonst in anderen Tests als
+    # schulweite Vorlage (`test_eigener_stundenassistent`).
+    async with fabrik() as db:
+        await db.execute(Conversation.__table__.delete().where(Conversation.assistant_id == aid))
+        await db.execute(Assistant.__table__.delete().where(Assistant.id == aid))
+        await db.commit()
+
+
+async def _antwort(client, kopf, **json):
+    """`POST /chat` bis nach den Modellprüfungen: Danach hält die Suche den Lauf an."""
+    async def anhalten(**_):
+        raise _Angehalten
+
+    with patch("app.chat.router._get_model_info", AsyncMock(return_value=FAEHIGKEITEN)), \
+         patch("app.chat.router.kontext_fuer_frage", AsyncMock(side_effect=anhalten)):
+        try:
+            return await client.post("/chat", headers=kopf, json={
+                "messages": [{"role": "user", "content": "Hallo"}], **json})
+        except _Angehalten:
+            return None
+
+
+async def test_modell_ohne_funktionen_wird_abgewiesen(test_client, jwt_service, planender):
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    antwort = await _antwort(test_client, kopf, assistant_id=planender, model_id="chat-schnell")
+    assert antwort is not None and antwort.status_code == 403
+    assert "⚙" in antwort.json()["detail"] and "chat-schnell" in antwort.json()["detail"]
+
+
+async def test_modell_mit_funktionen_kommt_durch(test_client, jwt_service, planender):
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    assert await _antwort(test_client, kopf, assistant_id=planender, model_id="chat-komplex") is None
+
+
+async def test_ohne_faehigkeiten_bleibt_jedes_modell_waehlbar(test_client, jwt_service):
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    assert await _antwort(test_client, kopf, assistant_id=ASSISTENT, model_id="chat-schnell") is None
