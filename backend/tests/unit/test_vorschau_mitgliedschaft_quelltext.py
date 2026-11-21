@@ -26,8 +26,13 @@ AUSNAHMEN = {
 def _treffer():
     for datei in APP.rglob("*.py"):
         rel = datei.relative_to(APP).as_posix()
-        for nr, zeile in enumerate(datei.read_text(encoding="utf-8").splitlines(), 1):
-            if "GroupMembership.pseudonym ==" in zeile and not zeile.lstrip().startswith("#"):
+        text = datei.read_text(encoding="utf-8")
+        # Auch unter einem anderen Namen: `GroupMembership as _GM` entging dem Wächter bis 0.50
+        # (Chat, „Lehrkraft der Gruppe“ — in der Vorschau gab es die Planungsfunktionen).
+        namen = {"GroupMembership", *re.findall(r"\bGroupMembership\s+as\s+(\w+)", text)}
+        muster = re.compile(r"\b(?:" + "|".join(map(re.escape, namen)) + r")\.pseudonym\s*==")
+        for nr, zeile in enumerate(text.splitlines(), 1):
+            if muster.search(zeile) and not zeile.lstrip().startswith("#"):
                 yield rel, nr
 
 

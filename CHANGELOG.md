@@ -22,6 +22,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- Vorschaumodus: Im Chat einer Unterrichtsgruppe galt die Lehrkraft weiter als Lehrkraft der Gruppe; die
+  Planungsfunktionen standen der Vorschau offen.
 - Bildungsplan-Import: Der Dry-Run setzt unveränderte, archivierte Knoten probeweise wieder aktiv wie
   der echte Lauf; „neue Edition noch nicht vorhanden“ erscheint nur noch, wenn die Fassung fehlt.
 

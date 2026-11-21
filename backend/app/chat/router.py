@@ -2433,18 +2433,14 @@ async def chat(
 
     # Tool-Calling: aktive Tools aus Registry ermitteln
     _capability_map = await _get_model_info()
+    # Über `mitglied()` (in `ist_gruppenlehrkraft`): In der Vorschau ist die Lehrkraft dort
+    # Schüler:in — die Planungsfunktionen der Gruppe gibt es dann nicht. Bis 0.50 fragte eine
+    # eigene Abfrage die echte Rolle ab und entging dem Wächter über einen Alias.
     _is_group_teacher = False
     if conversation_group_id is not None:
-        import sqlalchemy as sa
-        from app.db.models import GroupMembership as _GM
-        _mbr = await db.execute(
-            sa.select(_GM).where(
-                _GM.group_id == conversation_group_id,
-                _GM.pseudonym == current_user.sub,
-                _GM.role_in_group == "teacher",
-            )
-        )
-        _is_group_teacher = _mbr.scalar_one_or_none() is not None
+        from app.planning.permissions import ist_gruppenlehrkraft
+
+        _is_group_teacher = await ist_gruppenlehrkraft(conversation_group_id, current_user, db)
 
     # Modell-Freigaben (oben geholt, beim Durchsetzen): Das Werkzeug-Schema bietet nur
     # Bildarten an, deren Modell für diesen Jahrgang freigeschaltet ist.
