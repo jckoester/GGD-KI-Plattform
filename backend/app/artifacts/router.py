@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import re
 
 from app.artifacts import geogebra, im_chat, promote, store, uebernahme
 from app.assistants import produkte
@@ -36,8 +35,9 @@ _GGB_MIME = "application/vnd.geogebra.file"
 
 
 def _slug(title: str | None, fallback: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")[:60]
-    return slug or fallback
+    from app.core.dateiname import dateiname_slug
+
+    return dateiname_slug(title, fallback)
 
 
 def _ggb_filename(title: str | None) -> str:

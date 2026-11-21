@@ -106,10 +106,9 @@ class LessonExport:
 
 
 def _slugify(s: str) -> str:
-    s = s.lower().strip()
-    s = re.sub(r"[äöü]", lambda m: {"ä": "ae", "ö": "oe", "ü": "ue"}[m.group()], s)
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    return s.strip("-")[:60] or "stunde"
+    from app.core.dateiname import dateiname_slug
+
+    return dateiname_slug(s, "stunde")
 
 
 _YAML_HEIKEL = re.compile(r"[,:\[\]{}#&*!|>'\"%@`]|^\s|\s$|^-")

@@ -1039,7 +1039,7 @@
             )) {
                 if (item.type === "start") {
                     testConversationId = item.conversationId;
-                } else if (item.type === "title" || item.type === "cost") {
+                } else if (item.type === "title") {
                     // ignorieren
                 } else if (typeof item === "string") {
                     const last = testMessages.length - 1;

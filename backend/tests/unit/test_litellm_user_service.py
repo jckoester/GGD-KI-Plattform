@@ -7,9 +7,23 @@ from app.litellm.user_service import (_extract_current_team_ids,
                                         ensure_litellm_user)
 
 
+def _db(vorhandener_schluessel="sk-vorhanden"):
+    """Sitzung mit gespeichertem Virtual Key (oder ohne: ``None``).
+
+    ⚠️ Ein bloßes ``AsyncMock()`` machte auch ``scalar_one_or_none()`` zur Coroutine: Der
+    Schlüssel war nie ``None``; die Tests bestanden an diesem Zweig vorbei, und es blieben
+    „coroutine was never awaited“-Warnungen (Todo, Filter 1).
+    """
+    db = AsyncMock()
+    ergebnis = MagicMock()
+    ergebnis.scalar_one_or_none.return_value = vorhandener_schluessel
+    db.execute.return_value = ergebnis
+    return db
+
+
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_first_login_creates_user_no_update():
-    db = AsyncMock()
+    db = _db()
     client = AsyncMock()
     client.get_user.return_value = None
 
@@ -32,7 +46,7 @@ async def test_ensure_litellm_user_first_login_creates_user_no_update():
 
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_existing_user_no_change_no_update():
-    db = AsyncMock()
+    db = _db()
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-2"}
 
@@ -55,7 +69,7 @@ async def test_ensure_litellm_user_existing_user_no_change_no_update():
 
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_existing_user_grade_change_updates_budget():
-    db = AsyncMock()
+    db = _db()
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-3"}
 
@@ -77,7 +91,7 @@ async def test_ensure_litellm_user_existing_user_grade_change_updates_budget():
 
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_teacher_plus_admin_keeps_teacher_budget():
-    db = AsyncMock()
+    db = _db()
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-4"}
 
@@ -151,8 +165,9 @@ async def test_ensure_litellm_user_generates_key_when_none_in_db():
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_skips_key_generation_when_key_exists():
     """Key bereits in DB → generate_key wird nicht aufgerufen."""
-    db = AsyncMock()
-    db.execute.return_value.scalar_one_or_none = AsyncMock(return_value="sk-existing-key")
+    # Bis 0.50 eine AsyncMock-Methode: Sie lieferte eine Coroutine statt des Schlüssels —
+    # der Test bestand, weil eine Coroutine nicht `None` ist, nicht wegen des Schlüssels.
+    db = _db("sk-existing-key")
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-has-key"}
 
@@ -174,7 +189,7 @@ async def test_ensure_litellm_user_skips_key_generation_when_key_exists():
 
 @pytest.mark.asyncio
 async def test_ensure_litellm_user_api_error_is_logged_but_not_raised():
-    db = AsyncMock()
+    db = _db()
     client = AsyncMock()
     client.get_user.side_effect = RuntimeError("LiteLLM unreachable")
 

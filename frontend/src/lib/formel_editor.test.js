@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { einstellen, feldEinrichten, tottasteAbfangen } from './formel_editor.js'
+import { einstellen, feldEinrichten, tottasteAbfangen, TEXTE_DE } from './formel_editor.js'
 
 describe('einstellen — MathLive ohne Netz', () => {
     it('lädt keine Schriften und Klänge nach, setzt das deutsche Komma', () => {
@@ -10,6 +10,13 @@ describe('einstellen — MathLive ohne Netz', () => {
             fontsDirectory: null, soundsDirectory: null, keypressSound: null, plonkSound: null,
             decimalSeparator: ',', locale: 'de',
         })
+    })
+
+    it('überschreibt schiefe deutsche Texte von MathLive', () => {
+        const M = {}
+        einstellen(M)
+        expect(M.strings).toEqual({ de: TEXTE_DE })
+        expect(TEXTE_DE['keyboard.tooltip.alphabetic']).toBe('Buchstaben')
     })
 })
 

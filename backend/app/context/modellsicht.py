@@ -233,9 +233,12 @@ def fuer_modell(
     Modell sah aber nur deren Überschriften und meldete, es gebe nichts. Deshalb geht der
     Inhalt jetzt mit — gekürzt, nicht weggelassen.
 
-    Die interne ``node_id`` bleibt draußen: Sie nützt dem Modell nichts (kein Werkzeug
-    nimmt sie entgegen) und taucht sonst in Antworten auf. Ergebnisse anderer Werkzeuge
-    der Gruppe werden unverändert durchgereicht.
+    Die interne ``node_id`` bleibt draußen, sonst taucht sie in Antworten auf. ⚠️ Das hat
+    einen Preis: ``update_lesson_phases`` verlangt seit 0.15 für Kompetenzen in ``refs`` eine
+    Kennung — eine Kompetenz, die das Modell nur aus der Suche kennt, kann es deshalb
+    vorschlagen, aber nicht eintragen (Todo, Päckchen AD). Begriffe löst der Server über
+    den Titel auf (0.17). Ergebnisse anderer Werkzeuge der Gruppe werden unverändert
+    durchgereicht.
 
     ⚠️ **Hier fällt die Entscheidung, was das Modell sieht** (Paket 9, AP3). Die
     Suchschicht liefert seither die rohe Metadatenspalte mit (`mit_metadaten`); diese

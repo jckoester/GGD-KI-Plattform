@@ -630,3 +630,13 @@ async def test_office_tabelle_mit_linien_hochkant(fmt):
         assert "<w:tblBorders>" in xml and 'w:orient="landscape"' not in xml
     else:
         assert "0.5pt solid" in z.read("content.xml").decode()
+
+
+def test_slugify_eszett_und_werkstatt_gleich():
+    """Seit 0.50 eine Regel für Werkstatt und Stundenexport (`app/core/dateiname.py`)."""
+    from app.artifacts.router import _slug
+
+    assert _slugify("Straße der Säuren") == "strasse-der-saeuren"
+    assert _slug("Säure-Base-Titration", "dokument") == "saeure-base-titration"
+    assert _slug("", "dokument") == "dokument"
+    assert _slug("a" * 59 + " b", "x") == "a" * 59  # kein Bindestrich am Ende nach dem Kürzen

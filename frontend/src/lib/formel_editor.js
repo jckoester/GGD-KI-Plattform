@@ -26,7 +26,17 @@ export function einstellen(MathfieldElement) {
     MathfieldElement.plonkSound = null;
     MathfieldElement.decimalSeparator = ',';
     MathfieldElement.locale = 'de';
+    // Schiefe Übersetzungen von MathLive (0.111) überschreiben; der Setter mischt ein, statt zu
+    // ersetzen. „Zeile hinzufügen nach/vor“ (vertauscht) steht im Kontextmenü, das hier auf
+    // Ausschneiden/Kopieren/Einfügen/Alles markieren beschränkt ist — es erscheint nie.
+    MathfieldElement.strings = { de: TEXTE_DE };
 }
+
+/** Eigene deutsche Texte für MathLive. */
+export const TEXTE_DE = {
+    // Das Layout heißt so, weil es lateinische Buchstaben zeigt — nicht römische Zahlen.
+    'keyboard.tooltip.alphabetic': 'Buchstaben',
+};
 
 // Kontextmenü: nur, was man zum Schreiben braucht — keine Farben, Schriftarten, Matrizen.
 const MENUE = new Set(['cut', 'copy', 'paste', 'select-all']);

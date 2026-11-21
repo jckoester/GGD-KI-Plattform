@@ -22,6 +22,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- Erster Seitenaufruf lädt kein 6-MB-Paket mehr: Fach-Symbole werden einzeln nachgeladen.
+- Dateinamen beim Herunterladen aus der Werkstatt und beim Stundenexport schreiben Umlaute und ß aus
+  („saeure“ statt „s-ure“).
+- Formel-Editor: Die Bildschirmtastatur nennt das Buchstaben-Layout „Buchstaben“ statt „Römische Buchstaben“.
 - Vorschaumodus: Im Chat einer Unterrichtsgruppe galt die Lehrkraft weiter als Lehrkraft der Gruppe; die
   Planungsfunktionen standen der Vorschau offen.
 - Bildungsplan-Import: Der Dry-Run setzt unveränderte, archivierte Knoten probeweise wieder aktiv wie
