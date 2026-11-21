@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.50.0] – 2026-11-21
+
 ### Neu
 
 - Leitlinien der Schule: eigene Rahmenwerke (etwa SDGs, Weltethos) mit Aspekten, gepflegt von Admins im Abschnitt
@@ -33,10 +35,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Nach dem Update
 
+- Backend und Frontend neu bauen und starten; offene Browser-Tabs einmal neu laden. Keine Migration.
 - `config/pedagogy.yaml` auf Prod übernehmen (Punkt 6 in `teacher_extension`), Backend neu starten.
-- Backend und Frontend neu bauen und starten. Keine Migration.
 - Prompt des Assistenten „Curriculum-Entwurf“ im Editor durch `config/prompts/curriculum_assistent.md` ersetzen (der
   Seed ändert vorhandene Assistenten nicht).
+- Leitlinien der Schule legen Admins unter Bibliothek → Leitperspektiven an (`docs/admin/leitlinien.md`).
 
 ## [0.49.0] – 2026-11-19
 

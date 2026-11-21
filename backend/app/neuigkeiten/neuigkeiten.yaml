@@ -497,7 +497,7 @@
 - id: "0.50-leitlinien"
   version: "0.50.0"
   # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
-  datum: 2026-11-20
+  datum: 2026-11-21
   rollen: [teacher]
   eintrag: curricula
   titel: "Leitlinien der Schule im Curriculum"
