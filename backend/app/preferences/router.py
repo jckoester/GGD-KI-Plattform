@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
 from app.calendar.base import CalendarSourceError
+from app.chat.modellwahl import BEVORZUGT_SCHLUESSEL, pruefe_bevorzugtes_modell
 from app.calendar.service import KUERZEL_PREFERENCE_KEY, validate_kuerzel
 from app.db.session import get_db
 from app.preferences.service import get_preferences, patch_preferences
@@ -39,11 +40,26 @@ async def update_preferences(
                 status_code=503,
                 detail=f"Das Kürzel kann derzeit nicht geprüft werden: {exc}",
             ) from None
+    # Bevorzugte Modelle (0.51, AV Schritt 3): nur Lehrkräfte, nur freigegebene Chat-Modelle,
+    # für Planungs-Assistenten nur mit Funktionen (⚙). In der Vorschau ist der Weg gesperrt.
+    entfernen: list[str] = []
+    for schluessel in BEVORZUGT_SCHLUESSEL:
+        if schluessel in updates:
+            try:
+                updates[schluessel] = await pruefe_bevorzugtes_modell(
+                    schluessel, updates[schluessel], current_user)
+            except PermissionError as exc:
+                raise HTTPException(status_code=403, detail=str(exc)) from None
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from None
+            if updates[schluessel] is None:  # keine Vorliebe: Schlüssel weg, nicht `null`
+                del updates[schluessel]
+                entfernen.append(schluessel)
     if STUFEN_SCHLUESSEL in updates:
         updates[STUFEN_SCHLUESSEL] = _pruefe_stufe(
             updates[STUFEN_SCHLUESSEL], current_user.roles
         )
-    return await patch_preferences(db, current_user.sub, updates)
+    return await patch_preferences(db, current_user.sub, updates, tuple(entfernen))
 
 
 def _pruefe_stufe(wert, rollen: list[str]) -> int:

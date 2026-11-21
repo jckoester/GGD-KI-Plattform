@@ -186,3 +186,53 @@ async def test_modell_mit_funktionen_kommt_durch(test_client, jwt_service, plane
 async def test_ohne_faehigkeiten_bleibt_jedes_modell_waehlbar(test_client, jwt_service):
     kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
     assert await _antwort(test_client, kopf, assistant_id=ASSISTENT, model_id="chat-schnell") is None
+
+
+# ── Schritt 3: bevorzugte Modelle speichern ──────────────────────────────────
+
+
+@pytest_asyncio.fixture
+async def ohne_vorliebe(test_client, jwt_service):
+    """Lehrkraft ohne Vorliebe vorher und nachher — die Test-DB behält Einstellungen."""
+    kopf = _kopf(jwt_service, TEACHER1_PSEUDO, ["teacher"])
+    leer = {"modell_frei": None, "modell_planung": None}
+    await test_client.patch("/preferences", headers=kopf, json=leer)
+    yield kopf
+    await test_client.patch("/preferences", headers=kopf, json=leer)
+
+
+async def test_vorliebe_speichern_und_lesen(test_client, ohne_vorliebe, fabrik):
+    from app.preferences.service import bevorzugte_modelle
+
+    with patch("app.litellm.modell_eigenschaften.alle_eigenschaften", AsyncMock(return_value={})):
+        r = await test_client.patch("/preferences", headers=ohne_vorliebe,
+                                    json={"modell_frei": "chat-schnell", "modell_planung": "chat-komplex"})
+    assert r.status_code == 200, r.text
+    async with fabrik() as db:
+        assert await bevorzugte_modelle(db, TEACHER1_PSEUDO) == {
+            "modell_frei": "chat-schnell", "modell_planung": "chat-komplex"}
+
+
+async def test_vorliebe_nur_fuer_lehrkraefte_und_nicht_in_der_vorschau(test_client, jwt_service):
+    schuelerin = _kopf(jwt_service, STUDENT_PSEUDO, ["student"], grade="8")
+    r = await test_client.patch("/preferences", headers=schuelerin, json={"modell_frei": "chat-schnell"})
+    assert r.status_code == 403
+    vorschau = _kopf(jwt_service, TEACHER1_PSEUDO, [], vorschau=True)
+    r = await test_client.patch("/preferences", headers=vorschau, json={"modell_frei": "chat-schnell"})
+    assert r.status_code == 403
+
+
+async def test_vorliebe_ohne_funktionen_fuer_planung_abgewiesen(test_client, ohne_vorliebe):
+    from app.litellm.modell_eigenschaften import Eigenschaften
+
+    with patch("app.litellm.modell_eigenschaften.alle_eigenschaften",
+               AsyncMock(return_value={"chat-schnell": Eigenschaften(funktionsaufrufe=False)})):
+        r = await test_client.patch("/preferences", headers=ohne_vorliebe, json={"modell_planung": "chat-schnell"})
+    assert r.status_code == 422 and "Funktionen" in r.json()["detail"]
+
+
+async def test_keine_vorliebe_entfernt_den_schluessel(test_client, ohne_vorliebe):
+    with patch("app.litellm.modell_eigenschaften.alle_eigenschaften", AsyncMock(return_value={})):
+        await test_client.patch("/preferences", headers=ohne_vorliebe, json={"modell_frei": "chat-schnell"})
+    r = await test_client.patch("/preferences", headers=ohne_vorliebe, json={"modell_frei": ""})
+    assert "modell_frei" not in r.json()

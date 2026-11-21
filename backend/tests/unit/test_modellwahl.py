@@ -51,3 +51,56 @@ def test_unbekannt_und_ohne_faehigkeiten_sperren_nicht():
     assert not fehlen_funktionen(PLANER, "neu", "chat-komplex", F)
     assert not fehlen_funktionen(SimpleNamespace(tool_groups=[]), "chat-schnell", "chat-komplex", F)
     assert not fehlen_funktionen(None, "chat-schnell", "chat-komplex", F)
+
+
+# ── Schritt 3: bevorzugte Modelle ────────────────────────────────────────────
+
+import pytest
+from unittest.mock import AsyncMock, patch
+
+from app.chat.modellwahl import BEVORZUGT_FREI, BEVORZUGT_PLANUNG, pruefe_bevorzugtes_modell
+from app.litellm.modell_eigenschaften import Eigenschaften
+
+EIGENSCHAFTEN = {"chat-komplex": Eigenschaften(funktionsaufrufe=True),
+                 "chat-schnell": Eigenschaften(funktionsaufrufe=False)}
+
+
+async def _pruefe(schluessel, wert, user, erlaubt=frozenset({"chat-komplex", "chat-schnell"})):
+    with patch("app.litellm.team_models.erlaubte_modelle_fuer",
+               AsyncMock(return_value=None if erlaubt is None else set(erlaubt))), \
+         patch("app.litellm.modell_eigenschaften.alle_eigenschaften", AsyncMock(return_value=EIGENSCHAFTEN)):
+        return await pruefe_bevorzugtes_modell(schluessel, wert, user)
+
+
+@pytest.mark.asyncio
+async def test_lehrkraft_speichert_freigegebenes_modell():
+    assert await _pruefe(BEVORZUGT_FREI, " chat-schnell ", _u("teacher")) == "chat-schnell"
+    assert await _pruefe(BEVORZUGT_PLANUNG, "chat-komplex", _u("teacher")) == "chat-komplex"
+
+
+@pytest.mark.asyncio
+async def test_leer_heisst_keine_vorliebe():
+    assert await _pruefe(BEVORZUGT_FREI, "", _u("teacher")) is None
+    assert await _pruefe(BEVORZUGT_PLANUNG, None, _u("teacher")) is None
+
+
+@pytest.mark.asyncio
+async def test_schuelerin_hat_keine_vorliebe():
+    with pytest.raises(PermissionError):
+        await _pruefe(BEVORZUGT_FREI, "chat-komplex", _u("student"))
+
+
+@pytest.mark.asyncio
+async def test_nicht_freigegeben_und_ohne_funktionen_fuer_planung():
+    with pytest.raises(ValueError, match="nicht freigeschaltet"):
+        await _pruefe(BEVORZUGT_FREI, "ant-opus", _u("teacher"))
+    with pytest.raises(ValueError, match="Planungs-Assistenten brauchen"):
+        await _pruefe(BEVORZUGT_PLANUNG, "chat-schnell", _u("teacher"))
+    with pytest.raises(ValueError, match="kein Chat-Modell"):
+        await _pruefe(BEVORZUGT_FREI, "system-titel", _u("teacher"), erlaubt={"system-titel"})
+
+
+@pytest.mark.asyncio
+async def test_freigaben_unbekannt_sperren_nicht():
+    # Proxy nicht erreichbar: wie überall nicht sperren.
+    assert await _pruefe(BEVORZUGT_FREI, "ant-opus", _u("teacher"), erlaubt=None) == "ant-opus"

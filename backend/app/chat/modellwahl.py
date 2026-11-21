@@ -53,3 +53,41 @@ def fehlen_funktionen(assistant, modell: str, des_assistenten: str, funktionsauf
     if assistant is None or not (assistant.tool_groups or []) or modell == des_assistenten:
         return False
     return funktionsaufrufe.get(modell) is False
+
+
+# ── Bevorzugte Modelle der Lehrkraft (0.51, AV Schritt 3, F4) ──────────────────
+#
+# Zwei Schlüssel in `user_preferences.preferences`: eines für freie Chats, eines für
+# Planungs-Assistenten (`plant`). Nur für Lehrkräfte (F8). Geprüft beim Speichern; ob die Wahl
+# beim Anlegen eines Chats noch gilt (Freigabe geändert, Modell entfernt), prüft Schritt 4.
+
+BEVORZUGT_FREI = "modell_frei"
+BEVORZUGT_PLANUNG = "modell_planung"
+BEVORZUGT_SCHLUESSEL = (BEVORZUGT_FREI, BEVORZUGT_PLANUNG)
+
+
+async def pruefe_bevorzugtes_modell(schluessel: str, wert, user: JwtPayload) -> str | None:
+    """Das Modell, wie es gespeichert wird (``None`` = keine Vorliebe). Wirft ``ValueError``
+    (unzulässig) oder ``PermissionError`` (keine Lehrkraft)."""
+    from app.config import settings
+    from app.litellm.modell_eigenschaften import alle_eigenschaften
+    from app.litellm.team_models import erlaubte_modelle_fuer
+
+    if not darf_im_assistenten_waehlen(user):
+        raise PermissionError("Bevorzugte Modelle gibt es für Lehrkräfte.")
+    if wert in (None, ""):
+        return None
+    if not isinstance(wert, str):
+        raise ValueError("Das Modell muss als Name angegeben werden.")
+    modell = wert.strip()
+    if any(modell.startswith(p) for p in settings.model_picker_hidden_prefixes):
+        raise ValueError(f"„{modell}“ ist kein Chat-Modell.")
+    erlaubt = await erlaubte_modelle_fuer(user.roles, getattr(user, "grade", None))
+    if erlaubt is not None and modell not in erlaubt:
+        raise ValueError(f"„{modell}“ ist für dich nicht freigeschaltet.")
+    if schluessel == BEVORZUGT_PLANUNG:
+        eigenschaften = (await alle_eigenschaften()).get(modell)
+        if eigenschaften is not None and eigenschaften.funktionsaufrufe is False:
+            raise ValueError(braucht_funktionen_text(modell).replace("Dieser Assistent braucht",
+                                                                     "Planungs-Assistenten brauchen"))
+    return modell

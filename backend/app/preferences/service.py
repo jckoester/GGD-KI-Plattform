@@ -12,14 +12,17 @@ async def get_preferences(db: AsyncSession, pseudonym: str) -> dict:
     return row[0] if row else {}
 
 
-async def patch_preferences(db: AsyncSession, pseudonym: str, updates: dict) -> dict:
+async def patch_preferences(
+    db: AsyncSession, pseudonym: str, updates: dict, entfernen: tuple[str, ...] = ()
+) -> dict:
+    """Einstellungen ergänzen; ``entfernen``: Schlüssel, die danach fehlen statt ``null`` zu tragen."""
     result = await db.execute(
         text("SELECT preferences FROM user_preferences WHERE pseudonym = :pseudonym"),
         {"pseudonym": pseudonym},
     )
     row = result.fetchone()
     current = row[0] if row else {}
-    merged = {**current, **updates}
+    merged = {k: v for k, v in {**current, **updates}.items() if k not in entfernen}
     await db.execute(
         text("""
             INSERT INTO user_preferences (pseudonym, preferences)
@@ -138,3 +141,17 @@ async def einrichtung_lesen(db: AsyncSession, pseudonym: str) -> tuple[dict | No
 
 async def einrichtung_speichern(db: AsyncSession, pseudonym: str, stand: dict) -> None:
     await patch_preferences(db, pseudonym, {EINRICHTUNG_SCHLUESSEL: stand})
+
+
+
+# ── Bevorzugte Modelle (0.51, AV Schritt 3) ──────────────────────────────────
+#
+# Wie oben: nur die zwei Werte, nie das Dict — der Chat liest sie (Schritt 4).
+
+
+async def bevorzugte_modelle(db: AsyncSession, pseudonym: str) -> dict[str, str]:
+    """``{"modell_frei": …, "modell_planung": …}`` — nur gesetzte Werte."""
+    from app.chat.modellwahl import BEVORZUGT_SCHLUESSEL
+
+    prefs = await get_preferences(db, pseudonym)
+    return {k: v for k in BEVORZUGT_SCHLUESSEL if isinstance(v := prefs.get(k), str) and v}
