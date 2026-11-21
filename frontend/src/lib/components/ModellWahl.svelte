@@ -62,6 +62,10 @@
                 : 'text-light-tx dark:text-dark-tx'}"
         >
             {#if modelle.length > 0}
+                <!-- Vorgabe-Eintrag auch hier (0.51): im Assistenten-Chat „wie der Assistent“. -->
+                {#if vorgabe !== null}
+                    <option value="">{vorgabe}</option>
+                {/if}
                 {#each modelle as model (model.id)}
                     <option value={model.id}
                         >{eintragsText(model, $budget?.eur_usd_rate, $budget?.einheiten_je_euro)}</option

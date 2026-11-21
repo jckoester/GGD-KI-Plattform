@@ -491,6 +491,16 @@ export async function* streamChat(
         continue;
       }
 
+      // Das bevorzugte Modell griff nicht (0.51, AV): Grund und das Modell, mit dem es läuft.
+      if (currentEventType === "modell_hinweis") {
+        try {
+          const { detail, modell } = JSON.parse(payload);
+          yield { type: "modell_hinweis", detail, modell: modell ?? null };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       // Die Bausteine, die beim Antworten vorlagen (0.14) — nach dem Speichern, vor
       // `message`. Dieselbe Liste liefert das Neuladen als `message.kontext`.
       if (currentEventType === "kontext") {

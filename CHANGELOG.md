@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Lehrkräfte wählen das Modell auch im Chat mit einem Assistenten, vorbelegt mit „wie der Assistent“; bei
+  Assistenten mit Fähigkeiten stehen nur Modelle mit ⚙ zur Wahl. Schüler:innen sehen das Modell des Assistenten.
+
 ### Geändert
 
 - Im Chat mit einem Assistenten gilt für Schüler:innen und in der Vorschau immer das Modell des Assistenten,

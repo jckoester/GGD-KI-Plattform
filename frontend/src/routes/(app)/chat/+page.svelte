@@ -85,6 +85,7 @@
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import ModellWahl from "$lib/components/ModellWahl.svelte";
     import AssistentInfo from "$lib/components/AssistentInfo.svelte";
+    import { modelleFuerAssistent, zuSendendesModell } from "$lib/modellwahl_chat.js";
     import {
         pageTitle,
         activeConversationId,
@@ -197,6 +198,21 @@
     let assistentenGeladen = $state(false);
     let pickerOpen = $state(false);
     let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
+    // Modellwahl im Assistenten-Chat (0.51, AV Schritt 5): getrennt vom Modell des freien Chats,
+    // damit dessen gemerkte Wahl (sessionStorage) einen Assistenten nicht umstellt. Leer heißt
+    // „wie der Assistent“ — der Server entscheidet (Modell des Assistenten oder Vorliebe).
+    let assistentenModell = $state("");
+    // Das bevorzugte Modell griff nicht (Ereignis `modell_hinweis`).
+    let modellHinweis = $state(null);
+    // Der aktive Assistent mit allen Angaben — die laufende Konversation kennt nur Kennung und Namen.
+    const aktiverAssistent = $derived(
+        selectedAssistant ??
+            availableAssistants.find((a) => a.id === conversationAssistant?.id) ??
+            conversationAssistant,
+    );
+    const assistentenModelle = $derived(
+        modelleFuerAssistent({ istLehrkraft, assistent: aktiverAssistent, modelle: availableModels }),
+    );
     let assistantSwitchHint = $state(null); // string | null
 
     // Fach-Kontext-State
@@ -761,7 +777,13 @@
                     }));
             }
             // 3-3: assistant_id und model_id immer mitsenden
-            const modelId = selectedAssistant ? null : selectedModelId;
+            // Mit Assistent wählen nur Lehrkräfte (0.51, AV); „Assistent beenden“ ist freier Chat.
+            const modelId = zuSendendesModell({
+                mitAssistent: !!(selectedAssistant || conversationAssistant) && !assistentBeenden,
+                istLehrkraft,
+                frei: selectedModelId,
+                imAssistenten: assistentenModell,
+            });
             const assistantId = selectedAssistant?.id ?? null;
 
             for await (const item of streamChat(
@@ -793,6 +815,10 @@
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
                         : selectedModelId || currentConversationModel;
+                    // Das wirksame Modell zeigt der Wähler im Assistenten-Chat (0.51).
+                    if ((selectedAssistant || conversationAssistant) && item.model) {
+                        assistentenModell = item.model;
+                    }
 
                     // Trenner bei Modell- oder Assistent-Wechsel
                     if (
@@ -947,6 +973,11 @@
                         };
                         messages = messages;
                     }
+                    continue;
+                }
+                if (item.type === "modell_hinweis") {
+                    modellHinweis = item.detail;
+                    if (item.modell) assistentenModell = item.modell;
                     continue;
                 }
                 // Bausteine der Antwort (0.14) — kommen nach dem Speichern, wie
@@ -1246,6 +1277,8 @@
             assistantSwitchHint = `Assistent gewechselt zu „${assistant.name}“. Der bisherige Chatverlauf bleibt im Kontext sichtbar.`;
         }
         selectedAssistant = assistant;
+        // Neuer Assistent: wieder „wie der Assistent“ (0.51) — eine Wahl gilt je Konversation.
+        if (assistant.id !== conversationAssistant?.id) assistentenModell = "";
         pickerOpen = false;
         textarea?.focus();
     }
@@ -1347,6 +1380,8 @@
                 // Daumen an den Antworten (0.31) — der Server kennt Test- und Vorschau-Chats.
                 bewertbar = data.bewertbar ?? false;
                 currentConversationModel = data.model_used;
+                assistentenModell = data.model_used ?? "";
+                modellHinweis = null;
                 totalCostUsd = data.total_cost_usd ?? null;
                 selectedAssistant = null;
                 conversationAssistant = data.assistant_name
@@ -1424,6 +1459,8 @@
             activeConversationStunde.set(null);
             activeConversationCurriculum.set(null);
             conversationAssistant = null;
+            assistentenModell = "";
+            modellHinweis = null;
             pickerOpen = false;
             subjectPickerOpen = false;
             pendingSubjectId = null;
@@ -1984,6 +2021,22 @@
                             )}
                         />
                     </span>
+                    <!-- Lehrkräfte stellen auch hier um (0.51, AV); bei Fähigkeiten nur ⚙-Modelle. -->
+                    {#if assistentenModelle}
+                        <ModellWahl
+                            id="chat-model-assistent"
+                            modelle={assistentenModelle}
+                            bind:wert={assistentenModell}
+                            disabled={isStreaming || modelsLoading}
+                            vorgabe="wie der Assistent"
+                            leerText="Kein passendes Modell"
+                        />
+                    {:else if assistentenModell}
+                        <!-- Schüler:innen: das Modell des Assistenten als Angabe, ohne Wahl. -->
+                        <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Modell: {assistentenModell}
+                        </span>
+                    {/if}
                 {:else}
                     <!-- Modell-Auswahl -->
                     <ModellWahl
@@ -2007,6 +2060,10 @@
                     >
                 {/if}
             </div>
+            {#if modellHinweis}
+                <!-- Das bevorzugte Modell griff nicht (0.51, AV Schritt 4). -->
+                <WarningBanner message={modellHinweis} />
+            {/if}
             <div>
                 <!-- Globaler Hinweistext. Die beiden Absätze wiegen NICHT gleich viel:
                      Absatz 1 ist ein Transparenzhinweis und bleibt immer stehen
