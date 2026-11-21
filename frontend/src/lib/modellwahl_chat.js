@@ -23,3 +23,39 @@ export function zuSendendesModell({ mitAssistent, istLehrkraft, frei, imAssisten
   if (!mitAssistent) return frei || null
   return istLehrkraft ? imAssistenten || null : null
 }
+
+
+/**
+ * Kosten **mit diesem Assistenten** für ein Modell (0.51, AV Schritt 6).
+ *
+ * Wie `app/assistants/kosten.py`: mittlere Nachricht des Modells + feste Token des Assistenten
+ * (Prompt, Bausteine, Dokumente) × Eingabepreis. So stehen im Wähler und neben dem Assistenten
+ * dieselben Zahlen. Fehlt eine Angabe, bleibt sie fehlend — eine Null hieße „kostenlos“.
+ *
+ * @returns {{usd_je_nachricht: number|null, usd_dokumente: number|null}}
+ */
+export function kostenMitAssistent(modell, assistent) {
+  const preis = modell?.usd_je_eingabetoken
+  if (modell?.usd_je_nachricht == null || preis == null || assistent?.token_zusatz == null) {
+    return { usd_je_nachricht: null, usd_dokumente: null }
+  }
+  return {
+    usd_je_nachricht: modell.usd_je_nachricht + assistent.token_zusatz * preis,
+    usd_dokumente: assistent.token_dokumente ? assistent.token_dokumente * preis : null,
+  }
+}
+
+/** Die Einträge des Wählers mit den Kosten mit diesem Assistenten. */
+export function modelleMitAssistentenKosten(modelle, assistent) {
+  return (modelle ?? []).map((m) => ({ ...m, usd_je_nachricht: kostenMitAssistent(m, assistent).usd_je_nachricht }))
+}
+
+/**
+ * Der Assistent, wie ihn der Info-Knopf zeigt: mit den Kosten des **gewählten** Modells.
+ * Ohne Wahl („wie der Assistent“) oder ohne passende Angaben bleibt seine eigene Schätzung.
+ */
+export function assistentMitModell(assistent, modell) {
+  if (!assistent || !modell) return assistent
+  const k = kostenMitAssistent(modell, assistent)
+  return k.usd_je_nachricht == null ? assistent : { ...assistent, ...k }
+}

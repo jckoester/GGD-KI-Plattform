@@ -85,7 +85,12 @@
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import ModellWahl from "$lib/components/ModellWahl.svelte";
     import AssistentInfo from "$lib/components/AssistentInfo.svelte";
-    import { modelleFuerAssistent, zuSendendesModell } from "$lib/modellwahl_chat.js";
+    import {
+        assistentMitModell,
+        modelleFuerAssistent,
+        modelleMitAssistentenKosten,
+        zuSendendesModell,
+    } from "$lib/modellwahl_chat.js";
     import {
         pageTitle,
         activeConversationId,
@@ -210,8 +215,19 @@
             availableAssistants.find((a) => a.id === conversationAssistant?.id) ??
             conversationAssistant,
     );
-    const assistentenModelle = $derived(
-        modelleFuerAssistent({ istLehrkraft, assistent: aktiverAssistent, modelle: availableModels }),
+    // Die Einträge zeigen die Kosten **mit diesem Assistenten** (0.51, Schritt 6), der Info-Knopf
+    // dieselbe Zahl für das gewählte Modell — vorher standen dort zwei verschiedene Schätzungen.
+    const assistentenModelle = $derived.by(() => {
+        const m = modelleFuerAssistent({ istLehrkraft, assistent: aktiverAssistent, modelle: availableModels });
+        return m && modelleMitAssistentenKosten(m, aktiverAssistent);
+    });
+    const assistentFuerInfo = $derived(
+        assistentenModelle
+            ? assistentMitModell(
+                  availableAssistants.find((a) => a.id === aktiverAssistent?.id),
+                  availableModels.find((m) => m.id === assistentenModell),
+              )
+            : availableAssistants.find((a) => a.id === aktiverAssistent?.id),
     );
     let assistantSwitchHint = $state(null); // string | null
 
@@ -2015,11 +2031,7 @@
                         {selectedAssistant?.name || conversationAssistant?.name}
                         <!-- Kosten und Dokumente (0.27): Die laufende Konversation kennt nur Kennung
                              und Namen; die vollen Angaben stehen in der Assistentenliste. -->
-                        <AssistentInfo
-                            assistent={availableAssistants.find(
-                                (a) => a.id === (selectedAssistant?.id ?? conversationAssistant?.id),
-                            )}
-                        />
+                        <AssistentInfo assistent={assistentFuerInfo} />
                     </span>
                     <!-- Lehrkräfte stellen auch hier um (0.51, AV); bei Fähigkeiten nur ⚙-Modelle. -->
                     {#if assistentenModelle}

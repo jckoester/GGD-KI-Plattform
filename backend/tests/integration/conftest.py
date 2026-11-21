@@ -160,9 +160,13 @@ BEGIN
   LOOP
     s := pg_get_serial_sequence(format('public.%I', r.table_name), 'id');
     IF s IS NOT NULL THEN
+      -- Nur vorwärts (0.51): Mit `max(id)` allein fiel die Folge zurück, sobald die Zeile
+      -- mit der höchsten ID gelöscht war; der nächste Lauf vergab ihre ID neu, und das
+      -- Audit-Log (nur anhängen) trug zu ihr noch die Ereignisse des Vorgängers.
       EXECUTE format(
-        'SELECT setval(%L, GREATEST(COALESCE((SELECT max(id) FROM public.%I), 0), 100000))',
-        s, r.table_name);
+        'SELECT setval(%L, GREATEST(COALESCE((SELECT max(id) FROM public.%I), 0), 100000, '
+        '(SELECT last_value FROM %s)))',
+        s, r.table_name, s);
     END IF;
   END LOOP;
 END $$;

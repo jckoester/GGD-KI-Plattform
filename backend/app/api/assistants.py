@@ -81,6 +81,10 @@ class AssistantSummary(BaseModel):
     usd_je_nachricht: Optional[float] = None
     #: Davon die Kontext-Dokumente.
     usd_dokumente: Optional[float] = None
+    #: Feste Token je Nachricht (Prompt, Bausteine, Dokumente) und davon die Dokumente (0.51):
+    #: Die Oberfläche rechnet damit die Kosten, wenn eine Lehrkraft ein anderes Modell wählt.
+    token_zusatz: int = 0
+    token_dokumente: int = 0
     #: Kontext-Dokumente, die der Assistent bei jeder Nachricht mitbekommt (F9).
     dokumente: list[DokumentKurz] = []
     model_config = ConfigDict(from_attributes=True)
@@ -937,6 +941,8 @@ async def list_assistants(
         AssistantSummary.model_validate(a).model_copy(update={
             "usd_je_nachricht": kosten[a.id].usd_je_nachricht,
             "usd_dokumente": kosten[a.id].usd_dokumente,
+            "token_zusatz": kosten[a.id].token_zusatz,
+            "token_dokumente": kosten[a.id].token_dokumente,
             "dokumente": [DokumentKurz(name=d.name, groesse_bytes=d.groesse_bytes)
                           for d in kosten[a.id].dokumente],
         })

@@ -205,6 +205,9 @@ class ModelItem(BaseModel):
     # dann weg, statt eine Null oder ein „kann nicht" zu erfinden — beim Kontextfenster
     # ist das der Regelfall (17 von 31 Deployments haben es, keines der IONOS-Modelle).
     usd_je_nachricht: float | None = None
+    #: Eingabepreis je Token (0.51): Kosten eines Assistenten mit diesem Modell =
+    #: `usd_je_nachricht` + `token_zusatz` des Assistenten × dieser Preis.
+    usd_je_eingabetoken: float | None = None
     kontextfenster: int | None = None
     denkt: bool | None = None
     bilder: bool | None = None
@@ -3244,6 +3247,7 @@ def _modell_eintrag(model_id: str, e: Eigenschaften | None) -> ModelItem:
         id=model_id,
         supports_function_calling=e.funktionsaufrufe,
         usd_je_nachricht=e.usd_je_nachricht,
+        usd_je_eingabetoken=e.preis_ein_usd or None,
         kontextfenster=e.kontextfenster,
         denkt=e.denkt,
         bilder=e.bilder,

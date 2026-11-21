@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Lehrkräfte wählen das Modell auch im Chat mit einem Assistenten, vorbelegt mit „wie der Assistent“; bei
   Assistenten mit Fähigkeiten stehen nur Modelle mit ⚙ zur Wahl. Schüler:innen sehen das Modell des Assistenten.
+- Kosten im Assistenten-Chat: Der Modellwähler zeigt die Kosten je Nachricht mit diesem Assistenten (samt Prompt
+  und Dokumenten), die Angabe am Assistenten folgt dem gewählten Modell.
 
 ### Geändert
 

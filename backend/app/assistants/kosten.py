@@ -42,6 +42,11 @@ class Kosten:
     usd_je_nachricht: float | None = None
     usd_dokumente: float | None = None
     dokumente: list[Dokument] = field(default_factory=list)
+    #: Feste Token je Nachricht (Prompt, Bausteine, Dokumente) und davon die Dokumente — auch
+    #: ohne bekannten Preis. Daraus rechnet die Oberfläche die Kosten mit einem **anderen**
+    #: Modell (0.51, AV Schritt 6): Schätzung des Modells + Token × dessen Eingabepreis.
+    token_zusatz: int = 0
+    token_dokumente: int = 0
 
 
 async def kosten_je_assistent(db: AsyncSession, assistenten: list[Assistant]) -> dict[int, Kosten]:
@@ -63,15 +68,17 @@ async def kosten_je_assistent(db: AsyncSession, assistenten: list[Assistant]) ->
     ergebnis: dict[int, Kosten] = {}
     for a in assistenten:
         docs = dokumente.get(a.id, [])
-        e = eigenschaften.get(modell_des_assistenten(a))
-        if e is None or not e.preis_ein_usd:
-            ergebnis[a.id] = Kosten(dokumente=docs)
-            continue
         fest = _token(len(a.system_prompt or "") + len(bausteine_modul.texte(a.bausteine or [])))
         doc_token = sum(d.token for d in docs)
+        e = eigenschaften.get(modell_des_assistenten(a))
+        if e is None or not e.preis_ein_usd:
+            ergebnis[a.id] = Kosten(dokumente=docs, token_zusatz=fest + doc_token, token_dokumente=doc_token)
+            continue
         ergebnis[a.id] = Kosten(
             usd_je_nachricht=(ein + fest + doc_token) * e.preis_ein_usd + aus * (e.preis_aus_usd or 0.0),
             usd_dokumente=doc_token * e.preis_ein_usd if docs else None,
             dokumente=docs,
+            token_zusatz=fest + doc_token,
+            token_dokumente=doc_token,
         )
     return ergebnis

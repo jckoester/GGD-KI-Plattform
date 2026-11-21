@@ -55,3 +55,22 @@ async def test_liste_nennt_kosten_und_dokumente(test_client, auth_headers, assis
     ohne = je_name["KOS Ohne Preis"]
     assert ohne["usd_je_nachricht"] is None and ohne["usd_dokumente"] is None
     assert ohne["dokumente"] == []
+
+
+async def test_feste_token_fuer_die_rechnung_mit_anderem_modell(test_client, auth_headers, assistenten):
+    """(0.51, AV Schritt 6) Die Oberfläche rechnet: Schätzung des Modells + token_zusatz × Eingabepreis.
+
+    Mit dem eigenen Modell muss das genau die Schätzung der Liste ergeben — sonst stünden neben
+    dem Assistenten und im Modellwähler wieder zwei verschiedene Zahlen.
+    """
+    resp = await test_client.get("/assistants", headers=auth_headers)
+    je_name = {a["name"]: a for a in resp.json()["items"] if a["name"].startswith("KOS ")}
+    mit = je_name["KOS Mit Dokument"]
+    assert (mit["token_zusatz"], mit["token_dokumente"]) == (400 // 4 + 1000, 1000)
+
+    modell = Eigenschaften(preis_ein_usd=PREIS_EIN, preis_aus_usd=PREIS_AUS)
+    assert modell.usd_je_nachricht + mit["token_zusatz"] * PREIS_EIN == pytest.approx(mit["usd_je_nachricht"])
+    assert mit["token_dokumente"] * PREIS_EIN == pytest.approx(mit["usd_dokumente"])
+
+    # Ohne Preis gibt es keine Zahl, die Token aber schon.
+    assert je_name["KOS Ohne Preis"]["token_zusatz"] == 0
