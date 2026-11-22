@@ -54,6 +54,11 @@ pytest-httpx>=0.25.0,<1.0
 # Prüfung wäre schlimmer als keine.
 pyflakes>=3.2,<4.0
 
+# Runtime - Schnittstelle für KI-Abos (0.54, Päckchen AW): MCP-Server über Streamable HTTP;
+# in AX auch der OAuth-Teil (PKCE, Dynamic Client Registration, Metadaten). Eng gepinnt:
+# 2.x hat die API gegenüber 1.x umbenannt (`FastMCP` → `MCPServer`), Updates bewusst.
+mcp>=2.3.0,<2.4
+
 # Runtime - Auth
 bcrypt>=4.0.0,<5.0
 jsonschema>=4.22.0,<5.0

@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Entwicklung
+
+- Neue Abhängigkeit `mcp` 2.3 (MCP Python SDK, MIT) für die Schnittstelle zu KI-Abos.
+
 ## [0.53.1] – 2026-11-22
 
 ### Neu

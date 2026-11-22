@@ -53,6 +53,7 @@ export const BIBLIOTHEKEN = [
             { name: 'python-jose', paket: 'python-jose', lizenz: 'MIT' },
             { name: 'bcrypt', paket: 'bcrypt', lizenz: 'Apache-2.0' },
             { name: 'jsonschema', paket: 'jsonschema', lizenz: 'MIT' },
+            { name: 'MCP Python SDK', paket: 'mcp', lizenz: 'MIT' },
             { name: 'Jinja2', paket: 'jinja2', lizenz: 'BSD-3-Clause' },
             { name: 'WeasyPrint', paket: 'weasyprint', lizenz: 'BSD-3-Clause' },
             { name: 'markdown-it-py', paket: 'markdown-it-py', lizenz: 'MIT' },
