@@ -520,3 +520,17 @@
     unter „Bevorzugte Modelle“ fest, womit neue freie Chats und neue Chats mit
     Planungs-Assistenten beginnen.
   link: /help/chat#modell-im-assistenten-chat
+
+- id: "0.52-entwuerfe-lesbar"
+  version: "0.52.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-22
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curriculum-Entwürfe für alle Lehrkräfte lesbar"
+  text: >-
+    Entwürfe von Curricula kannst du jetzt in allen Fächern lesen, nicht nur in deiner Fachschaft,
+    etwa um dich mit anderen Fächern abzustimmen. Das gilt auch umgekehrt: Die Entwürfe deiner
+    Fachschaft lesen alle Lehrkräfte. Bearbeiten und veröffentlichen kann weiter nur die
+    Fachschaft, und in Suche, Chat und Planung erscheint ein Entwurf erst nach dem Veröffentlichen.
+  link: /help/curriculum#entwurf-und-veröffentlichen
