@@ -652,9 +652,10 @@
         </thead>
         <tbody>
             {#each curriculum?.kapitel || [] as kap, kapIndex (kap.id)}
-                <!-- Kapitel-Kopfzeile -->
+                <!-- Kapitel-Kopfzeile; `id` als Sprungziel (Leitlinien-Übersicht, 0.53) -->
                 <tr
-                    class="bg-light-bg-2 dark:bg-dark-bg-2 {editMode
+                    id="kapitel-{kap.id}"
+                    class="scroll-mt-24 bg-light-bg-2 dark:bg-dark-bg-2 {editMode
                         ? 'cursor-move'
                         : ''}"
                     draggable={editMode}

@@ -105,6 +105,14 @@
         };
     });
 
+    // Sprung an ein Kapitel (`#kapitel-<id>`, etwa aus der Leitlinien-Übersicht, 0.53),
+    // sobald das Curriculum gezeichnet ist.
+    $effect(() => {
+        const hash = $page.url.hash;
+        if (loading || !curriculum || !hash.startsWith("#kapitel-")) return;
+        requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" }));
+    });
+
     // ── Auf aktuellen Bildungsplan aktualisieren (Re-Link) ────────────────────
     let relinkPreview = $state(null);   // Vorschau-Plan (mode/summary/target)
     let relinkBusy = $state(false);

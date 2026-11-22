@@ -9,7 +9,7 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import LfdbTree from '$lib/components/LfdbTree.svelte'
     import LeitlinienAbschnitt from '$lib/components/LeitlinienAbschnitt.svelte'
-    import { TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
+    import { TriangleAlert, ChevronDown, ChevronRight, ExternalLink, LayoutGrid } from 'lucide-svelte'
     import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Prüfung: nur teacher/admin
@@ -151,6 +151,15 @@
                                            hover:text-primary dark:hover:text-dark-bl transition-colors"
                                 >
                                     <ExternalLink class="w-4 h-4" />
+                                </a>
+                                <a
+                                    href="/knowledge/cross-cutting-themes/{lp.id}/overview"
+                                    title="Übersicht: wo die Aspekte im Unterricht vorkommen"
+                                    aria-label="Übersicht zu {lp.title}"
+                                    class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
+                                           hover:text-primary dark:hover:text-dark-bl transition-colors"
+                                >
+                                    <LayoutGrid class="w-4 h-4" />
                                 </a>
                             </div>
                             <button

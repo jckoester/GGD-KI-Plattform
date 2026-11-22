@@ -2125,6 +2125,13 @@ export async function getBandAbdeckung(subjectId, bpVersion, band, entwuerfe = f
   return _jsonOderFehler(res, 'Abdeckung konnte nicht geladen werden')
 }
 
+/** Schulweite Übersicht einer Leitlinie oder Leitperspektive (0.53, Päckchen AU). */
+export async function getLeitlinienUebersicht(nodeId, nurVeroeffentlicht = false) {
+  const q = new URLSearchParams({ nur_veroeffentlicht: nurVeroeffentlicht ? 'true' : 'false' })
+  const res = await fetch(`${BASE}/context/leitlinien/${nodeId}/uebersicht?${q}`, { credentials: 'include' })
+  return _jsonOderFehler(res, 'Übersicht konnte nicht geladen werden')
+}
+
 /** Abdeckung der PK einer Fassung über alle Curricula des Fachs in ihr (0.46, Schritt 9). */
 export async function getPkAbdeckung(subjectId, bpVersion, entwuerfe = false) {
   const q = new URLSearchParams({ bp_version: bpVersion, entwuerfe: entwuerfe ? 'true' : 'false' })

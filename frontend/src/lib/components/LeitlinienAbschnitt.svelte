@@ -13,7 +13,7 @@
      *   nodeHref — (id) => Adresse der Detailansicht
      *   zurueck  — Rückweg für die Formulare
      */
-    import { ChevronDown, ChevronRight, ExternalLink, Plus } from 'lucide-svelte'
+    import { ChevronDown, ChevronRight, ExternalLink, LayoutGrid, Plus } from 'lucide-svelte'
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import { kuerzelVergleich } from '$lib/hinweise.js'
 
@@ -88,6 +88,14 @@
                                 class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2 hover:text-primary dark:hover:text-dark-bl"
                             >
                                 <ExternalLink class="w-4 h-4" />
+                            </a>
+                            <a
+                                href="/knowledge/cross-cutting-themes/{lb.id}/overview"
+                                title="Übersicht: wo die Aspekte im Unterricht vorkommen"
+                                aria-label="Übersicht zu {lb.title}"
+                                class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2 hover:text-primary dark:hover:text-dark-bl"
+                            >
+                                <LayoutGrid class="w-4 h-4" />
                             </a>
                         </div>
                         <button
