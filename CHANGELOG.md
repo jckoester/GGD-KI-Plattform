@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Curriculum-Entwürfe können alle Lehrkräfte lesen, nicht nur die Fachschaft; bearbeiten, kopieren, veröffentlichen
+  und löschen weiterhin nur die Fachschaft (und Admins). Suche, Chat und Planung nutzen Entwürfe weiter nicht.
+
 ## [0.51.0] – 2026-11-21
 
 ### Neu

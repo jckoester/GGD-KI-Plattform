@@ -1,15 +1,17 @@
-"""Entwürfe von Curricula (0.45, Päckchen AP Teil A, E7, E8, E11).
+"""Entwürfe von Curricula (0.45, Päckchen AP Teil A, E7, E8, E11; Lesen seit 0.52, AZ).
 
 Ein Entwurf ist ein Curriculum-Baum (`curriculum`, `kapitel`, `lernsequenz`) mit
-`status = 'draft'`. Ihn sehen und bearbeiten nur die Mitglieder der Fachschaft des Fachs und
-Admins — mit der echten Rolle, nie in der Vorschau.
+`status = 'draft'`. **Lesen** dürfen ihn alle Lehrkräfte und Admins (seit 0.52, hebt E7 auf),
+**bearbeiten** nur die Mitglieder der Fachschaft des Fachs und Admins (E8) — beides mit der
+echten Rolle, nie in der Vorschau. Zwei Regeln, :func:`darf_entwurf_lesen` und
+:func:`darf_entwurf_bearbeiten`; ein Wächtertest hält die Leseregel aus schreibenden Wegen.
 
 **Wo die Regel greift.** Die Listen- und Suchwege filtern auf `active` und schließen Entwürfe
 damit ohnehin aus (Suche, Retrieval, Embeddings, Jahresplanung, „Meine Bausteine“). Diese
 Datei ist für die Wege, die einen Knoten **direkt** holen: `_check_read_permission` und
 `_check_write_permission` im Router (direkte Adresse, Umgebung, Kanten, allgemeines PATCH)
 und die Curriculum-Endpunkte. Eine Regel, keine Kopien — wer eine neue Stelle braucht, ruft
-:func:`pruefe_entwurf`.
+:func:`pruefe_entwurf_lesen` oder :func:`pruefe_entwurf_bearbeiten`.
 
 ⚠️ Den Status eines Entwurfs ändert nur „Veröffentlichen“ (Schritt 4). Beide PATCH-Wege
 weisen jeden Übergang von und nach `draft` ab (:func:`pruefe_statuswechsel`) — sonst
@@ -23,16 +25,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 ENTWURF = "draft"
 CURRICULUM_TYPEN = frozenset({"curriculum", "kapitel", "lernsequenz"})
-# Ein Curriculum, das jemand lesen darf, ist `active` oder — für die Fachschaft — ein Entwurf.
+# Ein Curriculum, das jemand lesen darf, ist `active` oder — für Lehrkräfte — ein Entwurf.
 LESBARE_STATUS = ("active", ENTWURF)
+NUR_FACHSCHAFT = "Entwürfe bearbeitet die Fachschaft des Fachs."
 
 
-async def darf_entwurf(db: AsyncSession, subject_id: int | None, user) -> bool:
-    """Ob die Person Entwürfe dieses Fachs sehen und bearbeiten darf (E7, E8).
+def darf_entwurf_lesen(user) -> bool:
+    """Ob die Person Curriculum-Entwürfe lesen darf — alle Fächer (0.52, AZ; hebt E7 auf).
+
+    Lehrkraft oder Admin. In der Vorschau trägt der Token `["student"]` und fällt durch.
+    Entwürfe bleiben trotzdem aus Suche, Retrieval und Planung: Diese Wege filtern auf
+    `active`, unabhängig vom Leserecht.
+    """
+    roles = getattr(user, "roles", None) or ()
+    return "admin" in roles or "teacher" in roles
+
+
+async def darf_entwurf_bearbeiten(db: AsyncSession, subject_id: int | None, user) -> bool:
+    """Ob die Person Entwürfe dieses Fachs bearbeiten, anlegen und kopieren darf (E8).
 
     Admin, oder Lehrkraft in einer Fachschaft des Fachs (`fachschafts_faecher`, dieselbe Regel
     wie das Schreibrecht bei `write_scope = subject`). In der Vorschau sind die Rollen
     simuliert und die Mitgliedschaften auf die gewählte Gruppe beschränkt — beides fällt durch.
+    Bis 0.52 hieß sie `darf_entwurf` und regelte auch das Lesen.
     """
     roles = getattr(user, "roles", None) or ()
     if "admin" in roles:
@@ -117,7 +132,7 @@ async def darf_loeschen(db: AsyncSession, node, user) -> bool:
 
     if node.status != ENTWURF:
         return await darf_schreiben(db, node.status, node.subject_id, user)
-    if not await darf_entwurf(db, node.subject_id, user):
+    if not await darf_entwurf_bearbeiten(db, node.subject_id, user):
         return False
     if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
         return True
@@ -131,13 +146,21 @@ def wer_veroeffentlicht() -> str:
     return "Mitglieder der Fachschaft und Admins"
 
 
-async def pruefe_entwurf(db: AsyncSession, subject_id: int | None, user) -> None:
-    """404, wenn die Person den Entwurf nicht sehen darf.
+def pruefe_entwurf_lesen(user) -> None:
+    """404, wenn die Person den Entwurf nicht lesen darf.
 
     404 statt 403: Wer den Entwurf nicht sehen darf, erfährt auch nicht, dass es ihn gibt.
     """
-    if not await darf_entwurf(db, subject_id, user):
+    if not darf_entwurf_lesen(user):
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
+
+
+async def pruefe_entwurf_bearbeiten(db: AsyncSession, subject_id: int | None, user) -> None:
+    """404, wenn die Person den Entwurf nicht einmal lesen darf; 403, wenn sie ihn liest, aber
+    nicht bearbeiten darf (seit 0.52 — vorher gab es nur 404)."""
+    pruefe_entwurf_lesen(user)
+    if not await darf_entwurf_bearbeiten(db, subject_id, user):
+        raise HTTPException(status_code=403, detail=NUR_FACHSCHAFT)
 
 
 def pruefe_statuswechsel(alt: str, neu: str | None) -> None:

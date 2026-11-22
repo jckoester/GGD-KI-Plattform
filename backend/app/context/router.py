@@ -65,8 +65,9 @@ from app.context.schemas import (
     ZielZaehlung,
 )
 from app.context.curriculum_entwurf import (
-    CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf, darf_loeschen, darf_schreiben,
-    darf_veroeffentlichen, erbe_entwurf, fachvorsitz_zugeordnet, pruefe_anlegen, pruefe_entwurf,
+    CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf_bearbeiten, darf_entwurf_lesen, darf_loeschen, darf_schreiben,
+    darf_veroeffentlichen, erbe_entwurf, fachvorsitz_zugeordnet, pruefe_anlegen, pruefe_entwurf_bearbeiten,
+    pruefe_entwurf_lesen,
     pruefe_kante, pruefe_statuswechsel, schreibrecht, wer_veroeffentlicht,
 )
 
@@ -151,7 +152,7 @@ async def _check_write_permission(
     # Vor allen anderen Zweigen: Weder Eigentum noch der allgemeine Fachschaftszweig umgehen sie.
     if node.content_type in CURRICULUM_TYPEN:
         if node.status == ENTWURF:
-            await pruefe_entwurf(db, node.subject_id, user)  # 404: verrät den Entwurf nicht
+            await pruefe_entwurf_bearbeiten(db, node.subject_id, user)  # 404/403 (0.52)
         if not await darf_schreiben(db, node.status, node.subject_id, user):
             raise HTTPException(status_code=403, detail=_NUR_VORSITZ)
         return
@@ -194,10 +195,11 @@ async def _check_read_permission(
     `subject`/`school`/`global` → für alle eingeloggten Nutzer:innen lesbar. (Vorher prüfte der
     Lesepfad **nur** `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Audit #1.)
     """
-    # Entwürfe (0.45) sieht nur die Fachschaft und Admins — vor dem Eigentum: Die direkte
-    # Adresse, die Umgebung und das Kopieren eines Knotens gehen alle hier durch.
+    # Entwürfe lesen seit 0.52 alle Lehrkräfte (AZ; bis dahin nur die Fachschaft) — vor dem
+    # Eigentum: Die direkte Adresse, die Umgebung und das Kopieren eines Knotens gehen alle hier
+    # durch. Wer kopiert, braucht danach das Bearbeitungsrecht.
     if node.status == ENTWURF:
-        await pruefe_entwurf(db, node.subject_id, user)
+        pruefe_entwurf_lesen(user)
         return
     # Eigentum zählt in der Vorschau nicht (0.29) — wie in `read_scope_clause`.
     if node.owner_pseudonym == user.sub and eigenes_zaehlt(user.sub):
@@ -274,7 +276,7 @@ async def _require_curriculum_write(
     if node is None or node.content_type != "curriculum" or node.status not in LESBARE_STATUS:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
     if node.status == ENTWURF:
-        await pruefe_entwurf(db, node.subject_id, user)
+        await pruefe_entwurf_bearbeiten(db, node.subject_id, user)
     # Dieselbe Regel wie für Kapitel und Lernsequenzen (0.45). Bis dahin zählte hier nur die
     # eine Fachschaftsgruppe am Knoten, im allgemeinen Schreibrecht jede des Fachs.
     if not await darf_schreiben(db, node.status, node.subject_id, user):
@@ -827,7 +829,7 @@ async def create_node(
         raise HTTPException(status_code=422, detail=str(exc))
     if payload.status == ENTWURF:  # Teil eines Curriculum-Entwurfs (0.45)
         pruefe_anlegen(payload.content_type, payload.status)
-        await pruefe_entwurf(db, payload.subject_id, user)
+        await pruefe_entwurf_bearbeiten(db, payload.subject_id, user)
     # Leitlinien der Schule (0.50, AT F2): nur Admins legen an; Kürzel Pflicht und eindeutig.
     if payload.content_type in LEITLINIEN_TYPEN:
         if "admin" not in user.roles:
@@ -1814,7 +1816,7 @@ async def _curriculum_rechte(db: AsyncSession, tree: dict, user: JwtPayload) -> 
     das Curriculum, das ein Entwurf beim Veröffentlichen ersetzt.
     """
     status, fach = tree.get("status"), tree.get("subject_id")
-    entwurf_recht = await darf_entwurf(db, fach, user)
+    entwurf_recht = await darf_entwurf_bearbeiten(db, fach, user)
     aus = {
         "can_edit": await darf_schreiben(db, status, fach, user),
         "darf_veroeffentlichen": status == ENTWURF and await darf_veroeffentlichen(db, fach, user),
@@ -1849,7 +1851,7 @@ async def _curriculum_lesen(db: AsyncSession, tree: dict, user: JwtPayload) -> N
     Funktion lädt Entwürfe mit.
     """
     if tree.get("status") == ENTWURF:
-        await pruefe_entwurf(db, tree.get("subject_id"), user)
+        pruefe_entwurf_lesen(user)
     _check_curriculum_read_permission(tree, user)
 
 
@@ -2059,7 +2061,7 @@ async def curriculum_als_entwurf_kopieren(
     from app.context.relink import duplicate_curriculum
 
     tree = await _entwurfsbaum(db, curriculum_id, user, "active")
-    if not await darf_entwurf(db, tree["subject_id"], user):
+    if not await darf_entwurf_bearbeiten(db, tree["subject_id"], user):
         raise HTTPException(status_code=403, detail="Kopieren darf die Fachschaft des Fachs.")
     if (offen := await _offener_entwurf(db, curriculum_id)) is not None:
         raise HTTPException(status_code=409, detail={
@@ -2334,9 +2336,7 @@ async def list_curricula_by_subject(
 async def _lesbare_curricula(db: AsyncSession, subject_id: int, user: JwtPayload) -> list[ContextNode]:
     """Die Curricula eines Fachs, die die Person sieht, mit `darf_schreiben` und bei Entwürfen
     `zuletzt_geaendert` — für die Liste, die Übersicht nach Bändern und die Bandabdeckung."""
-    from app.context.curriculum_entwurf import darf_entwurf
-
-    status = ["active", ENTWURF] if await darf_entwurf(db, subject_id, user) else ["active"]
+    status = ["active", ENTWURF] if darf_entwurf_lesen(user) else ["active"]
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "curriculum",

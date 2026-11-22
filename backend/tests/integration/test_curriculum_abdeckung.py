@@ -121,8 +121,9 @@ async def test_abdeckung_je_kompetenz(db, welt):
     assert [k["nr"] for k in a["ausserhalb"]] == ["3.1(9)"]
 
 
-async def test_abdeckung_eines_entwurfs_bleibt_verborgen(db, welt):
-    for wer in (_user(f"fremd-{TOKEN}", "teacher"), _user(f"s-{TOKEN}", "student")):
-        with pytest.raises(HTTPException) as e:
-            await curriculum_abdeckung(welt["neun"].id, db=db, user=wer)
-        assert e.value.status_code == 404
+async def test_abdeckung_eines_entwurfs_nur_fuer_lehrkraefte(db, welt):
+    """Seit 0.52 (AZ) auch für Lehrkräfte außerhalb der Fachschaft; Schüler:innen nicht."""
+    await curriculum_abdeckung(welt["neun"].id, db=db, user=_user(f"fremd-{TOKEN}", "teacher"))
+    with pytest.raises(HTTPException) as e:
+        await curriculum_abdeckung(welt["neun"].id, db=db, user=_user(f"s-{TOKEN}", "student"))
+    assert e.value.status_code == 404

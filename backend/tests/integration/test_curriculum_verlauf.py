@@ -185,4 +185,5 @@ async def test_nur_wer_schreiben_darf(db, welt):
     for weg in (curriculum_sichern, curriculum_zuruecknehmen, curriculum_verlauf_lesen):
         with pytest.raises(HTTPException) as e:
             await weg(welt["cur"].id, db=db, user=FREMDE)
-        assert e.value.status_code == 404  # Entwurf: für Fremde gibt es ihn nicht
+        # Entwurf: Fremde Lehrkräfte lesen ihn seit 0.52, den Verlauf führt nur die Fachschaft.
+        assert e.value.status_code == 403

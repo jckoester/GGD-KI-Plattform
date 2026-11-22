@@ -159,7 +159,7 @@ async def curricula_finden(db: AsyncSession, user, fach: str | None, jahrgangsst
 async def curriculum_waehlen(db: AsyncSession, user, curriculum_id: UUID, kopieren: bool) -> tuple[ContextNode | None, dict]:
     """(Curriculum für den Bezug, Antwort). Ein veröffentlichtes mit offenem Entwurf führt zum
     Entwurf; ohne Entwurf wird es Bezug zum Lesen, mit `kopieren` als Entwurf kopiert."""
-    from app.context.curriculum_entwurf import darf_entwurf
+    from app.context.curriculum_entwurf import darf_entwurf_bearbeiten
     from app.context.relink import duplicate_curriculum
     from app.context.router import _offener_entwurf
 
@@ -173,7 +173,7 @@ async def curriculum_waehlen(db: AsyncSession, user, curriculum_id: UUID, kopier
     if not kopieren:
         return cur, {"hinweis": "Veröffentlicht: nur lesen. Zum Ändern nach Zustimmung der Lehrkraft "
                                 "waehle_curriculum mit als_entwurf_kopieren=true."}
-    if not await darf_entwurf(db, cur.subject_id, user):
+    if not await darf_entwurf_bearbeiten(db, cur.subject_id, user):
         return None, {"error": "Kopieren darf die Fachschaft des Fachs."}
     neu_id, _ = await duplicate_curriculum(db, cur.id, owner=user.sub, titel=cur.title)
     return await db.get(ContextNode, neu_id), {"hinweis": "Als Entwurf kopiert. Veröffentlicht wird er in der "

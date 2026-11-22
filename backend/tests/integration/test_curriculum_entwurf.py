@@ -146,9 +146,23 @@ async def test_fachschaft_und_admin_lesen_den_entwurf(db, welt):
             assert (await get_node(n.id, db=db, user=wer)).id == n.id
 
 
-@pytest.mark.parametrize("wer", ["fremd", "schuelerin", "vorschau"])
+async def test_fremde_lehrkraft_liest_den_entwurf(db, welt):
+    """Seit 0.52 (AZ, hebt E7 auf): lesen alle Lehrkräfte, bearbeiten nur die Fachschaft."""
+    cur, kap, ls = welt["entwurf"]
+    baum = await get_curriculum(cur.id, db=db, user=FREMDE)
+    assert [k["title"] for k in baum["kapitel"]] == [kap.title]
+    assert baum["can_edit"] is False and baum["darf_kopieren"] is False
+    await export_curriculum(cur.id, format="yaml", db=db, user=FREMDE)
+    await fehlende_begriffe_im_curriculum(cur.id, format="json", db=db, user=FREMDE)
+    await fachmethoden_vorschlaege(cur.id, q="", db=db, user=FREMDE)
+    for n in (cur, kap, ls):
+        assert (await get_node(n.id, db=db, user=FREMDE)).id == n.id
+        await get_neighborhood(n.id, depth=1, relation=None, category=None, db=db, user=FREMDE)
+
+
+@pytest.mark.parametrize("wer", ["schuelerin", "vorschau"])
 async def test_niemand_sonst_sieht_den_entwurf(db, welt, wer):
-    user = {"fremd": FREMDE, "schuelerin": SCHUELERIN}.get(wer) or in_vorschau(_vorschau_von(MITGLIED))
+    user = SCHUELERIN if wer == "schuelerin" else in_vorschau(_vorschau_von(MITGLIED))
     cur, kap, ls = welt["entwurf"]
     await _abgewiesen(get_curriculum(cur.id, db=db, user=user))
     await _abgewiesen(export_curriculum(cur.id, format="yaml", db=db, user=user))
@@ -166,14 +180,16 @@ async def test_veroeffentlichtes_bleibt_fuer_alle_lesbar(db, welt):
 
 
 async def test_entwurf_nicht_in_liste_suche_und_jahresplanung(db, welt):
-    """Auch für die Fachschaft: Ein Entwurf ist kein gültiges Curriculum."""
+    """Auch für die Fachschaft: Ein Entwurf ist kein gültiges Curriculum — Suche und Planung
+    nehmen ihn nicht, gleich wer ihn lesen darf."""
     cur, kap, _ = welt["entwurf"]
     aktiv, _, _ = welt["aktiv"]
-    # Die Liste zeigt den Entwurf der Fachschaft (mit `status`, Schritt 2) — sonst niemandem.
-    liste = await list_curricula_by_subject(welt["fach"].id, db=db, user=LEHRKRAFT)
-    assert {(c.id, c.status) for c in liste} == {(aktiv.id, "active"), (cur.id, "draft")}
-    for wer in (FREMDE, SCHUELERIN):
-        assert [c.id for c in await list_curricula_by_subject(welt["fach"].id, db=db, user=wer)] == [aktiv.id]
+    # Die Liste zeigt den Entwurf allen Lehrkräften (mit `status`, Schritt 2; seit 0.52 nicht nur
+    # der Fachschaft) — Schüler:innen nicht.
+    for wer in (LEHRKRAFT, FREMDE):
+        liste = await list_curricula_by_subject(welt["fach"].id, db=db, user=wer)
+        assert {(c.id, c.status) for c in liste} == {(aktiv.id, "active"), (cur.id, "draft")}
+    assert [c.id for c in await list_curricula_by_subject(welt["fach"].id, db=db, user=SCHUELERIN)] == [aktiv.id]
 
     async def gefunden(titel):
         ergebnis = await suche(titel, Suchprofil(pseudonym=MITGLIED, rollen=("teacher",)), db,
@@ -214,11 +230,12 @@ async def test_fachschaft_bearbeitet_den_entwurf(db, welt):
 
 
 async def test_fremde_schreiben_nicht_in_den_entwurf(db, welt):
+    """Sie lesen ihn (0.52) — deshalb 403 statt 404: Der Entwurf ist ihnen ja bekannt."""
     cur, _, ls = welt["entwurf"]
-    await _abgewiesen(update_curriculum_meta(cur.id, CurriculumMetaUpdate(title="x"), db=db, user=FREMDE))
-    await _abgewiesen(update_node(ls.id, ContextNodeUpdate(title="x"), db=db, user=FREMDE))
+    await _abgewiesen(update_curriculum_meta(cur.id, CurriculumMetaUpdate(title="x"), db=db, user=FREMDE), 403)
+    await _abgewiesen(update_node(ls.id, ContextNodeUpdate(title="x"), db=db, user=FREMDE), 403)
     await _abgewiesen(create_edge(ContextEdgeCreate(from_node_id=ls.id, to_node_id=welt["ik"].id,
-                                                    relation="references"), db=db, user=FREMDE))
+                                                    relation="references"), db=db, user=FREMDE), 403)
 
 
 @pytest.mark.parametrize("weg", ["patch", "verwalten"])
@@ -313,7 +330,8 @@ async def test_neues_curriculum_ist_ein_entwurf(db, welt):
         schule="Test", fachplan_node_id=str(fachplan.id)), db=db, user=LEHRKRAFT)
     assert neu.status == "draft"
     assert neu.owner_pseudonym == MITGLIED
-    await _abgewiesen(get_curriculum(neu.id, db=db, user=FREMDE))
+    await _abgewiesen(get_curriculum(neu.id, db=db, user=SCHUELERIN))
+    assert (await get_curriculum(neu.id, db=db, user=FREMDE))["can_edit"] is False
 
 
 def _kapitel(welt, **kw):
@@ -332,7 +350,7 @@ async def test_teile_gleich_als_entwurf_anlegen(db, welt):
     baum = await get_curriculum(cur.id, db=db, user=KOLLEGIN)
     assert kap.title in [k["title"] for k in baum["kapitel"]]
 
-    await _abgewiesen(create_node(_kapitel(welt, status="draft"), db=db, user=FREMDE))
+    await _abgewiesen(create_node(_kapitel(welt, status="draft"), db=db, user=FREMDE), 403)
     begriff = ContextNodeCreate(category="concept", content_type="begriff", title="B", status="draft",
                                 subject_id=welt["fach"].id)
     await _abgewiesen(create_node(begriff, db=db, user=LEHRKRAFT), 422)
@@ -347,7 +365,7 @@ async def test_frisches_kapitel_erbt_den_entwurf(db, welt):
     await create_edge(ContextEdgeCreate(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
                       db=db, user=LEHRKRAFT)
     assert kap.status == "draft"
-    await _abgewiesen(get_node(kap.id, db=db, user=FREMDE))
+    await _abgewiesen(get_node(kap.id, db=db, user=SCHUELERIN))
 
 
 async def test_haengendes_kapitel_erbt_nicht(db, welt):
@@ -378,7 +396,7 @@ async def test_kopie_ist_entwurf_der_kopierenden_person(db, welt):
     ls_neu = await db.get(ContextNode, UUID(ls_map[str(ls.id)]))
     assert (kap_neu.status, kap_neu.metadata_["kopie_von"]) == ("draft", str(kap.id))
     assert (ls_neu.status, ls_neu.owner_pseudonym) == ("draft", ZWEITES)
-    await _abgewiesen(get_curriculum(neu_id, db=db, user=FREMDE))
+    await _abgewiesen(get_curriculum(neu_id, db=db, user=SCHUELERIN))
     assert aktiv.status == "active"
 
 

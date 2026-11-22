@@ -64,10 +64,10 @@ async def zugang(db: AsyncSession, user, curriculum_id: UUID, *, schreiben: bool
     Grundsätzlich das Schreibrecht des Editors: Der Assistent arbeitet für die Fachschaft an
     ihrem Curriculum. Ein **veröffentlichtes** Curriculum darf dagegen nur der Fachvorsitz ändern
     (E9) — lesen, als Bezug wählen und als Entwurf kopieren darf es die ganze Fachschaft, dieselbe
-    Regel wie „Als Entwurf kopieren“ im Editor (`darf_entwurf`). Geschrieben wird ohnehin nur in
+    Regel wie „Als Entwurf kopieren“ im Editor (`darf_entwurf_bearbeiten`). Geschrieben wird ohnehin nur in
     Entwürfe (E17).
     """
-    from app.context.curriculum_entwurf import LESBARE_STATUS, darf_entwurf
+    from app.context.curriculum_entwurf import LESBARE_STATUS, darf_entwurf_bearbeiten
     from app.context.router import _require_curriculum_write
 
     try:
@@ -75,7 +75,7 @@ async def zugang(db: AsyncSession, user, curriculum_id: UUID, *, schreiben: bool
     except HTTPException as e:
         cur = await db.get(ContextNode, curriculum_id) if e.status_code == 403 else None
         if not (cur is not None and cur.content_type == "curriculum" and cur.status != ENTWURF
-                and cur.status in LESBARE_STATUS and await darf_entwurf(db, cur.subject_id, user)):
+                and cur.status in LESBARE_STATUS and await darf_entwurf_bearbeiten(db, cur.subject_id, user)):
             return str(e.detail) if isinstance(e.detail, str) else "Kein Zugriff auf dieses Curriculum."
     if schreiben and cur.status != ENTWURF:
         return NUR_ENTWUERFE

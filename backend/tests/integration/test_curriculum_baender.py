@@ -117,10 +117,11 @@ async def test_uebersicht_nach_fassung_und_band(db, welt):
     assert [c["title"] for b in u["fassungen"][2]["baender"] for c in b["curricula"]] == [f"Alt {TOKEN}"]
 
 
-async def test_entwuerfe_nur_fuer_die_fachschaft(db, welt):
+async def test_entwuerfe_fuer_alle_lehrkraefte(db, welt):
+    """Seit 0.52 (AZ) lesen alle Lehrkräfte Entwürfe, nicht nur die Fachschaft."""
     u = await curricula_nach_baendern(welt["fach"].id, db=db, user=_user(f"fremd-{TOKEN}", "teacher"))
     titel = [c["title"] for f in u["fassungen"] for b in f["baender"] for c in b["curricula"]]
-    assert f"K6 neu {TOKEN}" not in titel and f"K6 {TOKEN}" in titel
+    assert f"K6 neu {TOKEN}" in titel and f"K6 {TOKEN}" in titel
 
 
 async def test_abdeckung_misst_nur_das_band(db, welt):
@@ -159,10 +160,10 @@ async def test_bandabdeckung_mit_entwuerfen_ersetzt_das_original(db, welt):
         "verknuepft": 3, "partiell": 0, "fehlt": 0}
 
 
-async def test_bandabdeckung_entwuerfe_nicht_fuer_fremde(db, welt):
+async def test_bandabdeckung_mit_entwuerfen_auch_fuer_fremde_lehrkraft(db, welt):
     a = await band_abdeckung_route(welt["fach"].id, bp_version=V3, band="Klassen 5/6", entwuerfe=True,
                                    db=db, user=_user(f"fremd-{TOKEN}", "teacher"))
-    assert [c["title"] for c in a["curricula"]] == [f"K5 {TOKEN}", f"K6 {TOKEN}"]
+    assert [c["title"] for c in a["curricula"]] == [f"K5 {TOKEN}", f"K6 neu {TOKEN}"]
 
 
 async def test_bandabdeckung_nennt_nicht_zugeordnete(db, welt):
