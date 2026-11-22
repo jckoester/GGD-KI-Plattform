@@ -9,7 +9,7 @@
         exportCurriculum,
         relinkCurriculum,
     } from "$lib/api.js";
-    import { curriculumStd, ENTWURF_HINWEIS } from "$lib/curriculum.js";
+    import { curriculumStd, entwurfHinweis } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
     import CurriculumBandWahl from "$lib/components/CurriculumBandWahl.svelte";
@@ -256,7 +256,7 @@
             </div>
 
             {#if curriculum.status === "draft"}
-                <div class="mb-4"><InfoBanner message={ENTWURF_HINWEIS} /></div>
+                <div class="mb-4"><InfoBanner message={entwurfHinweis(curriculum)} /></div>
                 {#if curriculum.kopie_von}
                     <p class="-mt-2 mb-4 text-xs text-light-tx-2 dark:text-dark-tx-2">
                         Beim Veröffentlichen ersetzt dieser Entwurf

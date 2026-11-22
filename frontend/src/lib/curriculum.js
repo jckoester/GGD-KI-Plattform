@@ -11,9 +11,22 @@ export function curriculumStd(curr) {
     return (curr?.kapitel || []).reduce((s, k) => s + kapitelStd(k), 0)
 }
 
-/** Hinweis im Kopf von Ansicht und Editor eines Entwurfs (0.45, Päckchen AP). */
+/**
+ * Hinweis im Kopf von Ansicht und Editor eines Entwurfs (0.45, Päckchen AP). Seit 0.52 (AZ)
+ * lesen alle Lehrkräfte Entwürfe; der Satz sagt das der Fachschaft, die ihn bearbeitet (F2).
+ */
 export const ENTWURF_HINWEIS =
-  'Entwurf: Nur die Fachschaft und Admins sehen dieses Curriculum. In Suche, Chat und Jahresplanung erscheint es erst nach dem Veröffentlichen.'
+  'Entwurf: Alle Lehrkräfte können ihn lesen, bearbeiten kann ihn die Fachschaft. In Suche, Chat und Jahresplanung erscheint er erst nach dem Veröffentlichen.'
+
+/** Dasselbe für Lehrkräfte, die den Entwurf nur lesen (0.52, AZ). */
+export const ENTWURF_NUR_LESEN =
+  'Entwurf — nur lesen. Bearbeiten und veröffentlichen kann die Fachschaft des Fachs. Noch nicht gültig: In Suche, Chat und Jahresplanung erscheint er erst nach dem Veröffentlichen.'
+
+/** Welcher der beiden Hinweise zu einem Curriculum gehört; leer, wenn es kein Entwurf ist. */
+export function entwurfHinweis(curriculum) {
+  if (curriculum?.status !== 'draft') return ''
+  return curriculum.can_edit ? ENTWURF_HINWEIS : ENTWURF_NUR_LESEN
+}
 
 /**
  * Banner in der Planung (0.45, E15): Einheiten, deren Curriculum-Kapitel zu einem ersetzten

@@ -74,12 +74,12 @@
                 {/if}
             </span>
         </div>
-        <!-- Entwurf (0.45): kommt nur für Fachschaft und Admins aus dem Backend -->
+        <!-- Entwurf (0.45): seit 0.52 für alle Lehrkräfte, „ersetzt …“ steht in der Zeile (AZ, F1) -->
         {#if curr.status === 'draft'}
             <span
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
                        bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye"
-                title="Nur für die Fachschaft sichtbar, bis es veröffentlicht ist"
+                title="Noch nicht veröffentlicht — lesen können ihn alle Lehrkräfte, bearbeiten die Fachschaft"
             >
                 Entwurf
             </span>

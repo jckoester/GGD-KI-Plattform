@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen } from './curriculum.js'
+import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen, entwurfHinweis, ENTWURF_HINWEIS, ENTWURF_NUR_LESEN } from './curriculum.js'
 
 describe('lernsequenzStd', () => {
     it('liest eine Zahl', () => {
@@ -69,5 +69,21 @@ describe('ersetztHinweis (0.45)', () => {
     expect(ersetztHinweis([])).toBe('')
     expect(ersetztHinweis(['Trigonometrie'])).toMatch(/^Die Einheit „Trigonometrie“ hängt an einem Kapitel/)
     expect(ersetztHinweis(['A', 'B'])).toMatch(/^2 Einheiten \(„A“, „B“\) hängen/)
+  })
+})
+
+describe('entwurfHinweis (0.52, AZ)', () => {
+  it('Fachschaft: der Satz, dass alle Lehrkräfte mitlesen', () => {
+    expect(entwurfHinweis({ status: 'draft', can_edit: true })).toBe(ENTWURF_HINWEIS)
+    expect(ENTWURF_HINWEIS).toContain('Alle Lehrkräfte können ihn lesen')
+  })
+  it('wer nur liest: „nur lesen“ und wer bearbeitet', () => {
+    expect(entwurfHinweis({ status: 'draft', can_edit: false })).toBe(ENTWURF_NUR_LESEN)
+    expect(ENTWURF_NUR_LESEN).toMatch(/^Entwurf — nur lesen\./)
+    expect(ENTWURF_NUR_LESEN).toContain('Fachschaft')
+  })
+  it('veröffentlicht oder ohne Curriculum: kein Hinweis', () => {
+    expect(entwurfHinweis({ status: 'active', can_edit: false })).toBe('')
+    expect(entwurfHinweis(null)).toBe('')
   })
 })

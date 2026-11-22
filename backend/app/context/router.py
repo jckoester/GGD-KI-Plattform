@@ -2327,8 +2327,8 @@ async def list_curricula_by_subject(
 ):
     """Gibt alle Curriculum-Knoten eines Fachs zurück.
 
-    Entwürfe (0.45) nur für die Fachschaft und Admins — die Oberfläche markiert sie über
-    `status`.
+    Entwürfe (0.45) für Lehrkräfte und Admins (seit 0.52 alle, nicht nur die Fachschaft) — die
+    Oberfläche markiert sie über `status`.
     """
     return await _lesbare_curricula(db, subject_id, user)
 

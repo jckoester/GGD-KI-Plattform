@@ -94,7 +94,8 @@
         >
             <Send class="w-4 h-4" /> Veröffentlichen
         </button>
-    {:else}
+    {:else if curriculum.can_edit}
+        <!-- Wer nur liest (0.52, AZ), bekommt das im Hinweis über dem Curriculum gesagt. -->
         <span class="self-center text-xs text-light-tx-2 dark:text-dark-tx-2">
             Veröffentlichen dürfen: {curriculum.wer_veroeffentlicht}.
         </span>
