@@ -95,6 +95,19 @@ async def test_lehrkraft_sieht_den_geplanten_stand(db, welt):
     assert u["nur_veroeffentlicht"] is False
 
 
+async def test_alle_faecher_ungefiltert_in_der_reihenfolge_der_schule(db, welt):
+    """F7: auch Fächer ohne Curriculum — die Schulleitung sieht, wo noch keins angelegt ist."""
+    ch = Subject(slug=f"ch-{TOKEN}", name=f"Chemie {TOKEN}", fach_code=f"C{TOKEN[:3]}".upper(), sort_order=-1)
+    welt["ma"].sort_order = -2
+    db.add(ch)
+    await db.flush()
+    u = await leitlinien_uebersicht(db, welt["ll"].id, LEHRKRAFT)
+    alle = [f["id"] for f in u["alle_faecher"]]
+    assert alle.index(welt["ma"].id) < alle.index(ch.id) < alle.index(welt["bio"].id)
+    assert [f["name"] for f in u["faecher"]] == [f"Mathe {TOKEN}", f"Bio {TOKEN}"]  # gleiche Reihenfolge
+    assert ch.id not in [f["id"] for f in u["faecher"]]
+
+
 async def test_nur_veroeffentlichte(db, welt):
     u = await leitlinien_uebersicht(db, welt["ll"].id, LEHRKRAFT, nur_veroeffentlicht=True)
     a1, a2, _ = u["aspekte"]

@@ -136,7 +136,11 @@ async def leitlinien_uebersicht(db: AsyncSession, leitlinie_id: UUID, user, *,
     - ``aspekte``: je aktiver Aspekt die Fundstellen und ``je_fach`` (Fach-ID → Anzahl) fürs
       Raster;
     - ``ganz``: Fundstellen, die auf die Leitlinie als Ganzes verweisen;
-    - ``faecher``: die Fächer mit mindestens einer Fundstelle, nach Name — die Spalten;
+    - ``faecher``: die Fächer mit mindestens einer Fundstelle;
+    - ``alle_faecher``: alle Fächer der Schule, ungefiltert (F7) — für den Umschalter „alle
+      Fächer“; eine leere Spalte zeigt, welches Fach noch kein Curriculum hat. Beide Listen in
+      der Reihenfolge der Schule (`sort_order`, dann Name), damit die Spalten beim Umschalten
+      an ihrem Platz bleiben;
     - ``ohne_fundstelle``: Kürzel der Aspekte, die nirgends vorkommen.
     """
     knoten = await db.get(ContextNode, leitlinie_id)
@@ -156,26 +160,30 @@ async def leitlinien_uebersicht(db: AsyncSession, leitlinie_id: UUID, user, *,
     for f in alle:
         nach_ziel.setdefault(f.pop("ziel_id"), []).append(f)
 
-    faecher: dict[int | None, str] = {}
+    faecher: set[int | None] = set()
     aspekte = []
     for a in leitlinie.aspekte:
         liste = nach_ziel.get(str(a.id), [])
         je_fach: dict[str, int] = {}
         for f in liste:
-            faecher[f["fach_id"]] = f["fach"] or "ohne Fach"
+            faecher.add(f["fach_id"])
             schluessel = str(f["fach_id"])
             je_fach[schluessel] = je_fach.get(schluessel, 0) + 1
         aspekte.append({"node_id": str(a.id), "kuerzel": a.kuerzel, "titel": a.titel,
                         "fundstellen": liste, "je_fach": je_fach})
     ganz = nach_ziel.get(str(leitlinie.id), [])
-    for f in ganz:
-        faecher[f["fach_id"]] = f["fach"] or "ohne Fach"
+    faecher |= {f["fach_id"] for f in ganz}
+    alle_faecher = [{"id": i, "name": n} for i, n in (await db.execute(
+        sa.select(Subject.id, Subject.name).order_by(Subject.sort_order, Subject.name))).all()]
+    if None in faecher:  # Curriculum ohne Fach — als letzte Spalte
+        alle_faecher.append({"id": None, "name": "ohne Fach"})
 
     return {
         "art": "leitperspektive" if knoten.content_type == LEITPERSPEKTIVE else "leitlinie",
         "leitlinie": {"node_id": str(leitlinie.id), "kuerzel": leitlinie.kuerzel, "titel": leitlinie.titel},
         "nur_veroeffentlicht": nur_veroeffentlicht or not darf_entwurf_lesen(user),
-        "faecher": [{"id": i, "name": n} for i, n in sorted(faecher.items(), key=lambda x: x[1])],
+        "faecher": [f for f in alle_faecher if f["id"] in faecher],
+        "alle_faecher": alle_faecher,
         "aspekte": aspekte,
         "ganz": ganz,
         "ohne_fundstelle": [a["kuerzel"] for a in aspekte if not a["fundstellen"]],
