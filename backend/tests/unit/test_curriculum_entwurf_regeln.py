@@ -68,3 +68,39 @@ def test_pdf_vorlage_zeigt_den_vermerk():
     ohne = vorlage.render(title="T", school_name="", meta={}, entwurf=None, kapitel=[])
     assert '<div class="doc-entwurf">Entwurf, Stand 15.11.2026</div>' in mit
     assert 'class="doc-entwurf"' not in ohne
+
+
+# ── Lesen (0.52, Päckchen AZ: alle Lehrkräfte; hebt E7 auf) ─────────────────
+
+import time
+
+from app.auth import vorschau
+from app.auth.jwt import JwtPayload
+from app.context.curriculum_entwurf import darf_entwurf_lesen, pruefe_entwurf_lesen
+
+
+def _wer(*rollen, preview=None):
+    return JwtPayload(sub="p", roles=list(rollen), role=rollen[0], grade=None, exp=9999999999,
+                      iat=0, jti="j", preview=preview)
+
+
+@pytest.mark.parametrize("rollen,darf", [
+    (("teacher",), True),
+    (("teacher", "admin"), True),
+    (("admin",), True),
+    (("teacher", "fachvorsitz"), True),
+    (("student",), False),
+    (("review",), False),  # Krisen-Einsicht ohne Lehrkraft-Rolle: kein Curriculum-Material
+])
+def test_wer_entwuerfe_liest(rollen, darf):
+    assert darf_entwurf_lesen(_wer(*rollen)) is darf
+
+
+def test_vorschau_liest_keine_entwuerfe():
+    jetzt = int(time.time())
+    wer = _wer("student", preview=vorschau.Vorschau(echte_rollen=["teacher"], beginn=jetzt,
+                                                    sitzung_ablauf=jetzt + 3600))
+    assert darf_entwurf_lesen(wer) is False
+    with pytest.raises(HTTPException) as e:
+        pruefe_entwurf_lesen(wer)
+    assert e.value.status_code == 404  # verrät den Entwurf nicht

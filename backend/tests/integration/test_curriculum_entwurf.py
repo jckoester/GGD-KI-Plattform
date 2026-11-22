@@ -660,3 +660,30 @@ async def test_entwurf_laeuft_nicht_ab(db, welt):
     for n in (cur, kap, ls):
         await db.refresh(n)
         assert n.status == "draft"
+
+
+# ── Lesen ohne Bearbeiten (0.52, Päckchen AZ) ────────────────────────────────
+
+
+async def test_fremde_lehrkraft_loescht_und_veroeffentlicht_nicht(db, welt, ohne_vorsitz):
+    """Sie liest den Entwurf, die Knöpfe bekommt sie nicht, und die Wege dahinter bleiben zu —
+    auch ohne Fachvorsitz-Gruppe, wo jedes Mitglied der Fachschaft veröffentlicht."""
+    cur, kap, ls = welt["entwurf"]
+    rechte = await get_curriculum(cur.id, db=db, user=FREMDE)
+    assert not (rechte["can_edit"] or rechte["darf_veroeffentlichen"] or rechte["darf_loeschen"]
+                or rechte["darf_kopieren"])
+    await _abgewiesen(curriculum_veroeffentlichen(cur.id, db=db, user=FREMDE), 403)
+    for n in (cur, kap, ls):
+        await _abgewiesen(delete_node(n.id, force=False, db=db, user=FREMDE), 403)
+    assert (await db.get(ContextNode, cur.id, populate_existing=True)).status == "draft"
+
+
+async def test_fremde_lehrkraft_kopiert_das_veroeffentlichte_nicht_als_entwurf(db, welt):
+    aktiv, _, _ = welt["aktiv"]
+    assert (await get_curriculum(aktiv.id, db=db, user=FREMDE))["darf_kopieren"] is False
+    await _abgewiesen(curriculum_als_entwurf_kopieren(aktiv.id, db=db, user=FREMDE), 403)
+
+
+async def test_review_ohne_lehrkraft_liest_keine_entwuerfe(db, welt):
+    cur, _, _ = welt["entwurf"]
+    await _abgewiesen(get_curriculum(cur.id, db=db, user=_user(f"review-{TOKEN}", "review")))
