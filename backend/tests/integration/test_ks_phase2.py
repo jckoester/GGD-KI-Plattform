@@ -198,23 +198,30 @@ class TestImportHashUpdate:
 class TestImportArchiving:
     """Knoten der im zweiten Lauf nicht mehr im JSONL vorkommt -> archived."""
 
-    def test_removed_node_gets_archived(self, db_url):
-        # Erst 5 Knoten importieren
+    def test_removed_node_gets_archived(self, db_url, tmp_path):
+        """Ein Aspekt fällt weg, sein Typ ist im zweiten Lauf weiter vertreten → archiviert.
+
+        Bis 0.53.1 entfiel hier die IK-Kompetenz (früher `bp_import_4nodes.jsonl`). Ohne
+        konfigurierte Fächer gilt sie als fachlos; seit 0.53.1 archiviert der Import
+        fachlose Knoten nur je Typ, der im Import vorkommt — und die IK war der einzige
+        ihres Typs. Geprüft wird deshalb der Wegfall eines Aspekts neben einem bleibenden.
+        """
         run_import(db_url, FIXTURE_DIR / 'bp_import_5nodes.jsonl')
 
-        # Dann 4 Knoten (IK fehlt)
-        run_import(db_url, FIXTURE_DIR / 'bp_import_4nodes.jsonl')
+        zeilen = (FIXTURE_DIR / 'bp_import_5nodes.jsonl').read_text(encoding='utf-8').splitlines()
+        ohne = tmp_path / 'bp_import_ohne_test02.jsonl'
+        ohne.write_text('\n'.join(z for z in zeilen if '"TEST_02"' not in z) + '\n', encoding='utf-8')
+        run_import(db_url, ohne)
 
         conn = psycopg2.connect(get_sync_url(db_url))
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT status FROM context_nodes "
-                "WHERE metadata->>'bp_id' = 'BP2016BW_ALLG_GYM_TST_IK_5-6_01_01'"
+                "SELECT metadata->>'bp_id', status FROM context_nodes "
+                "WHERE metadata->>'bp_id' IN ('TEST_01', 'TEST_02')"
             )
-            row = cur.fetchone()
+            status = dict(cur.fetchall())
         conn.close()
-        assert row is not None
-        assert row[0] == 'archived'
+        assert status == {'TEST_01': 'active', 'TEST_02': 'archived'}
 
 
 # -----------------------------------------------------------------------------

@@ -320,3 +320,39 @@ def test_render_lfdb_report():
     assert "1 Bausteine · 1 Themenblöcke · 1 Kompetenzen" in report
     assert "Mit Pluralismus umgehen" in report
     assert "Leitperspektiven: BTV, PG" in report
+
+
+# ── Rückweg aus der Datenbank (0.53.1) ───────────────────────────────────────
+
+lfdb_nodes_aus_db = _lfdb.lfdb_nodes_aus_db
+
+
+def _wie_in_der_db(n):
+    """Was der Import von einem Knoten speichert (`build_metadata`: + content_hash, bp_version)."""
+    return {"bp_id": n["bp_id"], "content_type": n["content_type"], "title": n["title"],
+            "content": n["content"], "parent_bp_id": n["parent_bp_id"],
+            "metadata": {**n["metadata"], "content_hash": n["content_hash"], "bp_version": n["bp_version"]},
+            "min_grade": n["min_grade"], "max_grade": n["max_grade"], "niveau": n["niveau"],
+            "bp_version": n["bp_version"]}
+
+
+def test_lfdb_aus_db_ergibt_dieselbe_jsonl():
+    """Rundweg: PDF-Knoten → Datenbank → JSONL ist wieder dieselbe Datei (Hash unverändert)."""
+    original = build_lfdb_nodes(_valid_structure(), source_url="https://x/lfdb.pdf")
+    zurueck = lfdb_nodes_aus_db([_wie_in_der_db(n) for n in reversed(original)])
+    assert zurueck == original
+
+
+def test_lfdb_aus_db_ordnet_eltern_vor_kindern_natuerlich():
+    zeilen = [
+        {"bp_id": f"X_B1_T{i}", "content_type": "lfdb_themenblock", "title": "t", "content": "t",
+         "parent_bp_id": "X_B1", "metadata": {"content_hash": "h"}} for i in (10, 2)
+    ] + [{"bp_id": "X_B1", "content_type": "lfdb_baustein", "title": "b", "content": "b",
+          "parent_bp_id": "X", "metadata": {"content_hash": "h"}}]
+    assert [n["bp_id"] for n in lfdb_nodes_aus_db(zeilen)] == ["X_B1", "X_B1_T2", "X_B1_T10"]
+
+
+def test_lfdb_aus_db_ohne_hash_bricht_ab():
+    with pytest.raises(ValueError, match="content_hash"):
+        lfdb_nodes_aus_db([{"bp_id": "X_B1", "content_type": "lfdb_baustein", "title": "b",
+                            "content": "b", "parent_bp_id": "X", "metadata": {}}])

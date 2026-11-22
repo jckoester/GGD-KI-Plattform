@@ -130,8 +130,39 @@ def test_entfernte_knoten_einer_kommenden_fassung_werden_archiviert(pg):
     _lauf(mod, cur, sid, 2026)
     cur.execute("SELECT metadata->>'bp_id' FROM context_nodes WHERE id::text = %s", (str(ids["v2"]),))
     bekannt = {cur.fetchone()[0]}
-    mod.archive_removed_nodes(cur, bekannt, False, subject_ids={sid}, mit_fachlosen=False)
+    mod.archive_removed_nodes(cur, bekannt, False, subject_ids={sid})
     assert _status(cur, ids)["v3"] == ("archived", True)
+
+
+def test_fachlose_typen_ausserhalb_des_imports_bleiben_aktiv(db_url, run_migrations):
+    """0.53.1: Ein Import mit Leitperspektiven, aber ohne `lfdb.jsonl`, lässt den LFDB stehen.
+
+    Am 24.08.2026 archivierte genau dieser Fall alle 75 LFDB-Knoten. Läuft in einer
+    Transaktion, die am Ende verworfen wird — die Abfrage erfasst alle fachlosen Knoten der
+    Testdatenbank, auch fremde.
+    """
+    mod = _import_modul()
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    psycopg2.extras.register_uuid(conn_or_curs=conn)
+    cur = conn.cursor()
+    try:
+        ids = {}
+        for typ in ("leitperspektive_aspekt", "lfdb_kompetenz"):
+            cur.execute(
+                """INSERT INTO context_nodes (category, content_type, title, status, metadata,
+                       read_scope, write_scope, owner_pseudonym)
+                   VALUES ('knowledge', %s, %s, 'active', %s, 'global', 'global', 'system') RETURNING id""",
+                (typ, f"{typ} {TOKEN}", f'{{"bp_id": "FACHLOS_{TOKEN}_{typ}"}}'))
+            ids[typ] = cur.fetchone()[0]
+        # Der Import kannte nur andere Leitperspektiven-Aspekte — beide Knoten fehlen darin.
+        mod.archive_removed_nodes(cur, {"BNE_01"}, False, subject_ids=set(),
+                                  fachlose_typen={"leitperspektive", "leitperspektive_aspekt"})
+        cur.execute("SELECT content_type, status FROM context_nodes WHERE id = ANY(%s)",
+                    (list(ids.values()),))
+        assert dict(cur.fetchall()) == {"leitperspektive_aspekt": "archived", "lfdb_kompetenz": "active"}
+    finally:
+        conn.rollback()
+        conn.close()
 
 
 # ── Lesen: Curriculum-Wege mit, Suche ohne ───────────────────────────────────

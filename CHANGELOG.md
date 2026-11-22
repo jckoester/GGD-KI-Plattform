@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Bildungsplan-Import: Ein Voll-Import archiviert fachlose Knoten nur noch für die Typen, die er gelesen hat. Bisher
+  archivierte ein Import mit Leitperspektiven, aber ohne `lfdb.jsonl`, den ganzen Leitfaden Demokratiebildung.
+- `python -m scripts.pdf_import --lfdb --aus-db` schreibt `lfdb.jsonl` aus den Knoten der Datenbank, ohne PDF und LLM.
+
 ## [0.53.0] – 2026-11-22
 
 ### Neu

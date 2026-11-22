@@ -208,6 +208,11 @@ def build_subject_id_lookup(conn) -> dict[str, int]:
 # -- Laden und Sortieren ---------------------------------------------------------
 
 
+#: Dateien ohne Fach: die Leitperspektiven (Scraper) und der Leitfaden Demokratiebildung
+#: (PDF-Import, `lfdb.jsonl`). Sie gehören zu keinem Fach-Code und sind nicht verwaist.
+FACHLOSE_DATEIEN = ("LEITPERSPEKTIVEN", "LFDB")
+
+
 def _melde_verwaiste_datei(
     jsonl_file: Path, bekannte_fach_codes: set[str] | None
 ) -> None:
@@ -226,7 +231,7 @@ def _melde_verwaiste_datei(
     if not bekannte_fach_codes:
         return
     stem = jsonl_file.stem.upper()
-    if stem.startswith("LEITPERSPEKTIVEN"):
+    if stem.startswith(FACHLOSE_DATEIEN):
         return
     # `M_BASIS`, `M_V2` und `M` gehoeren alle zum Fach-Code `M`.
     kandidat = stem.split("_")[0]
@@ -648,7 +653,7 @@ def archive_removed_nodes(
     known_bp_ids: set[str],
     dry_run: bool,
     subject_ids: set[int] | None = None,
-    mit_fachlosen: bool = True,
+    fachlose_typen: set[str] | None = None,
 ) -> int:
     """Setzt status='archived' fuer Knoten die nicht mehr im JSONL vorkommen.
 
@@ -662,10 +667,13 @@ def archive_removed_nodes(
     Ausgabeverzeichnis. Ein Voll-Import über das Scraper-Verzeichnis sah sie nie und legte
     beide Fächer vollständig still — 959 Knoten, unbemerkt.
 
-    `mit_fachlosen` steuert dasselbe für Knoten **ohne** Fach (Leitperspektiven und ihre
-    Aspekte). Sie gehören zu keinem Fach und würden von einer reinen Fach-Einschränkung
-    nie erfasst; enthielt der Import solche Knoten, sollen veraltete darunter aber sehr
-    wohl archiviert werden.
+    `fachlose_typen` tut dasselbe für Knoten **ohne** Fach — Leitperspektiven, ihre Aspekte
+    und der Leitfaden Demokratiebildung (`lfdb_*`). Eine reine Fach-Einschränkung erfasste
+    sie nie; enthält der Import solche Knoten, sollen veraltete darunter aber sehr wohl
+    archiviert werden. **Nur je Typ, der im Import vorkommt:** Bis 0.53.1 genügte irgendein
+    fachloser Knoten, und alle fachlosen Typen galten als vollständig gelesen. Am 24.08.2026
+    lag `leitperspektiven.jsonl` im Verzeichnis, `lfdb.jsonl` aber nicht — der Voll-Import
+    archivierte den ganzen LFDB (75 Knoten), unbemerkt bis 22.11.2026.
 
     Ein ganzes Fach stilllegen geht damit nicht mehr nebenbei — das ist Absicht und
     passiert jetzt über das Fehlen in `subjects.yaml` plus `--prune-subjects`.
@@ -683,13 +691,13 @@ def archive_removed_nodes(
           AND content_type = ANY(%s)
           AND status IN ('active', 'upcoming')
           AND metadata->>'bp_id' NOT IN ({placeholders})
-          AND (subject_id = ANY(%s) OR (subject_id IS NULL AND %s))
+          AND (subject_id = ANY(%s) OR (subject_id IS NULL AND content_type = ANY(%s)))
     """,
         (
             [ct for ct in BP_CONTENT_TYPES],
             *known_bp_ids,
             list(subject_ids),
-            mit_fachlosen,
+            sorted(fachlose_typen or ()),
         ),
     )
     rows = cur.fetchall()
@@ -1167,16 +1175,19 @@ def run_import(
                     for slug in (n.get("fach_slug") for n in nodes)
                     if slug and slug in subject_id_lookup
                 }
-                import_hat_fachlose = any(not n.get("fach_slug") for n in nodes)
+                fachlose_typen = {
+                    n.get("content_type") for n in nodes
+                    if not n.get("fach_slug") and n.get("content_type")
+                }
                 logger.info(
                     "Archivierung eingegrenzt auf %d Fach/Fächer%s",
                     len(import_subject_ids),
-                    " + fachlose Knoten (Leitperspektiven)" if import_hat_fachlose else "",
+                    f" + fachlose Typen {sorted(fachlose_typen)}" if fachlose_typen else "",
                 )
                 stats["archived"] = archive_removed_nodes(
                     cur, known_bp_ids, dry_run,
                     subject_ids=import_subject_ids,
-                    mit_fachlosen=import_hat_fachlose,
+                    fachlose_typen=fachlose_typen,
                 )
 
             # Veraltete Knoten durch neuere BP-Version ersetzen

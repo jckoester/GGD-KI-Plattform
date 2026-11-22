@@ -358,6 +358,16 @@ python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
   --input scripts/scraper/output/lfdb.jsonl --db-url $DATABASE_URL
 ```
 
+> **`lfdb.jsonl` nie löschen.** Kein Scrape erzeugt sie neu. Ist sie verloren, schreibt
+> der Rückweg aus der Datenbank sie wieder — ohne PDF und LLM, mit den gespeicherten Hashes
+> (ein erneuter Import erkennt die Knoten als unverändert und setzt archivierte wieder aktiv):
+> ```bash
+> python -m scripts.pdf_import --lfdb --aus-db --db-url $DATABASE_URL
+> ```
+> Fehlte die Datei bei einem Voll-Import vor 0.53.1, ist der LFDB archiviert (geschehen am
+> 24.08.2026). Seit 0.53.1 archiviert der Import fachlose Knoten nur je `content_type`, der in
+> den gelesenen Dateien vorkommt.
+
 Erzeugt 3 content_types: `lfdb_baustein` → `lfdb_themenblock` → `lfdb_kompetenz`
 (als Unterknoten am bestehenden LFDB-Übersichtsknoten). Im Frontend:
 Wissensdatenbank → Leitperspektiven (dreistufig aufklappbarer Baum).

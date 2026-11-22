@@ -8,6 +8,8 @@ Modi:
       python -m scripts.pdf_import --lfdb --source <url> --pages "24-33"
       # Re-Run ohne LLM (aus gespeicherter Struktur):
       python -m scripts.pdf_import --lfdb --structure-json output/lfdb_struktur.json --source <url>
+      # Rückweg aus der Datenbank (ohne PDF und LLM), wenn die JSONL verloren ist:
+      python -m scripts.pdf_import --lfdb --aus-db --db-url $DATABASE_URL
 
   Fremdsprachen-Pipeline (PDF → LLM → Fachplan/Leitidee/IK/PK-JSONL + Report):
       python -m scripts.pdf_import --fremdsprache --fach E1
@@ -38,7 +40,7 @@ from scripts.pdf_import.extract import (
     extract_lfdb_structure,
 )
 from scripts.pdf_import.fremdsprache import build_fremdsprache_nodes, render_fremdsprache_report
-from scripts.pdf_import.lfdb import build_lfdb_nodes, render_lfdb_report
+from scripts.pdf_import.lfdb import build_lfdb_nodes, lfdb_nodes_aus_db, render_lfdb_report
 from scripts.pdf_import.nodes import write_jsonl
 from scripts.pdf_import.pdf_text import extract_text, load_pdf_bytes, parse_page_spec, split_pages
 
@@ -51,6 +53,45 @@ def _run_dump(args) -> None:
         print(f"{len(text)} Zeichen → {args.output}", file=sys.stderr)
     else:
         print(text)
+
+
+_LFDB_AUS_DB_SQL = """
+    SELECT n.metadata->>'bp_id', n.content_type, n.title, n.content, n.metadata,
+           p.metadata->>'bp_id', n.min_grade, n.max_grade, n.niveau, n.bp_version
+    FROM context_nodes n
+    LEFT JOIN context_edges e ON e.from_node_id = n.id AND e.relation = 'part_of'
+    LEFT JOIN context_nodes p ON p.id = e.to_node_id
+    WHERE n.category = 'knowledge'
+      AND n.content_type IN ('lfdb_baustein', 'lfdb_themenblock', 'lfdb_kompetenz')
+      AND n.status IN ('active', 'archived')
+"""
+
+
+def _run_lfdb_aus_db(args) -> None:
+    """Schreibt die LFDB-Knoten der Datenbank als `lfdb.jsonl` (nur lesend)."""
+    import os
+
+    import psycopg2
+
+    url = (args.db_url or os.environ.get("DATABASE_URL") or "").replace(
+        "postgresql+asyncpg://", "postgresql://")
+    if not url:
+        raise ValueError("--aus-db braucht --db-url oder DATABASE_URL")
+    felder = ("bp_id", "content_type", "title", "content", "metadata", "parent_bp_id",
+              "min_grade", "max_grade", "niveau", "bp_version")
+    with psycopg2.connect(url) as conn, conn.cursor() as cur:
+        cur.execute(_LFDB_AUS_DB_SQL)
+        zeilen = [dict(zip(felder, z)) for z in cur.fetchall()]
+        conn.rollback()
+    doppelt = {z["bp_id"] for z in zeilen if sum(y["bp_id"] == z["bp_id"] for y in zeilen) > 1}
+    if doppelt:
+        raise ValueError(f"Knoten mit mehreren Eltern: {sorted(doppelt)}")
+    nodes = lfdb_nodes_aus_db(zeilen)
+    jsonl_dir = Path(args.jsonl_dir)
+    write_jsonl(nodes, jsonl_dir / "lfdb.jsonl")
+    zaehlung = {t: sum(n["content_type"] == t for n in nodes)
+                for t in ("lfdb_baustein", "lfdb_themenblock", "lfdb_kompetenz")}
+    print(f"{len(nodes)} Knoten {zaehlung} → {jsonl_dir / 'lfdb.jsonl'}", file=sys.stderr)
 
 
 def _run_lfdb(args) -> None:
@@ -151,6 +192,9 @@ def main() -> None:
                         help="Pfad zu subjects.yaml (Fach-Codes/PDF-URLs)")
     parser.add_argument("--structure-json", default=None,
                         help="Vor-extrahierte Struktur (überspringt den LLM-Aufruf)")
+    parser.add_argument("--aus-db", action="store_true",
+                        help="mit --lfdb: JSONL aus den Knoten der Datenbank statt aus dem PDF")
+    parser.add_argument("--db-url", default=None, help="für --aus-db; ohne → DATABASE_URL")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="LLM-Modell für die Extraktion")
     parser.add_argument("--output-dir", default="scripts/pdf_import/output",
                         help="Arbeitsmaterial: Review-Report und Struktur-JSON (für Re-Runs)")
@@ -168,6 +212,8 @@ def main() -> None:
             if not args.fach:
                 parser.error("--fremdsprache braucht --fach (z. B. E1)")
             _run_fremdsprache(args)
+        elif args.lfdb and args.aus_db:
+            _run_lfdb_aus_db(args)
         elif args.lfdb:
             if not args.source and not args.structure_json:
                 parser.error("--lfdb braucht --source oder --structure-json")

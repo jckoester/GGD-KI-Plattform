@@ -438,7 +438,7 @@ def test_archivierung_ist_auf_die_importierten_faecher_begrenzt():
     """Der Kern des Fixes: Fächer außerhalb des Imports dürfen nicht erfasst werden."""
     cur = _ArchivCursor()
     archive_removed_nodes(
-        cur, {"BP_A", "BP_B"}, dry_run=True, subject_ids={2, 7}, mit_fachlosen=False
+        cur, {"BP_A", "BP_B"}, dry_run=True, subject_ids={2, 7}
     )
     sql, params = cur.calls[0]
     assert "subject_id = ANY(%s)" in sql
@@ -448,20 +448,27 @@ def test_archivierung_ist_auf_die_importierten_faecher_begrenzt():
     assert fachlisten == [[2, 7]] or fachlisten == [[7, 2]], fachlisten
 
 
-def test_fachlose_knoten_werden_nur_bei_bedarf_erfasst():
-    """Leitperspektiven hängen an keinem Fach.
+def test_fachlose_knoten_werden_nur_je_importiertem_typ_erfasst():
+    """Leitperspektiven und der LFDB hängen an keinem Fach.
 
     Eine reine Fach-Einschränkung erwischte sie nie — enthält der Import aber
-    Leitperspektiven, sollen veraltete darunter sehr wohl archiviert werden.
+    Leitperspektiven, sollen veraltete darunter sehr wohl archiviert werden. Nur die
+    Typen, die der Import enthält: Am 24.08.2026 archivierte ein Voll-Import mit
+    `leitperspektiven.jsonl`, aber ohne `lfdb.jsonl`, den ganzen LFDB (75 Knoten).
     """
-    for flag in (True, False):
-        cur = _ArchivCursor()
-        archive_removed_nodes(
-            cur, {"BP_A"}, dry_run=True, subject_ids={2}, mit_fachlosen=flag
-        )
-        sql, params = cur.calls[0]
-        assert "subject_id IS NULL AND %s" in sql
-        assert flag in params
+    cur = _ArchivCursor()
+    archive_removed_nodes(
+        cur, {"BP_A"}, dry_run=True, subject_ids={2},
+        fachlose_typen={"leitperspektive_aspekt", "leitperspektive"},
+    )
+    sql, params = cur.calls[0]
+    assert "subject_id IS NULL AND content_type = ANY(%s)" in sql
+    assert params[-1] == ["leitperspektive", "leitperspektive_aspekt"]
+    assert not any("lfdb" in str(p) for p in params[-2:]), "LFDB darf nicht erfasst werden"
+
+    cur = _ArchivCursor()
+    archive_removed_nodes(cur, {"BP_A"}, dry_run=True, subject_ids={2})
+    assert cur.calls[0][1][-1] == [], "ohne fachlose Knoten im Import keine fachlosen Typen"
 
 
 def test_ohne_fachliste_wird_nichts_fremdes_archiviert():
@@ -1080,8 +1087,9 @@ def test_editionsdateien_gelten_als_dasselbe_fach(tmp_path, caplog):
 
 
 def test_leitperspektiven_gehoeren_zu_keinem_fach(tmp_path, caplog):
-    """Die LP-Datei ist fachlos und darf nicht als verwaist gelten."""
+    """Die LP-Datei und die LFDB-Datei sind fachlos und dürfen nicht als verwaist gelten."""
     _jsonl(tmp_path, "leitperspektiven", bp_id="BNE_01")
+    _jsonl(tmp_path, "lfdb", bp_id="BP2016BW_ALLG_LP_LFDB_B1")
 
     with caplog.at_level(logging.WARNING):
         _import_bp.load_jsonl_files(tmp_path, None, {"M"})

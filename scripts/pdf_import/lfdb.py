@@ -66,6 +66,56 @@ def build_lfdb_nodes(structure: dict, *, source_url: str | None = None) -> list[
     return nodes
 
 
+#: Reihenfolge der Ebenen in der JSONL — Eltern vor Kindern, wie `build_lfdb_nodes`.
+_EBENEN = ("lfdb_baustein", "lfdb_themenblock", "lfdb_kompetenz")
+
+
+def _natuerlich(bp_id: str) -> list:
+    """`…_B2_T10` nach `…_B2_T9`."""
+    import re
+
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", bp_id)]
+
+
+def lfdb_nodes_aus_db(zeilen: list[dict]) -> list[dict]:
+    """Die LFDB-Knoten aus der Datenbank zurück als JSONL (0.53.1, Rückweg ohne LLM).
+
+    Die JSONL des PDF-Imports ging verloren (sie lag bis 24.08.2026 in einem eigenen
+    Verzeichnis); ohne sie archiviert jeder Voll-Import den LFDB. Die Knoten stehen aber
+    vollständig in der Datenbank. Daraus entsteht dieselbe Datei — mit dem **gespeicherten**
+    `content_hash`, damit der Import die Knoten als unverändert erkennt (kein neues
+    Embedding) und sie nur wieder aktiv setzt.
+
+    `zeilen`: je Knoten `bp_id`, `content_type`, `title`, `content`, `metadata`,
+    `parent_bp_id` (über die Kante `part_of`), `min_grade`, `max_grade`, `niveau`,
+    `bp_version`. Archivierte Knoten gehören dazu — gerade die sollen zurück.
+    """
+    aus = []
+    for z in sorted(zeilen, key=lambda z: (_EBENEN.index(z["content_type"]), _natuerlich(z["bp_id"]))):
+        meta = dict(z.get("metadata") or {})
+        hash_ = meta.pop("content_hash", None)
+        meta.pop("bp_version", None)  # setzt der Import aus dem Knoten
+        if not hash_:
+            raise ValueError(f"{z['bp_id']}: kein content_hash in der Datenbank")
+        aus.append({
+            "bp_id": z["bp_id"],
+            "type": "knowledge",
+            "content_type": z["content_type"],
+            "title": z["title"],
+            "content": z["content"] or "",
+            "content_hash": hash_,
+            "parent_bp_id": z["parent_bp_id"],
+            "relations": [],
+            "min_grade": z.get("min_grade"),
+            "max_grade": z.get("max_grade"),
+            "niveau": z.get("niveau") or "regulär",
+            "bp_version": z.get("bp_version") or "",
+            "metadata": meta,
+            "visibility": "global",
+        })
+    return aus
+
+
 def render_lfdb_report(structure: dict) -> str:
     """Menschenlesbarer Markdown-Baum zur Review (Vollständigkeit/Zuordnung prüfen)."""
     lines = ["# LFDB — Extraktions-Review", ""]
