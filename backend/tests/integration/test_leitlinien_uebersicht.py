@@ -159,3 +159,40 @@ async def test_leitperspektive(db, welt):
     assert await leitlinien_uebersicht(db, asp[0].id, LEHRKRAFT) is None
     # Die Leitlinie aus der Welt bleibt eine Leitlinie
     assert (await leitlinien_uebersicht(db, welt["ll"].id, LEHRKRAFT))["art"] == "leitlinie"
+
+
+async def test_lfdb_themenbloecke_als_spalten(db, welt):
+    """0.53.1, F2: Spalten = Themenblöcke; Kompetenz zählt beim Themenblock, Baustein und
+    LFDB als Ganzes unter „Ganz“; eine Lernsequenz je Spalte nur einmal."""
+    bp = "BP2016BW_ALLG_LP_LFDB"
+    lp = _knoten("leitperspektive", f"LFDB {TOKEN}", metadata_={"bp_id": bp})
+    b1 = _knoten("lfdb_baustein", f"Baustein 1 {TOKEN}", metadata_={"bp_id": f"{bp}_B1"})
+    t2, t10 = (_knoten("lfdb_themenblock", f"Block {n} {TOKEN}", metadata_={"bp_id": f"{bp}_B1_{n}"})
+               for n in ("T2", "T10"))
+    k3 = _knoten("lfdb_kompetenz", f"Kompetenz {TOKEN}", metadata_={"bp_id": f"{bp}_B1_T2_K3"})
+    alt = _knoten("lfdb_themenblock", f"Archiviert {TOKEN}", status="archived",
+                  metadata_={"bp_id": f"{bp}_B1_T3"})
+    db.add_all([lp, b1, t2, t10, k3, alt])
+    await db.flush()
+    db.add_all([ContextEdge(from_node_id=v.id, to_node_id=n.id, relation="part_of")
+                for v, n in ((b1, lp), (t2, b1), (t10, b1), (alt, b1), (k3, t2))])
+    ls = {t: (await db.execute(sa.select(ContextNode).where(ContextNode.title == f"LS {t} {TOKEN}"))).scalar_one()
+          for t in ("Bio7", "Ma7 neu")}
+    # Bio7 verweist auf Themenblock und Kompetenz (eine Fundstelle) sowie auf den Baustein,
+    # Ma7 neu auf den LFDB als Ganzes.
+    db.add_all([ContextEdge(from_node_id=ls["Bio7"].id, to_node_id=z.id, relation="references") for z in (t2, k3, b1)]
+               + [ContextEdge(from_node_id=ls["Ma7 neu"].id, to_node_id=lp.id, relation="references")])
+    await db.flush()
+
+    u = await leitlinien_uebersicht(db, lp.id, LEHRKRAFT)
+    assert u["art"] == "leitperspektive"
+    assert u["leitlinie"]["kuerzel"] == "LFDB"
+    assert [(a["kuerzel"], a["titel"]) for a in u["aspekte"]] == [
+        ("B1.T2", f"Block T2 {TOKEN}"), ("B1.T10", f"Block T10 {TOKEN}")]
+    assert _orte(u["aspekte"][0]) == [(f"Bio7 {TOKEN}", "draft")]
+    assert u["aspekte"][0]["je_fach"] == {str(welt["bio"].id): 1}
+    assert u["ohne_fundstelle"] == ["B1.T10"]
+    assert sorted(f["curriculum"] for f in u["ganz"]) == [f"Bio7 {TOKEN}", f"Ma7 neu {TOKEN}"]
+    assert [f["name"] for f in u["faecher"]] == [f"Bio {TOKEN}", f"Mathe {TOKEN}"]
+    # Ein Baustein ist selbst keine Leitperspektive
+    assert await leitlinien_uebersicht(db, b1.id, LEHRKRAFT) is None

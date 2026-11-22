@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Curriculum: Im Feld *Hinweise* lässt sich nach `@` auch auf Bausteine, Themenblöcke und Kompetenzen des Leitfadens
   Demokratiebildung verweisen; der Curriculum-Assistent schreibt sie als Kürzel (`LFDB_B1_T2`).
+- Übersicht der Leitperspektiven: Für den Leitfaden Demokratiebildung sind die 11 Themenblöcke die Spalten; Verweise auf
+  Kompetenzen zählen bei ihrem Themenblock, Verweise auf einen Baustein unter „Ganz“.
 
 ### Behoben
 
