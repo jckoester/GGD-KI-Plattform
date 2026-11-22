@@ -26,6 +26,10 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # vollständige Spiegel eines Schuljahres einige hundert Anfragen braucht; eng genug,
     # dass eine Schleife ohne Abbruch auffällt statt durchzulaufen.
     "token": (300, 60.0),
+    # MCP-Server für KI-Abos (0.54, AW F5), gezählt je Token und je Nachricht (POST). Ein
+    # Auftrag im KI-Programm löst mehrere Werkzeugaufrufe aus; 60 je Minute lassen das zu und
+    # bremsen eine Schleife.
+    "mcp": (60, 60.0),
     # Rückmeldungen (ADR-020): ein **Stundenfenster**, nicht wie die übrigen ein
     # Minutenfenster. Fünf Meldungen in einer Stunde deckt jeden ehrlichen Fall ab;
     # der eigentliche Riegel gegen Unsinn ist das Tageslimit aus der Datenbank.

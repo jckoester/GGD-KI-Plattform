@@ -9,6 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Zugangstoken: neue Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“ (`curriculum:read`);
   sie gilt nur für die Schnittstelle zu KI-Abos und öffnet keinen anderen Zugang.
+- Schnittstelle für KI-Abos (MCP) unter `/api/mcp`, ab Werk aus (`MCP_AKTIV`, `MCP_OEFFENTLICHE_URL`); angemeldet mit
+  einem Zugangstoken, gedrosselt je Token (Eimer `mcp`).
 
 ### Entwicklung
 

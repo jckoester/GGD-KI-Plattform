@@ -233,7 +233,11 @@ async def lifespan(app: FastAPI):
             "(z. B. CHAT_DEFAULT_MODEL=chat-standard)."
         )
 
-    yield
+    # Schnittstelle für KI-Abos (0.54): Der Session-Manager des MCP-SDK läuft mit der App.
+    from app.mcp.server import lebenszyklus
+
+    async with lebenszyklus(getattr(app.state, "mcp_server", None)):
+        yield
 
     # ── Herunterfahren ────────────────────────────────────────────────────────
     # Laufende Hintergrundaufgaben zu Ende bringen lassen: Kosten-Nachträge und
@@ -310,3 +314,9 @@ app.include_router(feedback_router)
 app.include_router(bewertung_router)
 app.include_router(group_join_router)
 app.include_router(einrichtung_router)
+
+# Schnittstelle für KI-Abos (MCP, 0.54, Päckchen AW): nur mit MCP_AKTIV (F4), dann unter /mcp.
+from app.mcp.server import einhaengen as _mcp_einhaengen  # noqa: E402
+
+app.state.mcp_server = _mcp_einhaengen(
+    app, aktiv=settings.mcp_aktiv, oeffentliche_url=settings.mcp_oeffentliche_url)

@@ -244,6 +244,14 @@ class Settings(BaseSettings):
     # Vorlauf der letzten Warnung vor dieser Grenze.
     crisis_final_warning_days: int = 14
 
+    # Schnittstelle für KI-Abos (MCP, 0.54, Päckchen AW). Aus, bis die Schule sie bewusst
+    # einschaltet (F4) — Inhalte gehen dann an den Anbieter des Abos. Die öffentliche Adresse
+    # des Servers, wie Clients sie aufrufen (hinter nginx mit `/api`), etwa
+    # `https://ki.schule.de/api/mcp`; aus ihr kommen die erlaubten Host- und Origin-Werte und
+    # in AX `issuer`/`resource` der OAuth-Metadaten. Ohne sie startet der Server nicht.
+    mcp_aktiv: bool = False
+    mcp_oeffentliche_url: str = ""
+
     allowed_hosts: list[str] = ["*"]
     # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
     # der direkte TCP-Peer hier gelistet ist, wird `X-Forwarded-For` ausgewertet — sonst spoofbar.
