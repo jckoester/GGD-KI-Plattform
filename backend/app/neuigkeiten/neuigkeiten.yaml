@@ -534,3 +534,17 @@
     Fachschaft lesen alle Lehrkräfte. Bearbeiten und veröffentlichen kann weiter nur die
     Fachschaft, und in Suche, Chat und Planung erscheint ein Entwurf erst nach dem Veröffentlichen.
   link: /help/curriculum#entwurf-und-veröffentlichen
+
+- id: "0.53-leitlinien-uebersicht"
+  version: "0.53.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-22
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Wo kommen die Leitperspektiven im Unterricht vor?"
+  text: >-
+    Auf der Seite Leitperspektiven zeigt dir das Raster-Symbol an jeder Leitperspektive und jeder
+    Leitlinie der Schule eine Übersicht: in welchem Fach welcher Aspekt in den Curricula vorkommt
+    und welcher noch nirgends. Du kannst auf eine Klasse eingrenzen, alle Fächer zeigen und
+    Entwürfe ausblenden; ein Klick auf eine Fundstelle öffnet das Curriculum am Kapitel.
+  link: /help/bibliothek#wo-kommt-eine-leitperspektive-im-unterricht-vor

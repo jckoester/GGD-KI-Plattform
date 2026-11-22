@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.53.0] – 2026-11-22
+
 ### Neu
 
 - Leitperspektiven: Übersicht je Leitperspektive und je Leitlinie der Schule — ein Raster Fach × Aspekt mit der Zahl
