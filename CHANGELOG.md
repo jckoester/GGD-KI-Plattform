@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.53.1] – 2026-11-22
+
 ### Neu
 
 - Curriculum: Im Feld *Hinweise* lässt sich nach `@` auch auf Bausteine, Themenblöcke und Kompetenzen des Leitfadens
@@ -17,6 +19,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Bildungsplan-Import: Ein Voll-Import archiviert fachlose Knoten nur noch für die Typen, die er gelesen hat. Bisher
   archivierte ein Import mit Leitperspektiven, aber ohne `lfdb.jsonl`, den ganzen Leitfaden Demokratiebildung.
 - `python -m scripts.pdf_import --lfdb --aus-db` schreibt `lfdb.jsonl` aus den Knoten der Datenbank, ohne PDF und LLM.
+
+### Nach dem Update
+
+- Leitfaden Demokratiebildung wiederherstellen, falls archiviert: `lfdb.jsonl` mit `--aus-db` schreiben und importieren,
+  siehe `docs/admin/bildungsplan-import.md`, Abschnitt „LFDB aus der Datenbank wiederherstellen“. Die Embeddings rechnet
+  der nächtliche Cron.
 
 ## [0.53.0] – 2026-11-22
 

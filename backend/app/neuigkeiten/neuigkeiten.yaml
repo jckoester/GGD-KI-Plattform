@@ -548,3 +548,16 @@
     und welcher noch nirgends. Du kannst auf eine Klasse eingrenzen, alle Fächer zeigen und
     Entwürfe ausblenden; ein Klick auf eine Fundstelle öffnet das Curriculum am Kapitel.
   link: /help/bibliothek#wo-kommt-eine-leitperspektive-im-unterricht-vor
+
+- id: "0.53-lfdb-verweise"
+  version: "0.53.1"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-22
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Verweise auf den Leitfaden Demokratiebildung"
+  text: >-
+    Im Curriculum kannst du jetzt auf den Leitfaden Demokratiebildung verweisen: im Feld Hinweise
+    nach @, auf einen Baustein, einen Themenblock oder eine Kompetenz. Die Übersicht der
+    Leitperspektiven zeigt dazu, wo seine Themenblöcke im Unterricht vorkommen.
+  link: /help/curriculum#hinweise-leitperspektiven-und-leitlinien
