@@ -2151,6 +2151,27 @@ async def curriculum_abdeckung(
     return await abdeckung(db, tree)
 
 
+@router.get("/leitlinien/{node_id}/uebersicht")
+async def leitlinien_uebersicht_route(
+    node_id: UUID,
+    nur_veroeffentlicht: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+):
+    """Schulweite Übersicht einer Leitlinie oder Leitperspektive (0.53, Päckchen AU).
+
+    Je Aspekt die Fundstellen in allen lesbaren Curricula, Entwürfe gekennzeichnet mitgezählt
+    (F3); `nur_veroeffentlicht` zeigt den gültigen Stand. Nur Lehrkräfte und Admins (F2) — in
+    der Vorschau sind die Rollen die einer Schüler:in, die Route ist dort also gesperrt.
+    """
+    from app.context.leitlinien_uebersicht import leitlinien_uebersicht
+
+    aus = await leitlinien_uebersicht(db, node_id, user, nur_veroeffentlicht=nur_veroeffentlicht)
+    if aus is None:
+        raise HTTPException(status_code=404, detail="Leitlinie oder Leitperspektive nicht gefunden")
+    return aus
+
+
 @router.get("/curricula/{curriculum_id}", response_model=CurriculumRead)
 async def get_curriculum(
     curriculum_id: UUID,

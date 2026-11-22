@@ -26,11 +26,13 @@ SPERRE = {"pruefe_entwurf_bearbeiten"}
 
 #: Wer die Leseregel **direkt** aufruft. Eine neue Stelle gehört bewusst hierher.
 DIREKT = {"_check_read_permission", "_curriculum_lesen", "_lesbare_curricula",
-          "pruefe_entwurf_lesen", "pruefe_entwurf_bearbeiten"}
+          "pruefe_entwurf_lesen", "pruefe_entwurf_bearbeiten",
+          # Übersicht der Leitlinien (0.53, AU): zählt Entwürfe mit, liest nur.
+          "leitlinien_fundstellen", "leitlinien_uebersicht"}
 
 #: Lesende Hilfsfunktionen ohne eigene Route.
 LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
-          "_lesbare_curricula", "_entwurfsbaum"}
+          "_lesbare_curricula", "_entwurfsbaum", "leitlinien_fundstellen", "leitlinien_uebersicht"}
 
 #: Nicht lesende Stellen, die die Leseregel benutzen: Grund und die Prüfung, die sie danach
 #: aufrufen müssen (``None``: ändert nichts an einem Entwurf).
