@@ -2478,6 +2478,11 @@ async def create_edge(
 
     await _check_write_permission(from_node, user, db)
     await _check_read_permission(to_node, user, db)
+    # Eine Kante in einen Entwurf ändert ihn (ein frisches Kapitel wird Teil von ihm): Dafür
+    # braucht es das Bearbeitungsrecht, nicht nur das Leserecht. Bis 0.52 hielt das die
+    # Leseprüfung mit 404 ab — seither lesen alle Lehrkräfte Entwürfe (AZ).
+    if to_node.status == ENTWURF:
+        await pruefe_entwurf_bearbeiten(db, to_node.subject_id, user)
     await erbe_entwurf(db, from_node, to_node, payload.relation)  # frisches Kapitel → Entwurf
     pruefe_kante(from_node.status, to_node.status)
 

@@ -238,6 +238,35 @@ async def test_fremde_schreiben_nicht_in_den_entwurf(db, welt):
                                                     relation="references"), db=db, user=FREMDE), 403)
 
 
+async def test_fremde_haengen_kein_kapitel_in_den_entwurf(db, welt):
+    """Gefunden beim Wächter (0.52): Eine Lehrkraft einer **anderen** Fachschaft legt dort ein
+    frisches Kapitel an und hängt es per `part_of` an den fremden Entwurf — `erbe_entwurf` machte
+    es zum Teil davon. Bis 0.52 hielt das die 404 der Leseprüfung ab; jetzt prüft `create_edge`
+    das Bearbeitungsrecht am Entwurf."""
+    cur, _, _ = welt["entwurf"]
+    anderes = Subject(slug=f"anders-{TOKEN}", name=f"Anders {TOKEN}", fach_code=f"A{TOKEN[:4]}".upper())
+    db.add(anderes)
+    await db.flush()
+    fs2 = Group(name=f"FS2 {TOKEN}", slug=f"fs2-{TOKEN}", type="subject_department", subject_id=anderes.id)
+    db.add(fs2)
+    await db.flush()
+    db.add(GroupMembership(group_id=fs2.id, pseudonym=FREMD, role_in_group="teacher"))
+    await db.flush()
+    eigenes = await create_node(ContextNodeCreate(
+        category="knowledge", content_type="kapitel", title=f"Eigenes {TOKEN}", read_scope="school",
+        write_scope="subject", write_scope_group_id=fs2.id, subject_id=anderes.id), db=db, user=FREMDE)
+    await _abgewiesen(create_edge(ContextEdgeCreate(from_node_id=eigenes.id, to_node_id=cur.id,
+                                                    relation="part_of"), db=db, user=FREMDE), 403)
+    assert eigenes.status == "active"
+    titel = [k["title"] for k in (await get_curriculum(cur.id, db=db, user=LEHRKRAFT))["kapitel"]]
+    assert eigenes.title not in titel
+
+
+async def test_fremde_kopieren_keine_teile_des_entwurfs(db, welt):
+    _, kap, _ = welt["entwurf"]
+    await _abgewiesen(copy_node(kap.id, ContextNodeCopyRequest(), db=db, user=FREMDE), 422)
+
+
 @pytest.mark.parametrize("weg", ["patch", "verwalten"])
 async def test_status_aendert_nur_veroeffentlichen(db, welt, weg):
     """Weder die Fachschaft über das allgemeine PATCH noch die Eigentümerin über
