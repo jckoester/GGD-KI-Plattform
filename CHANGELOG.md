@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.51.0] – 2026-11-21
+
 ### Neu
 
 - Lehrkräfte wählen das Modell auch im Chat mit einem Assistenten, vorbelegt mit „wie der Assistent“; bei

@@ -507,3 +507,16 @@
     Leitperspektive. Die Abdeckung zeigt, welche Aspekte vorkommen, und der Curriculum-Assistent
     schlägt passende vor.
   link: /help/curriculum#hinweise-leitperspektiven-und-leitlinien
+
+- id: "0.51-modellwahl"
+  version: "0.51.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-21
+  rollen: [teacher]
+  titel: "Modell wählen, auch mit Assistent"
+  text: >-
+    Im Chat mit einem Assistenten kannst du jetzt das Modell umstellen; „wie der Assistent“ lässt
+    es bei seinem. Neben jedem Modell steht, was eine Nachricht damit kostet. Im Profil legst du
+    unter „Bevorzugte Modelle“ fest, womit neue freie Chats und neue Chats mit
+    Planungs-Assistenten beginnen.
+  link: /help/chat#modell-im-assistenten-chat
