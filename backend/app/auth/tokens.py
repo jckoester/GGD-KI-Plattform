@@ -33,6 +33,9 @@ SCOPE_BESCHRIFTUNG: dict[str, str] = {
     "planning:write": "Unterrichtsplanung ändern",
     "context:read": "Bausteine lesen",
     "context:write": "Bausteine ändern",
+    # 0.54, Päckchen AW: nur für den MCP-Server (`app/mcp/`). Öffnet keinen REST-Weg —
+    # `app.auth.scopes` kennt ihn nicht, und dort gilt deny-by-default.
+    "curriculum:read": "Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme",
 }
 
 SCOPES = frozenset(SCOPE_BESCHRIFTUNG)

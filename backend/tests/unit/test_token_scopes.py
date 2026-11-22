@@ -84,7 +84,11 @@ class TestTabelleUndScopesPassenZusammen:
     und ein verlangter Scope, den niemand vergeben kann, eine Tür ohne Schlüssel."""
 
     def test_jeder_scope_wird_irgendwo_verlangt(self):
-        verlangt = {s for paar in _ZUSTAENDIG.values() for s in paar}
+        # Zwei Stellen verlangen Scopes: die Tabelle der REST-Router und der MCP-Server
+        # (0.54, AW) — dessen Scope öffnet bewusst keinen REST-Weg.
+        from app.mcp.auth import SCOPE as MCP_SCOPE
+
+        verlangt = {s for paar in _ZUSTAENDIG.values() for s in paar} | {MCP_SCOPE}
         assert verlangt == set(SCOPES), (
             f"nur in der Tabelle: {verlangt - set(SCOPES)}; "
             f"nur vergebbar: {set(SCOPES) - verlangt}"

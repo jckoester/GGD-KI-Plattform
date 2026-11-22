@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Zugangstoken: neue Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“ (`curriculum:read`);
+  sie gilt nur für die Schnittstelle zu KI-Abos und öffnet keinen anderen Zugang.
+
 ### Entwicklung
 
 - Neue Abhängigkeit `mcp` 2.3 (MCP Python SDK, MIT) für die Schnittstelle zu KI-Abos.

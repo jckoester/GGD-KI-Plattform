@@ -49,6 +49,7 @@ Cron-Container (separat):
 | `crisis/` | Krisenerkennung (ADR-008): Schlüsselwort-Erkennung (`detector.py`), Benachrichtigung, Erinnerungen an unerledigte Fälle |
 | `export/` | Ausgabeformate: PDF (weasyprint), DOCX/ODT (Pandoc), Vorlagen, Prärendern von Diagrammen |
 | `mail/` | SMTP-Versand — einzige Stelle, die Mails verschickt |
+| `mcp/` | Schnittstelle für KI-Abos (seit 0.54, Päckchen AW): lesender MCP-Server; Anmeldung mit Zugangstoken mit Scope `curriculum:read` (`auth.py`) |
 | `models/` | Platzhalter-Paket ohne Inhalt; die SQLAlchemy-Modelle liegen in `db/` |
 | `pedagogy/` | Pädagogische Leitplanken (ADR-008 Teil 1+2): `pedagogy.yaml` laden, Präambeln und Lernverhalten in den System-Prompt komponieren |
 | `pii/` | Datensparsamkeit-Gate (Phase 14): lokale NER + Muster, ohne Netzaufruf |
