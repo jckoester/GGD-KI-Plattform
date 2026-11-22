@@ -209,6 +209,12 @@ Weltethos, stehen sie in derselben Auswahl nach `@`, unter den Leitperspektiven.
 auf die Leitlinie als Ganzes oder auf einen ihrer Aspekte. Im Curriculum erscheinen sie in
 einer eigenen Farbe, damit Bildungsplan und Schule unterscheidbar bleiben.
 
+Auch den **Leitfaden Demokratiebildung** findest du dort, unter den Leitperspektiven. Du
+verweist auf den Leitfaden als Ganzes, auf einen Baustein, einen Themenblock oder eine
+Kompetenz. Ohne Suchtext zeigt die Auswahl nur Bausteine und Themenblöcke. Tippst du weiter,
+etwa „streiten“ oder „B1.T2“, erscheinen auch die passenden Kompetenzen. Im Curriculum steht
+dann zum Beispiel „LFDB B1.T2: Richtig streiten lernen“.
+
 ### Material
 
 Im Feld **Material** steht Freitext, Links — und mit `@` Verweise auf Bausteine aus dem

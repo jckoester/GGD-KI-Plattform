@@ -370,7 +370,19 @@ python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
 
 Erzeugt 3 content_types: `lfdb_baustein` → `lfdb_themenblock` → `lfdb_kompetenz`
 (als Unterknoten am bestehenden LFDB-Übersichtsknoten). Im Frontend:
-Wissensdatenbank → Leitperspektiven (dreistufig aufklappbarer Baum).
+Bibliothek → Leitperspektiven (dreistufig aufklappbarer Baum).
+
+> **Embeddings nicht vergessen.** Der Import setzt `embedding = NULL`; die Vektoren rechnet
+> `embedding_backfill.py`, und der nimmt nur **aktive** Knoten. Auf Prod erledigt das der
+> nächtliche Cron. Auf Dev läuft kein Cron, dort von Hand:
+> ```bash
+> cd backend && python scripts/embedding_backfill.py \
+>   --content-type lfdb_themenblock --content-type lfdb_kompetenz
+> ```
+> Vollständig sind es 71 Vektoren; die 4 Bausteine bekommen bewusst keinen. Auf Dev hatte bis
+> 22.11.2026 kein LFDB-Knoten einen, und die Chat-Suche fand den Leitfaden nicht: Der Backfill
+> lief zwischen Import (16.07.) und Archivierung (24.08.) nie, auf Prod waren die Crons bis
+> 0.39.2 tot.
 
 > **Alten `import_hinweis` entfernen (einmalig, Bestandssystem).** Der
 > Übersichtsknoten (`BP2016BW_ALLG_LP_LFDB`), der vor der Umstellung importiert
@@ -425,6 +437,13 @@ LLM aus der gespeicherten Struktur:
 >
 > Ein Schritt-4/5-Voll-Import erfasst damit **alle** Fächer; die Einzelaufrufe oben bleiben
 > für den gezielten Import nach einer Extraktion.
+>
+> **Fachlose Knoten (seit 0.53.1).** Archiviert wird je Fach nur, was zu den Fächern im
+> Import gehört. Fachlose Knoten (Leitperspektiven, LFDB) archiviert er nur für die
+> `content_type`s, die in den gelesenen Dateien vorkommen (`archive_removed_nodes(…,
+> fachlose_typen=…)`). Ein Import nur mit `leitperspektiven.jsonl` lässt den LFDB also
+> stehen. Bis 0.53.1 genügte irgendein fachloser Knoten im Import, und alles Fachlose außerhalb
+> der Dateien wurde archiviert.
 Anschließend Embeddings (Schritt 6) und die Suchprüfung (Schritt 7) wie üblich.
 
 ---

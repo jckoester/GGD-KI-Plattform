@@ -353,7 +353,7 @@ docker compose run --rm \
   python -m scripts.pdf_import --lfdb \
     --source "https://.../BP2016BW_ALLG_LFDB_20190712.pdf" \
     --pages "24-33"
-# → scripts/pdf_import/output/lfdb.jsonl        (Import-Datei, auf dem Host)
+# → scripts/scraper/output/lfdb.jsonl          (Import-Datei, auf dem Host)
 #   scripts/pdf_import/output/lfdb_report.md     (zum inhaltlichen Prüfen)
 #   scripts/pdf_import/output/lfdb_struktur.json (für Re-Runs ohne LLM)
 
@@ -374,7 +374,7 @@ docker compose run --rm \
   backend \
   sh -c 'python /app/import-scripts/import_bildungsplan.py \
     --subjects /app/config/subjects.yaml \
-    --input /app/import-scripts/pdf_import/output/lfdb.jsonl \
+    --input /app/import-scripts/scraper/output/lfdb.jsonl \
     --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki" \
     --dry-run'
 # Sieht der Dry-Run gut aus: denselben Befehl OHNE --dry-run. Danach Embeddings (Schritt 4).
@@ -382,10 +382,16 @@ docker compose run --rm \
 
 Die erzeugten Knotentypen (`lfdb_baustein`, `lfdb_themenblock`, `lfdb_kompetenz`)
 sind idempotent über den Content-Hash — ein erneuter Lauf aktualisiert nur
-geänderte Knoten. Im Frontend erscheinen sie unter **Wissensdatenbank →
+geänderte Knoten. Im Frontend erscheinen sie unter **Bibliothek →
 Leitperspektiven** als dreistufig aufklappbarer Baum (Baustein → Themenblock →
 Kompetenz); der Import-Ort ist also derselbe wie bei den übrigen
-Leitperspektiven.
+Leitperspektiven. Seit 0.53.1 verweisen Curricula im Feld *Hinweise* auf alle drei Ebenen,
+und die Übersicht der Leitperspektiven zeigt die Themenblöcke als Spalten.
+
+> **`lfdb.jsonl` nie löschen.** Die Datei liegt bewusst neben den Dateien des Scrapers,
+> damit ein Voll-Import (Schritt 2/3) sie mitliest. Kein Scrape erzeugt sie neu. Bis 0.53.1
+> archivierte ein Voll-Import ohne diese Datei den ganzen LFDB; seit 0.53.1 lässt er ihn
+> unberührt.
 
 > Ein Text-Dump zum Inspizieren der Quellseiten (ohne LLM) geht mit demselben
 > `docker compose run … backend python -m scripts.pdf_import --source <url> --pages "24-33"`
@@ -395,6 +401,46 @@ Leitperspektiven.
 > geht es direkt ohne Container — dann aber vorher die Umgebung laden, damit
 > `LITELLM_MASTER_KEY`/`LITELLM_PROXY_URL` gesetzt sind:
 > `set -a && source .env && set +a && python -m scripts.pdf_import --lfdb …`.
+
+### LFDB aus der Datenbank wiederherstellen (Update auf 0.53.1)
+
+Fehlt `lfdb.jsonl`, schreibt ein Rückweg sie aus den Knoten der Datenbank — ohne PDF und ohne
+LLM, mit unverändertem Inhalt und denselben Kennungen. Archivierte Knoten zählen mit. So
+lässt sich auch ein LFDB reparieren, den ein früherer Voll-Import archiviert hat.
+
+Ob das System betroffen ist, zeigt diese Abfrage:
+
+```sql
+SELECT status, count(*), count(embedding) AS mit_embedding
+FROM context_nodes WHERE content_type LIKE 'lfdb%' GROUP BY 1;
+```
+
+Stehen dort `archived`-Zeilen (vollständig sind es 75 Knoten), stellen Sie den LFDB nach dem
+Update auf 0.53.1 so wieder her:
+
+```bash
+# 1) lfdb.jsonl aus der Datenbank schreiben (ohne LLM)
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/pdf/scripts" -w /app/pdf \
+  backend \
+  sh -c 'python -m scripts.pdf_import --lfdb --aus-db \
+    --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki"'
+# → scripts/scraper/output/lfdb.jsonl
+
+# 2) Importieren wie Punkt 4) im Ablauf oben, zuerst mit --dry-run.
+#    Erwartet: 0 insertiert, 0 aktualisiert, 75 unverändert. Der Lauf setzt die
+#    archivierten Knoten wieder aktiv.
+```
+
+Die Embeddings rechnet der nächtliche `cron`-Lauf. Wer nicht warten will, startet ihn gezielt:
+
+```bash
+docker compose exec backend python scripts/embedding_backfill.py \
+  --content-type lfdb_themenblock --content-type lfdb_kompetenz
+```
+
+Danach zeigt die Abfrage oben 75 aktive Knoten, davon 71 mit Embedding. Die vier Bausteine
+bekommen bewusst keins.
 
 ### Fremdsprachen (Englisch, Französisch)
 

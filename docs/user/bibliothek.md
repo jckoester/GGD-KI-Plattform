@@ -46,6 +46,11 @@ Karte zur **Übersicht**:
   nennt Fach, Klassenstufen, Curriculum, Kapitel und Lernsequenz; ein Klick öffnet das
   Curriculum an diesem Kapitel.
 
+Beim **Leitfaden Demokratiebildung** sind die Spalten seine elf Themenblöcke, etwa „B1.T2“ für
+Baustein 1, Themenblock 2. Ein Verweis auf eine Kompetenz zählt bei ihrem Themenblock. Verweise
+auf einen ganzen Baustein oder auf den Leitfaden stehen unter **Ganz**. Verweist eine
+Lernsequenz auf einen Themenblock und eine seiner Kompetenzen, zählt sie dort einmal.
+
 Drei Einstellungen grenzen die Ansicht ein. Sie stehen in der Adresse, du kannst die Ansicht
 also als Link weitergeben:
 

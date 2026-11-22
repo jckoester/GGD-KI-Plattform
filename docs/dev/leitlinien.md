@@ -50,6 +50,17 @@ Wo sie gelesen werden — wer ein weiteres Token einführt, braucht dieselben St
 | `app/context/curriculum_assistent.py` (`_HINWEIS_TOKEN`) | Kanten beim Schreiben des Assistenten |
 | `app/context/curriculum_abdeckung.py` (`leitlinien_abdeckung`) | welche Aspekte in welchen Lernsequenzen vorkommen |
 
+**Leitfaden Demokratiebildung (seit 0.53.1).** Ein eigenes Token gibt es nicht. `lpa:` zeigt
+auch auf `lfdb_baustein`, `lfdb_themenblock` und `lfdb_kompetenz` (`LFDB_TYPEN` in
+`app/context/leitlinien.py`). Parser, Anzeige, Kanten und PDF/DOCX liefen dadurch unverändert.
+Geändert sind:
+
+- **Auswahl:** `lfdbAuswahl` in `hinweise.js`. Ohne Suchtext nur Bausteine und Themenblöcke,
+  mit Suchtext auch Kompetenzen; eingerückt nach Ebene (`tiefe`). Das Label lautet
+  „LFDB B1.T2: <Titel>“ (`lfdbAnzeige`).
+- **Import:** `resolve_leitperspektive_aspekt_node` nimmt die LFDB-Typen an. Der YAML-Export
+  schreibt wie bei allen `lpa:` die `bp_id`.
+
 ## Curriculum-Assistent
 
 Das Modell kennt keine UUIDs. Es schreibt Kürzel in zwei Felder der Operationen
@@ -60,6 +71,9 @@ Das Modell kennt keine UUIDs. Es schreibt Kürzel in zwei Felder der Operationen
   eines ihrer Aspekte („BNE_03“, die `bp_id` wie im YAML-Export). `lp_kuerzel_normalisieren`
   nimmt auch „BNE 3“, „bne3“ und „BNE-03“ an, `leitperspektiven_tokens` auch den Titel. Die
   Beschriftung des Tokens ist dieselbe wie aus dem Editor („BNE 3: <Titel>“).
+  Für den Leitfaden Demokratiebildung gilt die Kurzform `LFDB_B1_T2` bzw. `LFDB_B1_T2_K3`
+  (`lfdb_kuerzel`: die `bp_id` ab `LFDB_`). `lp_kuerzel_normalisieren` nimmt auch
+  „LFDB B1.T2“ und „lfdb_b1_t2“ an.
 
 Der Server macht daraus Token (`leitlinien_tokens`, `leitperspektiven_tokens`). Ein
 unbekanntes Kürzel weist den Stapel ab und nennt die möglichen. Beim Lesen
@@ -68,7 +82,7 @@ denselben Feldern. Dazu kommen:
 
 - `leitperspektiven`: nur die Köpfe mit der Zahl ihrer Aspekte. Die Aspekte selbst (51)
   liefert `get_bp_competences` mit `typ='lp'` auf Abruf, sonst stünden sie bei jedem Lesen des
-  Curriculums im Kontext;
+  Curriculums im Kontext. Mit `bereich='LFDB'` liefert sie den Baum des Leitfadens;
 - `leitlinien_der_schule` mit ihren Aspekten (meist wenige);
 - in `get_curriculum_coverage` je Leitlinie die nicht vorkommenden Aspekte.
 
@@ -106,6 +120,11 @@ die Datenbank über alle Curricula, die die Person lesen darf.
 |---|---|---|
 | `leitbild` | `alle_leitlinien` (über `metadata.leitlinie`) | `metadata.kuerzel` |
 | `leitperspektive` | `_leitperspektive`: `part_of`-Kanten der `leitperspektive_aspekt` | `metadata.bp_id` („BNE_07“) |
+| `leitperspektive` mit Kürzel `LFDB` (seit 0.53.1) | `_lfdb`: Themenblöcke unter den Bausteinen, je `part_of` | „B1.T2“ (`lfdb_anzeige`) |
+
+Beim LFDB fallen mehrere Ziele in eine Spalte. `_lfdb` liefert dazu die Zuordnung Ziel →
+Spalte: eine Kompetenz zu ihrem Themenblock, Bausteine und der LFDB selbst zu `ganz`. Je
+Spalte zählt eine Lernsequenz einmal, auch wenn sie auf Themenblock und Kompetenz verweist.
 
 **Antwort:**
 
@@ -115,7 +134,7 @@ die Datenbank über alle Curricula, die die Person lesen darf.
 | `leitlinie` | `node_id`, `kuerzel`, `titel` |
 | `nur_veroeffentlicht` | wahr auch dann, wenn die Person keine Entwürfe lesen darf |
 | `aspekte` | je Aspekt `fundstellen` und `je_fach` (Fach-ID → Anzahl) |
-| `ganz` | Fundstellen mit Verweis auf die Leitlinie als Ganzes |
+| `ganz` | Fundstellen mit Verweis auf die Leitlinie als Ganzes, beim LFDB auch auf einen Baustein |
 | `faecher` | Fächer mit mindestens einer Fundstelle |
 | `alle_faecher` | alle Zeilen aus `subjects`, ungefiltert; Curricula ohne Fach als „ohne Fach“ am Ende |
 | `ohne_fundstelle` | Kürzel der Aspekte ohne Fundstelle |
