@@ -30,6 +30,39 @@ Administration. Im Curriculum verweist du auf sie wie auf eine Leitperspektive (
 du die Aspekte auf der Seite deines Fachs unter **Nachschlagen**, und der Chat bezieht sie ein,
 wenn deine Frage dazu passt.
 
+### Wo kommt eine Leitperspektive im Unterricht vor?
+
+Als Lehrkraft siehst du für jede Leitperspektive und jede Leitlinie der Schule, wo ihre Aspekte
+in den Curricula vorkommen. Auf der Seite **Leitperspektiven** führt das Raster-Symbol an der
+Karte zur **Übersicht**:
+
+- **Raster:** Je Fach eine Zeile, je Aspekt eine Spalte, in der Zelle die Zahl der
+  Lernsequenzen, die auf den Aspekt verweisen. Je dunkler das Farbfeld, desto mehr. Fährst du
+  über ein Kürzel im Kopf der Tabelle oder tippst es an, steht der Text des Aspekts daneben.
+  Eine Spalte **Ganz** zählt Verweise auf die Leitperspektive als Ganzes, wenn es welche gibt.
+- **Ohne Fundstelle:** Aspekte, die in keinem Curriculum vorkommen, nennt ein Hinweis über dem
+  Raster; ihr Kürzel steht rot.
+- **Fundstellen je Aspekt:** Unter dem Raster klappst du jeden Aspekt auf. Jede Fundstelle
+  nennt Fach, Klassenstufen, Curriculum, Kapitel und Lernsequenz; ein Klick öffnet das
+  Curriculum an diesem Kapitel.
+
+Drei Einstellungen grenzen die Ansicht ein. Sie stehen in der Adresse, du kannst die Ansicht
+also als Link weitergeben:
+
+- **Alle Fächer zeigen, auch ohne Eintragung:** Ohne diese Einstellung stehen nur Fächer mit
+  mindestens einer Fundstelle im Raster. Mit ihr siehst du alle Fächer der Schule — auch die,
+  die noch kein Curriculum angelegt haben.
+- **Nur veröffentlichte Curricula:** Sonst zählen Entwürfe mit und sind als *Entwurf*
+  gekennzeichnet. Ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, steht an
+  dessen Stelle — so siehst du den Stand nach dem Veröffentlichen.
+- **Klasse:** nur Fundstellen aus Curricula, die diese Klassenstufe abdecken. Der Hinweis nennt
+  dann die Aspekte, die in dieser Klasse fehlen.
+
+Gezählt werden die Verweise im Feld *Hinweise* (siehe
+[Curriculum](curriculum.md#hinweise-leitperspektiven-und-leitlinien)), in allen Curricula, die
+du lesen kannst. Wie bei der Abdeckung eines einzelnen Curriculums ist das eine Information,
+keine Pflicht.
+
 > **Was die Suche zusagt — und was nicht.** Sie antwortet in getrennten Abschnitten, und
 > der Unterschied ist wichtig:
 >

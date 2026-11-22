@@ -43,6 +43,12 @@ verweisen, wird beim Löschen archiviert.
   Leitperspektiven, in eigener Farbe.
 - **Abdeckung eines Curriculums** und Übersicht vor dem Veröffentlichen: welche Aspekte
   vorkommen. Nur zur Information, nicht als Pflicht.
+- **Übersicht** (seit 0.53): Auf der Seite *Leitperspektiven* zeigt ein Raster je Leitlinie
+  und je Leitperspektive, in welchem Fach welcher Aspekt vorkommt, mit Filtern für Entwürfe
+  und Klassenstufe. Sie sehen Lehrkräfte und Admins, Schüler:innen nicht. Die Zeilen der
+  Ansicht „alle Fächer“ sind die Fächer aus `config/subjects.yaml` — stehen dort nur Fächer,
+  die die Schule anbietet, zeigt eine leere Zeile ein Fach ohne Curriculum. Einzustellen ist
+  nichts.
 - **Curriculum-Assistent:** Er fragt zu Beginn, ob das Curriculum Leitlinien berücksichtigen
   soll, und trägt Aspekte nach Zustimmung ein.
 - **Schüler:innen** finden die Aspekte unter *Nachschlagen* auf der Seite ihres Fachs. Der

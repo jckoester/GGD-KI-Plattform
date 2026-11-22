@@ -238,6 +238,8 @@ nicht die Verweise in den Hinweisen.
 - **Leitlinien der Schule:** Je Leitlinie steht, welche Aspekte in welchen Lernsequenzen
   vorkommen und welche nicht. Das ist eine Information, keine Pflicht — eine Leitlinie muss
   nicht in jedem Curriculum stehen. Auch die Übersicht vor dem Veröffentlichen nennt es.
+  Wo eine Leitlinie oder Leitperspektive in **allen** Curricula vorkommt, zeigt die
+  [Übersicht auf der Seite Leitperspektiven](bibliothek.md#wo-kommt-eine-leitperspektive-im-unterricht-vor).
 - Die Abdeckung zeigt den **gespeicherten** Stand; im Editor lädt sie nach dem Speichern neu.
 
 ### Abdeckung über das Band

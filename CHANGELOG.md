@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Leitperspektiven: Übersicht je Leitperspektive und je Leitlinie der Schule — ein Raster Fach × Aspekt mit der Zahl
+  der Fundstellen in allen Curricula, darunter die Fundstellen je Aspekt mit Sprung ins Curriculum an das Kapitel.
+  Umschalter „alle Fächer“, Filter „nur veröffentlichte Curricula“ und „Klasse“; Aspekte ohne Fundstelle hervorgehoben.
+  Für Lehrkräfte und Admins.
+
 ## [0.52.0] – 2026-11-22
 
 ### Geändert

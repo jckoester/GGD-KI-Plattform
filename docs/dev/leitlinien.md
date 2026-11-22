@@ -74,3 +74,86 @@ denselben Feldern. Dazu kommen:
 
 **Genannte Felder ersetzen, andere bleiben:** Ein `eintrag_aendern` nur mit `hinweise`
 behält die Verweise; eines mit `leitlinien` ersetzt nur diese.
+
+## Schulweite Übersicht (seit 0.53)
+
+Päckchen AU: Wo kommt welcher Aspekt einer Leitlinie **oder Leitperspektive** über alle
+Curricula vor? Die Abdeckung oben zeigt das je Curriculum aus dem Baum; die Übersicht fragt
+die Datenbank über alle Curricula, die die Person lesen darf.
+
+**Abfrage** (`app/context/leitlinien_uebersicht.py`):
+
+- `leitlinien_fundstellen(db, ziel_ids, user, nur_veroeffentlicht=False)` geht über die Kanten,
+  nicht über die Token: `references` (Lernsequenz → Ziel), dann `part_of` Lernsequenz → Kapitel
+  → Curriculum. Das gilt für `lb`/`lba` wie für `lp`/`lpa`, denn beide Wege legen beim
+  Speichern dieselben Kanten an. Je Verweis eine Fundstelle mit Fach, Curriculum, Status,
+  Fassung, Stufen, Kapitel und Lernsequenz.
+- **Was zählt:**
+  - Curricula mit `active` und, für alle mit `darf_entwurf_lesen`, `draft`.
+  - Lesbar sind sie über `read_scope` `global`/`school`/`subject`, eigene `private` nur
+    außerhalb der Vorschau (`eigenes_zaehlt`).
+  - Kapitel und Lernsequenz zählen nur mit dem Status ihres Curriculums, ein archiviertes
+    Kapitel also nicht.
+  - Archivierte Aspekte fallen heraus.
+- **Ersetzende Entwürfe:** Ein Entwurf mit `metadata.kopie_von` verdrängt sein Original — wie
+  die Bandabdeckung mit Entwürfen. Sonst stünde dieselbe Lernsequenz zweimal im Raster. Mit
+  `nur_veroeffentlicht` zählt nur `active`.
+- `leitlinien_uebersicht(db, node_id, user, nur_veroeffentlicht=False)` baut daraus die Antwort
+  und gibt `None` für alles, was keine aktive Leitlinie oder Leitperspektive ist. Der Baum
+  entsteht je Art anders:
+
+| Art | Aspekte | Kürzel des Aspekts |
+|---|---|---|
+| `leitbild` | `alle_leitlinien` (über `metadata.leitlinie`) | `metadata.kuerzel` |
+| `leitperspektive` | `_leitperspektive`: `part_of`-Kanten der `leitperspektive_aspekt` | `metadata.bp_id` („BNE_07“) |
+
+**Antwort:**
+
+| Feld | Inhalt |
+|---|---|
+| `art` | `leitlinie` oder `leitperspektive` |
+| `leitlinie` | `node_id`, `kuerzel`, `titel` |
+| `nur_veroeffentlicht` | wahr auch dann, wenn die Person keine Entwürfe lesen darf |
+| `aspekte` | je Aspekt `fundstellen` und `je_fach` (Fach-ID → Anzahl) |
+| `ganz` | Fundstellen mit Verweis auf die Leitlinie als Ganzes |
+| `faecher` | Fächer mit mindestens einer Fundstelle |
+| `alle_faecher` | alle Zeilen aus `subjects`, ungefiltert; Curricula ohne Fach als „ohne Fach“ am Ende |
+| `ohne_fundstelle` | Kürzel der Aspekte ohne Fundstelle |
+
+Beide Fächerlisten folgen `sort_order`, dann dem Namen, damit die Zeilen beim Umschalten an
+ihrem Platz bleiben.
+
+**Route:** `GET /context/leitlinien/{node_id}/uebersicht?nur_veroeffentlicht=` mit
+`require_any_role(["teacher", "admin"])`. In der Vorschau trägt das Token die Rollen einer
+Schüler:in, die Route antwortet dort also 403 — ohne eigenen Eintrag. Unbekannt oder kein
+Rahmenwerk: 404.
+
+**Wächter:** Beide Funktionen rufen `darf_entwurf_lesen` und stehen deshalb in `DIREKT` und
+`LESEND` von `tests/unit/test_entwurf_leserecht_waechter.py`. Die Namen sind bewusst
+eindeutig, weil der Wächter gleichnamige Funktionen zusammenfasst.
+
+**Oberfläche:**
+
+- **Seite:** `routes/(app)/knowledge/cross-cutting-themes/[id]/overview/+page.svelte`. Die
+  Umformung steht in `frontend/src/lib/leitlinien_uebersicht.js` und ist ohne Oberfläche
+  geprüft (`spalten`, `zeilen`, `stufenAuswahl`, `aufStufe`, `fundstelleHref`).
+- **Filter in der Adresse:**
+  - `faecher=alle`;
+  - `nur_veroeffentlicht=1` — der einzige, der neu lädt;
+  - `stufe=<n>` — wirkt nur im Frontend über `min_grade`/`max_grade` der Fundstellen. Ohne
+    Stufenangabe fällt eine Fundstelle bei gewählter Klasse heraus.
+- **Farben:** die Mengenstufen `--diagramm-stufe-1…5` der Heatmap (`lib/heatmap_stufen.js`).
+  Die Zahl steht in Textfarbe neben dem Farbfeld, nicht darauf.
+- **Sprung ans Kapitel:** Kapitelzeilen in `CurriculumTable.svelte` tragen
+  `id="kapitel-<uuid>"`. Die Curriculum-Seite scrollt nach dem Laden zum Hash.
+
+**Tests:**
+
+- `tests/integration/test_leitlinien_uebersicht.py` prüft über die echte Kette:
+  - ersetzende Kopie;
+  - `nur_veroeffentlicht` und ohne Leserecht;
+  - archivierte Teile;
+  - Leitperspektive;
+  - alle Fächer.
+- `tests/unit/test_leitlinien_uebersicht_route.py` prüft die Rollen und die Vorschau.
+- `frontend/src/lib/leitlinien_uebersicht.test.js` prüft das Raster und die Stufen.
