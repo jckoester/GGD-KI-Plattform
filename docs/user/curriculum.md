@@ -33,12 +33,12 @@ Band die Curricula, die dazu gehören.
 ## Wer darf was
 
 Ein Curriculum gehört der **Fachschaft**, nicht einer einzelnen Person. Solange es ein
-**Entwurf** ist, arbeitet die Fachschaft unter sich; mit dem **Veröffentlichen** gilt es für
-alle.
+**Entwurf** ist, bearbeitet es die Fachschaft; lesen können es alle Lehrkräfte, etwa um sich
+zwischen Fächern abzustimmen. Mit dem **Veröffentlichen** gilt es für alle.
 
 | | Entwurf | Veröffentlicht |
 |---|---|---|
-| **Ansehen** | Mitglieder der Fachschaft, Admins | alle Lehrkräfte |
+| **Ansehen** | alle Lehrkräfte | alle Lehrkräfte |
 | **Bearbeiten** | Mitglieder der Fachschaft, Admins | Fachvorsitz und Admins\* |
 | **Veröffentlichen** | Fachvorsitz und Admins\* | — |
 | **Löschen** | wer den Entwurf angelegt hat, Fachvorsitz, Admins | Fachvorsitz und Admins\* |
@@ -90,9 +90,10 @@ Assistenten erscheint die kommende Fassung erst, wenn sie gilt.
 ## Entwurf und Veröffentlichen
 
 Ein neues Curriculum ist zunächst ein **Entwurf**: In der Liste trägt es die Marke „Entwurf“,
-in Ansicht und Editor steht ein Hinweis. Den Entwurf sehen und bearbeiten nur die Mitglieder
-der Fachschaft und Admins. In Suche, Chat und Jahresplanung erscheint er nicht — auch nicht für
-die Fachschaft. Ein Entwurf läuft nicht ab; die Liste zeigt, wann er zuletzt geändert wurde.
+in Ansicht und Editor steht ein Hinweis. Lesen können den Entwurf alle Lehrkräfte (seit 0.52),
+bearbeiten nur die Mitglieder der Fachschaft und Admins. Wer ihn nur liest, sieht oben
+„Entwurf — nur lesen“ und keine Knöpfe zum Bearbeiten; exportieren geht. In Suche, Chat und
+Jahresplanung erscheint ein Entwurf nicht — für niemanden, auch nicht für die Fachschaft. Ein Entwurf läuft nicht ab; die Liste zeigt, wann er zuletzt geändert wurde.
 
 **Veröffentlichen** — der Knopf steht oben rechts in Ansicht und Editor. Vorher zeigt eine
 Übersicht, was auffällt: Stunden, nicht verknüpfte Kompetenzen, als veraltet markierte
@@ -244,8 +245,7 @@ nicht die Verweise in den Hinweisen.
 Ein Band umfasst oft zwei oder drei Klassenstufen, und jede hat ihr eigenes Curriculum. Ob das
 Band als Ganzes abgedeckt ist, zeigt **IK-Abdeckung im Band** (am Bandkopf der Liste):
 
-- Oben stehen die Curricula des Bands. Mit **Entwürfe einbeziehen** zählen auch Entwürfe der
-  Fachschaft; ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, tritt an dessen
+- Oben stehen die Curricula des Bands. Mit **Entwürfe einbeziehen** zählen auch die Entwürfe; ein Entwurf, der ein veröffentlichtes Curriculum ersetzen soll, tritt an dessen
   Stelle — so siehst du den Stand nach dem Veröffentlichen.
 - Je inhaltsbezogener Kompetenz: **verknüpft**, sobald ein Curriculum sie ganz verknüpft;
   **partiell**, wenn sie nur teilweise vorkommt; sonst **fehlt**. Dahinter steht, welche
@@ -466,5 +466,6 @@ Zu seinen Klassen gibt es im Bildungsplan mehrere Bänder (Basis- und Leistungsf
 Editor unter **Band im Bildungsplan** das richtige und speichere.
 
 **Wer sieht mein Curriculum?**
-Solange es ein Entwurf ist, nur die Fachschaft und Admins. Veröffentlicht sehen es alle
-Lehrkräfte der Schule. Es ist ein Fachschaftsdokument, kein persönlicher Entwurf.
+Alle Lehrkräfte der Schule — auch schon den Entwurf (seit 0.52; bis dahin nur die Fachschaft).
+Bearbeiten kann den Entwurf nur die Fachschaft. Schüler:innen sehen ein Curriculum erst, wenn
+es veröffentlicht ist. Es ist ein Fachschaftsdokument, kein persönlicher Entwurf.

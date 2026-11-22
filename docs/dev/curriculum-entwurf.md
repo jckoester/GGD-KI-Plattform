@@ -25,13 +25,40 @@ Entscheidungen: Plan „Curriculum-Assistent, Teil A“, ADR-019 Nachtrag K2.
 ⚠️ **Die Lesewege filtern nicht alle auf `active`.** Suche, Retrieval, Embedding-Nachholung,
 Curriculum-Resolver, „Meine Bausteine“ und `list_curricula_by_subject` tun es — die direkten Wege
 (`GET /context/nodes/{id}`, Umgebung, Kanten, Kopieren) nicht. Deshalb greift die Regel in
-`_check_read_permission` und `_check_write_permission`, **vor** Eigentum und Admin-Zweig. Ein Entwurf
-ohne Recht ergibt **404**, nicht 403.
+`_check_read_permission` und `_check_write_permission`, **vor** Eigentum und Admin-Zweig. Wer den
+Entwurf nicht lesen darf, bekommt **404**; wer ihn liest, aber nicht bearbeiten darf, **403**
+(„Entwürfe bearbeitet die Fachschaft des Fachs.“, seit 0.52).
 
 `load_curriculum_tree` lädt Entwürfe mit (Kinder mit dem Status des Curriculums, `status` im Baum).
 Jeder Endpunkt, der einen Baum ausliefert, prüft mit `_curriculum_lesen`.
 
-## Rechte — eine Regel
+## Lesen und Bearbeiten — zwei Regeln (seit 0.52)
+
+Bis 0.52 regelte `darf_entwurf` Lesen und Bearbeiten zugleich (E7: nur die Fachschaft). Seit
+Päckchen AZ sind es zwei:
+
+| | Regel | Prüfung (Fehler) | Wer |
+|---|---|---|---|
+| Lesen | `darf_entwurf_lesen(user)` — synchron, nur Rollen | `pruefe_entwurf_lesen` (404) | Lehrkraft oder Admin; nicht Schüler:innen, nicht die Vorschau |
+| Bearbeiten | `darf_entwurf_bearbeiten(db, subject_id, user)` | `pruefe_entwurf_bearbeiten` (404, sonst 403) | Admin oder Lehrkraft in einer Fachschaft des Fachs |
+
+- **Lesen** nutzen nur `_check_read_permission`, `_curriculum_lesen` und `_lesbare_curricula`.
+- **Bearbeiten** nutzen alle schreibenden Wege: `_check_write_permission`,
+  `_require_curriculum_write`, `create_node` (Teile als Entwurf), Kanten **in** einen Entwurf
+  (`create_edge` — sonst hängte eine andere Fachschaft ein eigenes Kapitel hinein, `erbe_entwurf`),
+  „Als Entwurf kopieren“, Löschen, `_curriculum_rechte` (`darf_kopieren`) und der
+  Curriculum-Assistent (`zugang`).
+- Suche, Retrieval, Embeddings und Planung bleiben ohne Entwürfe — sie filtern auf `active`,
+  unabhängig vom Leserecht.
+
+**Wächter:** `tests/unit/test_entwurf_leserecht_waechter.py` verfolgt per AST über `app/`, wer die
+Leseregel direkt oder über Hilfsfunktionen erreicht. Jede Stelle ist eine reine GET-Route, eine
+bekannte lesende Hilfsfunktion (`LESEND`) oder steht in `ERLAUBT` — mit Grund und der Prüfung, die
+sie danach aufrufen muss (der Test prüft, dass sie es tut). Wer eine neue Route baut, die einen
+Entwurf über `_check_read_permission` holt und dann ändert, bekommt hier den Fehler, nicht in
+Produktion.
+
+## Rechte am Curriculum — eine Regel
 
 `schreibrecht(status, subject_id, roles, fachschaften, zugeordnet)` ohne Datenbank, benutzt von
 `_check_write_permission`, `_schreibrechte_setzen` (`darf_schreiben` in Listen),
@@ -41,7 +68,7 @@ Jeder Endpunkt, der einen Baum ausliefert, prüft mit `_curriculum_lesen`.
 |---|---|---|
 | Admin | ja | ja |
 | Lehrkraft in einer Fachschaft des Fachs (`fachschafts_faecher`) | ja | ohne Zuordnung ja, mit Zuordnung nur mit Rolle `fachvorsitz` |
-| alle anderen, Vorschau | nein (404) | nein |
+| alle anderen, Vorschau | nein (Lehrkräfte 403, sonst 404) | nein |
 
 - `fachvorsitz_zugeordnet()`: ob `group_role_map` in `auth.yaml` eine Gruppe auf `fachvorsitz` abbildet —
   je Prüfung frisch gelesen. Die Integrationstests stellen es per autouse-Fixture ab
@@ -242,7 +269,7 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
   Curriculum seitdem geändert (Prüfsumme über dieselben Felder wie ein gesicherter Stand), wird
   nichts geschrieben. Nach dem Schreiben ist der Vorschlag verbraucht.
 - **Veröffentlichte Curricula:** `zugang()` lässt die ganze Fachschaft lesen, als Bezug wählen
-  und als Entwurf kopieren (`darf_entwurf`, wie „Als Entwurf kopieren“ im Editor), auch wenn ein
+  und als Entwurf kopieren (`darf_entwurf_bearbeiten`, wie „Als Entwurf kopieren“ im Editor), auch wenn ein
   Fachvorsitz zugeordnet ist und das Schreibrecht des Editors nur ihn hat.
 - **Rückgängig:** Ohne Rückfrage nimmt `undo_last_curriculum_change` nur einen Stand zurück, den
   der Assistent für dieselbe Person gesichert hat (`reason == "assistant"` und
