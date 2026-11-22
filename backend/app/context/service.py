@@ -1020,10 +1020,13 @@ async def resolve_leitperspektive_node(db: AsyncSession, lp_code: str) -> UUID |
 
 
 async def resolve_leitperspektive_aspekt_node(db: AsyncSession, bp_id: str) -> UUID | None:
-    """Löst Leitperspektive-Aspekt-bp_id (z. B. 'BNE_01') zu node_id auf."""
+    """Löst Leitperspektive-Aspekt-bp_id (z. B. 'BNE_01') zu node_id auf — seit 0.53.1 auch
+    die Teile des LFDB (``BP2016BW_ALLG_LP_LFDB_B1_T2``), auf die `lpa:` ebenso zeigt."""
+    from app.context.leitlinien import LFDB_TYPEN
+
     result = await db.execute(
         sa.select(ContextNode.id).where(
-            ContextNode.content_type == "leitperspektive_aspekt",
+            ContextNode.content_type.in_(("leitperspektive_aspekt", *LFDB_TYPEN)),
             ContextNode.metadata_["bp_id"].astext == bp_id,
             ContextNode.status == "active",
         )

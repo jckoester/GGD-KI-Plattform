@@ -9,7 +9,7 @@
      *   value    — gebundener Textwert (zwei-Wege: bind:value)
      *   onchange — Callback bei Änderung
      */
-    import { getActiveTrigger, leitlinienAuswahl, parseHinweise } from "$lib/hinweise.js";
+    import { getActiveTrigger, leitlinienAuswahl, lfdbAuswahl, parseHinweise } from "$lib/hinweise.js";
     import HinweisChip from "./HinweisChip.svelte";
 
     let { value = $bindable(""), onchange = () => {} } = $props();
@@ -20,7 +20,7 @@
     let dropdownIndex = $state(0);
 
     // Cache für LP+Aspekte (einmaliger Abruf pro Editor-Instanz)
-    let lpCache = null; // { lps: Node[], aspekte: Node[], leitlinien: Node[] } | null
+    let lpCache = null; // { lps: Node[], aspekte: Node[], leitlinien: Node[], lfdb: Node[] } | null
 
     // Für # Cross-Fach: welches Fach wurde erkannt?
     let resolvedFachCode = $state(null); // z.B. 'ETH'
@@ -44,11 +44,12 @@
             // Alle LPs + Aspekte einmalig laden und cachen
             if (!lpCache) {
                 try {
-                    const params = new URLSearchParams({ limit: "200" });
-                    params.append("content_type", "leitperspektive");
-                    params.append("content_type", "leitperspektive_aspekt");
-                    params.append("content_type", "leitbild");
-                    params.append("content_type", "leitbild_aspekt");
+                    // 500 = Obergrenze der Route; LP + Aspekte + LFDB (75) + Leitlinien ≈ 150
+                    const params = new URLSearchParams({ limit: "500" });
+                    for (const typ of ["leitperspektive", "leitperspektive_aspekt", "leitbild", "leitbild_aspekt",
+                                       "lfdb_baustein", "lfdb_themenblock", "lfdb_kompetenz"]) {
+                        params.append("content_type", typ);
+                    }
                     const res = await fetch(`/api/context/nodes?${params}`, {
                         credentials: "include",
                     });
@@ -58,9 +59,10 @@
                         lps: nodes.filter((n) => n.content_type === "leitperspektive"),
                         aspekte: nodes.filter((n) => n.content_type === "leitperspektive_aspekt"),
                         leitlinien: nodes.filter((n) => n.content_type.startsWith("leitbild")),
+                        lfdb: nodes.filter((n) => n.content_type.startsWith("lfdb_")),
                     };
                 } catch {
-                    lpCache = { lps: [], aspekte: [], leitlinien: [] };
+                    lpCache = { lps: [], aspekte: [], leitlinien: [], lfdb: [] };
                 }
             }
 
@@ -82,7 +84,10 @@
                       )
                     : lpAspekte;
 
-                if (!lpMatches && matchingAspekte.length === 0) continue;
+                // Leitfaden Demokratiebildung: Bausteine, Themenblöcke, Kompetenzen (0.53.1)
+                const lfdbTeile = kuerzel === "LFDB" ? lfdbAuswahl(lpCache.lfdb, trigger.query, lpMatches && !!q) : [];
+
+                if (!lpMatches && matchingAspekte.length === 0 && lfdbTeile.length === 0) continue;
 
                 // LP-Kopf
                 items.push({
@@ -107,6 +112,7 @@
                         serialized: `@[${aspektLabel}](lpa:${aspekt.id})`,
                     });
                 }
+                items.push(...lfdbTeile);
             }
 
             // Leitlinien der Schule hinter den Leitperspektiven (0.50, AT)
@@ -278,7 +284,7 @@
                             confirmSelection(item);
                         }}
                         class="w-full px-3 py-2 text-left text-sm flex items-start gap-2 transition-colors
-                               {item.indented ? 'pl-6' : ''}
+                               {item.tiefe === 3 ? 'pl-12' : item.tiefe === 2 ? 'pl-9' : item.indented ? 'pl-6' : ''}
                                {i === dropdownIndex
                             ? 'bg-light-ui-2 dark:bg-dark-ui-2'
                             : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"

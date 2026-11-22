@@ -191,7 +191,8 @@ async def leitperspektiven_lesen(db: AsyncSession, bereich: str | None) -> dict:
             liste = [e for e in liste if e["kuerzel"] == b.upper() or b.casefold() in e["titel"].casefold()]
     return {"leitperspektiven": liste,
             "hinweis": "Im Eintrag als Kürzel in leitperspektiven: die Leitperspektive (BNE) oder, "
-                       "meist treffender, ein Aspekt (BNE_03)."}
+                       "meist treffender, ein Aspekt (BNE_03); beim LFDB ein Themenblock (LFDB_B1_T2) "
+                       "oder eine Kompetenz (LFDB_B1_T2_K3)."}
 
 
 def _bereich_von_bis(nrs: list[str]) -> str:

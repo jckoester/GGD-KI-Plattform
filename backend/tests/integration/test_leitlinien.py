@@ -303,3 +303,57 @@ async def test_assistent_unbekanntes_kuerzel_nennt_die_moeglichen(db, leitlinie,
          "leitlinien": ["SDG99-UNBEKANNT"]}])
     assert r.get("ok") is False
     assert "Möglich:" in str(r) and f"{SDG}-13" in str(r)
+
+
+# ── Leitfaden Demokratiebildung (0.53.1): `lpa:` zeigt auch auf seine Teile ─────
+
+NR = 900 + int(uuid.uuid4().int % 99)  # Baustein-Nummer, die echte Daten nicht haben
+LFDB_B = f"BP2016BW_ALLG_LP_LFDB_B{NR}"
+
+
+@pytest_asyncio.fixture
+async def lfdb(db):
+    def k(typ, titel, bp_id):
+        return ContextNode(category="knowledge", content_type=typ, title=titel, status="active",
+                           read_scope="global", write_scope="global", owner_pseudonym="system",
+                           metadata_={"bp_id": bp_id})
+
+    kopf = k("leitperspektive", "Leitfaden Demokratiebildung", "BP2016BW_ALLG_LP_LFDB")
+    b = k("lfdb_baustein", f"Baustein {NR}: Identität {TOKEN}", LFDB_B)
+    t = k("lfdb_themenblock", f"Wer bin ich {TOKEN}", f"{LFDB_B}_T1")
+    kp = k("lfdb_kompetenz", f"Was macht mich aus {TOKEN}?", f"{LFDB_B}_T1_K2")
+    db.add_all([kopf, b, t, kp])
+    await db.flush()
+    return {"b": b, "t": t, "k": kp}
+
+
+async def test_assistent_schreibt_und_liest_verweise_auf_den_lfdb(db, leitlinie, curriculum, lfdb):
+    ls, cur, t, kp = curriculum["ls"], curriculum["cur"], lfdb["t"], lfdb["k"]
+    r = await _ruf("apply_curriculum_operations", db, cur, operations=[
+        {"op": "eintrag_aendern", "lernsequenz_id": str(ls.id), "eintrag": 1,
+         "leitperspektiven": [f"LFDB B{NR}.T1", f"lfdb_b{NR}_t1_k2"]}])
+    assert r.get("ok") is True, r
+    await db.refresh(ls)
+    hinweise = ls.metadata_["eintraege"][0]["hinweise"]
+    assert f"@[LFDB B{NR}.T1: Wer bin ich {TOKEN}](lpa:{t.id})" in hinweise
+    assert f"(lpa:{kp.id})" in hinweise
+    kanten = set((await db.execute(sa.select(ContextEdge.to_node_id).where(
+        ContextEdge.from_node_id == ls.id, ContextEdge.relation == "references"))).scalars())
+    assert {t.id, kp.id} <= kanten
+
+    entwurf = await _ruf("get_curriculum_draft", db, cur)
+    eintrag = entwurf["kapitel"][0]["lernsequenzen"][0]["eintraege"][0]
+    assert eintrag["leitperspektiven"] == [f"LFDB_B{NR}_T1", f"LFDB_B{NR}_T1_K2"]
+
+    lp = await _ruf("get_bp_competences", db, cur, typ="lp", bereich="LFDB")
+    teile = [a["kuerzel"] for a in lp["leitperspektiven"][0]["aspekte"]]
+    assert [x for x in teile if f"B{NR}" in x] == [f"LFDB_B{NR}", f"LFDB_B{NR}_T1", f"LFDB_B{NR}_T1_K2"]
+
+
+async def test_lfdb_verweis_ueberlebt_export_und_import(db, lfdb):
+    t = lfdb["t"]
+    text = f"Bezug @[LFDB B{NR}.T1: Wer bin ich](lpa:{t.id})."
+    portabel = await hinweise_uuid_to_code(text, db)
+    assert portabel == f"Bezug @[LFDB B{NR}.T1: Wer bin ich](lpa:{LFDB_B}_T1)."
+    warnungen = []
+    assert await hinweise_code_to_uuid(portabel, db, warnungen) == text and warnungen == []

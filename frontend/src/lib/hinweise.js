@@ -174,3 +174,45 @@ export function leitlinienAuswahl(nodes, query) {
     }
     return items
 }
+
+const LFDB_TYPEN = ['lfdb_baustein', 'lfdb_themenblock', 'lfdb_kompetenz']
+
+/** `BP2016BW_ALLG_LP_LFDB_B1_T2` → `B1.T2` (leer, wenn es kein LFDB-Teil ist). */
+export function lfdbAnzeige(bpId) {
+    const [, rest] = String(bpId ?? '').toUpperCase().split('LP_LFDB_')
+    return rest ? rest.replace(/_/g, '.') : ''
+}
+
+/**
+ * Teile des Leitfadens Demokratiebildung für die Auswahl nach `@` (0.53.1): Bausteine,
+ * Themenblöcke und Kompetenzen als Baum unter dem Kopf „Leitfaden Demokratiebildung“. Das Token
+ * ist `lpa:` wie bei einem Aspekt einer Leitperspektive.
+ *
+ * Ohne Suchtext nur Bausteine und Themenblöcke — die 60 Kompetenzen kämen sonst bei jedem `@`
+ * mit. Mit Suchtext alles, dessen Titel oder Kürzel passt.
+ *
+ * @param {Array} nodes — Knoten der Typen `lfdb_*`
+ * @param {string} query
+ * @param {boolean} kopfTrifft — passt der Kopf „LFDB“ selbst zum Suchtext?
+ */
+export function lfdbAuswahl(nodes, query, kopfTrifft = false) {
+    const q = (query ?? '').toLowerCase()
+    const tiefe = { lfdb_baustein: 1, lfdb_themenblock: 2, lfdb_kompetenz: 3 }
+    return nodes
+        .filter((n) => LFDB_TYPEN.includes(n.content_type) && lfdbAnzeige(n.metadata?.bp_id))
+        .filter((n) => {
+            const kurz = lfdbAnzeige(n.metadata.bp_id).toLowerCase()
+            if (!q || kopfTrifft) return n.content_type !== 'lfdb_kompetenz'
+            return n.title.toLowerCase().includes(q) || kurz.includes(q)
+        })
+        .sort((a, b) => kuerzelVergleich(a.metadata.bp_id, b.metadata.bp_id))
+        .map((n) => {
+            const kurz = n.title.length <= 80 ? n.title : n.title.slice(0, 79) + '…'
+            const label = `LFDB ${lfdbAnzeige(n.metadata.bp_id)}: ${kurz}`
+            return {
+                node_id: n.id, label, sublabel: n.title.length > 80 ? n.title : null, kind: 'lpa',
+                indented: true, tiefe: tiefe[n.content_type],
+                serialized: `@[${label}](lpa:${n.id})`,
+            }
+        })
+}

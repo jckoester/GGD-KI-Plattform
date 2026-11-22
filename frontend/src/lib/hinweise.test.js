@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseHinweise, serializeHinweise, extractEdgeTargets, getActiveTrigger, leitlinienAuswahl } from './hinweise.js'
+import { parseHinweise, serializeHinweise, extractEdgeTargets, getActiveTrigger, leitlinienAuswahl, lfdbAuswahl, lfdbAnzeige } from './hinweise.js'
 
 const LP = '11111111-1111-1111-1111-111111111111'
 const LPA = '22222222-2222-2222-2222-222222222222'
@@ -180,5 +180,38 @@ describe('leitlinienAuswahl', () => {
 
     it('ohne Leitlinien: leer', () => {
         expect(leitlinienAuswahl([], 'x')).toEqual([])
+    })
+})
+
+describe('lfdbAuswahl (0.53.1)', () => {
+    const P = 'BP2016BW_ALLG_LP_LFDB'
+    const n = (typ, bp, title) => ({ id: bp, content_type: typ, title, metadata: { bp_id: `${P}_${bp}` } })
+    const NODES = [
+        n('lfdb_kompetenz', 'B1_T1_K1', 'Was macht mich aus?'),
+        n('lfdb_themenblock', 'B1_T10', 'Zehn'),
+        n('lfdb_themenblock', 'B1_T1', 'Wer bin ich'),
+        n('lfdb_baustein', 'B1', 'Baustein 1: Identität'),
+    ]
+
+    it('ohne Suchtext Bausteine und Themenblöcke als Baum, natürlich geordnet', () => {
+        const items = lfdbAuswahl(NODES, '')
+        expect(items.map((i) => [i.label, i.tiefe])).toEqual([
+            ['LFDB B1: Baustein 1: Identität', 1], ['LFDB B1.T1: Wer bin ich', 2], ['LFDB B1.T10: Zehn', 2]])
+        expect(items[1].serialized).toBe('@[LFDB B1.T1: Wer bin ich](lpa:B1_T1)')
+        expect(items.every((i) => i.kind === 'lpa')).toBe(true)
+    })
+
+    it('mit Suchtext auch Kompetenzen, nach Titel oder Kürzel', () => {
+        expect(lfdbAuswahl(NODES, 'macht').map((i) => i.label)).toEqual(['LFDB B1.T1.K1: Was macht mich aus?'])
+        expect(lfdbAuswahl(NODES, 'b1.t1').map((i) => i.tiefe)).toEqual([2, 3, 2]) // T1, T1.K1, T10
+    })
+
+    it('trifft der Kopf, wie ohne Suchtext', () => {
+        expect(lfdbAuswahl(NODES, 'lfdb', true)).toHaveLength(3)
+    })
+
+    it('Kurzform aus der bp_id', () => {
+        expect(lfdbAnzeige(`${P}_B2_T3_K4`)).toBe('B2.T3.K4')
+        expect(lfdbAnzeige('BNE_03')).toBe('')
     })
 })

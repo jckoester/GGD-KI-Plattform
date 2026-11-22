@@ -159,3 +159,23 @@ def test_lfdb_wird_nicht_verstuemmelt():
 )
 def test_lp_kuerzel_aus_metadaten(metadata, erwartet):
     assert leitperspektive_code(metadata) == erwartet
+
+
+@pytest.mark.parametrize("eingabe, erwartet", [
+    ("LFDB_B1_T2", "LFDB_B1_T2"), ("lfdb b1.t2", "LFDB_B1_T2"), ("LFDB B1 T2 K3", "LFDB_B1_T2_K3"),
+    ("LFDB-B01", "LFDB_B1"), ("LFDB", "LFDB"),
+])
+def test_lfdb_kuerzel_normalisierung(eingabe, erwartet):
+    """0.53.1: Teile des LFDB in jeder Schreibweise des Modells."""
+    from app.context.leitlinien import lp_kuerzel_normalisieren
+
+    assert lp_kuerzel_normalisieren(eingabe) == erwartet
+
+
+def test_lfdb_kuerzel_aus_der_bp_id():
+    from app.context.leitlinien import lfdb_anzeige, lfdb_kuerzel
+
+    assert lfdb_kuerzel("BP2016BW_ALLG_LP_LFDB_B1_T2_K3") == "LFDB_B1_T2_K3"
+    assert lfdb_kuerzel("BP2016BW_ALLG_LP_LFDB") == ""
+    assert lfdb_kuerzel("BNE_03") == ""
+    assert lfdb_anzeige("LFDB_B1_T2") == "B1.T2"

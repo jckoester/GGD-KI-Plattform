@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Curriculum: Im Feld *Hinweise* lässt sich nach `@` auch auf Bausteine, Themenblöcke und Kompetenzen des Leitfadens
+  Demokratiebildung verweisen; der Curriculum-Assistent schreibt sie als Kürzel (`LFDB_B1_T2`).
+
 ### Behoben
 
 - Bildungsplan-Import: Ein Voll-Import archiviert fachlose Knoten nur noch für die Typen, die er gelesen hat. Bisher

@@ -95,7 +95,8 @@ _registriere(
             "'3.2.1' oder 'alle'. Ein Kapitel bedient oft Kompetenzen aus mehreren Bereichen.")},
         "typ": {"type": "string", "enum": ["ik", "pk", "lp"], "description": (
             "ik = inhaltsbezogene Kompetenzen (Vorgabe), pk = prozessbezogene (gelten fürs ganze Fach), "
-            "lp = Leitperspektiven mit ihren Aspekten (Kürzel wie BNE_03; bereich = Kürzel wie 'BNE').")},
+            "lp = Leitperspektiven mit ihren Aspekten (Kürzel wie BNE_03, beim Leitfaden Demokratiebildung "
+            "Baustein/Themenblock/Kompetenz wie LFDB_B1_T2; bereich = Kürzel wie 'BNE').")},
     },
 )
 

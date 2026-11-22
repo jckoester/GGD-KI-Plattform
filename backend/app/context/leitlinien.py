@@ -188,6 +188,22 @@ import re as _re
 
 _TOKEN = _re.compile(r"\s*@\[([^\]]*)\]\((lba|lb|lpa|lp):([0-9a-f-]{36})\)")
 _LP_ASPEKT = _re.compile(r"^([A-ZÄÖÜ]+)[\s_\-.:]*0*(\d+)$")
+_LFDB = _re.compile(r"^LFDB[\s_\-.:]*B0*(\d+)(?:[\s_\-.:]*T0*(\d+))?(?:[\s_\-.:]*K0*(\d+))?$")
+
+#: Teile des Leitfadens Demokratiebildung (0.53.1). Im Curriculum zeigt `lpa:` auf sie wie auf
+#: den Aspekt einer Leitperspektive; Kürzel „LFDB_B1_T2_K3“ aus der `bp_id`.
+LFDB_TYPEN = ("lfdb_baustein", "lfdb_themenblock", "lfdb_kompetenz")
+
+
+def lfdb_kuerzel(bp_id: str | None) -> str:
+    """``BP2016BW_ALLG_LP_LFDB_B1_T2`` → ``LFDB_B1_T2``; sonst leer."""
+    _, trenner, rest = str(bp_id or "").upper().partition("LP_LFDB_")
+    return f"LFDB_{rest}" if trenner and rest else ""
+
+
+def lfdb_anzeige(kuerzel: str) -> str:
+    """``LFDB_B1_T2`` → ``B1.T2`` — kurz für Spaltenköpfe und Labels."""
+    return kuerzel.removeprefix("LFDB_").replace("_", ".")
 
 
 @dataclass
@@ -221,7 +237,7 @@ async def verweisziele(db: AsyncSession) -> Verweisziele:
     lp_liste: dict[str, dict] = {}
     titel: dict[str, str] = {}
     knoten = (await db.execute(sa.select(ContextNode).where(
-        ContextNode.content_type.in_(("leitperspektive", "leitperspektive_aspekt")),
+        ContextNode.content_type.in_(("leitperspektive", "leitperspektive_aspekt", *LFDB_TYPEN)),
         ContextNode.status == "active"))).scalars().all()
     for n in knoten:
         if n.content_type == "leitperspektive" and (code := leitperspektive_code(n.metadata_)):
@@ -241,6 +257,16 @@ async def verweisziele(db: AsyncSession) -> Verweisziele:
         titel[bp_id] = n.title
         if code in lp_liste:
             lp_liste[code]["aspekte"].append({"kuerzel": bp_id, "titel": n.title})
+    # Leitfaden Demokratiebildung (0.53.1): Bausteine, Themenblöcke, Kompetenzen als Teile
+    # der Leitperspektive LFDB — Token `lpa:` wie bei einem Aspekt (F1).
+    for n in knoten:
+        if n.content_type not in LFDB_TYPEN or not (k := lfdb_kuerzel((n.metadata_ or {}).get("bp_id"))):
+            continue
+        kurz = n.title if len(n.title) <= 80 else n.title[:79] + "…"
+        lp[k] = ("lpa", n.id, f"LFDB {lfdb_anzeige(k)}: {kurz}")
+        titel[k] = n.title
+        if "LFDB" in lp_liste:
+            lp_liste["LFDB"]["aspekte"].append({"kuerzel": k, "titel": n.title})
     for eintrag in lp_liste.values():
         eintrag["aspekte"].sort(key=lambda a: _natuerlich(a["kuerzel"]))
     kuerzel_von = {str(v[1]): k for k, v in ll.items()} | {str(v[1]): k for k, v in lp.items()}
@@ -290,10 +316,14 @@ def leitlinien_tokens(namen, ziele: Verweisziele) -> list[str]:
 
 
 def lp_kuerzel_normalisieren(name) -> str:
-    """„BNE“, „(L) BNE“ → „BNE“; „BNE 3“, „bne3“, „BNE_3“, „BNE-03“ → „BNE_03“."""
+    """„BNE“, „(L) BNE“ → „BNE“; „BNE 3“, „bne3“, „BNE_3“, „BNE-03“ → „BNE_03“;
+    „LFDB B1.T2“ → „LFDB_B1_T2“."""
     from app.context.service import normalize_lp_code
 
     k = normalize_lp_code(str(name))
+    if m := _LFDB.match(k):  # „LFDB B1.T2“, „lfdb_b1_t2_k3“ → „LFDB_B1_T2_K3“
+        return "_".join(["LFDB", f"B{int(m.group(1))}",
+                         *(f"{z}{int(v)}" for z, v in (("T", m.group(2)), ("K", m.group(3))) if v)])
     if m := _LP_ASPEKT.match(k):
         return f"{m.group(1)}_{int(m.group(2)):02d}"
     return k
