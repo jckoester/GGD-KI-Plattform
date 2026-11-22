@@ -6,13 +6,14 @@
      * Umschalter in der Adresse, damit die Ansicht als Link weitergeht:
      *   `?faecher=alle`         — alle Fächer der Schule statt nur der mit Eintragungen (F7)
      *   `?nur_veroeffentlicht=1` — ohne Entwürfe (F3)
+     *   `?stufe=7`               — nur Fundstellen, deren Curriculum Klasse 7 abdeckt (F6)
      */
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import { getLeitlinienUebersicht } from '$lib/api.js'
     import { stufe, stufenBereiche, bereichText } from '$lib/heatmap_stufen.js'
-    import { fundstelleHref, hoechstwert, spalten, zeilen, zellenText } from '$lib/leitlinien_uebersicht.js'
+    import { aufStufe, fundstelleHref, hoechstwert, spalten, stufenAuswahl, zeilen, zellenText } from '$lib/leitlinien_uebersicht.js'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
     import PageBody from '$lib/components/PageBody.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -26,6 +27,9 @@
 
     const alleFaecher = $derived($page.url.searchParams.get('faecher') === 'alle')
     const nurVeroeffentlicht = $derived($page.url.searchParams.get('nur_veroeffentlicht') === '1')
+
+    const stufeRoh = $derived(Number.parseInt($page.url.searchParams.get('stufe') ?? '', 10))
+    const klasse = $derived(Number.isFinite(stufeRoh) ? stufeRoh : null)
 
     let u = $state(null)
     let loading = $state(true)
@@ -44,15 +48,19 @@
         return () => { abgebrochen = true }
     })
 
-    function umschalten(name, wert) {
+    function setzen(name, wert) {
         const url = new URL($page.url)
-        if (wert) url.searchParams.set(name, name === 'faecher' ? 'alle' : '1')
+        if (wert) url.searchParams.set(name, wert)
         else url.searchParams.delete(name)
         goto(url, { replaceState: true, keepFocus: true, noScroll: true })
     }
+    const umschalten = (name, an) => setzen(name, an ? (name === 'faecher' ? 'alle' : '1') : null)
 
-    const sp = $derived(u ? spalten(u) : [])
-    const reihen = $derived(u ? zeilen(u, alleFaecher) : [])
+    // Auswahl aus dem ungefilterten Stand, damit sie sich beim Wählen nicht verändert
+    const stufen = $derived(u ? stufenAuswahl(u) : [])
+    const sicht = $derived(aufStufe(u, klasse))
+    const sp = $derived(sicht ? spalten(sicht) : [])
+    const reihen = $derived(sicht ? zeilen(sicht, alleFaecher) : [])
     const max = $derived(hoechstwert(reihen))
     const hier = $derived($page.url.pathname + $page.url.search)
     const art = $derived(u?.art === 'leitperspektive' ? 'Leitperspektive' : 'Leitlinie')
@@ -95,6 +103,19 @@
                    onchange={(e) => umschalten('nur_veroeffentlicht', e.currentTarget.checked)} />
             Nur veröffentlichte Curricula
         </label>
+        {#if stufen.length || klasse != null}
+            <label class="inline-flex items-center gap-2">
+                Klasse
+                <select value={klasse ?? ''} onchange={(e) => setzen('stufe', e.currentTarget.value || null)}
+                        class="pl-2 pr-8 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx">
+                    <option value="">alle</option>
+                    {#each stufen.includes(klasse) || klasse == null ? stufen : [...stufen, klasse].sort((a, b) => a - b) as s (s)}
+                        <option value={s}>{s}</option>
+                    {/each}
+                </select>
+            </label>
+        {/if}
     </div>
 
     {#if loading && !u}
@@ -112,13 +133,13 @@
         {#if sp.length === 0}
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Diese {art} hat keine Aspekte.</p>
         {:else}
-            {#if u.ohne_fundstelle.length}
-                <WarningBanner message="Ohne Fundstelle: {u.ohne_fundstelle.join(', ')}" />
+            {#if sicht.ohne_fundstelle.length}
+                <WarningBanner message="Ohne Fundstelle{klasse != null ? ` in Klasse ${klasse}` : ''}: {sicht.ohne_fundstelle.join(', ')}" />
             {/if}
 
             {#if reihen.length === 0}
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-6">
-                    Noch kein Curriculum verweist auf diese {art}.
+                    {klasse != null ? `In Klasse ${klasse} verweist` : 'Noch'} kein Curriculum auf diese {art}.
                 </p>
             {:else}
                 <div class="overflow-x-auto mb-3">

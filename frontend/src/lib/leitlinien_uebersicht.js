@@ -55,3 +55,49 @@ export function fundstelleHref(f, zurueck) {
     const back = zurueck ? `?back=${encodeURIComponent(zurueck)}` : "";
     return `/knowledge/curriculum/${f.curriculum_id}${back}#kapitel-${f.kapitel_id}`;
 }
+
+/** Alle Fundstellen der Übersicht, über Aspekte und „als Ganzes“. */
+function alleFundstellen(u) {
+    return [...(u?.aspekte ?? []).flatMap((a) => a.fundstellen), ...(u?.ganz ?? [])];
+}
+
+/**
+ * Klassenstufen für den Filter (F6): jede Stufe, die eine Fundstelle abdeckt — ein Curriculum
+ * für 7–8 bringt 7 und 8 mit. Aufsteigend; leer, wenn keine Fundstelle Stufen nennt.
+ */
+export function stufenAuswahl(u) {
+    const stufen = new Set();
+    for (const f of alleFundstellen(u)) {
+        const von = f.min_grade ?? f.max_grade;
+        const bis = f.max_grade ?? f.min_grade;
+        if (von == null) continue;
+        for (let s = von; s <= bis; s++) stufen.add(s);
+    }
+    return [...stufen].sort((a, b) => a - b);
+}
+
+/** Deckt die Fundstelle die Stufe ab? Ohne Angabe von Stufen: nein. */
+export function deckt(f, stufe) {
+    const von = f.min_grade ?? f.max_grade;
+    const bis = f.max_grade ?? f.min_grade;
+    return von != null && von <= stufe && stufe <= bis;
+}
+
+/**
+ * Die Übersicht, eingegrenzt auf eine Klassenstufe (F6); ohne Stufe unverändert. Fächer mit
+ * Eintragungen und Aspekte ohne Fundstelle gelten danach für diese Stufe.
+ */
+export function aufStufe(u, stufe) {
+    if (!u || stufe == null) return u;
+    const nur = (liste) => liste.filter((f) => deckt(f, stufe));
+    const aspekte = u.aspekte.map((a) => ({ ...a, fundstellen: nur(a.fundstellen) }));
+    const ganz = nur(u.ganz);
+    const mitEintrag = new Set([...aspekte.flatMap((a) => a.fundstellen), ...ganz].map((f) => f.fach_id));
+    return {
+        ...u,
+        aspekte,
+        ganz,
+        faecher: u.alle_faecher.filter((f) => mitEintrag.has(f.id)),
+        ohne_fundstelle: aspekte.filter((a) => a.fundstellen.length === 0).map((a) => a.kuerzel),
+    };
+}
