@@ -148,7 +148,7 @@ class Provider:
             raise OAuthFehler("Dieses Programm ist nicht mehr registriert. Bitte im Programm neu verbinden.")
         return {"programm": client.client_name or "Unbenanntes Programm",
                 "ruecksprung": urlsplit(daten["redirect_uri"]).netloc, "scope": SCOPE,
-                "tage": VERBINDUNG.days}
+                "berechtigung": tokens.SCOPE_BESCHRIFTUNG[SCOPE], "tage": VERBINDUNG.days}
 
     async def code_ausstellen(self, anfrage: str, user) -> str:
         """Nach der Zustimmung: Code speichern, Rücksprung-URL mit Code und State zurückgeben.

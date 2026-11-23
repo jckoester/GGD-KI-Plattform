@@ -3477,3 +3477,30 @@ export async function putEinrichtung(stand, seite) {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Stand konnte nicht gespeichert werden')
     return res.json()
 }
+
+// Zustimmung zu einem KI-Programm (0.55, Päckchen AX): was verbunden werden soll …
+export async function getOAuthAnfrage(anfrage) {
+  const res = await fetch(`${BASE}/oauth/anfrage?anfrage=${encodeURIComponent(anfrage)}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Die Anfrage ließ sich nicht laden");
+  }
+  return res.json(); // { programm, ruecksprung, scope, berechtigung, tage }
+}
+
+// … und die Entscheidung. Antwort `weiter`: die Rücksprungadresse des Programms.
+export async function sendOAuthEntscheidung(anfrage, zulassen) {
+  const res = await fetch(`${BASE}/oauth/entscheidung`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ anfrage, zulassen }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Die Entscheidung ließ sich nicht senden");
+  }
+  return res.json();
+}

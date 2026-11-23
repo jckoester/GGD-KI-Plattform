@@ -108,7 +108,8 @@ async def test_anfrage_zustimmung_und_code(welt):
     assert q["state"] == ["xyz"] and len(q["code"][0]) >= 40
     anfrage = parse_qs(urlsplit(ziel).query)["anfrage"][0]
     assert await p.anfrage_anzeigen(anfrage) == {
-        "programm": "Claude", "ruecksprung": "claude.ai", "scope": SCOPE, "tage": 90}
+        "programm": "Claude", "ruecksprung": "claude.ai", "scope": SCOPE,
+        "berechtigung": tokens.SCOPE_BESCHRIFTUNG[SCOPE], "tage": 90}
     assert parse_qs(urlsplit(p.ablehnen(anfrage)).query)["error"] == ["access_denied"]
 
 

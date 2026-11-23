@@ -8,7 +8,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Neu
 
 - Schnittstelle für KI-Abos: Anmeldung per OAuth (Registrierung, PKCE, Refresh mit Rotation, Widerruf); Metadaten unter
-  `/.well-known/oauth-…`. Täglicher Aufräumlauf `cleanup_oauth`.
+  `/.well-known/oauth-…`. Täglicher Aufräumlauf `cleanup_oauth`. Zustimmungsseite `/oauth/consent`: Lehrkräfte und Admins sehen
+  Programm, Berechtigung, Rücksprung und Dauer und lassen zu oder lehnen ab; ohne Anmeldung erst zur Anmeldung und zurück.
 
 ### Migration
 
