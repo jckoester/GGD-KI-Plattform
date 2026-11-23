@@ -12,6 +12,8 @@ Drei Prüfungen, alle mit Gegenprobe:
 2. **Keine schreibenden Aufrufe** im Paket selbst: `commit`, `add`, `flush`, `delete`,
    `sa.insert/update/delete` und Namen nach dem Muster `create_…`, `update_…`, `apply_…`.
 3. **Jedes Werkzeug ist als lesend gekennzeichnet** (`readOnlyHint`, kein `destructiveHint`).
+4. **Die YAML-Prüfung speichert nie (0.56, BA):** `curriculum_yaml_pruefen` ist der echte Import
+   in einem Savepoint (F4 a); jeder Aufruf von `durchlauf` nennt `speichern=False` ausdrücklich.
 
 **`oauth.py` ist ausgenommen (0.55, AX):** Der Autorisierungsserver muss Clients, Codes,
 Verbindungen und Token schreiben. Für ihn gilt eine eigene, enge Prüfung: Er schreibt **nur**
@@ -55,6 +57,13 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.context.curriculum_assistent", "abdeckung_kompakt"): "Lesefunktion (get_curriculum_coverage)",
     ("app.context.curriculum_assistent", "kompetenzen_lesen"): "Lesefunktion (get_bp_competences)",
     ("app.context.curriculum_assistent", "leitperspektiven_lesen"): "Lesefunktion (get_bp_competences typ=lp)",
+    ("app.context.curriculum_export", "build_curriculum_export_dict"): "Export als YAML (BA), liest",
+    ("app.context.service", "load_curriculum_tree"): "liest den Baum",
+    ("app.context.curriculum_yaml", "KeinRecht"): "Ausnahme",
+    # Die begründete Ausnahme (0.56, BA, F4 a): Die Prüfung ist der echte Import in einem
+    # Savepoint, der ohne `speichern=True` immer verworfen wird — dieselbe Logik wie die Vorschau
+    # in der Oberfläche, keine zweite. `test_durchlauf_nur_ohne_speichern` hält den Aufruf fest.
+    ("app.context.curriculum_yaml", "durchlauf"): "Import im Savepoint, immer verworfen (speichern=False)",
 }
 
 #: Für ganze Module: welche Attribute benutzt werden dürfen.
@@ -210,3 +219,31 @@ def test_jedes_werkzeug_lesend_gekennzeichnet():
     for w in werkzeuge:
         a = w.annotations
         assert a is not None and a.read_only_hint is True and a.destructive_hint is False, w.name
+
+
+def _durchlauf_aufrufe(baeume):
+    """Aufrufe von `durchlauf` und ob sie ausdrücklich `speichern=False` übergeben."""
+    for datei, baum in baeume:
+        for n in ast.walk(baum):
+            if isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", "")) == "durchlauf":
+                sicher = any(k.arg == "speichern" and isinstance(k.value, ast.Constant) and k.value.value is False
+                             for k in n.keywords)
+                yield f"{datei}:{n.lineno}", sicher
+
+
+def test_durchlauf_nur_ohne_speichern():
+    """Die YAML-Prüfung (BA) importiert im Savepoint — gespeichert werden darf über MCP nie.
+    Jeder Aufruf nennt `speichern=False` ausdrücklich; ein Vorgabewert, der sich ändert, oder eine
+    Variable reichen nicht."""
+    aufrufe = list(_durchlauf_aufrufe(_baeume()))
+    assert aufrufe, "curriculum_yaml_pruefen ruft durchlauf nicht mehr auf — Liste prüfen"
+    assert all(sicher for _, sicher in aufrufe), aufrufe
+
+
+@pytest.mark.parametrize("quelle", [
+    "async def f(db, t, u):\n    await durchlauf(db, t, u)",
+    "async def f(db, t, u):\n    await durchlauf(db, t, u, speichern=True)",
+    "async def f(db, t, u, s):\n    await durchlauf(db, t, u, speichern=s)",
+])
+def test_gegenprobe_durchlauf(quelle):
+    assert not all(sicher for _, sicher in _durchlauf_aufrufe(_baeume([quelle])))

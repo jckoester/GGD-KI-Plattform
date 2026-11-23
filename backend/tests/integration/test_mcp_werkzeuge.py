@@ -24,7 +24,8 @@ BP = "2016.V3"
 HOST = "ki.schule.test"
 KOPF = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
 WERKZEUGE = {"leitlinien", "leitperspektiven", "leitlinie_uebersicht", "curricula_finden",
-             "curriculum_lesen", "curriculum_abdeckung", "bildungsplan_kompetenzen"}
+             "curriculum_lesen", "curriculum_abdeckung", "bildungsplan_kompetenzen",
+             "curriculum_yaml", "curriculum_yaml_pruefen"}
 
 
 @pytest_asyncio.fixture
@@ -118,7 +119,7 @@ async def _ruf(rpc, name, **argumente):
     return (text if erg.get("isError") else json.loads(text)), bool(erg.get("isError"))
 
 
-async def test_sieben_werkzeuge_alle_lesend(db, welt):
+async def test_neun_werkzeuge_alle_lesend(db, welt):
     async with _verbunden(db) as rpc:
         liste = (await rpc("tools/list"))["tools"]
     assert {w["name"] for w in liste} == WERKZEUGE
@@ -206,3 +207,49 @@ async def test_curricula_wie_im_browser(db, welt):
         aus, _ = await _ruf(rpc, "curricula_finden", fach=welt["fach"].name)
     assert {c["curriculum_id"] for c in aus["curricula"]} == im_browser
     assert str(welt["entwurf"].id) in im_browser and str(welt["privat"].id) not in im_browser
+
+
+async def test_curriculum_yaml_und_pruefen(db, welt):
+    """BA (0.56): Vorlage holen, prüfen — gespeichert wird nichts. Ohne Fachschaft meldet die
+    Prüfung das als Fehler; mit Fachschaft läuft sie durch, und es entsteht trotzdem kein Knoten."""
+    import sqlalchemy as sa
+    import yaml
+
+    from app.db.models import Group, GroupMembership
+
+    fach = welt["fach"]
+    db.add(_knoten("fachplan", f"Physik {TOKEN}", read_scope="global", subject_id=fach.id, bp_version=BP,
+                   owner_pseudonym="system", metadata_={"bp_id": f"BP_{TOKEN}", "bp_version": BP}))
+    await db.flush()
+
+    async def zahl():
+        return (await db.execute(sa.select(sa.func.count()).select_from(ContextNode).where(
+            ContextNode.subject_id == fach.id))).scalar_one()
+
+    async with _verbunden(db) as rpc:
+        aus, fehler = await _ruf(rpc, "curriculum_yaml", curriculum_id=str(welt["aktiv"].id))
+        assert not fehler and "Entwurf" in aus["hinweis"]
+        daten = yaml.safe_load(aus["yaml"])
+        assert daten["kapitel"][0]["titel"] == f"Optik Physik 7/8 {TOKEN}"
+        _, fehler = await _ruf(rpc, "curriculum_yaml", curriculum_id=str(welt["privat"].id))
+        assert fehler
+
+        daten.update(fach_code=fach.fach_code, bp_id=f"BP_{TOKEN}", jahrgangsstufe="7/8", bp_version=BP)
+        text = yaml.safe_dump(daten, allow_unicode=True)
+        vorher = await zahl()
+        aus, fehler = await _ruf(rpc, "curriculum_yaml_pruefen", yaml=text)
+        assert not fehler and not aus["ok"] and "Fachschaft" in aus["fehler"][0]
+
+        gruppe = Group(name=f"FS {TOKEN}", slug=f"fs-{TOKEN}", type="subject_department", subject_id=fach.id)
+        db.add(gruppe)
+        await db.flush()
+        db.add(GroupMembership(group_id=gruppe.id, pseudonym=LEHRKRAFT))
+        await db.flush()
+        aus, fehler = await _ruf(rpc, "curriculum_yaml_pruefen", yaml=text)
+        assert not fehler and aus["ok"], aus
+        assert [k["titel"] for k in aus["kapitel"]] == [f"Optik Physik 7/8 {TOKEN}"]
+        assert "id" not in aus and "nichts gespeichert" in aus["hinweis"]
+        assert await zahl() == vorher
+
+        aus, _ = await _ruf(rpc, "curriculum_yaml_pruefen", yaml="a: &x 1\nb: *x\n")
+        assert not aus["ok"] and "Anker" in aus["fehler"][0]

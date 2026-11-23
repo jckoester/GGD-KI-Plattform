@@ -37,7 +37,9 @@ LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
           "_lesbare_curricula", "_entwurfsbaum", "leitlinien_fundstellen", "leitlinien_uebersicht",
           # MCP-Server (0.54, AW): nur lesende Werkzeuge; der Wächter `test_mcp_nur_lesend` hält
           # das Paket von schreibenden Funktionen fern.
-          "_curriculum_fuer_werkzeug", "lies_abdeckung", "lies_curricula", "lies_curriculum", "lies_uebersicht"}
+          "_curriculum_fuer_werkzeug", "lies_abdeckung", "lies_curricula", "lies_curriculum", "lies_uebersicht",
+          # 0.56 (BA): das Curriculum als YAML, wie der Export.
+          "lies_curriculum_yaml"}
 
 #: Nicht lesende Stellen, die die Leseregel benutzen: Grund und die Prüfung, die sie danach
 #: aufrufen müssen (``None``: ändert nichts an einem Entwurf).

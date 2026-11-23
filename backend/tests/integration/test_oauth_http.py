@@ -119,7 +119,7 @@ async def test_ganzer_ablauf_bis_zum_werkzeug(fabrik, person):
         assert r.status_code == 200, r.text
         kopf["mcp-protocol-version"] = r.json()["result"]["protocolVersion"]
         r = await c.post("/mcp", headers=kopf, json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        assert len(r.json()["result"]["tools"]) == 7
+        assert len(r.json()["result"]["tools"]) == 9
 
         # Refresh: neue Token, der alte Zugriff gilt bis zu seinem Ablauf weiter
         r = await c.post("/token", data={"grant_type": "refresh_token", "refresh_token": t["refresh_token"],

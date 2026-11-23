@@ -1,6 +1,6 @@
 """Die Werkzeuge des MCP-Servers — nur lesend (0.54, Päckchen AW Schritt 4, F2).
 
-Sieben Werkzeuge über dieselben Lesefunktionen wie Oberfläche und Curriculum-Assistent;
+Neun Werkzeuge über dieselben Lesefunktionen wie Oberfläche und Curriculum-Assistent;
 gelesen wird mit den Rechten der Person hinter dem Token (`principal`), also wie im Browser:
 Entwürfe für Lehrkräfte sichtbar (seit 0.52), private Curricula nur die eigenen.
 
@@ -9,6 +9,12 @@ die bekannten Felder heraus, bevor eine Antwort das Haus verlässt. Kennungen vo
 Kapiteln und Bausteinen bleiben — ein Programm braucht sie für Folgeaufrufe.
 
 **Fehler** fürs Programm als `ToolError` mit lesbarer Meldung, nie als Stacktrace.
+
+**Curricula entwerfen (0.56, BA):** `curriculum_yaml` liefert ein Curriculum als YAML (der
+Export), `curriculum_yaml_pruefen` prüft einen Entwurf mit derselben Logik wie der Import in der
+Oberfläche — der echte Import in einem Savepoint, der **immer** verworfen wird
+(`curriculum_yaml.durchlauf(…, speichern=False)`; der Wächter `test_mcp_nur_lesend` hält das
+fest). Anlegen tut die Lehrkraft selbst, in der Plattform, nach der Vorschau.
 """
 from __future__ import annotations
 
@@ -166,6 +172,46 @@ async def lies_abdeckung(db: AsyncSession, user, curriculum_id: str) -> dict:
     return await abdeckung_kompakt(db, await _curriculum_fuer_werkzeug(db, user, curriculum_id))
 
 
+#: Das Format für `curriculum_yaml_pruefen` — kurz, das Programm hat die Vorlage aus `curriculum_yaml`.
+YAML_FORMAT = (
+    "Oben: schule, fach_code (Kürzel, etwa 'M'), fach, schulart, jahrgangsstufe (etwa '7/8'), bp_version, "
+    "bp_id, vorwort, rahmen, kapitel. Kapitel: titel, reihenfolge, std, hinweis, konkretisierung (Liste), "
+    "lernsequenzen. Lernsequenz: bp_titel, bp_leitidee, reihenfolge, std, eintraege. Eintrag: ik (Liste "
+    "von {nr, partiell}), pk (Liste von {id}), konkretisierung, hinweise, material, begriffe, fachmethoden. "
+    "Verweise in hinweise: @[Text](lp:BNE), @[Text](lb:<Kürzel der Leitlinie>), @[Text](lba:<Kürzel des "
+    "Aspekts>), #[Text](ik:<Fachkürzel>:<Nr>). Keine YAML-Anker (&, *)."
+)
+
+
+async def lies_curriculum_yaml(db: AsyncSession, user, curriculum_id: str) -> dict:
+    import yaml
+
+    from app.context.curriculum_export import build_curriculum_export_dict
+    from app.context.service import load_curriculum_tree
+
+    node = await _curriculum_fuer_werkzeug(db, user, curriculum_id)
+    daten = await build_curriculum_export_dict(db, await load_curriculum_tree(db, node.id))
+    return {"yaml": yaml.safe_dump(daten, allow_unicode=True, sort_keys=False),
+            "hinweis": "Vorlage für einen Entwurf. Geändertes YAML mit curriculum_yaml_pruefen prüfen; "
+                       "importieren kann es die Lehrkraft in der Plattform (Curricula des Fachs → "
+                       "„Aus YAML importieren“). Es entsteht immer ein Entwurf."}
+
+
+async def lies_yaml_pruefung(db: AsyncSession, user, text: str, ersetzen: str | None) -> dict:
+    from app.context.curriculum_yaml import KeinRecht, durchlauf
+
+    ziel = _uuid(ersetzen, "das zu ersetzende Curriculum") if ersetzen else None
+    try:
+        # Nur lesend: Der Import läuft im Savepoint und wird verworfen (speichern=False, Wächter).
+        aus = await durchlauf(db, text, user, ersetzen=ziel, speichern=False)
+    except KeinRecht as e:
+        aus = {"ok": False, "fehler": [str(e) + " Die Datei kann eine Lehrkraft dieser Fachschaft importieren."],
+               "warnungen": []}
+    aus["hinweis"] = ("Geprüft, nichts gespeichert. Ohne Fehler kann die Lehrkraft die Datei in der Plattform "
+                      "importieren; es entsteht ein Entwurf.")
+    return aus
+
+
 async def lies_kompetenzen(db: AsyncSession, user, fach: str, jahrgangsstufe: str, bp_version: str | None,
                             bereich: str | None, typ: str) -> dict:
     """IK/PK eines Fachs für ein Band — dieselbe Auswahl wie im Curriculum-Assistenten, nur ohne
@@ -266,6 +312,25 @@ def registrieren(server: MCPServer, sitzung: Callable[[], AsyncSession] | None =
         curriculum_id: Annotated[str, Field(description="Kennung aus curricula_finden.")],
     ) -> dict:
         return await ausfuehren(lies_abdeckung, curriculum_id)
+
+    @server.tool(annotations=LESEND, structured_output=False, description=(
+        "Ein Curriculum als YAML — die Vorlage, um einen Entwurf zu schreiben (Format der Plattform). "
+        "Speichern kann das Programm nichts; die Lehrkraft importiert das YAML selbst."))
+    async def curriculum_yaml(
+        curriculum_id: Annotated[str, Field(description="Kennung aus curricula_finden.")],
+    ) -> dict:
+        return await ausfuehren(lies_curriculum_yaml, curriculum_id)
+
+    @server.tool(annotations=LESEND, structured_output=False, description=(
+        "Prüft einen Curriculum-Entwurf als YAML mit derselben Logik wie der Import der Plattform, ohne "
+        "zu speichern: Fehler und Warnungen mit Stelle, Gliederung mit Stunden, vorhandene Curricula "
+        "gleichen Fachs, Jahrgangs und Fassung. Format: " + YAML_FORMAT))
+    async def curriculum_yaml_pruefen(
+        yaml: Annotated[str, Field(description="Der YAML-Text, höchstens 200 000 Zeichen.", max_length=200_000)],
+        ersetzen: Annotated[str | None, Field(description="Kennung eines veröffentlichten Curriculums aus "
+                                                           "'vorhanden', das der Entwurf ersetzen soll.")] = None,
+    ) -> dict:
+        return await ausfuehren(lies_yaml_pruefung, yaml, ersetzen)
 
     @server.tool(annotations=LESEND, structured_output=False, description=(
         "Kompetenzen des Bildungsplans für ein Fach und eine Jahrgangsstufe. Ohne bereich: Übersicht der "
