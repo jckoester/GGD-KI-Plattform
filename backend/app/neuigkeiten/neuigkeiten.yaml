@@ -561,3 +561,16 @@
     nach @, auf einen Baustein, einen Themenblock oder eine Kompetenz. Die Übersicht der
     Leitperspektiven zeigt dazu, wo seine Themenblöcke im Unterricht vorkommen.
   link: /help/curriculum#hinweise-leitperspektiven-und-leitlinien
+
+- id: "0.56-curriculum-yaml-import"
+  version: "0.56.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-23
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curriculum aus YAML importieren"
+  text: >-
+    In der Liste der Curricula eines Fachs kann deine Fachschaft ein Curriculum jetzt aus einer
+    YAML-Datei importieren, etwa aus dem Export einer anderen Plattform. Eine Vorschau zeigt vorher
+    Gliederung und Unstimmigkeiten; es entsteht immer ein Entwurf.
+  link: /help/curriculum#aus-einer-yaml-datei-importieren

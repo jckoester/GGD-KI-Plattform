@@ -5,6 +5,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.56.0] – 2026-11-23
+
+### Neu
+
+- Curriculum aus YAML importieren: In der Liste der Curricula eines Fachs legen Fachschaft und Admins aus einer
+  YAML-Datei einen Entwurf an. Eine Vorschau zeigt vorher Fehler mit Stelle, Hinweise und die Gliederung; auf Wunsch
+  ersetzt der Entwurf beim Veröffentlichen ein vorhandenes Curriculum. Vorhandene Curricula ändert der Import nicht.
+- Schnittstelle für KI-Abos: Werkzeuge `curriculum_yaml` (Curriculum als YAML) und `curriculum_yaml_pruefen` (prüft
+  einen Entwurf, ohne zu speichern). Die Schnittstelle bleibt nur lesend.
+
+### Geändert
+
+- Import von Curricula (auch `scripts/import_curriculum.py`): strengere Prüfung der Datei; Verweise mit Kennung nur auf
+  lesbare Bausteine; doppelte Reihenfolge legt keine Kapitel mehr zusammen; importierte Knoten tragen die
+  Eigentümer:in.
+
+### Nach dem Update
+
+- Neuer Eimer `curriculum_import` in `config/rate_limits.example.yaml` (ohne Eintrag gilt die Vorgabe 20 in
+  5 Minuten je Person).
+
 ## [0.55.1] – 2026-11-23
 
 ### Geändert
