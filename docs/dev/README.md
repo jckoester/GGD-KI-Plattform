@@ -65,6 +65,7 @@ cd frontend && npm install && npm run dev
 - [Begriffe im Curriculum](curriculum-begriffe.md) — Begriffe und Fachmethoden am Eintrag: Format, Abgleich, Auflösung, Gerüste, Planung
 - [Entwürfe von Curricula](curriculum-entwurf.md) — Status `draft`, eine Rechteregel mit Fachvorsitz, Veröffentlichen und Ersetzen, Abdeckung; seit 0.46 kommende Fassung, Rückgängig, Rahmen, Funktionen des Curriculum-Assistenten, Bänder des Bildungsplans und Abdeckung über Band und Fassung
 - [Leitlinien der Schule](leitlinien.md) — `leitbild` und `leitbild_aspekt`, Kürzel statt Kanten, Token `lb`/`lba` im Curriculum, Felder des Curriculum-Assistenten (seit 0.50); schulweite Übersicht je Leitlinie und Leitperspektive (seit 0.53)
+- [MCP-Server für KI-Abos](mcp.md) — Aufbau, Schutzschichten, sieben lesende Werkzeuge, Wächter, Tests (seit 0.54)
 - [Neuen Knotentyp einführen](neuer-knotentyp.md) — Checkliste, Netzwerkgraph, die vier stummen Fallen
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache

@@ -127,10 +127,25 @@ async def token_widerrufen(
 async def verfuegbare_scopes(user: JwtPayload = Depends(_LEHRKRAFT_ODER_ADMIN)) -> dict:
     """Die vergebbaren Berechtigungen samt Beschriftung — damit die Oberfläche sie nicht
     doppelt führt und bei einer neuen nicht stillschweigend veraltet."""
+    from app.config import settings
+    from app.mcp.auth import SCOPE as MCP_SCOPE
+
+    def eintrag(k: str, v: str) -> dict:
+        aus = {"key": k, "label": v}
+        if hinweis := token_dienst.SCOPE_HINWEIS.get(k):
+            aus["hinweis"] = hinweis
+        if k == MCP_SCOPE:  # Adresse zum Eintragen im Programm, Anleitung in der Hilfe
+            aus["adresse"] = settings.mcp_oeffentliche_url
+            aus["hilfe"] = "/help/profil#ki-programme-verbinden"
+        return aus
+
     return {
+        # Den Scope für KI-Programme nur anbieten, wenn die Schule die Schnittstelle
+        # eingeschaltet hat (F4) — sonst legte man ein Token an, das nirgends hinführt.
         "scopes": [
-            {"key": k, "label": v}
+            eintrag(k, v)
             for k, v in token_dienst.SCOPE_BESCHRIFTUNG.items()
+            if k != MCP_SCOPE or (settings.mcp_aktiv and settings.mcp_oeffentliche_url)
         ],
         "max_tage": token_dienst.MAX_GUELTIGKEIT.days,
         "vorschlag_gueltig_bis": (

@@ -202,7 +202,12 @@ class TestEinTokenLegtKeinTokenAn:
 
 
 class TestScopeAuskunft:
-    async def test_beschriftungen_decken_alle_scopes_ab(self, test_client, auth_headers):
+    async def test_beschriftungen_decken_alle_scopes_ab(self, test_client, auth_headers, monkeypatch):
+        from app.config import settings
+
+        # Mit eingeschalteter Schnittstelle für KI-Abos: sonst fehlt `curriculum:read` (0.54).
+        monkeypatch.setattr(settings, "mcp_aktiv", True)
+        monkeypatch.setattr(settings, "mcp_oeffentliche_url", "https://ki.schule.test/api/mcp")
         resp = await test_client.get("/tokens/scopes", headers=auth_headers)
         assert resp.status_code == 200
         daten = resp.json()
@@ -226,3 +231,28 @@ class TestStepupBleibtGebunden:
             headers=auth_headers,
         )
         assert resp.status_code == 200, resp.text
+
+
+class TestScopeFuerKiProgramme:
+    """0.54, AW: `curriculum:read` erscheint im Dialog nur, wenn die Schule die Schnittstelle
+    eingeschaltet hat — dann mit Hinweis, Adresse und Link zur Anleitung."""
+
+    async def test_aus_nicht_angeboten(self, test_client, auth_headers, audit, monkeypatch):
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "mcp_aktiv", False)
+        keys = [s["key"] for s in (await test_client.get("/tokens/scopes", headers=auth_headers)).json()["scopes"]]
+        assert "curriculum:read" not in keys
+        assert "planning:read" in keys
+
+    async def test_an_mit_hinweis_und_adresse(self, test_client, auth_headers, audit, monkeypatch):
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "mcp_aktiv", True)
+        monkeypatch.setattr(settings, "mcp_oeffentliche_url", "https://ki.schule.test/api/mcp")
+        scopes = {s["key"]: s for s in (await test_client.get("/tokens/scopes", headers=auth_headers)).json()["scopes"]}
+        s = scopes["curriculum:read"]
+        assert s["adresse"] == "https://ki.schule.test/api/mcp"
+        assert s["hilfe"] == "/help/profil#ki-programme-verbinden"
+        assert "Anbieter" in s["hinweis"]
+        assert "hinweis" not in scopes["planning:read"]

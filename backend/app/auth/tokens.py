@@ -40,6 +40,14 @@ SCOPE_BESCHRIFTUNG: dict[str, str] = {
 
 SCOPES = frozenset(SCOPE_BESCHRIFTUNG)
 
+# Erklärung unter der Beschriftung im Dialog, wo ein Scope mehr braucht als seinen Namen.
+SCOPE_HINWEIS: dict[str, str] = {
+    "curriculum:read": (
+        "Für ein KI-Programm wie Claude, das du mit der Plattform verbindest. Es liest Curricula "
+        "(auch Entwürfe), Bildungspläne und Leitlinien und schreibt nichts. Was es liest, geht an "
+        "den Anbieter dieses Programms."),
+}
+
 # Obergrenze der Gültigkeit. Richtlinie der Anwendung, keine Invariante der Daten —
 # deshalb hier und nicht als CHECK in der Migration.
 MAX_GUELTIGKEIT = timedelta(days=365)

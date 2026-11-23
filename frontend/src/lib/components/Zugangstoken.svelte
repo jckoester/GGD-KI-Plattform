@@ -258,6 +258,18 @@
                             />
                             {s.label}
                         </label>
+                        {#if s.hinweis}
+                            <!-- Seit 0.54 (AW): was der Scope bedeutet, wohin das Programm verbindet -->
+                            <p class="ml-6 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                {s.hinweis}
+                                {#if s.adresse}
+                                    Adresse: <code class="break-all">{s.adresse}</code>.
+                                {/if}
+                                {#if s.hilfe}
+                                    <a href={s.hilfe} class="text-light-bl dark:text-dark-bl hover:underline">So verbindest du es</a>
+                                {/if}
+                            </p>
+                        {/if}
                     {/each}
                 </div>
             </fieldset>

@@ -154,6 +154,12 @@ section.footnotes {
     margin: 0;
     padding: 1rem;
     overflow-x: auto;
+    /* Der Grund kommt vom Container. In der Hilfe (`prose`) gibt das Typografie-Plugin jedem
+       `pre` einen dunklen Hintergrund und eine eigene Schriftfarbe — im hellen Modus stand die
+       schwarze Schrift dann auf Dunkelgrau (gefunden 23.11.2026). */
+    background-color: transparent;
+    color: inherit;
+    border-radius: 0;
 }
 
 .code-block code.hljs {

@@ -180,6 +180,34 @@ Ein Token kann **nicht** chatten, keine Budgets sehen und nichts verwalten. Es e
 
 Behandle den Tokentext wie ein Passwort: nicht per Mail verschicken, nicht in geteilte Notizen schreiben. Falls er doch einmal irgendwo gelandet ist, beende ihn im Profil — das wirkt sofort, auch mitten in einem laufenden Abgleich.
 
+## KI-Programme verbinden
+
+Hat deine Schule ein KI-Abo, etwa für Claude, kann das Programm Curricula, Bildungspläne und Leitlinien direkt aus der Plattform lesen. Dann kannst du dort zum Beispiel fragen: „Wo kommt BNE in unseren Curricula der Klassen 7 und 8 vor, und wo fehlt es?“ oder „Vergleiche die Curricula Mathematik und Physik in Klasse 9.“
+
+Das geht nur, wenn die Schule es eingeschaltet hat. Dann steht beim Anlegen eines Zugangstokens die Berechtigung **„Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“**, darunter die Adresse, die du im Programm einträgst.
+
+**Was das Programm sieht:** alle Curricula, die du auch im Browser lesen kannst, auch Entwürfe. Dazu die Bildungspläne mit Kompetenzen und Leitperspektiven, die Leitlinien der Schule und die Übersicht, wo eine Leitperspektive im Unterricht vorkommt.
+
+**Was es nicht sieht und nicht kann:** keine Chats, keine Unterrichtsplanung, keine Namen von Personen. Schreiben kann es nichts. Einen Entwurf, den das Programm vorschlägt, überträgst du selbst in den Editor.
+
+**Wohin die Inhalte gehen:** Was das Programm liest, schickt es an seinen Anbieter, etwa Anthropic. Curricula enthalten in der Regel nichts Personenbezogenes; schreib deshalb auch keine Namen von Schüler:innen hinein. Verbinde nur ein Programm, das die Schule dafür vorsieht.
+
+### Mit Claude Code verbinden
+
+1. Ein Zugangstoken anlegen, wie oben beschrieben, und **nur** die Berechtigung für KI-Programme ankreuzen.
+2. Im Terminal, mit der Adresse aus dem Profil und deinem Tokentext:
+
+   ```bash
+   claude mcp add --transport http schule https://ki.deine-schule.de/api/mcp \
+     --header "Authorization: Bearer ggd_pat_…"
+   ```
+
+3. In Claude Code mit `/mcp` prüfen, ob die Verbindung steht.
+
+Claude im Browser, in der Desktop-App oder auf dem Handy sowie andere Programme wie ChatGPT verbinden sich nur über eine eigene Anmeldung. Die kommt in einer späteren Version.
+
+**Verbindung beenden:** das Token im Profil beenden. Das wirkt sofort.
+
 ## Accountdaten
 
 Dein Anzeigename und deine Nutzerrolle kommen direkt aus dem Schulkonto (SSO) und können innerhalb von ki@schule nicht geändert werden. Für Änderungen am Schulkonto wende dich an den IT-Support deiner Schule.
