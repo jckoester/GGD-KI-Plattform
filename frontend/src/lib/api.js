@@ -2328,6 +2328,48 @@ export async function getFachplaene() {
     return res.json()
 }
 
+/**
+ * Curriculum aus YAML (0.56, Päckchen BA): Vorschau. Der echte Import als Entwurf, danach
+ * verworfen. Gibt die Vorschau zurück (`ok`, `fehler`, `warnungen`, `kapitel`, `summen`,
+ * `vorhanden`, `ersetzen`) — auch bei Fehlern in der Datei.
+ */
+export async function pruefeCurriculumYaml(yaml, ersetzen = null) {
+  const res = await fetch(`${BASE}/context/curricula/import/pruefen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ yaml, ersetzen }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(res.status, _yamlFehlertext(res.status, data))
+  return data
+}
+
+/**
+ * Curriculum aus YAML anlegen — immer als Entwurf. Gibt die Vorschau mit `id` zurück. Hat die
+ * Datei Fehler (`422`), kommt die Vorschau mit den Fehlern zurück statt einer Ausnahme.
+ */
+export async function importiereCurriculumYaml(yaml, ersetzen = null) {
+  const res = await fetch(`${BASE}/context/curricula/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ yaml, ersetzen }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (res.status === 422 && data.detail && typeof data.detail === 'object' && 'fehler' in data.detail) {
+    return data.detail
+  }
+  if (!res.ok) throw new ApiError(res.status, _yamlFehlertext(res.status, data))
+  return data
+}
+
+function _yamlFehlertext(status, data) {
+  if (status === 422) return 'Die Datei ist zu groß (höchstens 200 000 Zeichen).'
+  if (typeof data.detail === 'string') return data.detail
+  return 'Prüfen fehlgeschlagen'
+}
+
 // `createCurriculumFromDraft` stand hier und rief `POST /context/curricula` auf. Beides
 // am 2026-08-08 entfernt: Der Endpunkt committete nicht, wurde von keiner Seite benutzt
 // und doppelte den Admin-Weg über `scripts/import_curriculum.py`. Curricula entstehen in

@@ -10,18 +10,21 @@
      * - subjectId: ID des Fachs
      * - subjectFachCode: Bildungsplan-Fachkürzel (z. B. 'M', 'CH') — für die Vorbelegung der
      *   Curriculum-Neuanlage. NICHT der Slug! Fehlt der Code, wird ohne Vorbelegung verlinkt.
-     * - showNewButton: boolean (Default: true) — „Neues Curriculum“ für Fachschaft und Admins
+     * - showNewButton: boolean (Default: true) — „Neues Curriculum“ und „Aus YAML importieren“
+     *   (0.56) für Fachschaft und Admins
      */
     import { getCurriculaNachBaendern } from '$lib/api.js'
     import { user } from '$lib/stores/user.js'
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import { abdeckungsPfad, anzahlCurricula, fassungTitel, sichtbareFassungen } from '$lib/curriculum_baender.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
+    import CurriculumYamlImportDialog from '$lib/components/CurriculumYamlImportDialog.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
     let { subjectId = null, subjectFachCode = null, showNewButton = true } = $props()
 
     let uebersicht = $state(null)
+    let importOffen = $state(false)
     let loading = $state(true)
     let error = $state(null)
 
@@ -194,6 +197,20 @@
             >
                 + Neues Curriculum
             </a>
+            <!-- 0.56 (BA): legt immer einen Entwurf an; Rechte prüft das Backend (Fachschaft). -->
+            <button
+                type="button"
+                onclick={() => (importOffen = true)}
+                class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
+                       border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx-2 dark:text-dark-tx-2
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                Aus YAML importieren
+            </button>
         </div>
+    {/if}
+    {#if importOffen}
+        <CurriculumYamlImportDialog onClose={() => (importOffen = false)} />
     {/if}
 </div>
