@@ -44,17 +44,25 @@ FRONTEND_ORIGIN=https://ki.ihre-schule.de
   - die erlaubten Host- und Origin-Werte. Anfragen mit einem anderen Host-Kopf weist er ab
     (Schutz vor DNS-Rebinding).
 
-  Fehlt die Adresse oder passt sie nicht, bleibt die Schnittstelle trotz `MCP_AKTIV=true` aus,
-  und das Log des Backends meldet einen Fehler.
+  Fehlt die Adresse oder passt sie nicht (seit 0.55.1 auch: ohne `/api`), bleibt die
+  Schnittstelle trotz `MCP_AKTIV=true` aus, und das Log des Backends meldet einen Fehler. Ob
+  sie läuft, zeigt das Log beim Start:
+
+  ```bash
+  docker compose logs backend | grep -i "KI-Abos"
+  ```
+
+  Richtig ist `Schnittstelle für KI-Abos (MCP) unter https://…/api/mcp, OAuth-Issuer
+  https://…/api`.
 - `FRONTEND_ORIGIN` (gibt es schon, für CORS) bestimmt die Adresse der Zustimmungsseite
   `/oauth/consent`. Sie muss die öffentliche Adresse sein.
 - Ein neues Geheimnis braucht es nicht: Die OAuth-Anfrage zwischen Programm und
   Zustimmungsseite ist mit `JWT_SECRET` signiert.
 
-Danach das Backend neu starten:
+Danach den Container des Backends neu erzeugen, damit er die geänderte `.env` liest:
 
 ```bash
-docker compose up -d backend
+docker compose up -d --force-recreate backend
 ```
 
 Im Profil erscheint die Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für
@@ -115,13 +123,35 @@ curl -s -D - -o /dev/null -X POST https://ki.ihre-schule.de/api/mcp \
 | Ergebnis | Bedeutung |
 |---|---|
 | 1. oder 2. liefert HTML | Ein Proxy schickt `/.well-known/oauth-…` an das Frontend. |
-| 1. oder 2. liefert `404` | Die Schnittstelle ist aus, oder ein Proxy schneidet den Pfad. |
-| 3. liefert `404` | Die Schnittstelle ist aus, oder `/api/mcp` kommt nicht an. |
+| 1., 2. oder 3. liefert `{"detail":"Not Found"}` | Die Anfrage erreicht das Backend, die Route fehlt dort: Die Schnittstelle ist aus (Logzeile oben prüfen), oder ein Proxy reicht `/api/…` am nginx des Stacks vorbei direkt ans Backend. |
+| 1. oder 2. liefert eine andere `404` | Ein Proxy schneidet den Pfad oder kennt ihn nicht. |
+| 3. liefert eine andere `404` | `/api/mcp` kommt nicht am Stack an. |
 | 3. liefert `421` oder `400` | Der `Host`-Kopf passt nicht zu `MCP_OEFFENTLICHE_URL`. |
 
 Danach einmal mit einem echten Programm verbinden (Claude Code: `claude mcp add --transport
-http schule <Adresse>`, dann `/mcp` → *Authenticate*). Die Verbindung muss im Profil unter
-„Verbundene Programme“ erscheinen.
+http schule <Adresse>`, dann `/mcp` → *Authenticate*; Claude: siehe unten). Die Verbindung muss
+im Profil unter „Verbundene Programme“ erscheinen.
+
+## Konnektor in Claude anlegen
+
+Bei einem Abo für die Organisation (Team, Enterprise) legt ein Owner den Konnektor einmal für
+alle an; die Lehrkräfte verbinden sich danach selbst. Bei Einzelabos (Pro, Max) legt ihn jede
+Lehrkraft selbst an — die Schritte stehen in der Hilfe unter Profil → „KI-Programme verbinden“
+(`/help/profil#ki-programme-verbinden`); den Link können Sie weitergeben.
+
+1. In Claude *Organization settings → Connectors* → *Add* → *Custom* → *Web*.
+2. Name, etwa „Schulplattform“, und die Adresse aus `MCP_OEFFENTLICHE_URL`. *Continue*.
+3. Die erkannten Einstellungen prüfen:
+   - **Authentication:** *Sign in when needed* (oder *Sign in now*).
+   - **OAuth client: *Register automatically*.** Nicht die Voreinstellung *Use Claude's
+     published identity*: Die Plattform kennt nur die automatische Registrierung, mit der
+     Voreinstellung scheitert die Anmeldung.
+   - **Request headers:** leer lassen.
+4. *Add*.
+
+Die Lehrkräfte finden den Konnektor dann in Claude unter *Customize → Connectors* (mit dem
+Etikett „Custom“) und klicken *Connect*. Die Bezeichnungen der Oberfläche sind die von Claude,
+Stand 11/2026; sie können sich ändern.
 
 ## Verbindungen einsehen
 

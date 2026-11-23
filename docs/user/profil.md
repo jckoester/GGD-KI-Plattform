@@ -194,7 +194,21 @@ Das geht nur, wenn die Schule es eingeschaltet hat. Die Adresse, die du im Progr
 
 ### Mit Claude verbinden
 
-In Claude (im Browser, in der Desktop-App oder auf dem Handy) fügst du die Plattform als eigenen Konnektor hinzu, unter den Einstellungen bei den Konnektoren, mit der Adresse der Schule. Bei einem Abo für die ganze Organisation legt meist erst die Verwaltung des Abos den Konnektor an; danach verbindest du dich selbst.
+Ein Konnektor gilt für dein Claude-Konto: Legst du ihn im Browser an, ist er auch in der Desktop-App und auf dem Handy da.
+
+**Hat die Schule ein Abo für alle** (Team oder Enterprise), ist der Konnektor meist schon angelegt. Dann in Claude *Customize → Connectors*, den Konnektor der Schule wählen (Etikett „Custom“) und *Connect*.
+
+**Mit einem eigenen Abo** (Pro oder Max) legst du ihn selbst an:
+
+1. In Claude *Customize → Connectors* → *+ Add* → *Add custom connector*.
+2. Einen Namen, etwa „Schulplattform“, und die Adresse der Schule, etwa `https://ki.deine-schule.de/api/mcp`. *Continue*.
+3. Bei den Einstellungen zur Anmeldung:
+   - **Authentication:** *Sign in when needed*.
+   - **OAuth client:** ***Register automatically*** wählen — **nicht** die Voreinstellung *Use Claude's published identity*. Sonst klappt die Anmeldung nicht.
+   - **Request headers:** leer lassen.
+4. *Add*.
+
+Im Chat schaltest du den Konnektor über *+* → *Connectors* für das Gespräch ein. Die Namen der Menüs sind die von Claude und können sich ändern.
 
 Beim Verbinden öffnet sich eine Seite der Plattform:
 

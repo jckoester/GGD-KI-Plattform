@@ -165,6 +165,13 @@ def einhaengen(app: FastAPI, *, aktiv: bool, oeffentliche_url: str,
         logger.error("MCP_OEFFENTLICHE_URL muss https:// sein (OAuth verlangt es; http nur für localhost) "
                      "— die Schnittstelle für KI-Abos bleibt aus.")
         return None
+    # Öffentlich führt nur `/api/…` ins Backend (nginx). Ohne `/api` fänden die Programme weder die
+    # Metadaten noch `/authorize` und `/token` (die gingen ans Frontend). Lokal (http) darf die
+    # Adresse direkt aufs Backend zeigen.
+    if teile.scheme == "https" and not teile.path.rstrip("/").endswith("/api" + PFAD):
+        logger.error("MCP_OEFFENTLICHE_URL muss auf /api/mcp enden, etwa https://%s/api/mcp "
+                     "— die Schnittstelle für KI-Abos bleibt aus.", teile.netloc)
+        return None
     from app.config import settings
 
     server = baue_server(sitzung, oeffentliche_url=oeffentliche_url, geheimnis=geheimnis or settings.jwt_secret,

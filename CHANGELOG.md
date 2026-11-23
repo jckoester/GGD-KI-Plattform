@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.55.1] – 2026-11-23
+
+### Geändert
+
+- Schnittstelle für KI-Abos: `MCP_OEFFENTLICHE_URL` muss auf `/api/mcp` enden (lokal mit `http://localhost` genügt
+  `/mcp`). Ohne `/api` bleibt die Schnittstelle aus, und das Log nennt die richtige Form.
+- Hilfe und Admin-Doku: Konnektor in Claude anlegen, Schritt für Schritt; dabei *Register automatically* wählen.
+
+### Nach dem Update
+
+- Beim Start meldet das Log `Schnittstelle für KI-Abos (MCP) unter https://…/api/mcp`. Steht dort ein Fehler, die
+  Adresse in der `.env` korrigieren und `docker compose up -d --force-recreate backend`.
+
 ## [0.55.0] – 2026-11-23
 
 ### Neu
