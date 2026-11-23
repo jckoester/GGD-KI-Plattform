@@ -8,7 +8,7 @@ Migration 0112.
 1. `register_client` — Dynamic Client Registration, offen für alle (F12), aber Redirect-URIs nur
    `https://` oder Loopback.
 2. `authorize` — schreibt die Anfrage in ein **signiertes, kurzlebiges JWT** (keine Tabelle) und
-   schickt den Browser auf die Zustimmungsseite der Plattform (`/oauth/consent?anfrage=…`).
+   schickt den Browser auf die Zustimmungsseite im Frontend (`<FRONTEND_ORIGIN>/oauth/consent?anfrage=…`).
 3. `code_ausstellen` — nach Anmeldung und Zustimmung der Lehrkraft (Schritt 4): ein einmaliger
    Code, 5 Minuten gültig, zurück an den Client.
 4. `exchange_authorization_code` — PKCE prüft das SDK; hier entsteht die **Verbindung** (eine
@@ -80,7 +80,7 @@ class OAuthFehler(Exception):
 class Provider:
     """`OAuthAuthorizationServerProvider` über die Tabellen aus 0112."""
 
-    def __init__(self, *, oeffentliche_url: str, geheimnis: str,
+    def __init__(self, *, oeffentliche_url: str, geheimnis: str, zustimmungsseite: str,
                  sitzung: Callable[[], AsyncSession] | None = None):
         if sitzung is None:
             from app.db.session import AsyncSessionLocal
@@ -89,8 +89,9 @@ class Provider:
         self._sitzung = sitzung
         self._geheimnis = geheimnis
         self._resource = oeffentliche_url
-        teile = urlsplit(oeffentliche_url)
-        self._ursprung = f"{teile.scheme}://{teile.netloc}"
+        # Die Zustimmungsseite im Frontend (`FRONTEND_ORIGIN` + `/oauth/consent`). Auf Prod dieselbe
+        # Domain wie die Schnittstelle, auf Dev ein anderer Port als das Backend.
+        self._zustimmungsseite = zustimmungsseite
         self._pat = ZugangstokenPruefer(sitzung)
 
     # ── Clients ───────────────────────────────────────────────────────────────
@@ -127,7 +128,7 @@ class Provider:
             "state": params.state, "resource": params.resource,
             "iat": int(jetzt.timestamp()), "exp": int((jetzt + ANFRAGE).timestamp()),
         }, self._geheimnis, algorithm="HS256")
-        return construct_redirect_uri(f"{self._ursprung}/oauth/consent", anfrage=anfrage)
+        return construct_redirect_uri(self._zustimmungsseite, anfrage=anfrage)
 
     def anfrage_lesen(self, anfrage: str) -> dict:
         """Die signierte Anfrage — oder `OAuthFehler`, wenn sie abgelaufen oder gefälscht ist."""
@@ -275,7 +276,8 @@ class Provider:
 
     async def load_access_token(self, token: str) -> AccessToken | None:
         if token.startswith(tokens.PRAEFIX):
-            return await self._pat.verify_token(token)
+            zugang = await self._pat.verify_token(token)
+            return zugang.model_copy(update={"resource": self._resource}) if zugang else None
         if not token.startswith(PRAEFIX_ZUGRIFF):
             return None
         async with self._sitzung() as db:
@@ -305,11 +307,27 @@ class Provider:
                 await db.commit()
 
 
-async def alte_clients_aufraeumen(db: AsyncSession, *, jetzt: datetime | None = None) -> int:
-    """F12: Registrierungen, die 30 Tage nach der Anlage nie benutzt wurden, verschwinden."""
-    grenze = (jetzt or datetime.now(timezone.utc)) - timedelta(days=30)
-    ergebnis = await db.execute(sa.delete(OAuthClient).where(
-        OAuthClient.last_used_at.is_(None), OAuthClient.created_at < grenze))
-    await db.commit()
-    return ergebnis.rowcount
+async def oauth_aufraeumen(db: AsyncSession, *, jetzt: datetime | None = None, dry_run: bool = False) -> dict:
+    """Täglicher Lauf (`scripts/cleanup_oauth.py`):
 
+    - Clients, die 30 Tage nach der Registrierung nie benutzt wurden (F12) — jede:r kann
+      registrieren, ohne Aufräumen wüchse die Tabelle mit jedem Versuch;
+    - abgelaufene Codes und Token;
+    - eingelöste Refresh-Token nach 7 Tagen. Bis dahin erkennen sie Diebstahl; danach
+      stünden sonst bei stündlichem Refresh über 2000 Zeilen je Verbindung.
+    """
+    jetzt = jetzt or datetime.now(timezone.utc)
+    clients = sa.and_(OAuthClient.last_used_at.is_(None), OAuthClient.created_at < jetzt - timedelta(days=30))
+    codes = OAuthCode.expires_at < jetzt
+    token = sa.or_(OAuthTokenZeile.expires_at < jetzt, OAuthTokenZeile.rotiert_at < jetzt - timedelta(days=7))
+    if dry_run:
+        zaehlen = lambda m, b: db.scalar(sa.select(sa.func.count()).select_from(m).where(b))  # noqa: E731
+        return {"clients": await zaehlen(OAuthClient, clients), "codes": await zaehlen(OAuthCode, codes),
+                "token": await zaehlen(OAuthTokenZeile, token)}
+    # Ausgeschrieben statt in einer Schleife: Der Wächter `test_mcp_nur_lesend` sieht so, welche
+    # Tabellen hier geschrieben werden.
+    aus = {"clients": (await db.execute(sa.delete(OAuthClient).where(clients))).rowcount,
+           "codes": (await db.execute(sa.delete(OAuthCode).where(codes))).rowcount,
+           "token": (await db.execute(sa.delete(OAuthTokenZeile).where(token))).rowcount}
+    await db.commit()
+    return aus

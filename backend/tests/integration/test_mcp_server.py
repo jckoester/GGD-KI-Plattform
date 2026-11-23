@@ -57,7 +57,7 @@ async def _verbunden(fabrik):
     """Kein Fixture: Die Task-Gruppe des Session-Managers muss im selben Task enden, in dem
     sie begann — pytest-asyncio räumt Fixtures in einem anderen auf."""
     app = FastAPI()
-    server = einhaengen(app, aktiv=True, oeffentliche_url=URL, sitzung=fabrik)
+    server = einhaengen(app, aktiv=True, oeffentliche_url=URL, sitzung=fabrik, geheimnis="test")
     async with lebenszyklus(server):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
                                      base_url=f"https://{HOST}") as c:

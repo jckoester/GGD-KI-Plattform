@@ -142,6 +142,7 @@ dazukommt. Jetzt prüft ein Test sie gegen die `docker-compose.yml`
 | `embedding_backfill` | täglich 03:15 Uhr | — | Embeddings für Knoten ohne Embedding nachgenerieren |
 | `auto_confirm_reviews` | täglich 03:45 Uhr | — | Nachbereitungen, die niemand bestätigt hat, automatisch abschließen |
 | `cleanup_rendered_svg` | täglich 04:00 Uhr | ✅ | Zwischengespeicherte Server-Renderings räumen |
+| `cleanup_oauth` | täglich 04:20 Uhr | ✅ | Schnittstelle für KI-Abos (seit 0.55): nie benutzte Registrierungen nach 30 Tagen, abgelaufene Codes und Token, eingelöste Refresh-Token nach 7 Tagen löschen |
 | `cleanup_generated_images` | täglich 04:30 Uhr | ✅ | Erzeugte Bilder nach Ablauf der Frist löschen |
 | `cleanup_artifacts` | täglich 04:45 Uhr | ✅ | Abgelaufene Produkte der Werkstatt löschen |
 | `node_lifecycle` | täglich 05:00 Uhr | ✅ | Abgelaufene Bausteine archivieren, lange archivierte löschen |

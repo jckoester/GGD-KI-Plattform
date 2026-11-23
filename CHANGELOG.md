@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Schnittstelle für KI-Abos: Anmeldung per OAuth (Registrierung, PKCE, Refresh mit Rotation, Widerruf); Metadaten unter
+  `/.well-known/oauth-…`. Täglicher Aufräumlauf `cleanup_oauth`.
+
 ### Migration
 
 - 0112: Tabellen `oauth_clients`, `oauth_codes`, `oauth_tokens`; `personal_access_tokens.oauth_client_id`.

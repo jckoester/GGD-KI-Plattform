@@ -30,6 +30,10 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # Auftrag im KI-Programm löst mehrere Werkzeugaufrufe aus; 60 je Minute lassen das zu und
     # bremsen eine Schleife.
     "mcp": (60, 60.0),
+    # OAuth-Endpunkte für KI-Abos (0.55, AX): `/register`, `/token`, `/revoke` je Client-IP.
+    # Registrieren kann jede:r; ein Refresh je Verbindung und Stunde bleibt weit darunter, auch
+    # wenn viele Lehrkräfte über dieselben Server des Anbieters kommen.
+    "oauth": (30, 60.0),
     # Rückmeldungen (ADR-020): ein **Stundenfenster**, nicht wie die übrigen ein
     # Minutenfenster. Fünf Meldungen in einer Stunde deckt jeden ehrlichen Fall ab;
     # der eigentliche Riegel gegen Unsinn ist das Tageslimit aus der Datenbank.

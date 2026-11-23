@@ -62,6 +62,19 @@ server {
         proxy_read_timeout 300s;
     }
 
+    # OAuth-Metadaten für KI-Abos (seit 0.55): RFC 8414/9728 verlangen sie an der Wurzel,
+    # `/.well-known/oauth-protected-resource/api/mcp` und
+    # `/.well-known/oauth-authorization-server/api`. Ungekürzt ans Backend (kein /api-Strippen),
+    # nur dieser Präfix — `/.well-known/acme-challenge` u. a. bleiben, wo sie sind.
+    location ^~ /.well-known/oauth- {
+        set $upstream_backend backend;
+        proxy_pass http://$upstream_backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # Alles andere → SvelteKit-Frontend
     location / {
         set $upstream_frontend frontend;

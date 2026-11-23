@@ -16,7 +16,7 @@ Drei Prüfungen, alle mit Gegenprobe:
 **`oauth.py` ist ausgenommen (0.55, AX):** Der Autorisierungsserver muss Clients, Codes,
 Verbindungen und Token schreiben. Für ihn gilt eine eigene, enge Prüfung: Er schreibt **nur**
 diese vier Tabellen und importiert aus `app.*` nur `OAUTH_ERLAUBT`. Die Werkzeuge erreichen
-ihn nicht — `app.mcp.oauth` steht nicht in `ERLAUBT` für sie.
+ihn nicht: `werkzeuge.py` darf `app.mcp.oauth` nicht importieren (eigener Test).
 """
 import ast
 import asyncio
@@ -37,7 +37,9 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.ratelimit.drossel", "pruefe"): "Drossel, zählt im Speicher",
     ("app.mcp", "werkzeuge"): "eigenes Paket",
     ("app.mcp.auth", "SCOPE"): "eigenes Paket",
-    ("app.mcp.auth", "ZugangstokenPruefer"): "eigenes Paket",
+    ("app.config", "settings"): "Einstellungen lesen (Proxys, JWT-Geheimnis für die OAuth-Anfrage)",
+    ("app.core.client_ip", "client_ip"): "Drossel der OAuth-Endpunkte je IP",
+    ("app.mcp.oauth", "Provider"): "Autorisierungsserver (AX) — schreibt nur seine Tabellen, eigene Prüfung unten",
     ("app.mcp.auth", "principal"): "eigenes Paket",
     ("app.auth.vorschau", "eigenes_zaehlt"): "Leseregel für eigene private Knoten",
     ("app.context.curriculum_entwurf", "ENTWURF"): "Konstante",
@@ -160,6 +162,12 @@ def test_oauth_schreibt_nur_eigene_tabellen():
 def test_gegenprobe_oauth_fremde_tabelle():
     assert _oauth_ziele(_baeume(["async def f(db):\n    await db.execute(sa.update(ContextNode))"])) - OAUTH_TABELLEN
     assert _oauth_ziele(_baeume(["from app.db.models import ContextNode\nasync def f(db):\n    db.add(ContextNode(title='x'))"])) - OAUTH_TABELLEN
+
+
+def test_werkzeuge_erreichen_den_autorisierungsserver_nicht():
+    """`server.py` darf den Provider holen (er hängt ihn ein), die Werkzeuge nicht."""
+    importe = {m for d, m, _ in _importe(_baeume(dateien={"werkzeuge.py"}))}
+    assert "app.mcp.oauth" not in importe and "app.mcp.server" not in importe
 
 
 def test_liste_ohne_karteileichen():

@@ -34,7 +34,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.routing import Route
 
-from app.mcp.auth import SCOPE, ZugangstokenPruefer
+from app.mcp.auth import SCOPE
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +47,50 @@ ANLEITUNG = (
 )
 
 
-def baue_server(pruefer: ZugangstokenPruefer | None = None, *, oeffentliche_url: str) -> MCPServer:
-    """Der MCP-Server mit Anmeldung. Werkzeuge registriert `app.mcp.werkzeuge` (Schritt 4)."""
+def aussteller(oeffentliche_url: str) -> str:
+    """Der OAuth-Issuer: die öffentliche Adresse ohne das letzte `/mcp`.
+
+    `https://ki.schule.de/api/mcp` → `https://ki.schule.de/api`. Die Endpunkte des
+    Autorisierungsservers liegen dann unter `/api/authorize` usw. und laufen durch dieselbe
+    Proxy-Regel wie die übrige API (`/api/…` → Backend `/…`). Mit der Domain als Issuer
+    landeten sie im Frontend.
+    """
+    teile = urlsplit(oeffentliche_url)
+    pfad = teile.path.rstrip("/")
+    return f"{teile.scheme}://{teile.netloc}{pfad[: -len(PFAD)] if pfad.endswith(PFAD) else pfad}"
+
+
+def baue_server(sitzung: Callable[[], AsyncSession] | None = None, *, oeffentliche_url: str,
+                geheimnis: str, frontend: str) -> MCPServer:
+    """Der MCP-Server mit Anmeldung per OAuth (AX) und per Zugangstoken (AW).
+
+    Mit `auth_server_provider` baut das SDK den Token-Prüfer selbst aus
+    `Provider.load_access_token`; der nimmt beide Token-Arten an.
+    """
+    from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+
+    from app.mcp.oauth import Provider
     from app.version import plattformversion
 
-    teile = urlsplit(oeffentliche_url)
-    ursprung = f"{teile.scheme}://{teile.netloc}"
     return MCPServer(
         name="ggd-ki-plattform",
         version=plattformversion(),
         instructions=ANLEITUNG,
-        token_verifier=pruefer or ZugangstokenPruefer(),
-        # In AW nur Ressourcenserver ohne veröffentlichte OAuth-Metadaten
-        # (`resource_server_url=None`): Ein Client soll nicht nach einer Anmeldung suchen, die es
-        # erst mit AX gibt. `issuer_url` verlangt das SDK trotzdem.
-        auth=AuthSettings(issuer_url=ursprung, resource_server_url=None, required_scopes=[SCOPE]),
+        auth_server_provider=Provider(oeffentliche_url=oeffentliche_url, geheimnis=geheimnis, sitzung=sitzung,
+                                      zustimmungsseite=f"{frontend.rstrip('/')}/oauth/consent"),
+        auth=AuthSettings(
+            issuer_url=aussteller(oeffentliche_url),
+            resource_server_url=oeffentliche_url,
+            required_scopes=[SCOPE],
+            # Nur Token für genau diesen Server (RFC 8707). Der Provider setzt `resource` auf jeden
+            # Zugriff, auch auf Zugangstoken aus AW.
+            validate_token_resource=True,
+            # Offene Registrierung (F12): Claude braucht sie. Schutz: Redirect-Regel im Provider,
+            # Drossel je IP, Zustimmung der Lehrkraft, Aufräumen nach 30 Tagen.
+            client_registration_options=ClientRegistrationOptions(
+                enabled=True, valid_scopes=[SCOPE], default_scopes=[SCOPE]),
+            revocation_options=RevocationOptions(enabled=True),
+        ),
     )
 
 
@@ -75,24 +104,41 @@ def transportschutz(oeffentliche_url: str) -> TransportSecuritySettings:
     )
 
 
+def _schluessel_token(scope) -> str | None:
+    kopf = dict(scope.get("headers") or []).get(b"authorization", b"")
+    return hashlib.sha256(kopf).hexdigest() if kopf else None
+
+
+def _schluessel_ip(scope) -> str | None:
+    from starlette.requests import Request
+
+    from app.config import settings
+    from app.core.client_ip import client_ip
+
+    return client_ip(Request(scope), settings.trusted_proxies)
+
+
 class _Gedrosselt:
-    """ASGI-Hülle: Drossel `mcp` je Token, bevor das SDK die Nachricht liest.
+    """ASGI-Hülle: Drossel vor dem SDK, gezählt je POST.
+
+    - `/mcp`: Eimer `mcp` je Token (F5).
+    - `/register`, `/token`, `/authorize`, `/revoke`: Eimer `oauth` je Client-IP — registrieren
+      kann jede:r, ohne Drossel wäre das eine offene Schreibtür.
 
     Eine Klasse, keine Funktion: Starlette nimmt eine Funktion als Endpunkt (Request →
     Response, nur GET), eine Instanz mit ``__call__`` dagegen als ASGI-App.
     """
 
-    def __init__(self, innen):
-        self.innen = innen
+    def __init__(self, innen, eimer: str = "mcp", schluessel=_schluessel_token):
+        self.innen, self.eimer, self.schluessel = innen, eimer, schluessel
 
     async def __call__(self, scope, receive, send):
         from app.ratelimit.drossel import pruefe as drossel_pruefe
 
         if scope["type"] == "http" and scope["method"] == "POST":
-            kopf = dict(scope.get("headers") or []).get(b"authorization", b"")
-            if kopf:
+            if wer := self.schluessel(scope):
                 try:
-                    drossel_pruefe("mcp", hashlib.sha256(kopf).hexdigest(), [])
+                    drossel_pruefe(self.eimer, wer, [])
                 except HTTPException as e:
                     koerper = json.dumps({"detail": e.detail}).encode()
                     await send({"type": "http.response.start", "status": e.status_code, "headers": [
@@ -104,16 +150,25 @@ class _Gedrosselt:
 
 
 def einhaengen(app: FastAPI, *, aktiv: bool, oeffentliche_url: str,
-               sitzung: Callable[[], AsyncSession] | None = None) -> MCPServer | None:
+               sitzung: Callable[[], AsyncSession] | None = None, geheimnis: str | None = None,
+               frontend: str | None = None) -> MCPServer | None:
     """Hängt den Server an `app`, wenn er eingeschaltet ist. Gibt ihn zurück (für den
     Lebenszyklus), sonst `None`."""
     if not aktiv:
         return None
-    if not oeffentliche_url.startswith(("https://", "http://")):
-        logger.error("MCP_AKTIV ist gesetzt, aber MCP_OEFFENTLICHE_URL fehlt oder ist keine "
-                     "http(s)-Adresse — die Schnittstelle für KI-Abos bleibt aus.")
+    teile = urlsplit(oeffentliche_url)
+    if teile.scheme not in ("https", "http") or not teile.path.rstrip("/").endswith(PFAD):
+        logger.error("MCP_AKTIV ist gesetzt, aber MCP_OEFFENTLICHE_URL fehlt, ist keine http(s)-Adresse "
+                     "oder endet nicht auf /mcp — die Schnittstelle für KI-Abos bleibt aus.")
         return None
-    server = baue_server(ZugangstokenPruefer(sitzung), oeffentliche_url=oeffentliche_url)
+    if teile.scheme == "http" and teile.hostname not in ("localhost", "127.0.0.1", "::1"):
+        logger.error("MCP_OEFFENTLICHE_URL muss https:// sein (OAuth verlangt es; http nur für localhost) "
+                     "— die Schnittstelle für KI-Abos bleibt aus.")
+        return None
+    from app.config import settings
+
+    server = baue_server(sitzung, oeffentliche_url=oeffentliche_url, geheimnis=geheimnis or settings.jwt_secret,
+                         frontend=frontend or settings.frontend_origin)
     from app.mcp import werkzeuge
 
     werkzeuge.registrieren(server, sitzung)
@@ -121,7 +176,25 @@ def einhaengen(app: FastAPI, *, aktiv: bool, oeffentliche_url: str,
                                        json_response=True,
                                        transport_security=transportschutz(oeffentliche_url))
     app.router.routes.append(Route(PFAD, endpoint=_Gedrosselt(innen), methods=None))
-    logger.info("Schnittstelle für KI-Abos (MCP) unter %s", oeffentliche_url)
+    # Die übrigen Routen der Unter-App: OAuth-Endpunkte und die Metadaten (RFC 8414, RFC 9728).
+    # Sie brauchen keine Anmeldung und keine Host-Prüfung des SDK; die Host-Liste der App gilt.
+    for route in innen.routes:
+        pfad = getattr(route, "path", None)
+        if pfad == PFAD:
+            continue
+        if pfad == "/.well-known/oauth-authorization-server":
+            # RFC 8414 §3: Bei einem Issuer mit Pfad (`…/api`) fragt der Client an der Wurzel mit
+            # angehängtem Pfad; nginx reicht `/.well-known/oauth-…` ungekürzt durch.
+            if pfad_issuer := urlsplit(aussteller(oeffentliche_url)).path:
+                app.router.routes.append(Route(pfad + pfad_issuer, endpoint=route.endpoint, methods=route.methods))
+            app.router.routes.append(route)
+        elif pfad.startswith("/.well-known/"):
+            app.router.routes.append(route)
+        else:
+            app.router.routes.append(Route(pfad, endpoint=_Gedrosselt(route.app, "oauth", _schluessel_ip),
+                                           methods=None))
+    logger.info("Schnittstelle für KI-Abos (MCP) unter %s, OAuth-Issuer %s",
+                oeffentliche_url, aussteller(oeffentliche_url))
     return server
 
 

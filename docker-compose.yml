@@ -271,6 +271,7 @@ services:
              echo '45 3 * * * root python /app/scripts/auto_confirm_reviews.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '0 6 * * * root python /app/scripts/crisis_reminders.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '0 4 * * * root python /app/scripts/cleanup_rendered_svg.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
+             echo '20 4 * * * root python /app/scripts/cleanup_oauth.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '30 4 * * * root python /app/scripts/cleanup_generated_images.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '45 4 * * * root python /app/scripts/cleanup_artifacts.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              # Knoten-Lebenszyklus (ADR-013): abgelaufene archivieren, lange archivierte

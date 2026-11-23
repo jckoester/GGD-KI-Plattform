@@ -20,7 +20,7 @@ from app.auth.vorschau import Vorschau
 from app.db.models import OAuthClient, OAuthToken, PersonalAccessToken, PseudonymAudit
 from app.mcp.auth import SCOPE
 from app.mcp.oauth import (PRAEFIX_REFRESH, PRAEFIX_ZUGRIFF, OAuthFehler, Provider,
-                           alte_clients_aufraeumen, redirect_erlaubt)
+                           oauth_aufraeumen, redirect_erlaubt)
 
 pytestmark = pytest.mark.asyncio
 
@@ -41,7 +41,8 @@ async def welt(fabrik):
     async with fabrik() as db:
         db.add(PseudonymAudit(pseudonym=pseudo, role="teacher", roles=["teacher"], grade=None))
         await db.commit()
-    provider = Provider(oeffentliche_url=URL, geheimnis=GEHEIM, sitzung=fabrik)
+    provider = Provider(oeffentliche_url=URL, geheimnis=GEHEIM, sitzung=fabrik,
+                        zustimmungsseite="https://ki.schule.test/oauth/consent")
     await provider.register_client(OAuthClientInformationFull(
         client_id=cid, client_secret="s3cret", client_name="Claude", redirect_uris=[RUECK],
         token_endpoint_auth_method="client_secret_post"))
@@ -233,14 +234,31 @@ async def test_widerruf_beendet_die_verbindung(welt, fabrik):
     assert await p.load_access_token(antwort.access_token) is None
 
 
-async def test_nie_benutzte_clients_nach_30_tagen_weg(welt, fabrik):
+async def test_aufraeumen(welt, fabrik):
+    """F12: nie benutzte Clients nach 30 Tagen; abgelaufene Codes und Token; eingelöste
+    Refresh-Token nach 7 Tagen. Ein neuer, noch nicht benutzter Client bleibt."""
+    client, antwort = await _verbinden(welt)
+    rt = await welt["provider"].load_refresh_token(client, antwort.refresh_token)
+    await welt["provider"].exchange_refresh_token(client, rt, [])  # alter Refresh jetzt rotiert
+    alt_hash = hashlib.sha256(antwort.refresh_token.encode()).hexdigest()
     async with fabrik() as db:
         alt, benutzt = f"c-{uuid.uuid4().hex}", f"c-{uuid.uuid4().hex}"
         vorher = datetime.now(timezone.utc) - timedelta(days=31)
         db.add_all([OAuthClient(client_id=alt, metadaten={}, created_at=vorher),
                     OAuthClient(client_id=benutzt, metadaten={}, created_at=vorher, last_used_at=vorher)])
         await db.commit()
-        assert await alte_clients_aufraeumen(db) >= 1
+        probe = await oauth_aufraeumen(db, dry_run=True)
+        assert probe["clients"] >= 1
+        assert await db.get(OAuthClient, alt) is not None  # Probelauf löscht nichts
+        # in 8 Tagen: der rotierte Refresh-Token ist weg, der aktuelle bleibt
+        aus = await oauth_aufraeumen(db, jetzt=datetime.now(timezone.utc) + timedelta(days=8))
+        assert aus["clients"] >= 1 and aus["token"] >= 1
         assert await db.get(OAuthClient, alt) is None
         assert await db.get(OAuthClient, benutzt) is not None
-        assert await db.get(OAuthClient, welt["cid"]) is not None  # neu, nie benutzt — bleibt
+        assert await db.get(OAuthClient, welt["cid"]) is not None  # benutzt — bleibt
+        assert await db.scalar(sa.select(OAuthToken).where(OAuthToken.token_hash == alt_hash)) is None
+        offen = await db.scalar(sa.select(sa.func.count()).select_from(OAuthToken).where(
+            OAuthToken.art == "refresh", OAuthToken.rotiert_at.is_(None),
+            OAuthToken.verbindung_id.in_(sa.select(PersonalAccessToken.id).where(
+                PersonalAccessToken.pseudonym == welt["pseudo"]))))
+        assert offen == 1
