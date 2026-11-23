@@ -256,3 +256,39 @@ class TestScopeFuerKiProgramme:
         assert s["hilfe"] == "/help/profil#ki-programme-verbinden"
         assert "Anbieter" in s["hinweis"]
         assert "hinweis" not in scopes["planning:read"]
+
+
+class TestVerbundeneProgramme:
+    """0.55, AX F11: Eine OAuth-Verbindung steht in der Liste mit `oauth_client_id` und lässt sich
+    dort beenden wie ein Token."""
+
+    async def test_liste_und_beenden(self, test_client, auth_headers, audit, db):
+        from datetime import datetime, timedelta, timezone
+
+        from app.db.models import OAuthClient, OAuthToken
+
+        cid = f"c-verw-{TEACHER1_PSEUDO}"
+        db.add(OAuthClient(client_id=cid, metadaten={"client_name": "Claude"}))
+        await db.flush()
+        verbindung = PersonalAccessToken(pseudonym=TEACHER1_PSEUDO, name="Claude", token_hash=None,
+                                         scopes=["curriculum:read"], oauth_client_id=cid,
+                                         expires_at=datetime.now(timezone.utc) + timedelta(days=90))
+        db.add(verbindung)
+        await db.flush()
+        db.add(OAuthToken(token_hash=f"h-{cid}", art="zugriff", verbindung_id=verbindung.id,
+                          expires_at=datetime.now(timezone.utc) + timedelta(hours=1)))
+        await db.commit()
+        try:
+            liste = (await test_client.get("/tokens", headers=auth_headers)).json()
+            eintrag = next(e for e in liste if e["id"] == str(verbindung.id))
+            assert eintrag["oauth_client_id"] == cid and eintrag["name"] == "Claude"
+            assert all(e.get("oauth_client_id") is None for e in liste if e["id"] != str(verbindung.id))
+
+            resp = await test_client.delete(f"/tokens/{verbindung.id}", headers=auth_headers)
+            assert resp.status_code in (200, 204)
+            # Dass damit auch ihre Zugriffe enden, prüft test_oauth_provider (Widerruf im Profil).
+            await db.refresh(verbindung)
+            assert verbindung.revoked_at is not None
+        finally:
+            await db.execute(sa.delete(OAuthClient).where(OAuthClient.client_id == cid))
+            await db.commit()

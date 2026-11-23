@@ -5,7 +5,8 @@
     // hier in einem eigenen, auffälligen Block statt in der Liste: Wer ihn wegklickt,
     // bekommt ihn nicht wieder, und das muss man sehen, bevor man klickt.
     import { onMount } from "svelte";
-    import { KeyRound, Copy, Check, Trash2, Plus } from "lucide-svelte";
+    import { KeyRound, Copy, Check, Trash2, Plus, Bot } from "lucide-svelte";
+    import { aufteilen } from "$lib/zugangstoken_listen.js";
     import {
         createToken,
         getTokenScopes,
@@ -19,6 +20,8 @@
     import { holeFormular, merkeFormular } from "$lib/stepup_rueckkehr.js";
 
     let tokens = $state([]);
+    // Verbindungen per OAuth (seit 0.55) getrennt von den eigenen Token
+    const liste = $derived(aufteilen(tokens));
     let scopes = $state([]);
     let maxTage = $state(365);
     let laden = $state(true);
@@ -125,7 +128,8 @@
     }
 
     async function widerrufen(eintrag) {
-        if (!confirm(`Zugang „${eintrag.name}" wirklich beenden?`)) return;
+        const was = eintrag.oauth_client_id ? "Verbindung" : "Zugang";
+        if (!confirm(`${was} „${eintrag.name}" wirklich beenden?`)) return;
         try {
             await revokeToken(eintrag.id);
             await laden_();
@@ -158,6 +162,7 @@
 <p class="text-sm mb-3 text-light-tx-2 dark:text-dark-tx-2">
     Für Programme außerhalb des Browsers, die auf deine Unterrichtsplanung oder deine
     Bausteine zugreifen sollen. Ein Token kann nicht chatten und nichts verwalten.
+    Verbindest du ein KI-Programm wie Claude, erscheint es hier unter „Verbundene Programme“.
 </p>
 
 {#if fehler}
@@ -193,11 +198,38 @@
 {#if laden}
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Lädt…</p>
 {:else}
-    {#if tokens.length === 0}
+    {#if liste.programme.length}
+        <!-- Verbundene Programme (0.55, AX, F11): per OAuth verbunden, etwa Claude -->
+        <h3 class="text-sm font-medium mb-1 text-light-tx dark:text-dark-tx">Verbundene Programme</h3>
+        <ul class="mb-4 flex flex-col gap-2">
+            {#each liste.programme as eintrag (eintrag.id)}
+                <li class="flex items-start gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3">
+                    <Bot size={16} class="mt-0.5 shrink-0" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-light-tx dark:text-dark-tx">{eintrag.name}</p>
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            verbunden seit {datum(eintrag.created_at)} · zuletzt benutzt: {datum(eintrag.last_used_at)}
+                            · gültig bis {ablaufdatum(eintrag.expires_at)}
+                        </p>
+                    </div>
+                    <button
+                        class="shrink-0 rounded p-1 text-light-re dark:text-dark-re"
+                        title="Verbindung beenden"
+                        aria-label="Verbindung {eintrag.name} beenden"
+                        onclick={() => widerrufen(eintrag)}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </li>
+            {/each}
+        </ul>
+        <h3 class="text-sm font-medium mb-1 text-light-tx dark:text-dark-tx">Eigene Zugangstoken</h3>
+    {/if}
+    {#if liste.eigene.length === 0}
         <InfoBanner message="Du hast noch keine Zugangstoken angelegt." />
     {:else}
         <ul class="mb-4 flex flex-col gap-2">
-            {#each tokens as eintrag (eintrag.id)}
+            {#each liste.eigene as eintrag (eintrag.id)}
                 {@const z = zustand(eintrag)}
                 <li
                     class="flex items-start gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3"

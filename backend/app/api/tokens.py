@@ -45,6 +45,9 @@ class TokenRead(BaseModel):
     expires_at: datetime
     last_used_at: datetime | None
     revoked_at: datetime | None
+    # Gesetzt: Verbindung eines KI-Programms per OAuth (0.55, AX) — das Profil zeigt sie unter
+    # „Verbundene Programme“, nicht als Zugangstoken.
+    oauth_client_id: str | None = None
 
     class Config:
         from_attributes = True
