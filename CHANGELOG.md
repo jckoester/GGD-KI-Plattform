@@ -5,22 +5,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.54.0] – 2026-11-23
+
 ### Neu
 
-- Zugangstoken: neue Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“ (`curriculum:read`);
-  sie gilt nur für die Schnittstelle zu KI-Abos, öffnet keinen anderen Zugang und erscheint nur, wenn die Schnittstelle an
-  ist, mit Adresse und Anleitung („KI-Programme verbinden“ in der Hilfe zum Profil).
-- Schnittstelle für KI-Abos (MCP) unter `/api/mcp`, ab Werk aus (`MCP_AKTIV`, `MCP_OEFFENTLICHE_URL`); angemeldet mit
-  einem Zugangstoken, gedrosselt je Token (Eimer `mcp`). Sieben lesende Werkzeuge: Leitlinien, Leitperspektiven, Übersicht
-  einer Leitlinie oder Leitperspektive, Curricula finden, Curriculum lesen, Abdeckung, Kompetenzen des Bildungsplans.
+- Schnittstelle für KI-Abos (MCP) unter `/api/mcp`: Lehrkräfte verbinden ein KI-Programm wie Claude Code mit der
+  Plattform. Sieben lesende Werkzeuge: Leitlinien, Leitperspektiven, Übersicht einer Leitlinie oder Leitperspektive,
+  Curricula finden, Curriculum lesen, Abdeckung, Kompetenzen des Bildungsplans. Schreiben ist nicht möglich. Ab Werk
+  aus; gedrosselt je Token.
+- Zugangstoken: neue Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“ (`curriculum:read`),
+  nur für diese Schnittstelle und nur angeboten, wenn sie eingeschaltet ist; mit Adresse und Anleitung in der Hilfe.
 
 ### Behoben
 
 - Hilfe: Codeblöcke waren im hellen Modus kaum lesbar (schwarze Schrift auf dunkelgrauem Grund).
 
-### Entwicklung
+### Nach dem Update
 
-- Neue Abhängigkeit `mcp` 2.3 (MCP Python SDK, MIT) für die Schnittstelle zu KI-Abos.
+- Neue Abhängigkeit `mcp` 2.3 (MIT): `docker compose build backend cron && docker compose up -d`. Keine Migration.
+- Wer die Schnittstelle nutzen will: `MCP_AKTIV=true` und `MCP_OEFFENTLICHE_URL` (mit `/api`) in der `.env`, Backend neu
+  starten; siehe `docs/admin/ki-abos.md`. Neuer Eimer `mcp` in `config/rate_limits.example.yaml` (ohne Eintrag gilt die
+  Vorgabe 60 je Minute).
 
 ## [0.53.1] – 2026-11-22
 
