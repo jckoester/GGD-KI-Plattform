@@ -85,6 +85,33 @@ Assistenten erscheint die kommende Fassung erst, wenn sie gilt.
 > noch nicht eingelesen. Das ist eine Aufgabe der Administration, keine Einstellung, die
 > du ändern kannst.
 
+### Aus einer YAML-Datei importieren
+
+Ein Curriculum, das als YAML vorliegt — aus dem Export einer anderen Plattform oder von einem
+KI-Programm entworfen (siehe [KI-Programme verbinden](profil.md#ki-programme-verbinden)) —,
+holst du über **Aus YAML importieren** in der Liste der Curricula eines Fachs herein. Den Knopf
+sieht, wer in der Fachschaft ist, und Admins.
+
+1. Datei wählen oder den Text einfügen.
+2. **Prüfen.** Die Vorschau zeigt Titel, Klasse, Fassung, die Kapitel mit Stunden und Umfang —
+   und was nicht passt:
+   - **Fehler** (rot) mit der Stelle in der Datei, etwa „Kapitel 3, Lernsequenz 2: `std` ist
+     keine Zahl“. Mit Fehlern lässt sich nichts anlegen.
+   - **Hinweise** (gelb): Kompetenznummern oder Verweise, die es in dieser Plattform nicht
+     gibt, unbekannte Felder. Der Import geht trotzdem; was nicht aufgelöst wird, bleibt ohne
+     Verknüpfung.
+3. Gibt es zu Fach, Klasse und Fassung schon ein veröffentlichtes Curriculum, wählst du:
+   **ersetzt beim Veröffentlichen** dieses Curriculum (vorausgewählt) oder **neuer Entwurf,
+   der nichts ersetzt**. Beim Ersetzen wandern die Unterrichtseinheiten an Kapiteln mit
+   gleichem Titel mit, wie bei „Als Entwurf kopieren“.
+4. **Als Entwurf anlegen** — der Editor öffnet sich.
+
+Es entsteht **immer ein Entwurf**. Vorhandene Curricula ändert der Import nicht; sichtbar für
+alle wird der Entwurf erst, wenn ihr ihn veröffentlicht. Änderst du nach dem Prüfen den Text
+oder die Wahl, prüfst du neu.
+
+Verweise auf Bausteine, die du nicht lesen darfst, bleiben als Text ohne Link stehen.
+
 ---
 
 ## Entwurf und Veröffentlichen
@@ -427,10 +454,9 @@ anlegen](#ein-curriculum-anlegen)).
 - **YAML** — die maschinenlesbare Fassung; Begriffe und Fachmethoden gehen als Namen mit
   und werden in einer anderen Plattform gegen deren Bibliothek abgeglichen
 
-Das YAML ist die einzige Form, die sich wieder einlesen lässt. Änderungen in Word oder
-LibreOffice kommen nicht zurück in die Plattform — etwa um ein Curriculum in
-eine Übungsumgebung zu übertragen. Das erledigt die Administration
-([Runbook](../runbooks/curriculum-transfer.md)).
+Das YAML ist die einzige Form, die sich wieder einlesen lässt — über **Aus YAML importieren**
+(siehe [Aus einer YAML-Datei importieren](#aus-einer-yaml-datei-importieren)), als Entwurf.
+Änderungen in Word oder LibreOffice kommen nicht zurück in die Plattform.
 
 ---
 

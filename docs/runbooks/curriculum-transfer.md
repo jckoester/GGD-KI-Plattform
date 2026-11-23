@@ -7,10 +7,18 @@ typischerweise aus dem Produktivsystem nach promptLab oder auf eine Entwicklungs
 > braucht eine Testinstanz realistische Curricula. Sie von Hand nachzubauen ist die
 > eigentliche Hürde — dieser Weg nimmt sie ab.
 
-**Rollen:** Der **Export** ist eine Lehrkraft-Funktion in der Oberfläche. Der **Import** ist
-ein Admin-Vorgang auf der Kommandozeile des Backend-Containers; es gibt dafür bewusst keine
-Oberfläche — er schreibt tief in die Bibliothek und gehört in dieselbe Hand wie der
-Bildungsplan-Import.
+**Rollen:** Der **Export** ist eine Lehrkraft-Funktion in der Oberfläche. Für den **Import**
+gibt es zwei Wege:
+
+| Weg | Wer | Ergebnis |
+|---|---|---|
+| **Aus YAML importieren** in der Oberfläche (seit 0.56) | Fachschaft, Admins | immer ein **Entwurf**, mit Vorschau; ändert kein vorhandenes Curriculum. Einzelne Curricula, Grenze 200 KB |
+| `scripts.import_curriculum` auf der Kommandozeile (dieses Runbook) | Administration | **veröffentlicht**; ein zweiter Import desselben Fachs und Jahrgangs **aktualisiert** das vorhandene Curriculum und archiviert Kapitel, die die Datei nicht mehr kennt. Ganze Verzeichnisse, ohne Grenzen, mit `--bp-version` |
+
+Für ein einzelnes Curriculum ist der Weg über die Oberfläche der richtige. Die Kommandozeile
+bleibt für das Befüllen einer Testinstanz und für Überträge, die ein vorhandenes Curriculum
+gezielt ersetzen sollen. Beide Wege lesen die Datei mit derselben Prüfung
+(`app/context/curriculum_yaml.py`).
 
 ---
 

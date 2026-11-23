@@ -15,9 +15,14 @@ Was das Programm liest, geht an dessen Anbieter.
 
 ## Was die Schnittstelle kann
 
-- **Nur lesen.** Sieben Werkzeuge: Leitlinien, Leitperspektiven, die Übersicht einer Leitlinie
+- **Nur lesen.** Neun Werkzeuge: Leitlinien, Leitperspektiven, die Übersicht einer Leitlinie
   oder Leitperspektive, Curricula finden, ein Curriculum lesen, seine Abdeckung, die
-  Kompetenzen des Bildungsplans. Schreiben ist nicht möglich; ein Test im Code hält das so.
+  Kompetenzen des Bildungsplans; seit 0.56 ein Curriculum als YAML und die Prüfung eines
+  YAML-Entwurfs. Schreiben ist nicht möglich; ein Test im Code hält das so.
+- **Entwürfe nur über die Lehrkraft.** Ein Programm kann ein Curriculum als YAML entwerfen und
+  prüfen — die Prüfung ist der echte Import, der danach verworfen wird. Anlegen kann es nichts:
+  Die Lehrkraft lädt die Datei in der Plattform hoch (**Aus YAML importieren**), sieht eine
+  Vorschau, und es entsteht ein Entwurf, den die Fachschaft veröffentlicht.
 - **Mit den Rechten der Lehrkraft.** Gelesen wird, was die Person auch im Browser sieht —
   veröffentlichte Curricula und Entwürfe, eigene private, keine fremden privaten.
 - **Ohne Personen.** Die Antworten enthalten keine Pseudonyme und keine Namen. Chats,

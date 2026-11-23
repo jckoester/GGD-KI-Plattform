@@ -188,7 +188,9 @@ Das geht nur, wenn die Schule es eingeschaltet hat. Die Adresse, die du im Progr
 
 **Was das Programm sieht:** alle Curricula, die du auch im Browser lesen kannst, auch Entwürfe. Dazu die Bildungspläne mit Kompetenzen und Leitperspektiven, die Leitlinien der Schule und die Übersicht, wo eine Leitperspektive im Unterricht vorkommt.
 
-**Was es nicht sieht und nicht kann:** keine Chats, keine Unterrichtsplanung, keine Namen von Personen. Schreiben kann es nichts. Einen Entwurf, den das Programm vorschlägt, überträgst du selbst in den Editor.
+**Was es nicht sieht und nicht kann:** keine Chats, keine Unterrichtsplanung, keine Namen von Personen. Schreiben kann es nichts.
+
+**Ein Curriculum entwerfen lassen:** Das Programm kann ein Curriculum als YAML schreiben — es holt sich dafür ein vorhandenes als Vorlage und prüft seinen Entwurf mit derselben Prüfung wie die Plattform, ohne zu speichern. Die fertige Datei importierst du selbst: in der Liste der Curricula des Fachs unter **Aus YAML importieren** (siehe [Schulcurriculum](curriculum.md#aus-einer-yaml-datei-importieren)). Du siehst vorher eine Vorschau, und es entsteht ein Entwurf, den deine Fachschaft veröffentlicht. Zum Beispiel: „Entwirf ein Curriculum Chemie Klasse 9 nach dem Muster von Klasse 8 und prüfe es.“
 
 **Wohin die Inhalte gehen:** Was das Programm liest, schickt es an seinen Anbieter, etwa Anthropic. Curricula enthalten in der Regel nichts Personenbezogenes; schreib deshalb auch keine Namen von Schüler:innen hinein. Verbinde nur ein Programm, das die Schule dafür vorsieht.
 

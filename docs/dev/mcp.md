@@ -14,7 +14,7 @@ gegenüber 1.x umbenannt (`FastMCP` → `MCPServer`); Beispiele im Netz sind oft
 |---|---|
 | `app/mcp/auth.py` | `ZugangstokenPruefer` (`TokenVerifier` des SDK) über `tokens.pruefe`, Scope Pflicht; `principal()` macht im Werkzeug ein `JwtPayload` daraus (ohne Vorschau) |
 | `app/mcp/server.py` | `aussteller`, `baue_server`, `transportschutz`, Drossel-Hülle `_Gedrosselt`, `einhaengen`, `lebenszyklus` |
-| `app/mcp/werkzeuge.py` | die sieben Werkzeuge und ihre Lesefunktionen `lies_…(db, user, …)` |
+| `app/mcp/werkzeuge.py` | die neun Werkzeuge und ihre Lesefunktionen `lies_…(db, user, …)` |
 | `app/mcp/oauth.py` | `Provider` (Speicher des Autorisierungsservers, seit 0.55), `oauth_aufraeumen` |
 | `app/api/oauth.py` | Routen der Zustimmungsseite `/oauth/anfrage`, `/oauth/entscheidung` (seit 0.55) |
 
@@ -108,6 +108,8 @@ Kontolöschung nimmt Verbindungen (als Zugangstoken) und `oauth_codes` mit.
 | `curriculum_lesen` | `lies_curriculum` | `_lesbares_curriculum` + `entwurf_lesen` |
 | `curriculum_abdeckung` | `lies_abdeckung` | `abdeckung_kompakt` |
 | `bildungsplan_kompetenzen` | `lies_kompetenzen` | `kompetenzen_lesen`; ein ungespeicherter `ContextNode` trägt Fach, Fassung und Stufen |
+| `curriculum_yaml` (0.56) | `lies_curriculum_yaml` | `_lesbares_curriculum` + `build_curriculum_export_dict` — der YAML-Export |
+| `curriculum_yaml_pruefen` (0.56) | `lies_yaml_pruefung` | `curriculum_yaml.durchlauf(…, speichern=False)`: der Import als Entwurf im Savepoint, verworfen ([YAML-Import](curriculum-yaml-import.md)); ohne Fachschaft `ok: false` mit Meldung |
 
 Alle mit `ToolAnnotations(read_only_hint=True, destructive_hint=False, …)` und
 `structured_output=False` (JSON als Text). Fehler als `ToolError` mit lesbarer Meldung.
@@ -125,7 +127,9 @@ Import aus `app.*` muss in `ERLAUBT` des Wächters, mit Grund.
   Ob eine erlaubte Funktion intern schreibt, sichert die Begründung in `ERLAUBT`, kein Test.
   `oauth.py` ist ausgenommen und eng geprüft: schreibt nur `oauth_clients`, `oauth_codes`,
   `oauth_tokens`, `personal_access_tokens`, importiert nur `OAUTH_ERLAUBT`; `werkzeuge.py`
-  importiert weder `oauth` noch `server`.
+  importiert weder `oauth` noch `server`. **Begründete Ausnahme (0.56):** `durchlauf` schreibt
+  im Savepoint und verwirft; `test_durchlauf_nur_ohne_speichern` verlangt bei jedem Aufruf aus
+  dem Paket ausdrücklich `speichern=False`. Embeddings löst der Entwurfsmodus nicht aus.
 - `tests/unit/test_entwurf_leserecht_waechter.py`: die Lesefunktionen stehen als lesend.
 - `tests/unit/test_mcp_aus.py`: ab Werk aus.
 
