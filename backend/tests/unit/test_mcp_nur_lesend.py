@@ -12,6 +12,11 @@ Drei Prüfungen, alle mit Gegenprobe:
 2. **Keine schreibenden Aufrufe** im Paket selbst: `commit`, `add`, `flush`, `delete`,
    `sa.insert/update/delete` und Namen nach dem Muster `create_…`, `update_…`, `apply_…`.
 3. **Jedes Werkzeug ist als lesend gekennzeichnet** (`readOnlyHint`, kein `destructiveHint`).
+
+**`oauth.py` ist ausgenommen (0.55, AX):** Der Autorisierungsserver muss Clients, Codes,
+Verbindungen und Token schreiben. Für ihn gilt eine eigene, enge Prüfung: Er schreibt **nur**
+diese vier Tabellen und importiert aus `app.*` nur `OAUTH_ERLAUBT`. Die Werkzeuge erreichen
+ihn nicht — `app.mcp.oauth` steht nicht in `ERLAUBT` für sie.
 """
 import ast
 import asyncio
@@ -60,10 +65,30 @@ _SCHREIBENDE_NAMEN = {"pruefe_entwurf_bearbeiten", "operationen_anwenden", "rahm
                       "curriculum_neu", "curriculum_waehlen", "bezug_setzen", "erzeuge", "widerrufe"}
 
 
-def _baeume(quellen=None):
+#: Der Autorisierungsserver — schreibt, aber nur seine Tabellen (siehe unten).
+SCHREIBEND = {"oauth.py"}
+
+#: Was `oauth.py` aus `app.*` holen darf.
+OAUTH_ERLAUBT = {
+    ("app.auth", "tokens"): "pruefe_zeile, ERLAUBTE_ROLLEN, PRAEFIX",
+    ("app.db.models", "OAuthClient"): "eigene Tabelle",
+    ("app.db.models", "OAuthCode"): "eigene Tabelle",
+    ("app.db.models", "OAuthToken"): "eigene Tabelle (als OAuthTokenZeile)",
+    ("app.db.models", "PersonalAccessToken"): "Verbindungen (F7)",
+    ("app.mcp.auth", "SCOPE"): "eigenes Paket",
+    ("app.mcp.auth", "ZugangstokenPruefer"): "Zugangstoken aus AW weiter annehmen",
+    ("app.db.session", "AsyncSessionLocal"): "Sitzungsfabrik",
+}
+
+#: Die Modelle, die `oauth.py` schreiben darf (Namen wie im Quelltext).
+OAUTH_TABELLEN = {"OAuthClient", "OAuthCode", "OAuthTokenZeile", "PersonalAccessToken"}
+
+
+def _baeume(quellen=None, *, dateien=None):
     if quellen is not None:
         return [("probe.py", ast.parse(q)) for q in quellen]
-    return [(p.name, ast.parse(p.read_text())) for p in sorted(PAKET.glob("*.py"))]
+    return [(p.name, ast.parse(p.read_text())) for p in sorted(PAKET.glob("*.py"))
+            if (p.name in dateien if dateien is not None else p.name not in SCHREIBEND)]
 
 
 def _importe(baeume):
@@ -104,6 +129,37 @@ def test_importe_nur_aus_der_liste():
     offen = _unerlaubte_importe(_baeume())
     assert not offen, ("Neuer Import in app/mcp — liest er nur? Dann mit Grund in ERLAUBT "
                        f"eintragen, sonst gehört er nicht in den MCP-Server: {offen}")
+
+
+def _oauth_ziele(baeume):
+    """Modelle, auf die `oauth.py` schreibt: `sa.update/delete/insert(X)` und jede Erzeugung
+    eines Modells aus `app.db.models` — eine neue Zeile entsteht nur so (`db.add` bekommt oft
+    eine Variable, deren Typ der Baum nicht kennt)."""
+    ziele = set()
+    for _, baum in baeume:
+        modelle = {a.asname or a.name for n in ast.walk(baum)
+                   if isinstance(n, ast.ImportFrom) and n.module == "app.db.models" for a in n.names}
+        for n in ast.walk(baum):
+            if not isinstance(n, ast.Call):
+                continue
+            if (isinstance(n.func, ast.Attribute) and n.func.attr in {"update", "delete", "insert"}
+                    and n.args and isinstance(n.args[0], ast.Name)):
+                ziele.add(n.args[0].id)
+            elif isinstance(n.func, ast.Name) and n.func.id in modelle:
+                ziele.add(n.func.id)
+    return ziele
+
+
+def test_oauth_schreibt_nur_eigene_tabellen():
+    baeume = _baeume(dateien=SCHREIBEND)
+    assert _oauth_ziele(baeume) <= OAUTH_TABELLEN, _oauth_ziele(baeume) - OAUTH_TABELLEN
+    fremd = sorted({f"{d}: from {m} import {n}" for d, m, n in _importe(baeume) if (m, n) not in OAUTH_ERLAUBT})
+    assert not fremd, f"Neuer Import im Autorisierungsserver — prüfen und in OAUTH_ERLAUBT eintragen: {fremd}"
+
+
+def test_gegenprobe_oauth_fremde_tabelle():
+    assert _oauth_ziele(_baeume(["async def f(db):\n    await db.execute(sa.update(ContextNode))"])) - OAUTH_TABELLEN
+    assert _oauth_ziele(_baeume(["from app.db.models import ContextNode\nasync def f(db):\n    db.add(ContextNode(title='x'))"])) - OAUTH_TABELLEN
 
 
 def test_liste_ohne_karteileichen():

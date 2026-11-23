@@ -135,7 +135,14 @@ async def pruefe(db: AsyncSession, klartext: str) -> tuple[PersonalAccessToken, 
     )).scalar_one_or_none()
     if zeile is None:
         return None
+    principal = await pruefe_zeile(db, zeile)
+    return (zeile, principal) if principal is not None else None
 
+
+async def pruefe_zeile(db: AsyncSession, zeile: PersonalAccessToken) -> JwtPayload | None:
+    """Die Prüfung einer gefundenen Zeile: Widerruf, Ablauf, frische Rollen, Massenwiderruf,
+    ``last_used_at``. Dieselbe für Zugangstoken und OAuth-Verbindungen (0.55, AX) — deren
+    Zugriffstoken stehen in ``oauth_tokens``, die Verbindung hier."""
     jetzt = datetime.now(timezone.utc)
     if zeile.revoked_at is not None or zeile.expires_at <= jetzt:
         return None
@@ -162,7 +169,7 @@ async def pruefe(db: AsyncSession, klartext: str) -> tuple[PersonalAccessToken, 
         )
         await db.commit()
 
-    principal = JwtPayload(
+    return JwtPayload(
         sub=zeile.pseudonym,
         roles=rollen,
         grade=str(audit.grade) if audit.grade is not None else None,
@@ -171,7 +178,6 @@ async def pruefe(db: AsyncSession, klartext: str) -> tuple[PersonalAccessToken, 
         exp=int(zeile.expires_at.timestamp()),
         token_scopes=zeile.scopes,
     )
-    return zeile, principal
 
 
 async def widerrufe(db: AsyncSession, token_id: UUID, pseudonym: str) -> bool:
