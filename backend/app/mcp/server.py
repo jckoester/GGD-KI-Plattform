@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
@@ -30,6 +31,7 @@ from fastapi import FastAPI, HTTPException
 from mcp.server import MCPServer
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.transport_security import TransportSecuritySettings
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.routing import Route
 
 from app.mcp.auth import SCOPE, ZugangstokenPruefer
@@ -102,7 +104,7 @@ class _Gedrosselt:
 
 
 def einhaengen(app: FastAPI, *, aktiv: bool, oeffentliche_url: str,
-               pruefer: ZugangstokenPruefer | None = None) -> MCPServer | None:
+               sitzung: Callable[[], AsyncSession] | None = None) -> MCPServer | None:
     """Hängt den Server an `app`, wenn er eingeschaltet ist. Gibt ihn zurück (für den
     Lebenszyklus), sonst `None`."""
     if not aktiv:
@@ -111,10 +113,10 @@ def einhaengen(app: FastAPI, *, aktiv: bool, oeffentliche_url: str,
         logger.error("MCP_AKTIV ist gesetzt, aber MCP_OEFFENTLICHE_URL fehlt oder ist keine "
                      "http(s)-Adresse — die Schnittstelle für KI-Abos bleibt aus.")
         return None
-    server = baue_server(pruefer, oeffentliche_url=oeffentliche_url)
+    server = baue_server(ZugangstokenPruefer(sitzung), oeffentliche_url=oeffentliche_url)
     from app.mcp import werkzeuge
 
-    werkzeuge.registrieren(server)
+    werkzeuge.registrieren(server, sitzung)
     innen = server.streamable_http_app(streamable_http_path=PFAD, stateless_http=True,
                                        json_response=True,
                                        transport_security=transportschutz(oeffentliche_url))
