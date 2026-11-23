@@ -5,6 +5,11 @@ liefern, das die Schule abonniert hat, etwa Claude. Lehrkräfte fragen dann dort
 BNE in unseren Curricula vor?“, „Vergleiche die Curricula Klasse 7 in Mathematik und
 Physik.“ Technisch ist das ein **MCP-Server** (Model Context Protocol) im Backend.
 
+Seit 0.55 ist die Plattform dafür auch ein kleiner **OAuth-Autorisierungsserver**. Erst damit
+verbinden sich Claude im Browser, in der Desktop-App und auf dem Handy, ChatGPT und Microsoft
+365 Copilot: Sie melden Personen nur per OAuth an. Claude Code geht zusätzlich mit einem
+Zugangstoken.
+
 Ab Werk ist die Schnittstelle **aus**. Sie einzuschalten ist eine Entscheidung der Schule:
 Was das Programm liest, geht an dessen Anbieter.
 
@@ -17,8 +22,9 @@ Was das Programm liest, geht an dessen Anbieter.
   veröffentlichte Curricula und Entwürfe, eigene private, keine fremden privaten.
 - **Ohne Personen.** Die Antworten enthalten keine Pseudonyme und keine Namen. Chats,
   Unterrichtsplanung, Budgets und Verwaltung sind nicht erreichbar.
-- **Nur für Lehrkräfte und Admins**, angemeldet mit einem persönlichen Zugangstoken mit der
-  Berechtigung `curriculum:read`. Diese Berechtigung öffnet sonst keinen Weg in die Plattform.
+- **Nur für Lehrkräfte und Admins**, nicht in der Vorschau. Angemeldet per OAuth (Zustimmung
+  auf einer Seite der Plattform) oder mit einem persönlichen Zugangstoken mit der Berechtigung
+  `curriculum:read`. Diese Berechtigung öffnet sonst keinen Weg in die Plattform.
 
 ## Einschalten
 
@@ -27,12 +33,23 @@ In der `.env`:
 ```bash
 MCP_AKTIV=true
 MCP_OEFFENTLICHE_URL=https://ki.ihre-schule.de/api/mcp
+FRONTEND_ORIGIN=https://ki.ihre-schule.de
 ```
 
-`MCP_OEFFENTLICHE_URL` ist die Adresse, wie die Programme sie aufrufen, also **mit** `/api`.
-Aus ihr übernimmt der Server die erlaubten Host- und Origin-Werte. Anfragen mit einem anderen
-Host-Kopf weist er ab (Schutz vor DNS-Rebinding). Fehlt die Adresse, bleibt die Schnittstelle
-trotz `MCP_AKTIV=true` aus, und das Log des Backends meldet einen Fehler.
+- `MCP_OEFFENTLICHE_URL` ist die Adresse, wie die Programme sie aufrufen: **`https://`**,
+  **mit** `/api` und **mit `/mcp` am Ende**. Aus ihr leitet der Server ab:
+  - den OAuth-Issuer: die Adresse ohne `/mcp`, also `https://ki.ihre-schule.de/api`. Die
+    Endpunkte `/api/authorize`, `/api/token`, `/api/register` und `/api/revoke` laufen damit
+    durch dieselbe Proxy-Regel wie die übrige API;
+  - die erlaubten Host- und Origin-Werte. Anfragen mit einem anderen Host-Kopf weist er ab
+    (Schutz vor DNS-Rebinding).
+
+  Fehlt die Adresse oder passt sie nicht, bleibt die Schnittstelle trotz `MCP_AKTIV=true` aus,
+  und das Log des Backends meldet einen Fehler.
+- `FRONTEND_ORIGIN` (gibt es schon, für CORS) bestimmt die Adresse der Zustimmungsseite
+  `/oauth/consent`. Sie muss die öffentliche Adresse sein.
+- Ein neues Geheimnis braucht es nicht: Die OAuth-Anfrage zwischen Programm und
+  Zustimmungsseite ist mit `JWT_SECRET` signiert.
 
 Danach das Backend neu starten:
 
@@ -45,35 +62,89 @@ KI-Programme“ mit der Adresse erst, wenn die Schnittstelle eingeschaltet ist.
 
 ## Reverse Proxy
 
-Der mitgelieferte nginx (`infra/nginx.conf.template`) braucht keine Änderung: `location /api/`
-reicht `/api/mcp` als `/mcp` an das Backend weiter, setzt den `Host`-Kopf und puffert nicht.
-Wer einen eigenen Proxy betreibt, muss dasselbe sicherstellen:
+Zwei Pfadgruppen müssen das Backend erreichen:
 
-- `/api/mcp` → Backend `/mcp`, mindestens die Methode `POST`;
-- `Host` unverändert weitergeben (sonst greift die Host-Prüfung);
-- `Authorization` nicht entfernen.
+| Öffentlich | Backend | Zweck |
+|---|---|---|
+| `/api/mcp`, `/api/authorize`, `/api/token`, `/api/register`, `/api/revoke`, `/api/oauth/…` | ohne `/api` | MCP-Server, OAuth-Endpunkte, Zustimmung |
+| `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-authorization-server/api` | **unverändert** | Metadaten nach RFC 9728 und RFC 8414 |
+
+Die Metadaten **müssen an der Wurzel der Domain** liegen; die Programme fragen genau dort.
+Ohne sie findet Claude keine Anmeldung.
+
+**Der mitgelieferte nginx** (`infra/nginx.conf.template`) leitet beides seit 0.55 weiter:
+`location /api/` wie bisher, dazu `location ^~ /.well-known/oauth-` ungekürzt ans Backend.
+Andere `/.well-known/`-Pfade (etwa `acme-challenge`) bleiben unberührt. Wer die Vorlage
+angepasst hat, übernimmt den neuen Block.
+
+**Ein Proxy vor dem Stack** (etwa ein eigener nginx, der TLS macht und auf den nginx der
+Compose weiterleitet) muss:
+
+1. `/api/…` **und** `/.well-known/oauth-…` an den Stack weiterreichen — **unverändert**, ohne
+   `/api` abzuschneiden; das tut der nginx im Stack;
+2. den `Host`-Kopf weitergeben (Host-Prüfung von `/mcp`, `ALLOWED_HOSTS`);
+3. den Kopf `Authorization` stehen lassen;
+4. Formular-Bodies (`application/x-www-form-urlencoded`) an `/api/token` durchlassen.
+
+Außerdem gehört seine Adresse in `TRUSTED_PROXIES`. Sonst sieht das Backend alle Anfragen von
+derselben IP, und die Drossel der OAuth-Endpunkte (je IP) bremst alle gemeinsam.
 
 **Erreichbarkeit:** Claude ruft den Server von Anthropics Servern aus auf, nicht vom Gerät der
-Lehrkraft. Wer den Zugang auf Adressbereiche beschränkt, gibt den Bereich frei, den Anthropic
-dafür veröffentlicht (Stand 11/2026: `160.79.104.0/21`). Claude Code ruft dagegen vom Gerät
+Lehrkraft — auch die Metadaten und `/api/token`. Wer den Zugang auf Adressbereiche beschränkt,
+gibt den Bereich frei, den Anthropic dafür veröffentlicht (Stand 11/2026: `160.79.104.0/21`).
+Die Zustimmungsseite öffnet dagegen der Browser der Lehrkraft, und Claude Code ruft vom Gerät
 der Lehrkraft aus auf.
 
 ## Prüfen
 
-Ohne Token muss der Server mit `401` antworten:
+Nach dem Einschalten, **von außen** (also durch alle Proxys):
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST https://ki.ihre-schule.de/api/mcp \
+# 1. Metadaten der Ressource: JSON mit "resource" = MCP_OEFFENTLICHE_URL
+curl -s https://ki.ihre-schule.de/.well-known/oauth-protected-resource/api/mcp
+
+# 2. Metadaten des Autorisierungsservers: JSON mit "issuer" = https://ki.ihre-schule.de/api
+curl -s https://ki.ihre-schule.de/.well-known/oauth-authorization-server/api
+
+# 3. Ohne Token: 401, im Kopf WWW-Authenticate mit resource_metadata="…" (die Adresse aus 1.)
+curl -s -D - -o /dev/null -X POST https://ki.ihre-schule.de/api/mcp \
   -H "content-type: application/json" -d '{}'
 ```
 
-`404` heißt: Die Schnittstelle ist aus oder der Proxy leitet `/api/mcp` nicht weiter.
+| Ergebnis | Bedeutung |
+|---|---|
+| 1. oder 2. liefert HTML | Ein Proxy schickt `/.well-known/oauth-…` an das Frontend. |
+| 1. oder 2. liefert `404` | Die Schnittstelle ist aus, oder ein Proxy schneidet den Pfad. |
+| 3. liefert `404` | Die Schnittstelle ist aus, oder `/api/mcp` kommt nicht an. |
+| 3. liefert `421` oder `400` | Der `Host`-Kopf passt nicht zu `MCP_OEFFENTLICHE_URL`. |
 
-## Drossel
+Danach einmal mit einem echten Programm verbinden (Claude Code: `claude mcp add --transport
+http schule <Adresse>`, dann `/mcp` → *Authenticate*). Die Verbindung muss im Profil unter
+„Verbundene Programme“ erscheinen.
 
-Je Token höchstens 60 Nachrichten in der Minute, danach `429` mit `Retry-After`. Ein Auftrag
-im KI-Programm löst mehrere Werkzeugaufrufe aus; 60 genügen dafür und bremsen eine Schleife.
-Einstellbar in `config/rate_limits.yaml` (Eimer `mcp`).
+## Verbindungen einsehen
+
+Jede Lehrkraft sieht und beendet ihre Verbindungen im Profil. Wie viele es schulweit gibt:
+
+```sql
+SELECT name, count(*) FROM personal_access_tokens
+WHERE oauth_client_id IS NOT NULL AND revoked_at IS NULL AND expires_at > now()
+GROUP BY name;
+```
+
+Eine Verbindung gilt 90 Tage ab der Zustimmung, dann verbindet die Lehrkraft neu. Ein
+Zugriffstoken gilt eine Stunde; das Programm erneuert es selbst (Refresh mit Rotation). Kommt
+ein schon eingelöster Refresh-Token noch einmal, endet die Verbindung — er gilt als gestohlen.
+
+## Drossel und Aufräumen
+
+- `/api/mcp`: je Token höchstens 60 Nachrichten in der Minute (Eimer `mcp`).
+- `/api/register`, `/api/token`, `/api/revoke`: je IP höchstens 30 in der Minute (Eimer
+  `oauth`). Registrieren kann jedes Programm, ohne Anmeldung — das ist Standard und Claude
+  braucht es. Einen Zugang bekommt ein Programm erst mit Zustimmung einer Lehrkraft.
+- Danach `429` mit `Retry-After`. Einstellbar in `config/rate_limits.yaml`.
+- Der Cron-Lauf `cleanup_oauth` (täglich 04:20) löscht Registrierungen, die 30 Tage nie benutzt
+  wurden, abgelaufene Codes und Token und eingelöste Refresh-Token nach 7 Tagen.
 
 ## Datenschutz
 
@@ -83,8 +154,11 @@ nicht hinausgehen soll. Ob und mit welchem Anbieter die Schule das nutzt, entsch
 dazu gehört ein Vertrag zur Auftragsverarbeitung mit dem Anbieter des Abos und ein Eintrag im
 Verarbeitungsverzeichnis.
 
+Gespeichert werden je Verbindung Programm, Pseudonym, Zeitpunkte und die Token als Hash. Mit
+dem Konto (90 Tage ohne Anmeldung) gehen auch seine Verbindungen und offenen Codes.
+
 ## Abschalten
 
-`MCP_AKTIV=false` und das Backend neu starten. Die Route verschwindet (`404`); vorhandene
-Token mit der Berechtigung bleiben bestehen, führen aber nirgends hin. Einzelne Verbindungen
-beendet die Lehrkraft, indem sie ihr Token im Profil beendet.
+`MCP_AKTIV=false` und das Backend neu starten. Die Routen verschwinden (`404`); vorhandene
+Verbindungen und Token bleiben gespeichert, führen aber nirgends hin. Einzelne Verbindungen
+beendet die Lehrkraft im Profil.

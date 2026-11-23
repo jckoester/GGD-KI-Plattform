@@ -184,7 +184,7 @@ Behandle den Tokentext wie ein Passwort: nicht per Mail verschicken, nicht in ge
 
 Hat deine Schule ein KI-Abo, etwa für Claude, kann das Programm Curricula, Bildungspläne und Leitlinien direkt aus der Plattform lesen. Dann kannst du dort zum Beispiel fragen: „Wo kommt BNE in unseren Curricula der Klassen 7 und 8 vor, und wo fehlt es?“ oder „Vergleiche die Curricula Mathematik und Physik in Klasse 9.“
 
-Das geht nur, wenn die Schule es eingeschaltet hat. Dann steht beim Anlegen eines Zugangstokens die Berechtigung **„Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“**, darunter die Adresse, die du im Programm einträgst.
+Das geht nur, wenn die Schule es eingeschaltet hat. Die Adresse, die du im Programm einträgst, bekommst du von der Schule; sie steht auch beim Anlegen eines Zugangstokens unter der Berechtigung **„Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“**.
 
 **Was das Programm sieht:** alle Curricula, die du auch im Browser lesen kannst, auch Entwürfe. Dazu die Bildungspläne mit Kompetenzen und Leitperspektiven, die Leitlinien der Schule und die Übersicht, wo eine Leitperspektive im Unterricht vorkommt.
 
@@ -192,10 +192,28 @@ Das geht nur, wenn die Schule es eingeschaltet hat. Dann steht beim Anlegen eine
 
 **Wohin die Inhalte gehen:** Was das Programm liest, schickt es an seinen Anbieter, etwa Anthropic. Curricula enthalten in der Regel nichts Personenbezogenes; schreib deshalb auch keine Namen von Schüler:innen hinein. Verbinde nur ein Programm, das die Schule dafür vorsieht.
 
+### Mit Claude verbinden
+
+In Claude (im Browser, in der Desktop-App oder auf dem Handy) fügst du die Plattform als eigenen Konnektor hinzu, unter den Einstellungen bei den Konnektoren, mit der Adresse der Schule. Bei einem Abo für die ganze Organisation legt meist erst die Verwaltung des Abos den Konnektor an; danach verbindest du dich selbst.
+
+Beim Verbinden öffnet sich eine Seite der Plattform:
+
+1. Bist du nicht angemeldet, meldest du dich zuerst an, wie sonst auch.
+2. Die Seite zeigt, **welches Programm** zugreifen will, **welche Berechtigung** es bekommt (nur lesen), **wohin** es zurückspringt und **wie lange** die Verbindung gilt (90 Tage).
+3. *Zulassen* — und du bist zurück im Programm.
+
+Lass nur zu, wenn du die Verbindung gerade selbst angestoßen hast. Kommt die Seite unerwartet, etwa über einen Link in einer Mail, dann *Ablehnen*.
+
+Andere Programme, die das Verbinden auf diese Weise beherrschen (etwa ChatGPT oder Microsoft 365 Copilot), nutzen dieselbe Adresse. Wie man sie dort einträgt, hängt vom Programm und vom Abo ab.
+
+**Verbundene Programme** stehen im Profil unter „Zugangstoken“, mit dem Datum der Verbindung und wann sie zuletzt benutzt wurden. Dort beendest du eine Verbindung; das wirkt sofort. Nach 90 Tagen endet sie von selbst, dann verbindest du neu.
+
 ### Mit Claude Code verbinden
 
+Claude Code kann sich genauso verbinden: `claude mcp add --transport http schule <Adresse>` und dann in Claude Code `/mcp` → *Authenticate*. Oder mit einem Zugangstoken statt der Anmeldung:
+
 1. Ein Zugangstoken anlegen, wie oben beschrieben, und **nur** die Berechtigung für KI-Programme ankreuzen.
-2. Im Terminal, mit der Adresse aus dem Profil und deinem Tokentext:
+2. Im Terminal, mit der Adresse und deinem Tokentext:
 
    ```bash
    claude mcp add --transport http schule https://ki.deine-schule.de/api/mcp \
@@ -204,9 +222,7 @@ Das geht nur, wenn die Schule es eingeschaltet hat. Dann steht beim Anlegen eine
 
 3. In Claude Code mit `/mcp` prüfen, ob die Verbindung steht.
 
-Claude im Browser, in der Desktop-App oder auf dem Handy sowie andere Programme wie ChatGPT verbinden sich nur über eine eigene Anmeldung. Die kommt in einer späteren Version.
-
-**Verbindung beenden:** das Token im Profil beenden. Das wirkt sofort.
+Ein Token beendest du im Profil wie jedes andere.
 
 ## Accountdaten
 

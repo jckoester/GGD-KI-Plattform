@@ -170,3 +170,46 @@ async def test_registrierung_gedrosselt_je_ip(fabrik, person, monkeypatch):
         codes = [(await _registrieren(c, person)).status_code for _ in range(3)]
     store.reset()
     assert codes == [201, 201, 429]
+
+
+async def _code(c, provider, pseudo):
+    """Bis zum Code, ohne einzulösen: (Client, Code, Verifier)."""
+    client = (await _registrieren(c, pseudo)).json()
+    verifier, challenge = _pkce()
+    r = await c.get("/authorize", params={"response_type": "code", "client_id": client["client_id"],
+                                          "redirect_uri": RUECK, "code_challenge": challenge,
+                                          "code_challenge_method": "S256"})
+    rueck = await provider.code_ausstellen(parse_qs(urlsplit(r.headers["location"]).query)["anfrage"][0],
+                                           JwtPayload(sub=pseudo, roles=["teacher"], grade=None, jti="j", iat=0,
+                                                      exp=9999999999))
+    return client, parse_qs(urlsplit(rueck).query)["code"][0], verifier
+
+
+async def test_falscher_verifier_zu_gueltigem_code(fabrik, person):
+    """PKCE: Wer den Code abfängt, aber den Verifier nicht kennt, bekommt keine Token."""
+    async with _verbunden(fabrik) as (c, provider):
+        client, code, verifier = await _code(c, provider, person)
+        daten = {"grant_type": "authorization_code", "code": code, "redirect_uri": RUECK,
+                 "client_id": client["client_id"], "client_secret": client["client_secret"]}
+        r = await c.post("/token", data={**daten, "code_verifier": "falsch" * 8})
+        assert r.status_code == 400 and r.json()["error"] == "invalid_grant"
+        # Der richtige Verifier geht danach noch — ein Fehlversuch verbraucht den Code nicht
+        assert (await c.post("/token", data={**daten, "code_verifier": verifier})).status_code == 200
+
+
+async def test_abgelaufener_code(fabrik, person):
+    from datetime import datetime, timedelta, timezone
+
+    from app.db.models import OAuthCode
+
+    async with _verbunden(fabrik) as (c, provider):
+        client, code, verifier = await _code(c, provider, person)
+        async with fabrik() as db:
+            await db.execute(sa.update(OAuthCode).where(
+                OAuthCode.code_hash == hashlib.sha256(code.encode()).hexdigest())
+                .values(expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)))
+            await db.commit()
+        r = await c.post("/token", data={"grant_type": "authorization_code", "code": code, "redirect_uri": RUECK,
+                                         "code_verifier": verifier, "client_id": client["client_id"],
+                                         "client_secret": client["client_secret"]})
+        assert r.status_code == 400 and r.json()["error"] == "invalid_grant"
