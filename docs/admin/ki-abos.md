@@ -75,7 +75,8 @@ Ohne sie findet Claude keine Anmeldung.
 **Der mitgelieferte nginx** (`infra/nginx.conf.template`) leitet beides seit 0.55 weiter:
 `location /api/` wie bisher, dazu `location ^~ /.well-known/oauth-` ungekürzt ans Backend.
 Andere `/.well-known/`-Pfade (etwa `acme-challenge`) bleiben unberührt. Wer die Vorlage
-angepasst hat, übernimmt den neuen Block.
+angepasst hat, übernimmt den neuen Block. Nach einer Änderung `docker compose restart nginx`:
+Die Vorlage ist eingehängt, `up -d` startet den Dienst dafür nicht neu.
 
 **Ein Proxy vor dem Stack** (etwa ein eigener nginx, der TLS macht und auf den nginx der
 Compose weiterleitet) muss:

@@ -5,16 +5,31 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.55.0] – 2026-11-23
+
 ### Neu
 
-- Schnittstelle für KI-Abos: Anmeldung per OAuth (Registrierung, PKCE, Refresh mit Rotation, Widerruf); Metadaten unter
-  `/.well-known/oauth-…`. Täglicher Aufräumlauf `cleanup_oauth`. Zustimmungsseite `/oauth/consent`: Lehrkräfte und Admins sehen
-  Programm, Berechtigung, Rücksprung und Dauer und lassen zu oder lehnen ab; ohne Anmeldung erst zur Anmeldung und zurück.
-- Profil: „Verbundene Programme“ über den Zugangstoken — Name, verbunden seit, zuletzt benutzt, gültig bis, beenden.
+- Schnittstelle für KI-Abos: Anmeldung per OAuth. Damit verbinden sich Claude im Browser, in der Desktop-App und auf dem
+  Handy sowie andere Programme mit OAuth. Eine Zustimmungsseite zeigt Programm, Berechtigung, Rücksprung und Dauer
+  (90 Tage); zulassen dürfen Lehrkräfte und Admins, nicht in der Vorschau.
+- Profil: „Verbundene Programme“ mit Datum der Verbindung, letzter Nutzung, Ablauf und Beenden.
 
 ### Migration
 
 - 0112: Tabellen `oauth_clients`, `oauth_codes`, `oauth_tokens`; `personal_access_tokens.oauth_client_id`.
+
+### Nach dem Update
+
+- Wie üblich bauen, migrieren (0112), starten — siehe `docs/admin/updates-und-wartung.md`. Der Cron-Dienst bekommt dabei den
+  neuen Lauf `cleanup_oauth` (täglich 04:20).
+- nginx neu starten, damit er die geänderte Vorlage liest: `docker compose restart nginx` (`up -d` startet ihn bei einer
+  geänderten eingehängten Datei nicht neu).
+- Die Vorlage `infra/nginx.conf.template` hat einen neuen Block `location ^~ /.well-known/oauth-`. Wer sie angepasst hat,
+  übernimmt ihn. Ein Proxy vor dem Stack reicht `/.well-known/oauth-…` und `/api/…` unverändert weiter; seine Adresse
+  gehört in `TRUSTED_PROXIES`.
+- Bei eingeschalteter Schnittstelle: `MCP_OEFFENTLICHE_URL` muss mit `https://` beginnen und auf `/mcp` enden,
+  `FRONTEND_ORIGIN` die öffentliche Adresse sein. Prüfen von außen wie in `docs/admin/ki-abos.md`, Abschnitt „Prüfen“.
+- Neuer Eimer `oauth` in `config/rate_limits.example.yaml` (ohne Eintrag gilt die Vorgabe 30 je Minute und IP).
 
 ## [0.54.0] – 2026-11-23
 
