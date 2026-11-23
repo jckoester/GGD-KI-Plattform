@@ -121,3 +121,26 @@ def test_aus_ist_aus():
     assert einhaengen(app, aktiv=False, oeffentliche_url=URL) is None
     assert einhaengen(app, aktiv=True, oeffentliche_url="") is None  # ohne Adresse kein Server
     assert not [r for r in app.router.routes if getattr(r, "path", None) == "/mcp"]
+
+
+async def test_aus_antwortet_404():
+    """F4 als HTTP-Antwort: Ohne MCP_AKTIV gibt es /mcp nicht."""
+    app = FastAPI()
+    assert einhaengen(app, aktiv=False, oeffentliche_url=URL) is None
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=f"https://{HOST}") as c:
+        assert (await c.post("/mcp", json=INIT, headers=KOPF)).status_code == 404
+
+
+async def test_widerruf_wirkt_beim_naechsten_aufruf(fabrik, person):
+    """Zustandslos: Jede Nachricht prüft das Token neu — ein Widerruf im Profil beendet auch eine
+    laufende Verbindung sofort."""
+    klartext = await _token(fabrik, person)
+    async with _verbunden(fabrik) as client:
+        assert (await client.post("/mcp", json=INIT, headers=_mit(klartext))).status_code == 200
+        async with fabrik() as db:
+            zeile = (await db.execute(sa.select(PersonalAccessToken).where(
+                PersonalAccessToken.pseudonym == person))).scalar_one()
+            assert await tokens.widerrufe(db, zeile.id, person)
+        r = await client.post("/mcp", headers=_mit(klartext),
+                              json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        assert r.status_code == 401

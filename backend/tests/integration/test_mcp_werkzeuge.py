@@ -193,3 +193,16 @@ async def test_leitlinien_und_uebersicht(db, welt):
 
         aus, fehler = await _ruf(rpc, "leitperspektiven")
         assert not fehler and "leitperspektiven" in aus
+
+
+async def test_curricula_wie_im_browser(db, welt):
+    """Dieselbe Menge wie die Liste der Curricula eines Fachs im Browser (`_lesbare_curricula`)."""
+    from app.auth.jwt import JwtPayload
+    from app.context.router import _lesbare_curricula
+
+    user = JwtPayload(sub=LEHRKRAFT, roles=["teacher"], grade=None, jti="j", iat=0, exp=9999999999)
+    im_browser = {str(c.id) for c in await _lesbare_curricula(db, welt["fach"].id, user)}
+    async with _verbunden(db) as rpc:
+        aus, _ = await _ruf(rpc, "curricula_finden", fach=welt["fach"].name)
+    assert {c["curriculum_id"] for c in aus["curricula"]} == im_browser
+    assert str(welt["entwurf"].id) in im_browser and str(welt["privat"].id) not in im_browser
