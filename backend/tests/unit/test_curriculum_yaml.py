@@ -144,3 +144,8 @@ def test_rahmen_wird_geprueft():
     assert zu_entwurf({**GRUND, "rahmen": {"wochenstunden": {"9": 2}}}).ok
     p = zu_entwurf({**GRUND, "rahmen": {"wochenstunden": {"neun": 2}}})
     assert not p.ok and p.fehler[0].startswith("rahmen:")
+
+
+def test_titel_nur_leerraum_fehlt():
+    p = zu_entwurf({**GRUND, "kapitel": [{**GRUND["kapitel"][0], "titel": "   "}]})
+    assert "Kapitel 1, titel: fehlt." in p.fehler

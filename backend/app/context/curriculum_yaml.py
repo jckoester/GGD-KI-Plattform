@@ -306,21 +306,37 @@ def zu_entwurf(daten: dict, bp_version_override: str | None = None, *,
                     fachmethoden=verweise(e.get("fachmethoden"), f"{ewo}, fachmethoden", mit_objekt=("name",)),
                 ))
             lernsequenzen.append(CurriculumDraftLernsequenz(
-                bp_titel=text(ls.get("bp_titel"), f"{lwo}, bp_titel"),
+                bp_titel=(text(ls.get("bp_titel"), f"{lwo}, bp_titel") or "").strip() or None,
                 bp_leitidee=text(ls.get("bp_leitidee"), f"{lwo}, bp_leitidee"),
-                reihenfolge=zahl(ls.get("reihenfolge"), f"{lwo}, reihenfolge"),
+                reihenfolge=li if (r := zahl(ls.get("reihenfolge"), f"{lwo}, reihenfolge")) is None else r,
                 std=stunden(ls.get("std"), f"{lwo}, std"),
                 eintraege=eintraege,
             ))
         reihenfolge = zahl(kap.get("reihenfolge"), f"{kwo}, reihenfolge")
         konkretisierung = [t for i, k in enumerate(liste(kap.get("konkretisierung"), f"{kwo}, konkretisierung"), 1)
                            if (t := text(k, f"{kwo}, konkretisierung {i}"))]
-        titel = text(kap.get("titel"), f"{kwo}, titel", pflicht=True)
+        roh_titel = kap.get("titel")
+        titel = (text(roh_titel, f"{kwo}, titel", pflicht=True) or "").strip()
+        if not titel and isinstance(roh_titel, str) and roh_titel:
+            p.fehler.append(f"{kwo}, titel: fehlt.")
         kapitel.append(CurriculumDraftKapitel(
-            titel=titel or "", reihenfolge=reihenfolge if reihenfolge is not None else ki,
+            titel=titel, reihenfolge=reihenfolge if reihenfolge is not None else ki,
             std=stunden(kap.get("std"), f"{kwo}, std"), hinweis=text(kap.get("hinweis"), f"{kwo}, hinweis"),
             konkretisierung=konkretisierung, lernsequenzen=lernsequenzen,
         ))
+
+    # Die Reihenfolge ist Teil des Schlüssels jedes Kapitels und jeder Lernsequenz: Zwei gleiche
+    # Nummern legte der Import zu **einem** Knoten zusammen. Dann zählt die Position.
+    if len({k.reihenfolge for k in kapitel}) < len(kapitel):
+        p.warnungen.append("Kapitel: Reihenfolge doppelt — nach Position neu nummeriert.")
+        for i, k in enumerate(kapitel, 1):
+            k.reihenfolge = i
+    for k in kapitel:
+        if len({ls.reihenfolge for ls in k.lernsequenzen}) < len(k.lernsequenzen):
+            p.warnungen.append(f"Kapitel „{k.titel}“: Reihenfolge der Lernsequenzen doppelt — nach Position "
+                               f"neu nummeriert.")
+            for i, ls in enumerate(k.lernsequenzen, 1):
+                ls.reihenfolge = i
 
     if grenzen and zaehler["ls"] > grenzen.lernsequenzen:
         p.fehler.append(f"Zu viele Lernsequenzen ({zaehler['ls']}, höchstens {grenzen.lernsequenzen}).")

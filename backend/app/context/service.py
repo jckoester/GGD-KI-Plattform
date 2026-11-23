@@ -1260,7 +1260,11 @@ async def get_or_create_node(
         "min_grade": data.get("min_grade"),
         "max_grade": data.get("max_grade"),
         "metadata_": data.get("metadata_", {}),
-        "status": "active",
+        # Bis 0.56 ging `owner_pseudonym` hier verloren — importierte Knoten hatten keine
+        # Eigentümer:in, auch mit `--owner`. Für Entwürfe zählt sie (Löschen, E12).
+        "owner_pseudonym": data.get("owner_pseudonym"),
+        # Entwürfe aus dem YAML-Import (0.56, BA) — sonst wie bisher veröffentlicht.
+        "status": data.get("status", "active"),
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }
@@ -1507,14 +1511,29 @@ async def import_curriculum_from_draft(
     db: AsyncSession,
     payload: CurriculumDraftConfirmed,
     user_pseudonym: str,
+    *,
+    als_entwurf: bool = False,
+    kopie_von: UUID | None = None,
 ) -> tuple[UUID, ImportStats]:
     """Importiert ein Curriculum aus dem bestätigten Zwischenformat.
-    
-    Dies ist die Kernlogik für Stufe 2 (Persistenz).
-    Wird sowohl vom API-Endpunkt als auch vom CLI-Skript aufgerufen.
-    
+
+    Dies ist die Kernlogik für Stufe 2 (Persistenz). Kein Commit.
+
+    **Zwei Modi:**
+    - Ohne `als_entwurf` (Admin-Skript): Der Schlüssel folgt aus Fachplan und Jahrgang. Ein
+      zweiter Import desselben Fachs und Jahrgangs **aktualisiert** das vorhandene Curriculum
+      und archiviert Kapitel, die die Datei nicht mehr kennt; das Ergebnis ist veröffentlicht.
+    - Mit `als_entwurf` (Import in der Oberfläche, 0.56, BA): ein **neuer Entwurf** mit eigenem
+      Schlüssel (`yaml_<uuid>`). Er trifft nie ein vorhandenes Curriculum und archiviert nichts.
+      Mit `kopie_von` (ein veröffentlichtes Curriculum desselben Fachs) ersetzt er es beim
+      Veröffentlichen; seine Kapitel zeigen per `kopie_von` auf die gleichnamigen des
+      Originals, damit die Einheiten mitwandern (F3). Rechte und „höchstens ein offener
+      Entwurf“ prüft der Aufrufer.
+
     Rückgabe: (curriculum_id, stats)
     """
+    if kopie_von is not None and not als_entwurf:
+        raise ValueError("kopie_von gibt es nur für Entwürfe.")
     from app.context.curriculum_begriffe import eintrag_felder
     from app.context.curriculum_rahmen import rahmen_normalisieren
     stats = ImportStats()
@@ -1560,8 +1579,19 @@ async def import_curriculum_from_draft(
         or (fachplan.metadata_ or {}).get("bp_id")
         or f"fachplan-{fachplan.id}"
     )
-    import_key_base = f"{schluessel_praefix}_{payload.jahrgangsstufe}"
+    import_key_base = (f"yaml_{uuid.uuid4().hex}" if als_entwurf
+                       else f"{schluessel_praefix}_{payload.jahrgangsstufe}")
     curriculum_import_key = import_key_base
+
+    original, kapitel_vorbild = None, {}
+    if kopie_von is not None:
+        original = await db.get(ContextNode, kopie_von)
+        if (original is None or original.content_type != "curriculum" or original.status != "active"
+                or original.subject_id != subject_id):
+            raise ValueError("Das Curriculum, das der Entwurf ersetzen soll, gibt es nicht "
+                             "(veröffentlicht, im selben Fach).")
+        kapitel_vorbild = await _kapitel_nach_titel(db, original.id)
+    status_extra = {"status": "draft"} if als_entwurf else {}
     
     # Alle import_keys sammeln für späteres Archivieren
     all_import_keys: set[str] = set()
@@ -1571,8 +1601,11 @@ async def import_curriculum_from_draft(
     curriculum_data = {
         "category": "knowledge",
         "content_type": "curriculum",
-        "title": f"{payload.fach or payload.fach_code} Kl. {payload.jahrgangsstufe}",
+        # Ein Ersatz behält den Titel des Originals, wie „Als Entwurf kopieren“.
+        "title": original.title if original is not None
+        else f"{payload.fach or payload.fach_code} Kl. {payload.jahrgangsstufe}",
         "content": payload.vorwort or "",
+        **status_extra,
         "read_scope": "school",
         "write_scope": "subject" if department_group_id else "school",
         "write_scope_group_id": department_group_id,
@@ -1590,6 +1623,9 @@ async def import_curriculum_from_draft(
             "jahrgangsstufe": payload.jahrgangsstufe,
             "import_key": curriculum_import_key,
             **({"rahmen": rahmen} if (rahmen := rahmen_normalisieren(payload.rahmen)) else {}),
+            **({"kopie_von": str(original.id)} if original is not None else {}),
+            **({"band": band} if original is not None and (band := (original.metadata_ or {}).get("band"))
+               else {}),
         }
     }
     curriculum_id, created = await get_or_create_node(
@@ -1619,6 +1655,7 @@ async def import_curriculum_from_draft(
             "content_type": "kapitel",
             "title": kap.titel,
             "content": konkretisierung_text,
+            **status_extra,
             "read_scope": "school",
             "write_scope": "subject" if department_group_id else "school",
             "write_scope_group_id": department_group_id,
@@ -1632,6 +1669,8 @@ async def import_curriculum_from_draft(
                 "einleitung": kap.hinweis or "",
                 "breadcrumb": f"{schulart} | {fach_name} | Kl. {jahrgangsstufe}: {kap.titel}",
                 "import_key": kapitel_import_key,
+                **({"kopie_von": str(vorbild)}
+                   if (vorbild := _vorbild_nehmen(kapitel_vorbild, kap.titel)) is not None else {}),
             }
         }
         kapitel_id, created = await get_or_create_node(
@@ -1763,6 +1802,7 @@ async def import_curriculum_from_draft(
                 "content_type": "lernsequenz",
                 "title": ls.bp_titel or "",
                 "content": None,
+                **status_extra,
                 "read_scope": "school",
                 "write_scope": "subject" if department_group_id else "school",
                 "write_scope_group_id": department_group_id,
@@ -1798,10 +1838,12 @@ async def import_curriculum_from_draft(
                 stats.edge_count += 1
 
     # Was dieser Import früher angelegt hat und jetzt nicht mehr erzeugt, wird abgeräumt —
-    # sonst überlebt ein aus dem YAML gelöschtes Kapitel jeden Re-Import.
-    stats.archived_count = await archive_orphaned_curriculum_nodes(
-        db, import_key_base, all_import_keys
-    )
+    # sonst überlebt ein aus dem YAML gelöschtes Kapitel jeden Re-Import. Ein Entwurf hat einen
+    # frischen Schlüssel; abzuräumen gibt es da nichts.
+    if not als_entwurf:
+        stats.archived_count = await archive_orphaned_curriculum_nodes(
+            db, import_key_base, all_import_keys
+        )
     if stats.archived_count:
         logger.info(
             "%d verwaiste Kapitel/Lernsequenzen archiviert (nicht mehr im Import)",
@@ -1809,6 +1851,27 @@ async def import_curriculum_from_draft(
         )
 
     return curriculum_id, stats
+
+
+def _titel_schluessel(titel: str | None) -> str:
+    return " ".join((titel or "").split()).casefold()
+
+
+async def _kapitel_nach_titel(db: AsyncSession, curriculum_id: UUID) -> dict[str, list[UUID]]:
+    """Kapitel eines Curriculums je Titel (ohne Groß-/Kleinschreibung und Leerraum), in
+    Reihenfolge — für `kopie_von` am Kapitel eines Ersatz-Entwurfs (F3)."""
+    from app.context.relink import _children
+
+    aus: dict[str, list[UUID]] = {}
+    for kap in await _children(db, curriculum_id, "kapitel"):
+        aus.setdefault(_titel_schluessel(kap.title), []).append(kap.id)
+    return aus
+
+
+def _vorbild_nehmen(vorbilder: dict[str, list[UUID]], titel: str) -> UUID | None:
+    """Das nächste noch freie gleichnamige Kapitel des Originals — jedes höchstens einmal."""
+    frei = vorbilder.get(_titel_schluessel(titel))
+    return frei.pop(0) if frei else None
 
 
 def _normalize_ik_input(ik_raw: str | list | None, ik_partiell_default: bool) -> list[tuple[str, bool]]:
