@@ -27,7 +27,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.context.schemas import CurriculumDraftConfirmed, CurriculumDraftKapitel, CurriculumDraftLernsequenz, CurriculumDraftEntry
+from app.context.curriculum_yaml import zu_entwurf
+from app.context.schemas import CurriculumDraftConfirmed
 from app.context.service import import_curriculum_from_draft
 from app.db.models import ContextNode
 
@@ -63,6 +64,10 @@ def load_yaml_file(file_path: str) -> dict:
 def convert_yaml_to_draft(data: dict, bp_version_override: str | None = None) -> CurriculumDraftConfirmed:
     """Konvertiert YAML-Daten in das CurriculumDraftConfirmed-Format.
 
+    Seit 0.56 über dieselbe Einlese- und Bereinigungsschicht wie der Import in der Oberfläche
+    (`app.context.curriculum_yaml`), hier ohne Grenzen: Die Administration überträgt auch
+    große Bestände. Fehler → `ValueError` mit allen Meldungen; Warnungen ins Log.
+
     `bp_version_override` setzt die Bildungsplan-Edition aus der Datei außer Kraft. Nötig,
     wenn Quell- und Zielinstanz **verschiedene Editionen aktiv** haben — etwa beim
     Einspielen eines Produktiv-Exports (V2) in eine Dev-Instanz, in der die Basisedition
@@ -70,75 +75,12 @@ def convert_yaml_to_draft(data: dict, bp_version_override: str | None = None) ->
     Kompetenznummern können sich zwischen Editionen unterscheiden, das Ergebnis muss also
     jemand verantworten und die gemeldeten offenen Verweise ansehen.
     """
-    # Validierung der Pflichtfelder.
-    # `fachplan_id` steht bewusst NICHT mehr darin: Exporte echter Curricula schreiben
-    # dort `null`, weil gescrapte Fachplan-Knoten `bp_id` tragen statt `fachplan_id`.
-    # Verlangt wurde damit ein Feld, das die eigene Exportfunktion nicht füllen kann.
-    required_fields = ["schule", "fach_code", "schulart", "jahrgangsstufe", "bp_version"]
-    missing = [f for f in required_fields if f not in data]
-    if missing:
-        raise ValueError(f"Fehlende Pflichtfelder im YAML: {', '.join(missing)}")
-    
-    # Kapitel konvertieren
-    kapitel_list = []
-    for kap_data in data.get("kapitel", []):
-        lernsequenzen = []
-        for ls_data in kap_data.get("lernsequenzen", []):
-            eintraege = []
-            for entry_data in ls_data.get("eintraege", []):
-                # ik akzeptiert: str, list[str], list[dict({nr, partiell})]
-                ik_raw = entry_data.get("ik")
-                entry = CurriculumDraftEntry(
-                    ik=ik_raw,
-                    ik_partiell=entry_data.get("ik_partiell", False),
-                    pk=entry_data.get("pk", []),
-                    konkretisierung=entry_data.get("konkretisierung"),
-                    hinweise=entry_data.get("hinweise"),
-                    lp=entry_data.get("lp", []),
-                    material=entry_data.get("material"),
-                    begriffe=entry_data.get("begriffe") or [],
-                    fachmethoden=entry_data.get("fachmethoden") or [],
-                )
-                eintraege.append(entry)
-
-            ls = CurriculumDraftLernsequenz(
-                bp_titel=ls_data.get("bp_titel"),
-                bp_leitidee=ls_data.get("bp_leitidee"),
-                reihenfolge=ls_data.get("reihenfolge"),
-                std=str(ls_data["std"]) if ls_data.get("std") is not None else None,
-                eintraege=eintraege,
-            )
-            lernsequenzen.append(ls)
-        
-        kapitel = CurriculumDraftKapitel(
-            titel=kap_data["titel"],
-            reihenfolge=kap_data["reihenfolge"],
-            # YAML liefert `std: 4` als int zurück, das Zwischenformat erwartet Text.
-            # Bei den Lernsequenzen wurde schon gecastet, bei den Kapiteln nicht — der
-            # Wiederimport eines echten Exports scheiterte daran an der Validierung.
-            std=str(kap_data["std"]) if kap_data.get("std") is not None else None,
-            hinweis=kap_data.get("hinweis"),
-            konkretisierung=kap_data.get("konkretisierung", []),
-            lernsequenzen=lernsequenzen,
-        )
-        kapitel_list.append(kapitel)
-    
-    return CurriculumDraftConfirmed(
-        schule=data["schule"],
-        fach_code=data["fach_code"],
-        fach=data.get("fach"),
-        schulart=data["schulart"],
-        jahrgangsstufe=str(data["jahrgangsstufe"]),
-        fachplan_id=data.get("fachplan_id") or None,
-        # Wird die Edition überschrieben, darf die bp_id NICHT mitgehen: Sie zeigt auf
-        # den Fachplan der ursprünglichen Edition und würde die Überschreibung wieder
-        # aushebeln (bp_id wird vor Fach+Edition ausgewertet).
-        bp_id=None if bp_version_override else (data.get("bp_id") or None),
-        bp_version=bp_version_override or data["bp_version"],
-        vorwort=data.get("vorwort"),
-        rahmen=data.get("rahmen"),  # 0.46, E20
-        kapitel=kapitel_list,
-    )
+    pruefung = zu_entwurf(data, bp_version_override, grenzen=None)
+    for warnung in pruefung.warnungen:
+        logger.warning(f"  ⚠ {warnung}")
+    if not pruefung.ok:
+        raise ValueError("; ".join(pruefung.fehler))
+    return pruefung.entwurf
 
 
 async def import_single_curriculum(
