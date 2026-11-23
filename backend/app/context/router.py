@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import sqlalchemy as sa
 
 from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user, require_any_role, require_role
 from app.auth.jwt import JwtPayload
@@ -1838,10 +1839,9 @@ async def _curriculum_rechte(db: AsyncSession, tree: dict, user: JwtPayload) -> 
 
 
 async def _offener_entwurf(db: AsyncSession, curriculum_id) -> ContextNode | None:
-    return (await db.execute(sa.select(ContextNode).where(
-        ContextNode.content_type == "curriculum", ContextNode.status == ENTWURF,
-        ContextNode.metadata_["kopie_von"].astext == str(curriculum_id),
-    ).limit(1))).scalar_one_or_none()
+    from app.context.curriculum_entwurf import offener_entwurf
+
+    return await offener_entwurf(db, curriculum_id)
 
 
 async def _curriculum_lesen(db: AsyncSession, tree: dict, user: JwtPayload) -> None:
@@ -2611,6 +2611,68 @@ async def create_curriculum_node(
     await db.commit()
     await db.refresh(curriculum)
     return curriculum
+
+
+# ── Curriculum aus YAML (0.56, Päckchen BA) ──────────────────────────────────
+
+
+class CurriculumYamlEingabe(BaseModel):
+    """Der Text einer Curriculum-YAML und, wahlweise, das Curriculum, das der Entwurf beim
+    Veröffentlichen ersetzen soll. Die Länge begrenzt schon hier; die genaue Grenze in Bytes
+    prüft `curriculum_yaml.einlesen`."""
+    yaml: str = Field(..., max_length=200_000)
+    ersetzen: UUID | None = None
+
+
+async def _yaml_import_nutzer(user: JwtPayload = Depends(_TEACHER_OR_ADMIN)) -> JwtPayload:
+    """Lehrkraft oder Admin — und gedrosselt (Eimer `curriculum_import`, Prüfen und Anlegen
+    zusammen). Erst die Rolle, dann die Drossel, wie beim Fachbegriff-Import."""
+    from app.ratelimit.drossel import pruefe
+
+    pruefe("curriculum_import", user.sub, user.roles)
+    return user
+
+
+async def _yaml_durchlauf(eingabe: CurriculumYamlEingabe, db: AsyncSession, user: JwtPayload,
+                          speichern: bool) -> dict:
+    from app.context.curriculum_yaml import KeinRecht, durchlauf
+
+    try:
+        return await durchlauf(db, eingabe.yaml, user, ersetzen=eingabe.ersetzen, speichern=speichern)
+    except KeinRecht as e:
+        raise HTTPException(status_code=403, detail=str(e)) from None
+
+
+@router.post("/curricula/import/pruefen")
+async def curriculum_yaml_pruefen(
+    eingabe: CurriculumYamlEingabe,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_yaml_import_nutzer),
+) -> dict:
+    """Vorschau eines YAML-Imports: der echte Import als Entwurf, danach zurückgerollt (F4 a).
+
+    Immer `200` mit `ok`, `fehler`, `warnungen`, Gliederung und den vorhandenen Curricula, die
+    der Entwurf ersetzen könnte (F2) — auch bei Fehlern, damit die Oberfläche sie zeigt. `403`,
+    wenn die Person in dem Fach keine Entwürfe anlegen darf.
+    """
+    # Kein Commit: Der Import lief in einem Savepoint, und den hat `durchlauf` verworfen.
+    return await _yaml_durchlauf(eingabe, db, user, speichern=False)
+
+
+@router.post("/curricula/import", status_code=201)
+async def curriculum_yaml_importieren(
+    eingabe: CurriculumYamlEingabe,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_yaml_import_nutzer),
+) -> dict:
+    """Legt aus der YAML einen **Entwurf** an — nie ein veröffentlichtes Curriculum, nie eine
+    Änderung an einem vorhandenen (F1–F3). Mit `ersetzen` ersetzt der Entwurf beim
+    Veröffentlichen das Original. `422` mit der Vorschau als `detail`, wenn sie Fehler hat."""
+    ergebnis = await _yaml_durchlauf(eingabe, db, user, speichern=True)
+    if not ergebnis["ok"]:
+        raise HTTPException(status_code=422, detail=ergebnis)
+    await db.commit()
+    return ergebnis
 
 
 # ── Fach-Code Lookup ─────────────────────────────────────────────────────────

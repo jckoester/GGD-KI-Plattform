@@ -32,6 +32,8 @@ buckets:
   # Fachbegriff-Import: ein Lauf liest ein ganzes Bündel und schreibt Knoten und
   # Kanten. Jeder Import über den Dialog sind zwei Anfragen (Probelauf, echter Lauf).
   fachbegriffe_import: { limit: 20, window: 300 }
+  # Curriculum aus YAML (0.56): Prüfen und Anlegen zusammen
+  curriculum_import: { limit: 20, window: 300 }
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

@@ -1684,8 +1684,10 @@ async def import_curriculum_from_draft(
         await create_edge(db, kapitel_id, curriculum_id, "part_of")
         stats.edge_count += 1
         
-        # Embedding-Job für Kapitel
-        if created:
+        # Embedding-Job für Kapitel. Nicht für Entwürfe: Die Vorschau rollt zurück und hätte doch
+        # je Kapitel einen Aufruf nach außen ausgelöst (auch über MCP). Vektoren für Entwürfe
+        # braucht niemand; nach dem Veröffentlichen holt sie die Nachholung (nur `active`).
+        if created and not als_entwurf:
             await enqueue_embedding_job(kapitel_id, db)
         
         # 3. Lernsequenzen

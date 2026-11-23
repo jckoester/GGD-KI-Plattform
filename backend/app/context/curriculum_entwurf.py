@@ -139,6 +139,17 @@ async def darf_loeschen(db: AsyncSession, node, user) -> bool:
     return await darf_veroeffentlichen(db, node.subject_id, user)
 
 
+async def offener_entwurf(db: AsyncSession, curriculum_id):
+    """Der offene Entwurf, der dieses Curriculum ersetzen soll (`kopie_von`) — höchstens einer
+    je Curriculum („Als Entwurf kopieren“, YAML-Import)."""
+    from app.db.models import ContextNode
+
+    return (await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == "curriculum", ContextNode.status == ENTWURF,
+        ContextNode.metadata_["kopie_von"].astext == str(curriculum_id),
+    ).limit(1))).scalar_one_or_none()
+
+
 def wer_veroeffentlicht() -> str:
     """Für die Oberfläche, statt des Knopfs (Punkt 7)."""
     if fachvorsitz_zugeordnet():

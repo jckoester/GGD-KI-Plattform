@@ -414,3 +414,104 @@ async def verweise_pruefen(db, entwurf: CurriculumDraftConfirmed, user) -> list[
     for e, name, wo in felder:
         setattr(e, name, _UUID_VERWEIS.sub(lambda m, wo=wo: ersetzen(m, wo), getattr(e, name)))
     return warnungen
+
+
+# ── Vorschau und Anlegen (Schritt 3) ─────────────────────────────────────────
+
+class KeinRecht(Exception):
+    """Die Person darf in diesem Fach keine Entwürfe anlegen."""
+
+
+async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, speichern: bool = False) -> dict:
+    """Einlesen, bereinigen, als Entwurf importieren — und ohne `speichern` zurückrollen (F4 a).
+
+    Die Vorschau ist also der echte Import: dieselbe Auflösung von Fach, Fachplan und
+    Kompetenzen, dieselben Warnungen. Er läuft in einem Savepoint; ohne `speichern` wird der
+    verworfen. Kein Commit — das macht der Aufrufer.
+
+    Antwort: `ok`, `fehler`, `warnungen`, `curriculum` (Fach, Jahrgang, Edition, Titel),
+    `kapitel` (Titel, Stunden, Zahl der Lernsequenzen und Einträge, ob es ein Kapitel des
+    Originals ersetzt), `summen`, `vorhanden` (veröffentlichte Curricula gleichen Fachs,
+    Jahrgangs und Edition, je mit offenem Entwurf, F2), `ersetzen`; nach dem Speichern `id`.
+    `KeinRecht`, wenn die Person in dem Fach keine Entwürfe anlegen darf (F1).
+    """
+    import sqlalchemy as sa
+
+    from app.context.curriculum_entwurf import darf_entwurf_bearbeiten, offener_entwurf
+    from app.context.service import (
+        get_subject_id_by_code,
+        import_curriculum_from_draft,
+        load_curriculum_tree,
+    )
+    from app.context.stunden import als_stundenzahl
+    from app.db.models import ContextNode
+
+    p = einlesen(roh)
+    aus: dict = {"ok": False, "fehler": p.fehler, "warnungen": p.warnungen, "curriculum": None,
+                 "kapitel": [], "summen": None, "vorhanden": [], "ersetzen": None}
+    if not p.ok:
+        return aus
+    e = p.entwurf
+    subject_id = await get_subject_id_by_code(db, e.fach_code)
+    if subject_id is None:
+        p.fehler.append(f"fach_code: Ein Fach „{e.fach_code}“ gibt es hier nicht.")
+        return aus
+    if not await darf_entwurf_bearbeiten(db, subject_id, user):
+        raise KeinRecht("Entwürfe in diesem Fach legt die Fachschaft des Fachs an.")
+    p.warnungen.extend(await verweise_pruefen(db, e, user))
+
+    vorhanden = (await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == "curriculum", ContextNode.status == "active",
+        ContextNode.subject_id == subject_id,
+        ContextNode.metadata_["jahrgangsstufe"].astext == e.jahrgangsstufe,
+        ContextNode.metadata_["bp_version"].astext == e.bp_version,
+    ).order_by(ContextNode.title))).scalars().all()
+    for c in vorhanden:
+        offen = await offener_entwurf(db, c.id)
+        aus["vorhanden"].append({"id": str(c.id), "titel": c.title,
+                                 "band": (c.metadata_ or {}).get("band"),
+                                 "offener_entwurf": str(offen.id) if offen else None})
+    if ersetzen is not None:
+        ziel = next((v for v in aus["vorhanden"] if v["id"] == str(ersetzen)), None)
+        if ziel is None:
+            p.fehler.append("Das Curriculum, das der Entwurf ersetzen soll, passt nicht zu Fach, Jahrgang "
+                            "und Edition der Datei.")
+            return aus
+        if ziel["offener_entwurf"]:
+            p.fehler.append(f"Zu „{ziel['titel']}“ gibt es schon einen Entwurf. Bearbeite ihn oder lege "
+                            f"einen neuen Entwurf an, der nichts ersetzt.")
+            return aus
+        aus["ersetzen"] = ziel["id"]
+
+    sicherung = await db.begin_nested()
+    try:
+        cid, stats = await import_curriculum_from_draft(db, e, user.sub, als_entwurf=True, kopie_von=ersetzen)
+    except ValueError as fehler:
+        await sicherung.rollback()
+        p.fehler.append(str(fehler))
+        return aus
+    for w in stats.warnings:
+        if w not in p.warnungen:
+            p.warnungen.append(w)
+    tree = await load_curriculum_tree(db, cid)
+    kapitel, summen = [], {"kapitel": 0, "lernsequenzen": 0, "eintraege": 0, "stunden": 0.0}
+    for kap in tree.get("kapitel", []):
+        meta = kap.get("metadata") or {}
+        ls = kap.get("lernsequenzen", [])
+        n_e = sum(len((x.get("metadata") or {}).get("eintraege") or []) for x in ls)
+        std = als_stundenzahl(meta.get("std"))
+        kapitel.append({"titel": kap.get("title"), "std": std, "lernsequenzen": len(ls), "eintraege": n_e,
+                        "ersetzt_kapitel": bool(meta.get("kopie_von"))})
+        summen["kapitel"] += 1
+        summen["lernsequenzen"] += len(ls)
+        summen["eintraege"] += n_e
+        summen["stunden"] += std or 0
+    aus.update(ok=True, kapitel=kapitel, summen=summen, curriculum={
+        "titel": tree.get("title"), "fach_code": e.fach_code, "fach": e.fach,
+        "jahrgangsstufe": e.jahrgangsstufe, "bp_version": e.bp_version})
+    if speichern:
+        await sicherung.commit()
+        aus["id"] = str(cid)
+    else:
+        await sicherung.rollback()
+    return aus

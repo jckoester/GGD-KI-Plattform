@@ -51,6 +51,9 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # ein Probelauf plus ein echter Lauf, und man korrigiert ein paar Mal), bremsen
     # aber eine Schleife.
     "fachbegriffe_import": (20, 300.0),
+    # Curriculum aus YAML (0.56, BA): Prüfen und Anlegen sind je ein ganzer Import (das Prüfen
+    # rollt nur zurück). Wie beim Fachbegriff-Import: genug zum Korrigieren, nicht für eine Schleife.
+    "curriculum_import": (20, 300.0),
 }
 _FALLBACK = (60, 60.0)
 

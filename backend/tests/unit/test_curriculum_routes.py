@@ -65,6 +65,12 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         ("GET", "/context/curricula/{curriculum_id}/publish"),
         ("POST", "/context/curricula/{curriculum_id}/publish"),
         ("POST", "/context/curricula/{curriculum_id}/copy"),
+        # 0.56 (BA): YAML-Import neu entworfen, wie oben verlangt — Vorschau (`pruefen`, echter
+        # Import im Savepoint, verworfen), Rechte der Fachschaft, Konflikt mit vorhandenem
+        # Curriculum (`ersetzen`, ein offener Entwurf). Legt immer einen Entwurf an. Aufrufer:
+        # Importdialog in der Curriculum-Übersicht des Fachs.
+        ("POST", "/context/curricula/import/pruefen"),
+        ("POST", "/context/curricula/import"),
         # 0.46 (AP Teil B): Rückgängig — Verlauf lesen, Stand sichern (Editor vor dem Speichern),
         # zurücknehmen; Aufrufer der Curriculum-Editor.
         ("GET", "/context/curricula/{curriculum_id}/history"),
