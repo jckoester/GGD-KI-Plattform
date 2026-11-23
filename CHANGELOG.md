@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Migration
+
+- 0112: Tabellen `oauth_clients`, `oauth_codes`, `oauth_tokens`; `personal_access_tokens.oauth_client_id`.
+
 ## [0.54.0] – 2026-11-23
 
 ### Neu

@@ -2023,9 +2023,16 @@ class PersonalAccessToken(Base):
     # SHA-256 des Klartexts. Kein bcrypt/argon2: Das Token ist ein Zufallswert mit 256
     # Bit Entropie, kein Passwort — ein Wörterbuchangriff greift nicht, und der schnelle
     # Hash erlaubt den Abgleich über einen Index statt über einen Tabellendurchlauf.
-    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Bei einer OAuth-Verbindung (0.55, AX) leer: Sie hat keinen eigenen Tokentext, ihre Token
+    # stehen in `oauth_tokens`. Die Prüfung verlangt Hash oder Client.
+    token_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     scopes: Mapped[list] = mapped_column(
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
+    # Gesetzt = Verbindung eines KI-Programms per OAuth (0.55, AX, F7): ein Eintrag je Programm
+    # im Profil; widerrufen beendet alle seine Token.
+    oauth_client_id: Mapped[Optional[str]] = mapped_column(
+        Text, ForeignKey("oauth_clients.client_id", ondelete="CASCADE"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
@@ -2047,6 +2054,82 @@ class PersonalAccessToken(Base):
     __table_args__ = (
         Index("uq_personal_access_tokens_hash", "token_hash", unique=True),
         Index("idx_personal_access_tokens_pseudonym", "pseudonym"),
+        CheckConstraint("token_hash IS NOT NULL OR oauth_client_id IS NOT NULL",
+                        name="ck_personal_access_tokens_hash_oder_client"),
+    )
+
+
+# OAuth für KI-Abos (0.55, Päckchen AX; Migration 0112). Die Endpunkte liefert das SDK `mcp`,
+# hier steht nur der Speicher.
+class OAuthClient(Base):
+    """Ein per Dynamic Client Registration angelegtes Programm (etwa Claude).
+
+    ``client_secret`` im Klartext: Das SDK vergleicht es so, und bei offener Registrierung
+    schützt es wenig — PKCE, Redirect-URIs und die Zustimmung der Lehrkraft sichern den Zugang.
+    """
+
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    client_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # `OAuthClientInformationFull` ohne Secret: Name, Redirect-URIs, Grant-Typen, Auth-Methode.
+    metadaten: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Für den Cron, der nie benutzte Registrierungen nach 30 Tagen löscht (F12).
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+
+class OAuthCode(Base):
+    """Ein Autorisierungscode — nur sein SHA-256, einmalig, wenige Minuten gültig."""
+
+    __tablename__ = "oauth_codes"
+
+    code_hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    client_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("oauth_clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
+    scopes: Mapped[list] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
+    code_challenge: Mapped[str] = mapped_column(Text, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    redirect_uri_explizit: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    resource: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+
+class OAuthToken(Base):
+    """Ein ausgestellter Zugriffs- (1 h) oder Refresh-Token (90 Tage, F8) — nur der SHA-256.
+
+    Hängt an seiner Verbindung (`personal_access_tokens` mit `oauth_client_id`); deren Widerruf,
+    Ablauf und die frisch gelesenen Rollen gelten für ihn mit. ``rotiert_at``: eingelöster
+    Refresh-Token — kommt er noch einmal, ist er gestohlen, und die Verbindung endet.
+    """
+
+    __tablename__ = "oauth_tokens"
+
+    id: Mapped[UUIDType] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    art: Mapped[str] = mapped_column(Text, nullable=False)
+    verbindung_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("personal_access_tokens.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    rotiert_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("uq_oauth_tokens_hash", "token_hash", unique=True),
+        Index("idx_oauth_tokens_verbindung", "verbindung_id"),
+        CheckConstraint("art IN ('zugriff', 'refresh')", name="ck_oauth_tokens_art"),
     )
 
 

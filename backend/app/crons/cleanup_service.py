@@ -22,6 +22,7 @@ from app.db.models import (
     SsoGroupOffer,
     JwtRevocation,
     NodeEngagement,
+    OAuthCode,
     PersonalAccessToken,
     PseudonymAudit,
     TeacherGroupExclusion,
@@ -395,11 +396,14 @@ async def cleanup_inactive_accounts(
                         # stehen, während `pseudonym_audit` fällt, verlöre es zwar seine
                         # Rollen und damit seine Wirkung — aber ein gültiger Schlüssel zu
                         # einem gelöschten Konto hat in der Tabelle nichts verloren.
+                        # Seit 0.55 (AX) auch OAuth-Verbindungen — ihre `oauth_tokens` gehen per
+                        # Cascade mit. Offene Autorisierungscodes tragen das Pseudonym selbst.
                         await db.execute(
                             delete(PersonalAccessToken).where(
                                 PersonalAccessToken.pseudonym == pseudonym
                             )
                         )
+                        await db.execute(delete(OAuthCode).where(OAuthCode.pseudonym == pseudonym))
                         await db.execute(
                             delete(JwtRevocation).where(JwtRevocation.pseudonym == pseudonym)
                         )

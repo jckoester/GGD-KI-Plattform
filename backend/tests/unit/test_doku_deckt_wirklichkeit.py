@@ -92,6 +92,7 @@ _TABELLE = {
     "UserPreference": "user_preferences",
     "CalendarSyncStatus": "calendar_sync_status",
     "PersonalAccessToken": "personal_access_tokens",
+    "OAuthCode": "oauth_codes",
     "JwtRevocation": "jwt_revocations",
     "BudgetAccrual": "budget_accruals",
     "BudgetGrant": "budget_grants",

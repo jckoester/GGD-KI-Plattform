@@ -168,6 +168,23 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
             )
             ids[f"code_{wer}"] = cur.fetchone()[0]
 
+        # ── OAuth (0.55, AX): Verbindung mit Token und offener Code, je Konto ──
+        cur.execute("INSERT INTO oauth_clients (client_id, metadaten) VALUES ('test-m2-client', '{}')"
+                    " ON CONFLICT DO NOTHING")
+        for wer in (VERLASSEN, AKTIV):
+            cur.execute(
+                "INSERT INTO personal_access_tokens (pseudonym, name, scopes, expires_at, oauth_client_id)"
+                " VALUES (%s,'Claude','{curriculum:read}', now() + interval '90 days','test-m2-client')"
+                " RETURNING id", (wer,))
+            verbindung = cur.fetchone()[0]
+            cur.execute("INSERT INTO oauth_tokens (token_hash, art, verbindung_id, expires_at)"
+                        " VALUES (%s,'refresh',%s, now() + interval '90 days')",
+                        (f"test-m2-{wer}", verbindung))
+            cur.execute("INSERT INTO oauth_codes (code_hash, client_id, pseudonym, code_challenge,"
+                        " redirect_uri, redirect_uri_explizit, expires_at)"
+                        " VALUES (%s,'test-m2-client',%s,'x','https://claude.ai/cb',true, now() + interval '5 minutes')",
+                        (f"test-m2-code-{wer}", wer))
+
         # ── Audit-Log (0.28, ADR-010 §2.5) ──
         # Je eine Zeile in `admin`, `auth`, `moderation`; dazu eine des aktiven Kontos.
         ids["audit"] = {}
@@ -196,6 +213,7 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
             cur.execute("DELETE FROM feedback WHERE id = %s", (str(ids[schluessel]),))
         cur.execute("SET LOCAL audit.aufraeumen = 'on'")
         cur.execute("DELETE FROM audit_log WHERE event_type = 'test_konto'")
+        cur.execute("DELETE FROM oauth_clients WHERE client_id = 'test-m2-client'")  # Cascade
         cur.execute("DELETE FROM subjects WHERE id = %s", (SUBJECT_ID,))
         cur.execute("DELETE FROM pseudonym_audit WHERE pseudonym IN (%s,%s)",
                     (VERLASSEN, AKTIV))
@@ -393,3 +411,19 @@ def test_audit_log_admin_bleibt_auth_und_moderation_ohne_pseudonym(sync_conn, ge
     assert akteur(AKTIV, "auth") == AKTIV
     assert _zaehle(sync_conn, "SELECT actor_role FROM audit_log WHERE id = %s",
                    gelaufen["audit"][(VERLASSEN, "auth")]) == "teacher"
+
+
+class TestKiProgramme:
+    """0.55 (AX): Verbindungen zu KI-Programmen und offene Codes gehen mit dem Konto."""
+
+    def test_verbindung_token_und_code_verschwinden(self, sync_conn, gelaufen):
+        for sql in ("SELECT count(*) FROM personal_access_tokens WHERE pseudonym = %s",
+                    "SELECT count(*) FROM oauth_codes WHERE pseudonym = %s",
+                    "SELECT count(*) FROM oauth_tokens WHERE token_hash = 'test-m2-' || %s"):
+            assert _zaehle(sync_conn, sql, VERLASSEN) == 0, sql
+
+    def test_fremde_verbindung_bleibt(self, sync_conn, gelaufen):
+        for sql in ("SELECT count(*) FROM personal_access_tokens WHERE pseudonym = %s",
+                    "SELECT count(*) FROM oauth_codes WHERE pseudonym = %s",
+                    "SELECT count(*) FROM oauth_tokens WHERE token_hash = 'test-m2-' || %s"):
+            assert _zaehle(sync_conn, sql, AKTIV) == 1, sql

@@ -199,7 +199,8 @@ Personenbezug und bleibt.
 | `pseudonym_audit` | gelöscht — damit ist die Rückrechnung auf die Person endgültig unmöglich |
 | `user_preferences` | gelöscht; darin auch das Stundenplan-Kürzel |
 | `calendar_sync_status` | gelöscht — der Abrufstatus des Stundenplans |
-| `personal_access_tokens` | gelöscht |
+| `personal_access_tokens` | gelöscht — seit 0.55 auch die Verbindungen zu KI-Programmen per OAuth, ihre Token (`oauth_tokens`) mit |
+| `oauth_codes` | gelöscht — noch nicht eingelöste Autorisierungscodes (gelten ohnehin nur Minuten) |
 | `jwt_revocations` | gelöscht |
 | `budget_accruals` | gelöscht — die Zuteilungshistorie des Wochenmodells |
 | `budget_grants` | gelöscht — von Hand aufgebuchte Zuschläge samt ihrem Protokoll (wer, wann, warum) |
