@@ -63,3 +63,8 @@ def test_im_zweifel_zum_ziel(monkeypatch, verhalten, grund):
     u = asyncio.run(aufgabe.urteilen("Was ist ein Mol?", None, None, modell="m", zeitgrenze=0.05))
     assert (u.large, u.grund) == (True, grund)
     assert u.dauer < 0.9
+
+
+def test_nutzertext_mit_vorigem_urteil():
+    assert "Die vorige Nachricht war eine Aufgabe." in aufgabe.nutzertext("und?", "Löse 3x = 9", "Was nun?", True)
+    assert "vorige" not in aufgabe.nutzertext("und?", "Löse 3x = 9", "Was nun?")

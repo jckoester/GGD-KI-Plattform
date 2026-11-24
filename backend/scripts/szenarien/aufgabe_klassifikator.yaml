@@ -189,3 +189,62 @@ faelle:
   - {id: S08, art: alltag, etikett: sonst, nachricht: "Was ist dein Lieblingsessen?"}
   - {id: S09, art: alltag, etikett: sonst, nachricht: "Kannst du mir helfen?"}
   - {id: S10, art: alltag, etikett: sonst, nachricht: "mir ist langweilig"}
+
+  # Zwischenfragen in einer laufenden Aufgabe (nach Lauf 9, N3: „v = s durch t?“ ging an Small,
+  # Small rechnete die Lösung aus). Andere Wortlaute als die Beispiele im Klassifikator-Text.
+  - id: Z01
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Löse die Gleichung 2x + 6 = 14."
+    letzte_antwort: "Was musst du zuerst auf beiden Seiten abziehen?"
+    nachricht: "minus 6 also 2x = 8?"
+  - id: Z02
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Berechne den Flächeninhalt eines Kreises mit r = 4 cm."
+    letzte_antwort: "Welche Formel brauchst du für den Flächeninhalt eines Kreises?"
+    nachricht: "ist das pi mal r hoch 2?"
+  - id: Z03
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Bestimme das Prädikat im Satz: Die Kinder spielen im Garten."
+    letzte_antwort: "Welches Wort sagt dir, was die Kinder tun?"
+    nachricht: "ist das spielen?"
+  - id: Z04
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Übersetze: Marcus amicum in foro videt."
+    letzte_antwort: "Schau dir zuerst amicum an: Welcher Fall ist das?"
+    nachricht: "Akkusativ oder?"
+  - id: Z05
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Wie viel Gramm Wasser entstehen aus 4 g Wasserstoff?"
+    letzte_antwort: "Stell zuerst die Reaktionsgleichung auf."
+    nachricht: "2 H2 + O2 -> 2 H2O stimmt das so?"
+  - id: Z06
+    art: zwischenfrage
+    etikett: aufgabe
+    erste: "Ein Rechteck ist 5 m lang und 3 m breit. Berechne den Umfang."
+    letzte_antwort: "Wie berechnet man den Umfang eines Rechtecks?"
+    nachricht: "2 mal a plus 2 mal b?"
+
+  # Gegenproben: Wissensfrage mitten in einer Aufgabe, ohne einen Schritt zu prüfen.
+  - id: K01
+    art: wissen_in_aufgabe
+    etikett: wissensfrage
+    erste: "Löse die Gleichung 2x + 6 = 14."
+    letzte_antwort: "Was musst du zuerst auf beiden Seiten abziehen?"
+    nachricht: "warum heißt das eigentlich gleichung?"
+  - id: K02
+    art: wissen_in_aufgabe
+    etikett: wissensfrage
+    erste: "Berechne den Flächeninhalt eines Kreises mit r = 4 cm."
+    letzte_antwort: "Welche Formel brauchst du für den Flächeninhalt eines Kreises?"
+    nachricht: "wer hat eigentlich pi erfunden?"
+  - id: K03
+    art: wissen_in_aufgabe
+    etikett: beobachtet
+    erste: "Übersetze: Marcus amicum in foro videt."
+    letzte_antwort: "Schau dir zuerst amicum an: Welcher Fall ist das?"
+    nachricht: "was ist nochmal der unterschied zwischen dativ und akkusativ?"

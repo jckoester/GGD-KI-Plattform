@@ -121,8 +121,12 @@ Lösungsvorgriff“, 7a; Begründung und Messungen dort).
   Krisen-Erkennung, und läuft neben Vorab-Suche und Systemtext. Gewartet wird erst unmittelbar
   vor `litellm_payload["model"]`. Die Zeitgrenze steckt im Task (`asyncio.wait_for` in
   `urteilen`); `urteilen` wirft nie.
-- **Eingabe** (zustandslos): neue Nachricht, erste Nutzernachricht (ab dem zweiten Zug), letzte
-  Antwort gekürzt auf 600 Zeichen — alles aus `request.messages`. Nachricht ohne Text (nur Bild):
+- **Eingabe:** neue Nachricht, erste Nutzernachricht (ab dem zweiten Zug), letzte Antwort gekürzt
+  auf 600 Zeichen — aus `request.messages`. Dazu die Zeile „Die vorige Nachricht war eine
+  Aufgabe.“, wenn die letzte sichtbare Antwort weitergeleitet war (`_vorige_weitergeleitet`, eine
+  Abfrage auf `messages.weitergeleitet_von`; eine gerade ersetzte Antwort zählt nicht). Der Text
+  verlangt dann für „keine Aufgabe“ einen klar anderen Gegenstand — sonst kippte eine Kette von
+  Folgezügen nach einer begleitenden Antwort zu Small (Lauf 9b). Nachricht ohne Text (nur Bild):
   ohne Aufruf zum Ziel.
 - **Sichere Seite:** Zeitgrenze, Fehler und unlesbare Antwort gehen an das Zielmodell.
 - **Gespeichert:** `Message.model` ist das antwortende Modell, `Message.weitergeleitet_von` das
@@ -142,7 +146,7 @@ liest die Einstellungen in `app.chat.aufgabe`, nicht im Router: Viele Tests erse
 `app.chat.router.settings` durch ein `MagicMock`, dessen Attribute wahr sind.
 
 Tests: `tests/unit/test_chat_aufgabe.py`, `tests/unit/test_chat_aufgabe_weiterleitung.py`,
-`frontend/src/lib/chat_trenner.test.js`.
+`tests/integration/test_aufgabe_vorige.py`, `frontend/src/lib/chat_trenner.test.js`.
 
 ## SSE-Eventformat
 

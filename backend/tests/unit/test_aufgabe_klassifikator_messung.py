@@ -79,3 +79,14 @@ def test_mehrwartezeit_zaehlt_nur_was_ueber_die_suche_hinausgeht():
                               {"dauer": 2.0, "fehler": "x", "suche": 0.1}])
     assert "0,35 s" in zeilen[1]          # Median aus 0,7 und 0
     assert m._zeilen_suche([{"dauer": 1.0}]) == []
+
+
+def test_vorige_aus_dem_etikett_des_vorigen_zugs():
+    el = [
+        {"konversation": "k", "zug": 1, "etikett": "aufgabe"},
+        {"konversation": "k", "zug": 2, "etikett": "wissensfrage"},
+        {"konversation": "k", "zug": 3, "etikett": "aufgabe"},
+        {"konversation": "j", "zug": 1, "etikett": "wissensfrage"},
+    ]
+    m.vorige_setzen(el)
+    assert [e["vorige_aufgabe"] for e in el] == [False, True, False, False]

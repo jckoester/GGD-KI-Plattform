@@ -589,6 +589,8 @@ def fall_durchspielen(conn, jwt, schueler: str, kennung: int, fall: dict, basis:
                 "systemtext": (ergebnis.get("vorab_debug") or {}).get("systemtext"),
                 "druck": (ergebnis.get("vorab_debug") or {}).get("druck"),
                 "lehrkraft": (ergebnis.get("vorab_debug") or {}).get("lehrkraft"),
+                # Aufgaben-Weiterleitung (7a): Urteil, Grund, Dauer, `bezug`.
+                "aufgabe": (ergebnis.get("vorab_debug") or {}).get("aufgabe"),
                 "operator_soll": zug.get("operator"),
                 "werkzeug_soll": zug.get("werkzeug"),
                 "knoten": knoten_der_antwort(conn, konversation),

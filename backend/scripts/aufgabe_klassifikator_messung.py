@@ -45,6 +45,8 @@ ZIEL_FOLGEZUG = 1.0
 ZIEL_SMALL = 0.80
 ZIEL_MEDIAN_S = 1.0
 ZIEL_MAX_S = 1.5
+#: Mit `--mit-vorigem` (ab Lauf 4): das vorige Urteil als Kontext, wie im Chat.
+MIT_VORIGER = False
 
 
 
@@ -96,7 +98,19 @@ def elemente_aus_faellen(faelle: list[dict]) -> list[dict]:
 
 
 def nutzertext(e: dict) -> str:
-    return _nutzertext(e["nachricht"], e.get("erste"), e.get("letzte_antwort"))
+    return _nutzertext(e["nachricht"], e.get("erste"), e.get("letzte_antwort"), bool(e.get("vorige_aufgabe")))
+
+
+def vorige_setzen(elemente: list[dict]) -> list[dict]:
+    """``vorige_aufgabe`` je Folgezug aus dem **Etikett** des vorigen Zugs derselben Konversation —
+    so, als hätte der Klassifikator dort richtig geurteilt (im Chat: die vorige Antwort kam vom
+    Zielmodell)."""
+    vorher: dict[str, dict] = {}
+    for e in sorted(elemente, key=lambda x: (x["konversation"], x["zug"])):
+        v = vorher.get(e["konversation"])
+        e["vorige_aufgabe"] = bool(v and v["zug"] == e["zug"] - 1 and v["etikett"] == "aufgabe")
+        vorher[e["konversation"]] = e
+    return elemente
 
 
 def mehrheit(urteile: list[bool | None]) -> bool | None:
@@ -283,7 +297,8 @@ def pruefsatz(ziel: str) -> list[dict]:
         daten = json.loads((Path(ziel) / datei).read_text(encoding="utf-8"))
         quelle = datei.removeprefix("verlauf-").removesuffix(".json")
         basis += elemente_aus_transkript(daten, quelle, tr["etiketten"], tr.get("einzeln") or {})
-    return basis + elemente_aus_faellen(szenario["faelle"])
+    basis = basis + elemente_aus_faellen(szenario["faelle"])
+    return vorige_setzen(basis) if MIT_VORIGER else basis
 
 
 async def _schuelerkonto() -> str:
@@ -360,7 +375,9 @@ async def laufen(args) -> None:
           if args.aus else
           f"- **Wiederholungen:** {args.wiederholungen}, parallel {args.parallel}, Systemkonto, `temperature` 0"
           + ("; Vorab-Suche gleichzeitig zu jedem Aufruf (freier Chat, Klasse 8, nur lesend)"
-             if args.mit_suche else "")),
+             if args.mit_suche else "")
+          + ("; Folgezüge mit dem vorigen Etikett als Kontext („Die vorige Nachricht war eine Aufgabe.“)"
+             if MIT_VORIGER else "")),
          "- **Ohne lesbares Urteil** zählt wie „Aufgabe“ (Large).", ""]
     for modell, (elemente, aufrufe) in ergebnis.items():
         t += bericht_modell(modell, elemente, aufrufe)
@@ -382,7 +399,12 @@ def main() -> None:
     p.add_argument("--mit-suche", action="store_true",
                    help="Vorab-Suche gleichzeitig zu jedem Aufruf laufen lassen und ihre Dauer messen")
     p.add_argument("--parallel", type=int, default=2)
-    asyncio.run(laufen(p.parse_args()))
+    p.add_argument("--mit-vorigem", action="store_true",
+                   help="Folgezüge bekommen das Etikett des vorigen Zugs als Kontext (wie im Chat)")
+    args = p.parse_args()
+    global MIT_VORIGER
+    MIT_VORIGER = args.mit_vorigem
+    asyncio.run(laufen(args))
 
 
 if __name__ == "__main__":

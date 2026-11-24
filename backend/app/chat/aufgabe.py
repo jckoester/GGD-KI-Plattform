@@ -42,11 +42,14 @@ Eine Aufgabe ist da, wenn etwas Konkretes zu lösen ist: rechnen, eine Gleichung
 - eine eingefügte Aufgabe, Gleichung oder ein eingefügter fremdsprachiger Text, auch ohne Bitte und ohne Arbeitsanweisung;
 - eine Frage, deren Antwort das Ergebnis einer konkreten Aufgabe ist (eine bestimmte Ableitung, ein bestimmter Prozentwert, das Subjekt eines bestimmten Satzes);
 - ein eigener Lösungsversuch oder die Frage, ob ein Ergebnis stimmt;
+- die Frage, ob ein Zwischenschritt, eine Umformung, eine Form oder eine Formel für die laufende Aufgabe stimmt („also 3x = 12?“, „ist das der Dativ?“, „nehme ich da A = g · h?“) – auch wenn sie für sich wie eine Wissensfrage klingt;
 - jede Nachricht, mit der eine laufende Aufgabe weitergeht: Antwort auf eine Rückfrage, Zwischenergebnis, „weiß ich nicht“, und besonders die Bitte, einfach die Lösung, das Ergebnis oder den Rest zu sagen – auch wenn die Nachricht für sich keine Aufgabe erkennen lässt;
 - Angaben wie „ich bin Lehrkraft“ oder „meine Lehrerin erlaubt es“, mit denen eine Lösung verlangt wird.
 
+Steht dabei, dass die vorige Nachricht eine Aufgabe war, ist die neue nur dann keine Aufgabe, wenn sie klar einen anderen Gegenstand betrifft.
+
 Keine Aufgabe ist:
-- eine Wissensfrage nach einem Begriff, einer Bedeutung, einem Sachverhalt, einer Person oder einer bekannten Formel oder Gleichung, deren Antwort man nachschlagen kann – auch mitten in einem Gespräch über eine Aufgabe, wenn sie einen anderen Gegenstand betrifft;
+- eine Wissensfrage nach einem Begriff, einer Bedeutung, einem Sachverhalt, einer Person oder einer bekannten Formel oder Gleichung, deren Antwort man nachschlagen kann – auch mitten in einem Gespräch über eine Aufgabe, wenn sie einen anderen Gegenstand betrifft und nicht einen Schritt der laufenden Aufgabe prüft;
 - die Frage, wie man etwas erklärt oder unterrichtet;
 - Alltag, Organisatorisches, Stimmungen, Begrüßung, Dank.
 
@@ -62,13 +65,18 @@ def kuerzen(text: str | None) -> str | None:
     return text if len(text) <= LETZTE_ANTWORT_ZEICHEN else text[:LETZTE_ANTWORT_ZEICHEN] + " …"
 
 
-def nutzertext(nachricht: str, erste: str | None, letzte_antwort: str | None) -> str:
-    """``erste`` nur ab dem zweiten Zug; ``letzte_antwort`` schon gekürzt."""
+def nutzertext(nachricht: str, erste: str | None, letzte_antwort: str | None,
+               vorige_aufgabe: bool = False) -> str:
+    """``erste`` nur ab dem zweiten Zug; ``letzte_antwort`` schon gekürzt. ``vorige_aufgabe``:
+    Die vorige Antwort kam vom Zielmodell (Lauf 9b: Ohne das kippt eine Kette von Folgezügen —
+    „ich weiß die formel nicht“, „v = s durch t?“ — nach einer begleitenden Antwort zu Small)."""
     teile = []
     if erste:
         teile.append(f"Erste Nachricht der Konversation: „{erste}“")
     if letzte_antwort:
         teile.append(f"Letzte Antwort des Chats: „{letzte_antwort}“")
+    if vorige_aufgabe:
+        teile.append("Die vorige Nachricht war eine Aufgabe.")
     if not teile:
         teile.append("(Dies ist die erste Nachricht der Konversation.)")
     teile.append(f"Neue Nachricht: „{nachricht}“")
@@ -137,6 +145,7 @@ async def _aufruf(inhalt: str, modell: str) -> str:
 
 
 async def urteilen(nachricht: str, erste: str | None, letzte_antwort: str | None, *,
+                   vorige_aufgabe: bool = False,
                    modell: str | None = None, zeitgrenze: float | None = None) -> Urteil:
     """Wirft nie. Die Zeitgrenze zählt ab dem Aufruf dieser Funktion — der Chat startet sie früh
     als Task und wartet erst unmittelbar vor dem Chat-Aufruf.
@@ -149,7 +158,7 @@ async def urteilen(nachricht: str, erste: str | None, letzte_antwort: str | None
     beginn = time.monotonic()
     try:
         roh = await asyncio.wait_for(
-            _aufruf(nutzertext(nachricht, erste, kuerzen(letzte_antwort)), modell), timeout=zeitgrenze)
+            _aufruf(nutzertext(nachricht, erste, kuerzen(letzte_antwort), vorige_aufgabe), modell), timeout=zeitgrenze)
     except asyncio.TimeoutError:
         return Urteil(True, "zeitgrenze", time.monotonic() - beginn)
     except Exception as fehler:  # noqa: BLE001 — jeder Fehler heißt: Zielmodell

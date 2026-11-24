@@ -154,6 +154,9 @@ class MessageItem(BaseModel):
     attachments: list[AttachmentMeta] = []
     model: Optional[str] = None            # Aliasname (`chat-standard`)
     provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
+    # Aufgaben-Weiterleitung (7a, 0113): das gewählte Modell, wenn ein anderes antwortete —
+    # die Oberfläche setzt für einen solchen Wechsel keinen Trenner.
+    weitergeleitet_von: Optional[str] = None
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     images: list[GeneratedImageRef] = []
@@ -436,6 +439,23 @@ def _weiterleitung_moeglich(user: JwtPayload, ist_test: bool, assistent, model_u
         and "student" in (user.roles or []) and not _ist_lehrkraft(user) and not ist_test
         and assistent is None and model_used == settings.chat_default_model
     )
+
+
+async def _vorige_weitergeleitet(db: AsyncSession, conversation_id: UUID, ausser: list[UUID]) -> bool:
+    """Kam die letzte sichtbare Antwort vom Zielmodell (7a, nach Lauf 9b)? Dann erfährt der
+    Klassifikator, dass die vorige Nachricht eine Aufgabe war — sonst kippt eine Kette von
+    Folgezügen nach einer begleitenden Antwort zu Small. ``ausser``: die Antwort, die eine
+    Bearbeitung gerade ersetzt. Auch eine Weiterleitung über die Zeitgrenze zählt (sichere Seite)."""
+    abfrage = (
+        select(Message.weitergeleitet_von)
+        .where(Message.conversation_id == conversation_id, Message.role == "assistant",
+               Message.ersetzt_am.is_(None))
+        .order_by(*NACHRICHTEN_FOLGE)    # Wächter: nie nur nach der Zeit; die letzte zählt
+    )
+    if ausser:
+        abfrage = abfrage.where(Message.id.not_in(ausser))
+    antworten = (await db.execute(abfrage)).scalars().all()
+    return bool(antworten) and antworten[-1] is not None
 
 
 def _erste_nachricht(messages: list[ChatMessage]) -> Optional[str]:
@@ -2286,8 +2306,10 @@ async def chat(
     weitergeleitet_von: Optional[str] = None
     if _weiterleitung_moeglich(current_user, conversation_is_test, active_assistant, model_used):
         if user_message.strip():
+            _vorige = (not is_new) and await _vorige_weitergeleitet(db, conversation_id, ersetze_ids)
             _aufgabe_task = asyncio.create_task(aufgabe.urteilen(
                 user_message, _erste_nachricht(request.messages), _letzte_antwort(request.messages),
+                vorige_aufgabe=_vorige,
             ))
         else:
             # Nur ein Bild, kein Text: meist ein Foto der Aufgabe — ohne Klassifikator zum Ziel.

@@ -185,3 +185,52 @@ async def test_ausgeschaltet_aendert_nichts(monkeypatch):
     assert client.last_json["model"] == STANDARD
     assert persist.await_args.kwargs["weitergeleitet_von"] is None
     assert antwort.headers["X-Model-Gewaehlt"] == STANDARD
+
+
+@pytest.mark.asyncio
+async def test_vorige_weiterleitung_geht_als_kontext_mit():
+    """Kam die letzte Antwort vom Zielmodell, erfährt der Klassifikator es (nach Lauf 9b)."""
+    konv = uuid4()
+    bestehend = MagicMock()
+    bestehend.id = konv
+    bestehend.pseudonym = "pseudo-1"
+    bestehend.model_used = STANDARD
+    bestehend.system_prompt_snapshot = None
+    bestehend.assistant_id = None
+    bestehend.preview_context = None
+    bestehend.is_test = False
+    bestehend.vorgeschlagen = []
+    bestehend.stunde_node_id = None
+    db = _db()
+    erste = MagicMock()
+    erste.scalar_one_or_none = MagicMock(return_value=bestehend)
+    allgemein = db.execute.side_effect
+    aufrufe = [0]
+
+    def _ergebnis(*a, **k):
+        aufrufe[0] += 1
+        return erste if aufrufe[0] == 1 else allgemein(*a, **k)
+
+    db.execute = AsyncMock(side_effect=_ergebnis)
+    with _umgebung() as (client, aufruf, _p), \
+         patch("app.chat.router._vorige_weitergeleitet", new=AsyncMock(return_value=True)) as vorige:
+        antwort = await chat(ChatRequest(conversation_id=konv, messages=[
+            {"role": "user", "content": "Löse 3x = 9"},
+            {"role": "assistant", "content": "Wodurch teilst du?"},
+            {"role": "user", "content": "durch 3?"},
+        ]), current_user=_person(), db=db)
+        async for _ in antwort.body_iterator:
+            pass
+    assert vorige.await_count == 1
+    assert vorige.await_args.args[1] == konv
+    assert "Die vorige Nachricht war eine Aufgabe." in aufruf.await_args.args[0]
+    assert client.last_json["model"] == ZIEL
+
+
+@pytest.mark.asyncio
+async def test_neue_konversation_fragt_nicht_nach_der_vorigen():
+    with _umgebung() as (_, aufruf, _p), \
+         patch("app.chat.router._vorige_weitergeleitet", new=AsyncMock(return_value=True)) as vorige:
+        await _laufen(ChatRequest(messages=[{"role": "user", "content": "Löse 3x = 9"}]))
+    assert vorige.await_count == 0
+    assert "vorige" not in aufruf.await_args.args[0]
