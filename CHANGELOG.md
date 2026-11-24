@@ -5,11 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.57.0] – 2026-11-24
+
 ### Neu
 
 - Aufgaben-Weiterleitung im freien Schüler-Chat: Arbeitet eine Schüler:in an einer Aufgabe, antwortet ein stärkeres
   Modell, das die Lösung nicht vorwegnimmt; Wissensfragen bleiben beim Standardmodell. Ab Werk aus
   (`AUFGABE_MODEL`, `AUFGABE_ZIEL_MODEL`, `AUFGABE_ZEITGRENZE_S`).
+- Hilfe für Lehrkräfte: was der freie Chat bei Schüler:innen leistet und wo seine Grenzen liegen.
 
 ### Geändert
 

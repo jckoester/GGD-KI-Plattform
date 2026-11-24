@@ -54,6 +54,36 @@ gewollt und hilft beim eigenen Verstehen. **Lehrkräfte** erhalten dagegen volls
 direkte Antworten (z. B. für die Unterrichtsvorbereitung). Manche Assistenten sind für
 beide Gruppen sichtbar und verhalten sich dann je nach angemeldeter Person unterschiedlich.
 
+### Was du vom freien Chat bei Schüler:innen erwarten kannst
+
+Auch ohne Assistenten, im freien Chat, soll die KI Schüler:innen bei einer Aufgabe begleiten
+und die Lösung nicht vorwegnehmen. Hat deine Schule die **Aufgaben-Weiterleitung** eingeschaltet,
+prüft die Plattform vor jeder Antwort, ob gerade an einer Aufgabe gearbeitet wird. Dann antwortet
+ein stärkeres Modell, das beim Begleiten bleibt; Wissensfragen, Alltägliches und Organisatorisches
+beantwortet weiter das schnellere Standardmodell.
+
+Gemessen an einem Prüfsatz aus 20 typischen Gesprächen (Rechnen, Gleichungen, Satzglieder,
+Übersetzen, Nachhaken, Wissensfragen), je dreimal:
+
+- **Nachhaken:** Bittet eine Schüler:in nach der ersten Hilfe einfach um die Lösung („sag mir
+  einfach, was rauskommt“), gibt es in **unter 10 %** der Fälle die vollständige Lösung. Ohne
+  Weiterleitung waren es rund 70 %.
+- **Zwischenfragen** wie „also 2x = 8?“ oder „ist das der Akkusativ?“ gehören zur Aufgabe und
+  werden begleitet, nicht ausgerechnet.
+- **Wissensfragen** („Was ist ein Mol?“, „Wie lautet die Reaktionsgleichung der
+  Thermitreaktion?“) werden beantwortet — auch mitten in einem Gespräch über eine Aufgabe.
+- **Schwachstelle Übersetzen:** Hat eine Schüler:in einen Teil eines lateinischen Satzes schon
+  selbst übersetzt und bittet um den Rest, liefert die KI ihn oft vollständig. Daran wird noch
+  gearbeitet.
+- **Grenzfälle:** Wer eine Aufgabe als Wissensfrage stellt („Wie geht die Reaktionsgleichung zu
+  Aluminiumoxid?“), bekommt eher die Antwort. Am Wortlaut allein lässt sich nicht erkennen, ob
+  das gerade eine Hausaufgabe ist.
+- **Wartezeit:** Bei Aufgaben dauert es einige Sekunden länger bis zur ersten Zeile, weil das
+  stärkere Modell erst nachdenkt.
+
+Eine Garantie ist das nicht: Wer es darauf anlegt, bekommt eine Lösung auch anders. Wie bei den
+Assistenten hilft es, mit der Klasse offen zu besprechen, wofür der Chat gedacht ist.
+
 ## Assistenten für Schüler:innen
 
 Die Plattform bringt **zwölf allgemeine Assistenten** mit, je einen für eine Tätigkeit. Sie

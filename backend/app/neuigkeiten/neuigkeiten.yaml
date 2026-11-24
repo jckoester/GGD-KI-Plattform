@@ -574,3 +574,15 @@
     YAML-Datei importieren, etwa aus dem Export einer anderen Plattform. Eine Vorschau zeigt vorher
     Gliederung und Unstimmigkeiten; es entsteht immer ein Entwurf.
   link: /help/curriculum#aus-einer-yaml-datei-importieren
+
+- id: "0.57-aufgaben-weiterleitung"
+  version: "0.57.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-24
+  rollen: [teacher]
+  titel: "Freier Chat: weniger fertige Lösungen für Schüler:innen"
+  text: >-
+    Arbeiten Schüler:innen im freien Chat an einer Aufgabe, antwortet jetzt ein stärkeres Modell,
+    das beim Begleiten bleibt — auch wenn sie mehrmals nach der Lösung fragen. Wissensfragen
+    werden weiter beantwortet. Was du davon erwarten kannst, steht in der Hilfe.
+  link: /help/assistenten#was-du-vom-freien-chat-bei-schülerinnen-erwarten-kannst
