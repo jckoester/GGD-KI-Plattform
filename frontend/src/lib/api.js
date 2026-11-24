@@ -412,12 +412,14 @@ export async function* streamChat(
   // X-Conversation-Id Header auslesen
   const conversationIdFromHeader = res.headers.get("X-Conversation-Id");
   const modelFromHeader = res.headers.get("X-Model-Id") || null;
+  // Aufgaben-Weiterleitung (7a): das gewählte Modell, wenn ein anderes antwortet.
+  const gewaehltFromHeader = res.headers.get("X-Model-Gewaehlt") || null;
   const assistantIdHeader = res.headers.get("X-Assistant-Id");
   const assistantIdFromHeader = assistantIdHeader ? parseInt(assistantIdHeader) : null;
 
   // Erstes Event: start mit conversationId, model und assistantId
   if (conversationIdFromHeader) {
-    yield { type: "start", conversationId: conversationIdFromHeader, model: modelFromHeader, assistantId: assistantIdFromHeader };
+    yield { type: "start", conversationId: conversationIdFromHeader, model: modelFromHeader, gewaehlt: gewaehltFromHeader, assistantId: assistantIdFromHeader };
   }
 
   const reader = res.body.getReader();

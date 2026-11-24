@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Aufgaben-Weiterleitung im freien Schüler-Chat: Arbeitet eine Schüler:in an einer Aufgabe, antwortet ein stärkeres
+  Modell, das die Lösung nicht vorwegnimmt; Wissensfragen bleiben beim Standardmodell. Ab Werk aus
+  (`AUFGABE_MODEL`, `AUFGABE_ZIEL_MODEL`, `AUFGABE_ZEITGRENZE_S`).
+
+### Geändert
+
+- Der Trenner „Modell: …“ im Chat erscheint nur noch bei einem selbst gewählten Modellwechsel.
+- `chat-schnell` gehört nicht mehr zu den Standardmodellen für Schüler:innen (`SCHUELER_STANDARDMODELLE`).
+
+### Nach dem Update
+
+- Migration 0113 (`alembic upgrade head`).
+- Zum Einschalten `AUFGABE_MODEL=system-vorschlag` und `AUFGABE_ZIEL_MODEL=chat-komplex` setzen; die Budgets der
+  Schüler:innen auf die teureren Antworten prüfen.
+- In `/settings/models` die Freigabe von `chat-schnell` für Schüler-Jahrgänge entfernen (vorher prüfen, ob ein
+  Assistent für Schüler:innen es als Modell trägt).
+
 ## [0.56.0] – 2026-11-23
 
 ### Neu

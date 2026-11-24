@@ -42,7 +42,7 @@ from app.chat.image_models import (
     get_bildart,
     standard_unter,
 )
-from app.chat import kosten_nachtrag
+from app.chat import aufgabe, kosten_nachtrag
 from app.core.hintergrund import im_hintergrund
 from app.crisis.benachrichtigung import benachrichtige
 from app.crisis.config import help_topic_fuer_kategorie
@@ -427,6 +427,23 @@ def _letzte_antwort(messages: list[ChatMessage]) -> Optional[str]:
     return None
 
 
+def _weiterleitung_moeglich(user: JwtPayload, ist_test: bool, assistent, model_used: str) -> bool:
+    """Aufgaben-Weiterleitung (7a): nur Schüler:innen (die Vorschau zählt mit, F3), kein Testchat,
+    kein Assistent (der hat sein Modell), und nur vom Standardmodell aus — eine eigene Wahl im
+    Modellwähler bleibt unberührt (F4). Eine Freigabe des Zielmodells braucht es nicht (F1 b)."""
+    return bool(
+        aufgabe.eingeschaltet()
+        and "student" in (user.roles or []) and not _ist_lehrkraft(user) and not ist_test
+        and assistent is None and model_used == settings.chat_default_model
+    )
+
+
+def _erste_nachricht(messages: list[ChatMessage]) -> Optional[str]:
+    """Die erste Nutzernachricht der Konversation — nur, wenn die neue nicht selbst die erste ist."""
+    nutzer = [m for m in messages if m.role == "user"]
+    return _user_text(nutzer[0]) if len(nutzer) > 1 else None
+
+
 #: Obergrenze für den Klassifikator-Aufruf selbst; maßgeblich ist VORSCHLAG_NACHLAUF.
 _VORSCHLAG_HTTP_TIMEOUT = 30.0
 
@@ -444,6 +461,7 @@ def _vorab_debug_ereignis(
     druck: Optional[dict] = None,
     lehrkraft: Optional[dict] = None,
     curriculum: Optional[list[dict]] = None,
+    aufgabe: Optional[dict] = None,
 ) -> str | None:
     """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
     der Produktion**.
@@ -492,6 +510,8 @@ def _vorab_debug_ereignis(
         # 0.46: Aufrufe der Curriculum-Funktionen mit Argumenten und Ergebnis — der Strom trägt
         # sonst nur Namen; die Messung prüft daran Prüflauf vor Schreiben und Abgewiesenes.
         "curriculum": list(curriculum or []),
+        # Aufgaben-Weiterleitung (7a): Urteil, Grund, Dauer und der Satz des Klassifikators.
+        "aufgabe": aufgabe,
     }
     return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False, default=str)}\n\n"
 
@@ -1626,6 +1646,7 @@ async def _persist(
     ruheregel_leeren: bool = False,
     abgebrochen: bool = False,
     werkzeuge_mit_wirkung: Optional[list[str]] = None,
+    weitergeleitet_von: Optional[str] = None,
 ) -> Optional[UUID]:
     """Schreibt Nachrichten + Konversations-Update. Gibt die ID der Assistant-Nachricht
     zurück — das Frontend braucht sie, um später die Herkunft eines daraus gespeicherten
@@ -1660,6 +1681,7 @@ async def _persist(
         # Das tatsächlich befragte Anbietermodell — beim Schreiben aufgelöst, damit ein
         # späteres Umhängen des Alias alte Antworten nicht rückwirkend verfälscht.
         provider_model=provider_model,
+        weitergeleitet_von=weitergeleitet_von,
         assistant_id=assistant_id,    # 2-3
         tokens_input=tokens_input,
         tokens_output=tokens_output,
@@ -2257,6 +2279,20 @@ async def chat(
             await client.aclose()
             raise HTTPException(status_code=409, detail="Es gibt keine Nachricht, die sich ersetzen ließe.")
 
+    # Aufgaben-Weiterleitung (Plan „Freier Schüler-Chat“, 7a): Der Klassifikator läuft ab hier
+    # neben Krisen-Erkennung, Vorab-Suche und Systemtext; gewartet wird erst vor dem Chat-Aufruf.
+    _aufgabe_task: Optional[asyncio.Task] = None
+    _aufgabe_urteil: Optional[aufgabe.Urteil] = None
+    weitergeleitet_von: Optional[str] = None
+    if _weiterleitung_moeglich(current_user, conversation_is_test, active_assistant, model_used):
+        if user_message.strip():
+            _aufgabe_task = asyncio.create_task(aufgabe.urteilen(
+                user_message, _erste_nachricht(request.messages), _letzte_antwort(request.messages),
+            ))
+        else:
+            # Nur ein Bild, kein Text: meist ein Foto der Aufgabe — ohne Klassifikator zum Ziel.
+            _aufgabe_urteil = aufgabe.Urteil(True, "ohne_text", 0.0)
+
     # Krisen-Erkennung (ADR-008 Teil 3): lokal, parallel zum LLM-Call, OHNE Blockieren.
     # Test-Chats (Assistenten-Entwicklung) und Vorschau-Chats (0.29) werden nicht geflaggt.
     crisis_record: Optional[_CrisisRecord] = None
@@ -2458,6 +2494,14 @@ async def chat(
         {"role": msg.role, "content": _serialize_content(msg.content)}
         for msg in request.messages
     )
+    if _aufgabe_task is not None:
+        _aufgabe_urteil = await _aufgabe_task      # wirft nie; die Zeitgrenze steckt im Task
+    if _aufgabe_urteil is not None:
+        # Nur Ergebnis, Grund und Dauer ins Log — nie die Nachricht oder den `bezug`.
+        logger.info("Aufgaben-Weiterleitung: large=%s grund=%s dauer=%.2fs conv=%s",
+                    _aufgabe_urteil.large, _aufgabe_urteil.grund, _aufgabe_urteil.dauer, conversation_id)
+        if _aufgabe_urteil.large:
+            weitergeleitet_von, model_used = model_used, aufgabe.ziel_modell()
     litellm_payload["model"] = model_used
     litellm_payload["messages"] = llm_messages
 
@@ -2992,7 +3036,7 @@ async def chat(
                 generated_image_ids=list(_generated_image_ids),
                 bausteine=vereinige(kontext.bausteine, _werkzeug_bausteine),
                 ersetze_ids=ersetze_ids, werkzeuge_mit_wirkung=list(_wirkende_werkzeuge),
-                ruheregel_leeren=ruheregel_leeren,
+                ruheregel_leeren=ruheregel_leeren, weitergeleitet_von=weitergeleitet_von,
                 offen=[response, *_extra_responses], client=client,
             )
             raise
@@ -3055,6 +3099,7 @@ async def chat(
                 ersetze_ids=ersetze_ids,
                 ruheregel_leeren=ruheregel_leeren,
                 werkzeuge_mit_wirkung=_wirkende_werkzeuge,
+                weitergeleitet_von=weitergeleitet_von,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
@@ -3160,6 +3205,7 @@ async def chat(
             druck.debug() if druck is not None else None,
             lehrkraft.debug() if lehrkraft is not None else None,
             _curriculum_aufrufe,
+            _aufgabe_urteil.fuer_debug() if _aufgabe_urteil is not None else None,
         )
         if _debug:
             yield _debug
@@ -3172,6 +3218,9 @@ async def chat(
         headers={
             "X-Conversation-Id": str(conversation_id),
             "X-Model-Id": model_used or "",
+            # Aufgaben-Weiterleitung (7a): das gewählte Modell, wenn ein anderes antwortet —
+            # die Oberfläche setzt dann keinen Trenner.
+            "X-Model-Gewaehlt": weitergeleitet_von or model_used or "",
             "X-Assistant-Id": str(active_assistant_id) if active_assistant_id else "",
         },
     )
@@ -3812,6 +3861,8 @@ async def get_conversation_messages(
                 "crisis": crisis_map.get(msg.id),
                 "attachments": [],
                 "model": msg.model,
+                # Aufgaben-Weiterleitung (7a): gewähltes Modell, wenn ein anderes antwortete.
+                "weitergeleitet_von": msg.weitergeleitet_von,
                 "provider_model": msg.provider_model,
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,

@@ -127,6 +127,8 @@ PLANUNG_MODEL=chat-komplex   # seit 0.49: Planungsassistenten ohne eigenes Model
 TITLE_MODEL=system-titel
 BEGRIFFE_MODEL=system-begriffe
 VORSCHLAG_MODEL=system-vorschlag
+AUFGABE_MODEL=system-vorschlag      # Aufgaben-Weiterleitung im freien Schüler-Chat
+AUFGABE_ZIEL_MODEL=chat-komplex
 EMBEDDING_MODEL=embedding-standard
 EMBEDDING_DIMENSIONS=1536   # muss zur Vektorbreite des gewählten Modells passen
 ```

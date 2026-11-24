@@ -28,6 +28,7 @@
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import NachrichtenChips from "$lib/components/NachrichtenChips.svelte";
     import { blasenSchluessel, mitSchluessel } from "$lib/chat_schluessel.js";
+    import { gewaehltesModell, modellGewechselt, weitergeleitetAus } from "$lib/chat_trenner.js";
     import { CHIP_ICON, chipKlasse, fachAkzentStil } from "$lib/chip_form.js";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
@@ -410,15 +411,14 @@
         let prevAssistant = null;
         for (const msg of rawMessages) {
             if (msg.role === "assistant" && prevAssistant) {
-                const modelChanged =
-                    msg.model && msg.model !== prevAssistant.model;
+                const modelChanged = modellGewechselt(prevAssistant, msg);
                 const assistantChanged =
                     msg.assistantId != null &&
                     msg.assistantId !== prevAssistant.assistantId;
                 if (modelChanged || assistantChanged) {
                     result.push({
                         role: "change",
-                        model: msg.model,
+                        model: gewaehltesModell(msg),
                         assistantId: msg.assistantId,
                         assistantName: msg.assistantName ?? null,
                     });
@@ -862,8 +862,11 @@
                         const prev = lastAssistantMessage(
                             messages.slice(0, assistantIndex),
                         );
-                        const modelChanged =
-                            prev && item.model && item.model !== prev.model;
+                        const weitergeleitetVon = weitergeleitetAus(item.model, item.gewaehlt);
+                        const modelChanged = modellGewechselt(prev, {
+                            model: item.model,
+                            weitergeleitetVon,
+                        });
                         const assistantChanged =
                             prev &&
                             item.assistantId != null &&
@@ -871,7 +874,7 @@
                         if (modelChanged || assistantChanged) {
                             const separator = mitSchluessel({
                                 role: "change",
-                                model: item.model,
+                                model: item.gewaehlt || item.model,
                                 assistantId: item.assistantId,
                                 assistantName:
                                     selectedAssistant?.name ??
@@ -891,6 +894,7 @@
                     messages[assistantIndex] = {
                         ...messages[assistantIndex],
                         model: item.model,
+                        weitergeleitetVon: weitergeleitetAus(item.model, item.gewaehlt),
                         assistantId: item.assistantId,
                     };
                     messages = messages;
@@ -1402,6 +1406,7 @@
                           }))
                         : undefined,
                     model: m.model ?? null,
+                    weitergeleitetVon: m.weitergeleitet_von ?? null,
                     assistantId: m.assistant_id ?? null,
                     assistantName: m.assistant_name ?? null,
                     images: m.images?.length ? m.images : undefined,

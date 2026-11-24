@@ -692,6 +692,10 @@ class Message(Base):
     # Nullable: bei nicht erreichbarem Proxy unbekannt, und für Bestandszeilen nicht
     # rekonstruierbar.
     provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Aufgaben-Weiterleitung (Plan „Freier Schüler-Chat“, 7a, Migration 0113): das Modell, das
+    # ohne Weiterleitung geantwortet hätte. Leer = nicht weitergeleitet. Die Oberfläche zeigt
+    # für einen solchen Wechsel keinen Trenner; ein selbst gewählter zeigt weiter einen.
+    weitergeleitet_von: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
     )

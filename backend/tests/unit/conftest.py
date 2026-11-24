@@ -41,6 +41,17 @@ def _ohne_begriffsvorschlag(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _ohne_aufgaben_weiterleitung(monkeypatch):
+    """Unit-Tests laufen ohne `AUFGABE_MODEL` (Plan „Freier Schüler-Chat“, 7a) — steht es in der
+    lokalen `.env`, riefe jeder Schüler-Chat im Test den Klassifikator über das Systemkonto auf.
+    Tests, die die Weiterleitung brauchen, setzen die Modelle selbst und ersetzen `_aufruf`."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "aufgabe_model", "")
+    monkeypatch.setattr(settings, "aufgabe_ziel_model", "")
+
+
+@pytest.fixture(autouse=True)
 def _modellfreigaben_unbekannt(monkeypatch):
     """Tests laufen so, als wären die Modell-Freigaben je Team nicht zu erfahren (0.27).
 

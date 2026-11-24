@@ -159,6 +159,17 @@ class Settings(BaseSettings):
     # Leistung der Plattform, keine Anfrage der Schüler:in. Gemessen (28.10.2026): ein schnelles
     # Modell ohne Denkphase (Mistral-Small-24B); Denkmodelle brauchten 4–60 s.
     vorschlag_model: str = ""
+    # Aufgaben-Weiterleitung im freien Schüler-Chat (Plan „Freier Schüler-Chat
+    # Lösungsvorgriff“, 7a): Erkennt `aufgabe_model` je Zug, dass an einer Aufgabe gearbeitet
+    # wird, antwortet `aufgabe_ziel_model` statt CHAT_DEFAULT_MODEL. Beide leer = aus. Der
+    # Klassifikator läuft über das Systemkonto (wie C2), die Antwort über den Schlüssel der
+    # Schüler:in — das Zielmodell geht auf ihr Budget. Es braucht **keine** Freigabe für den
+    # Jahrgang (Jan, F1 b): Die Freigabe regelt nur die eigene Wahl im Modellwähler.
+    # Gemessen (24.11.2026): `system-vorschlag` 98 % der Aufgaben-Züge, Median 0,98 s.
+    aufgabe_model: str = ""
+    aufgabe_ziel_model: str = ""
+    # Ist der Klassifikator dann nicht fertig, antwortet das Zielmodell (die sichere Seite).
+    aufgabe_zeitgrenze_s: float = 2.0
     # Präfixe, deren Modelle NICHT im Chat-Modellwähler erscheinen: interne Modelle
     # (Titelgenerierung, Moderations-Klassifikator) und andere Modalitäten. Rein kosmetisch —
     # die Team-Allowlist bleibt unberührt, `system-titel` muss dort sogar stehen bleiben
@@ -172,7 +183,10 @@ class Settings(BaseSettings):
     # AV F1). `/settings/models` weist darauf hin, wenn ein Jahrgang ein anderes bekommt —
     # gesperrt wird nichts, die Freigabe entscheidet die Schule. Aufgabennamen, keine
     # Produktnamen (ADR-015 §6); wer seine Aliasse anders nennt, passt die Liste an.
-    schueler_standardmodelle: list[str] = ["chat-schnell", "chat-standard", "chat-komplex"]
+    # Ohne `chat-schnell` (Plan „Freier Schüler-Chat“, 7a, Jan 24.11.2026): `chat-standard` ist
+    # für Schüler:innen der Mindeststandard; ein schwächeres Modell umginge die Aufgaben-
+    # Weiterleitung, die nur vom Standardmodell aus greift.
+    schueler_standardmodelle: list[str] = ["chat-standard", "chat-komplex"]
     exchange_rate_fallback: float = 1.10
     # In welcher Währung die Preise in der LiteLLM-Config stehen (`input_cost_per_token`
     # & Co.) — NICHT, worin der Anbieter Rechnungen stellt.

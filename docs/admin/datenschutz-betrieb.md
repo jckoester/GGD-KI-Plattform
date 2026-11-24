@@ -47,6 +47,12 @@ angebotenen Assistenten), gelöscht mit der Konversation. Für das Verarbeitungs
 Empfängerkreis wie beim Chat, zusätzlich der Anbieter des Klassifikator-Modells, falls er ein
 anderer ist.
 
+**Aufgaben-Weiterleitung:** Für den Klassifikator (`AUFGABE_MODEL`) gehen die neue
+Schülernachricht, die erste Nachricht der Konversation und der Anfang der letzten Antwort an einen
+Anbieter — wie beim Vorschlag über den Systemschlüssel, also ohne Pseudonym. Gespeichert wird nur
+an der Antwort, welches Modell sonst geantwortet hätte (`messages.weitergeleitet_von`), gelöscht
+mit der Konversation. Die Nachricht und das Urteil stehen in keinem Log.
+
 ## PII-Eingabewarnung (Datensparsamkeit)
 
 Zusätzlich zur Pseudonymisierung warnt die Plattform Nutzer:innen, **bevor** sie

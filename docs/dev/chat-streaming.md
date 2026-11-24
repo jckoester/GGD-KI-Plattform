@@ -108,6 +108,42 @@ Wächtertest gegen das Backend.
 Tests: `tests/integration/test_chat_modellwahl.py`, `tests/unit/test_modellwahl.py`,
 `frontend/src/lib/modellwahl_chat.test.js`.
 
+## Aufgaben-Weiterleitung (`app/chat/aufgabe.py`)
+
+Im freien Schüler-Chat entscheidet je Zug ein Klassifikator, ob an einer Aufgabe gearbeitet wird;
+dann antwortet `AUFGABE_ZIEL_MODEL` statt `CHAT_DEFAULT_MODEL` (Plan „Freier Schüler-Chat
+Lösungsvorgriff“, 7a; Begründung und Messungen dort).
+
+- **Bedingung** (`_weiterleitung_moeglich`): `aufgabe.eingeschaltet()`, Rolle Schüler:in ohne
+  Lehrkraft (die Vorschau zählt mit), kein Testchat, kein Assistent, und das bis dahin bestimmte
+  Modell ist `CHAT_DEFAULT_MODEL`. Eine Freigabe des Zielmodells wird nicht geprüft.
+- **Zeitlicher Ablauf:** Der Task startet nach der Modellfreigabe-Prüfung, vor der
+  Krisen-Erkennung, und läuft neben Vorab-Suche und Systemtext. Gewartet wird erst unmittelbar
+  vor `litellm_payload["model"]`. Die Zeitgrenze steckt im Task (`asyncio.wait_for` in
+  `urteilen`); `urteilen` wirft nie.
+- **Eingabe** (zustandslos): neue Nachricht, erste Nutzernachricht (ab dem zweiten Zug), letzte
+  Antwort gekürzt auf 600 Zeichen — alles aus `request.messages`. Nachricht ohne Text (nur Bild):
+  ohne Aufruf zum Ziel.
+- **Sichere Seite:** Zeitgrenze, Fehler und unlesbare Antwort gehen an das Zielmodell.
+- **Gespeichert:** `Message.model` ist das antwortende Modell, `Message.weitergeleitet_von` das
+  Ausgangsmodell (Migration 0113); `Conversation.model_used` bleibt unverändert — sonst stünde der
+  Wähler nach dem Neuladen auf dem Zielmodell und hielte die Konversation dort.
+- **Kopfzeilen:** `X-Model-Id` (antwortend) und `X-Model-Gewaehlt` (gewählt). Die Oberfläche
+  vergleicht für den Trenner „Modell: …“ das gewählte Modell (`frontend/src/lib/chat_trenner.js`):
+  Ein Wechsel durch die Weiterleitung zeigt keinen, ein selbst gewählter schon.
+- **Beobachtung:** eine Log-Zeile je Zug mit `large`, `grund` und Dauer (nie die Nachricht);
+  `vorab_debug.aufgabe` außerhalb der Produktion mit dem `bezug` des Klassifikators.
+- **Messen:** `backend/scripts/aufgabe_klassifikator_messung.py` (offline, Prüfsatz
+  `szenarien/aufgabe_klassifikator.yaml`) benutzt Systemtext und Lesefunktionen aus
+  `app/chat/aufgabe.py` — eine Änderung am Text gehört vorher dort gemessen.
+
+⚠️ In Unit-Tests ist die Weiterleitung über `tests/unit/conftest.py` ausgeschaltet. Die Bedingung
+liest die Einstellungen in `app.chat.aufgabe`, nicht im Router: Viele Tests ersetzen
+`app.chat.router.settings` durch ein `MagicMock`, dessen Attribute wahr sind.
+
+Tests: `tests/unit/test_chat_aufgabe.py`, `tests/unit/test_chat_aufgabe_weiterleitung.py`,
+`frontend/src/lib/chat_trenner.test.js`.
+
 ## SSE-Eventformat
 
 Alle Events folgen dem Standard-SSE-Format (`event: <typ>\ndata: <json>\n\n`). Die

@@ -136,6 +136,7 @@ def test_messkanal_ausserhalb_der_produktion():
         "druck": None,
         "lehrkraft": None,
         "curriculum": [],
+        "aufgabe": None,
     }
 
 

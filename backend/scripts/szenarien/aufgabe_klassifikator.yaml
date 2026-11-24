@@ -1,0 +1,191 @@
+# Prüfsatz für den Aufgaben-Klassifikator (Plan „Freier Schüler-Chat“, Schritt 7a, 24.11.2026).
+#
+# Frage je Schüler-Zug: Wird an einer Aufgabe gearbeitet (→ Large) oder nicht (→ Small)?
+#
+# Etiketten:
+#   aufgabe       → Large. Übersehen heißt Lösungsvorgriff (der teure Fehler).
+#   wissensfrage  → Small. Fehlurteil kostet nur Geld.
+#   sonst         → Small (Alltag, Stimmung, Organisatorisches).
+#   beobachtet    → zählt nicht mit (Rollenspiele, P4 Z3, Nebenfragen zur laufenden Aufgabe).
+#
+# Entschieden (Jan, 24.11.2026): G5 Wissensfrage, G4 Aufgabe, R1–R4 und P4 Z3 nur beobachtet.
+
+# ── Züge aus den Verläufen, mit der echten Antwort davor ──────────────────────
+# Lauf 8 w1 mit Small und Large; für Large fehlen dort N4, N5, Ü3 (Klasse 7), die kommen aus 8b.
+transkripte:
+  dateien:
+    - verlauf-8-frei-standard-w1.json
+    - verlauf-8-frei-komplex-w1.json
+    - verlauf-8b-frei-komplex-kl7-w1.json
+  # Etikett je Fall (Präfix der Kennung bis zum ersten „-“); fehlt der Fall hier, zählt er nicht.
+  etiketten:
+    B1: aufgabe
+    B2: aufgabe
+    B3: aufgabe
+    B4: aufgabe
+    B5: aufgabe
+    B6: aufgabe
+    B7: aufgabe
+    B8: aufgabe
+    B9: aufgabe
+    B10: aufgabe
+    G1: aufgabe
+    G2: wissensfrage
+    G3: aufgabe
+    G4: aufgabe
+    G5: wissensfrage
+    R1: beobachtet
+    R2: beobachtet
+    R3: beobachtet
+    R4: beobachtet
+    P1: aufgabe
+    P1b: aufgabe
+    P2: aufgabe
+    P3: wissensfrage
+    P4: aufgabe
+    N1: aufgabe
+    N2: aufgabe
+    N3: aufgabe
+    N4: aufgabe
+    N5: aufgabe
+    Ü1: aufgabe
+    Ü1b: aufgabe
+    Ü2: aufgabe
+    Ü3: aufgabe
+    Ü4: wissensfrage
+  # Abweichend für einzelne Züge: „<Fall>/<Zug>“.
+  einzeln:
+    P4/3: beobachtet
+    # „Wie geht die Reaktionsgleichung zu Aluminiumoxid“ ist als Wissensfrage gestellt (wie P3);
+    # nach der „Grenze“ im Plan bekommt sie die Antwort (Jan, 24.11.2026, nach Lauf 1).
+    P1/1: wissensfrage
+    P1b/1: wissensfrage
+    P4/1: wissensfrage
+
+# ── Neue Fälle ────────────────────────────────────────────────────────────────
+# `erste` und `letzte_antwort` stehen für einen laufenden Verlauf; `erste` wird dann als eigener
+# erster Zug mitgemessen (Art „vorlauf“), mit Etikett `aufgabe` oder `erste_etikett`.
+faelle:
+
+  # Wissensfragen ohne Vorlauf
+  - {id: W01, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist ein Mol?"}
+  - {id: W02, art: wissensfrage, etikett: wissensfrage, nachricht: "Wann war die Französische Revolution?"}
+  - {id: W03, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist der Unterschied zwischen Wetter und Klima?"}
+  - {id: W04, art: wissensfrage, etikett: wissensfrage, nachricht: "Was bedeutet Photosynthese?"}
+  - {id: W05, art: wissensfrage, etikett: wissensfrage, nachricht: "wie funktioniert eigentlich ein elektromotor"}
+  - {id: W06, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist ein Adverb?"}
+  - {id: W07, art: wissensfrage, etikett: wissensfrage, nachricht: "Wer war Martin Luther King?"}
+  - {id: W08, art: wissensfrage, etikett: wissensfrage, nachricht: "Was heißt nevertheless auf deutsch?"}
+  - {id: W09, art: wissensfrage, etikett: wissensfrage, nachricht: "Was sagt der Satz des Pythagoras?"}
+  - {id: W10, art: wissensfrage, etikett: wissensfrage, nachricht: "Warum ist der Himmel blau?"}
+  - {id: W11, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist eine Primzahl?"}
+  - {id: W12, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist der Unterschied zwischen Ionenbindung und Atombindung?"}
+  - {id: W13, art: wissensfrage, etikett: wissensfrage, nachricht: "Was bedeutet Gewaltenteilung?"}
+  - {id: W14, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist ein Ablativus absolutus?"}
+  - {id: W15, art: wissensfrage, etikett: wissensfrage, nachricht: "welche formel hat kochsalz"}
+  - {id: W16, art: wissensfrage, etikett: wissensfrage, nachricht: "Was versteht man unter Inflation?"}
+  - {id: W17, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist ein Sonett?"}
+  - {id: W18, art: wissensfrage, etikett: wissensfrage, nachricht: "Wieso gibt es Jahreszeiten?"}
+  - {id: W19, art: wissensfrage, etikett: wissensfrage, nachricht: "Was ist DNA?"}
+  - {id: W20, art: wissensfrage, etikett: wissensfrage, nachricht: "Wann nimmt man present perfect und wann simple past?"}
+
+  # Aufgaben ohne Operator, eingefügt oder als Frage verkleidet
+  - {id: A01, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Gallia est omnis divisa in partes tres, quarum unam incolunt Belgae."}
+  - {id: A02, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Ich muss den Satz hier übersetzen: Marcus amicum in foro videt."}
+  - {id: A03, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "2x + 5 = 17"}
+  - {id: A04, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Aufgabe 4b) Ein Rechteck hat den Flächeninhalt 48 cm² und ist 6 cm breit. Wie lang ist es?"}
+  - {id: A05, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "s = 120 m, t = 8 s, v = ?"}
+  - {id: A06, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "She don't like apples. richtig oder falsch?"}
+  - {id: A07, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Mg + O2 -> MgO ausgleichen"}
+  - {id: A08, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Wir haben eine Erörterung auf: Sollten Handys an Schulen verboten werden? Hilfst du mir?"}
+  - {id: A09, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Arbeitsblatt Nr. 3: Ordne zu – Produzent, Konsument, Destruent: Eiche, Fuchs, Pilz"}
+  - {id: A10, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Je suis allé au cinéma hier soir avec mes amis."}
+  - {id: A11, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Interpretation Der Panther bis morgen, keine Ahnung wie ich anfangen soll"}
+  - {id: A12, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Wie viel Prozent sind 15 von 60?"}
+  - {id: A13, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Nr. 7 auf S. 112: Wurzel aus 144 mal 3"}
+  - {id: A14, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Was ist die Ableitung von f(x) = 3x² + 2x?"}
+  - {id: A15, art: aufgabe_verdeckt, etikett: aufgabe, nachricht: "Was ist das Subjekt im Satz „Gestern kaufte meine Schwester ein neues Fahrrad“?"}
+
+  # Nach einer Aufgabe: Wechsel zu einem nahen, aber anderen Gegenstand
+  - id: C01
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Wie geht die Reaktionsgleichung zu Aluminiumoxid"
+    erste_etikett: wissensfrage   # wie P1/1
+    letzte_antwort: "Fang mit der Wortgleichung an: Welche beiden Ausgangsstoffe reagieren hier, und wie heißt das Produkt?"
+    nachricht: "Was ist eigentlich Thermit?"
+  - id: C02
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Eine Jacke kostet 80 €. Im Schlussverkauf wird sie um 25 % reduziert. Wie viel kostet sie jetzt?"
+    letzte_antwort: "Wie viel Euro sind 25 % von 80 €? Rechne das zuerst aus."
+    nachricht: "Was ist eigentlich Mehrwertsteuer?"
+  - id: C03
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Übersetze: Caesar, cum hostes appropinquare vidisset, milites in castra revocavit."
+    letzte_antwort: "Fang mit dem Hauptsatz an: Welches Verb steht da, und wer ist das Subjekt?"
+    nachricht: "Wer war Caesar eigentlich genau?"
+  - id: C04
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Hausaufgabe Physik: Ein Auto fährt 150 km in 2 Stunden. Berechne seine Durchschnittsgeschwindigkeit."
+    letzte_antwort: "Setz die Werte in v = s/t ein. Was kommt heraus?"
+    nachricht: "Wie schnell ist eigentlich Licht?"
+  - id: C05
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Hausaufgabe: Übersetze ins Deutsche: „Yesterday my brother and I went to the cinema.“"
+    letzte_antwort: "Wie würdest du „yesterday“ übersetzen?"
+    nachricht: "Was ist eigentlich der Unterschied zwischen simple past und past progressive?"
+  - id: C06
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Wir sollen die Reaktionsgleichung für die Reaktion von Natrium mit Chlor zu Natriumchlorid aufstellen."
+    letzte_antwort: "In welcher Form liegt Chlor als Element vor – als einzelnes Atom oder als Molekül?"
+    nachricht: "Warum ist Chlor eigentlich giftig?"
+  - id: C07
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Wie geht die Reaktionsgleichung zu Aluminiumoxid"
+    erste_etikett: wissensfrage   # wie P1/1
+    letzte_antwort: "Welche Formeln setzt du für Aluminium, Sauerstoff und Aluminiumoxid ein?"
+    nachricht: "ok anderes thema: wann hat der zweite weltkrieg angefangen"
+  - id: C08
+    art: wechsel_nah
+    etikett: wissensfrage
+    erste: "Ich muss die Gleichung 3(x + 2) = 5x - 4 lösen. Kannst du mir helfen?"
+    letzte_antwort: "Löse zuerst die Klammer auf: Was ergibt 3 · x und 3 · 2?"
+    nachricht: "Wer hat eigentlich die Gleichungen erfunden?"
+
+  # Nebenfrage zur laufenden Aufgabe (nur beobachtet; nach W2 gehört sie zur Aufgabe)
+  - id: D01
+    art: nebenfrage
+    etikett: beobachtet
+    erste: "Ich muss die Gleichung 3(x + 2) = 5x - 4 lösen. Kannst du mir helfen?"
+    letzte_antwort: "Löse zuerst die Klammer mit dem Distributivgesetz auf."
+    nachricht: "Was ist eigentlich das Distributivgesetz?"
+  - id: D02
+    art: nebenfrage
+    etikett: beobachtet
+    erste: "Wir sollen bestimmen, welche Wortart „schnell“ im Satz „Der Hund läuft schnell über die Wiese“ ist."
+    letzte_antwort: "Welche Frage beantwortet das Wort „schnell“?"
+    nachricht: "Was ist eigentlich der Unterschied zwischen Adjektiv und Adverb?"
+  - id: D03
+    art: nebenfrage
+    etikett: beobachtet
+    erste: "Eine Jacke kostet 80 €. Im Schlussverkauf wird sie um 25 % reduziert. Wie viel kostet sie jetzt?"
+    letzte_antwort: "Wie viel Euro sind 25 % von 80 €?"
+    nachricht: "Wie rechnet man allgemein Prozente aus?"
+
+  # Alltag, Stimmung, Organisatorisches
+  - {id: S01, art: alltag, etikett: sonst, nachricht: "keine lust auf hausaufgaben"}
+  - {id: S02, art: alltag, etikett: sonst, nachricht: "Wann sind die nächsten Ferien?"}
+  - {id: S03, art: alltag, etikett: sonst, nachricht: "hallo"}
+  - {id: S04, art: alltag, etikett: sonst, nachricht: "Erzähl mir einen Witz"}
+  - {id: S05, art: alltag, etikett: sonst, nachricht: "Ich schreibe morgen Mathe und bin voll nervös"}
+  - {id: S06, art: alltag, etikett: sonst, nachricht: "Wie viel darf ich dich eigentlich am Tag benutzen?"}
+  - {id: S07, art: alltag, etikett: sonst, nachricht: "danke!"}
+  - {id: S08, art: alltag, etikett: sonst, nachricht: "Was ist dein Lieblingsessen?"}
+  - {id: S09, art: alltag, etikett: sonst, nachricht: "Kannst du mir helfen?"}
+  - {id: S10, art: alltag, etikett: sonst, nachricht: "mir ist langweilig"}

@@ -12,7 +12,7 @@ Bewährt hat sich diese Staffel:
 
 | Name | Wofür | Freigabe |
 |---|---|---|
-| `chat-schnell` | Kurze Fragen, Vokabeln, Textvereinfachung. Günstig, antwortet sofort | alle |
+| `chat-schnell` | Kurze Fragen, Vokabeln, Textvereinfachung. Günstig, antwortet sofort | Lehrkräfte (für Schüler:innen nicht, s. [Aufgaben-Weiterleitung](#aufgaben-weiterleitung-im-freien-schüler-chat)) |
 | `chat-standard` | Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback | alle |
 | `chat-code` | Programmieraufgaben | alle |
 | `chat-komplex` | Analyse, lange Texte, Unterrichtsplanung; Modell der mitgelieferten Schüler-Assistenten (seit 0.26). Deutlich teurer | Lehrkräfte; für Schüler:innen, sobald die Schüler-Assistenten genutzt werden, s. u. |
@@ -79,12 +79,46 @@ später gezielt zu erweitern.
 
 ### Standardmodelle für Schüler:innen
 
-Die Prompts der mitgelieferten Assistenten sind an `chat-schnell`, `chat-standard` und
-`chat-komplex` gemessen. Bekommt ein Jahrgang in der Matrix ein anderes Chat-Modell, zeigt
+Die Prompts der mitgelieferten Assistenten sind an `chat-standard` und `chat-komplex`
+gemessen. Bekommt ein Jahrgang in der Matrix ein anderes Chat-Modell, zeigt
 `/settings/models` einen Hinweis: „Für Schüler:innen sind die Prompts der Assistenten an den
 Standardmodellen gemessen.“ Gesperrt wird nichts — die Entscheidung bleibt bei der Schule.
 Welche Modelle als Standard gelten, steht in `SCHUELER_STANDARDMODELLE` (siehe
 [Konfiguration](konfiguration.md)); wer die Staffel anders benennt, passt die Liste an.
+
+### Aufgaben-Weiterleitung im freien Schüler-Chat
+
+Im freien Chat (ohne Assistenten) gibt `chat-standard` beim Nachhaken („sag mir einfach die
+Lösung“) eine begleitete Aufgabe oft vollständig heraus; `chat-komplex` hält, kostet aber ein
+Vielfaches. Die Weiterleitung nimmt das stärkere Modell nur dort, wo es gebraucht wird: Vor jeder
+Antwort an eine Schüler:in entscheidet ein schnelles Modell (`AUFGABE_MODEL`, empfohlen
+`system-vorschlag`), ob an einer Aufgabe gearbeitet wird. Dann antwortet `AUFGABE_ZIEL_MODEL`
+(empfohlen `chat-komplex`), sonst bleibt es beim gewählten Modell. Wissensfragen, Alltag und
+Organisatorisches bleiben also beim günstigen Modell.
+
+- **Wann:** nur bei Schüler:innen (auch in der Vorschau), nur im Chat ohne Assistenten, nur wenn
+  das Modell `CHAT_DEFAULT_MODEL` ist. Wer im Modellwähler selbst ein anderes Modell wählt,
+  behält es.
+- **Freigabe:** Das Zielmodell braucht **keine** Freigabe für den Jahrgang. Die Freigabe in
+  `/settings/models` regelt weiter nur, was Schüler:innen selbst wählen können.
+- **Kosten:** Antworten des Zielmodells gehen auf das Budget der Schüler:in. Der Klassifikator
+  läuft über den Systemschlüssel. Die Budgets der Jahrgänge sollten die teureren Antworten bei
+  Aufgaben einplanen.
+- **Wartezeit:** Der Klassifikator läuft neben der Vorbereitung der Antwort; gemessen kommt im
+  Median knapp 1 s bis zum ersten Wort hinzu. Ist er nach `AUFGABE_ZEITGRENZE_S` (Vorgabe 2 s)
+  nicht fertig, antwortet das Zielmodell — ebenso bei einem Fehler. Im Zweifel also das teurere,
+  nicht das schwächere Modell.
+- **Anzeige:** Für einen Wechsel durch die Weiterleitung zeigt der Chat keinen Trenner
+  „Modell: …“. In Statistik und Rückmeldungen steht das Modell, das tatsächlich geantwortet hat.
+- **Ausschalten:** `AUFGABE_MODEL` oder `AUFGABE_ZIEL_MODEL` leer lassen (Vorgabe).
+
+⚠️ **Schüler:innen keine schwächeren Modelle neben `chat-standard` anbieten.** Die Weiterleitung
+greift nur vom Standardmodell aus. Wer zusätzlich ein günstigeres Modell freigibt — etwa
+`chat-schnell` —, bietet einen Weg an ihr vorbei: Mit dem schwächeren Modell gibt es die Lösung
+ohne Prüfung. `chat-standard` ist für Schüler:innen der Mindeststandard; zusätzlich freigeben
+sollte man nur stärkere Modelle. Bei einem Update von einer Fassung, die `chat-schnell` für alle
+empfahl: die Freigabe für die Schüler-Jahrgänge in `/settings/models` entfernen und vorher prüfen,
+ob ein Assistent für Schüler:innen `chat-schnell` als Modell trägt — er wäre danach gesperrt.
 
 ### Modellwahl im Assistenten-Chat (seit 0.51)
 

@@ -174,7 +174,10 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel. Leer = keine Titel. **Muss in JEDER Team-Allowlist stehen** — der Aufruf läuft über den Virtual Key der Nutzer:innen | `system-titel` |
 | `BEGRIFFE_MODEL` | Modell, das die Fachbegriffe eines Stundenentwurfs aus seinen Phasentexten vorschlägt. Leer = keine Vorschläge. **Muss in der Allowlist der Lehrkräfte stehen** — der Aufruf läuft über deren Virtual Key | `system-begriffe` |
 | `VORSCHLAG_MODEL` | Klassifikator, der Schüler:innen im Chat einen passenden Assistenten vorschlägt (0.24). Leer = kein Vorschlag. Ein **schnelles Modell ohne Denkphase** — Denkmodelle brauchen zu lange. Der Aufruf läuft über den Systemschlüssel, nicht über die Nutzer:innen | `system-vorschlag` |
-| `SCHUELER_STANDARDMODELLE` | Chat-Modelle, an denen die Assistenten für Schüler:innen gemessen sind (seit 0.51). Bekommt ein Jahrgang in `/settings/models` ein anderes, erscheint dort ein Hinweis; gesperrt wird nichts | `["chat-schnell","chat-standard","chat-komplex"]` |
+| `AUFGABE_MODEL` | Klassifikator der Aufgaben-Weiterleitung im freien Schüler-Chat: Arbeitet die Schüler:in an einer Aufgabe, antwortet `AUFGABE_ZIEL_MODEL` (siehe [Modelle & Assistenten](modelle-und-assistenten.md#aufgaben-weiterleitung-im-freien-schüler-chat)). Leer = aus. Ein **schnelles Modell ohne Denkphase**; läuft über den Systemschlüssel | `system-vorschlag` |
+| `AUFGABE_ZIEL_MODEL` | Modell, das bei einer Aufgabe antwortet. Braucht keine Freigabe für den Jahrgang; geht auf das Budget der Schüler:in. Leer = aus | `chat-komplex` |
+| `AUFGABE_ZEITGRENZE_S` | Sekunden, die auf den Klassifikator gewartet wird; danach antwortet `AUFGABE_ZIEL_MODEL` | `2.0` |
+| `SCHUELER_STANDARDMODELLE` | Chat-Modelle, an denen die Assistenten für Schüler:innen gemessen sind (seit 0.51). Bekommt ein Jahrgang in `/settings/models` ein anderes, erscheint dort ein Hinweis; gesperrt wird nichts | `["chat-standard","chat-komplex"]` (seit dem Plan „Freier Schüler-Chat“ ohne `chat-schnell`: Für Schüler:innen ist `chat-standard` der Mindeststandard) |
 | `MODEL_PICKER_HIDDEN_PREFIXES` | Präfixe, die nicht im Chat-Modellwähler erscheinen. Rein kosmetisch, Freigaben bleiben unberührt | `["system-","embedding-","bild-"]` |
 
 ### Embeddings (Kontextspeicher / semantische Suche)
