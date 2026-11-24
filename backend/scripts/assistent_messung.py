@@ -91,7 +91,11 @@ def vorlage_einsetzen(daten: dict, vorlage: str | None, dateiname: str) -> list[
     ``stufe`` (gilt für Fälle ohne eigene), ``verboten`` — ein Zug mit ``verboten: vorlage`` bekommt
     diese Liste — und ``lage``: ``frei`` oder der Pfad einer Szenariodatei mit Kopf (relativ zu
     ``scripts/``), wie ``--freier-chat`` bzw. ``--assistent-aus``. So spielen dieselben Fälle in mehreren Lagen mit je passender Aufgabe (0.35, AL).
-    Ein unbekannter Platzhalter bricht ab (``KeyError``), statt lautlos stehen zu bleiben."""
+    Ein unbekannter Platzhalter bricht ab (``KeyError``), statt lautlos stehen zu bleiben.
+
+    ``lagen`` an einem Fall (seit 23.11.2026): nur in diesen Vorlagen spielen, etwa ``[frei]`` für
+    Fälle mit eigenem Wortlaut und eigener Stufe, die zu keinem Assistenten passen. Ohne Angabe in
+    jeder Lage."""
     vorlagen = daten.get("vorlagen")
     if not vorlagen:
         if vorlage:
@@ -101,7 +105,7 @@ def vorlage_einsetzen(daten: dict, vorlage: str | None, dateiname: str) -> list[
         raise SystemExit(f"{dateiname}: `--vorlage` fehlt oder ist unbekannt (vorhanden: {', '.join(vorlagen)}).")
     v = vorlagen[vorlage]
     werte = {k: str(w) for k, w in v.items() if k not in ("verboten", "lage")}
-    faelle = copy.deepcopy(daten["faelle"])
+    faelle = [f for f in copy.deepcopy(daten["faelle"]) if vorlage in (f.get("lagen") or [vorlage])]
     for fall in faelle:
         if fall.get("stufe") is None and "stufe" in v:
             fall["stufe"] = v["stufe"]

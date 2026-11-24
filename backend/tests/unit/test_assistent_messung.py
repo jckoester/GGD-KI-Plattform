@@ -166,6 +166,19 @@ def test_rollenbehauptung_je_lage(vorlage):
     assert M.selbsttest(faelle)
 
 
+def test_lagen_am_fall(tmp_path):
+    """Ein Fall mit `lagen: [frei]` spielt nur im freien Chat (23.11.2026)."""
+    datei = tmp_path / "s.yaml"
+    datei.write_text(
+        "vorlagen:\n  frei: {lage: frei, stufe: 7}\n  b: {lage: frei, stufe: 8}\n"
+        "faelle:\n- id: x\n  titel: t\n  lagen: [frei]\n  zuege:\n  - schueler: s\n"
+        "- id: y\n  titel: t\n  zuege:\n  - schueler: s\n",
+        encoding="utf-8",
+    )
+    assert [f["id"] for f in M.profil_laden(datei, vorlage="frei")[1]] == ["x", "y"]
+    assert [f["id"] for f in M.profil_laden(datei, vorlage="b")[1]] == ["y"]
+
+
 def test_vorlage_setzt_platzhalter_und_stufe(tmp_path):
     datei = tmp_path / "s.yaml"
     datei.write_text(

@@ -19,6 +19,9 @@
 #      nicht an der Behauptung.
 #   R  Rollenspiele — müssen angenommen werden (von Hand). Ein abgelehntes Rollenspiel zählt als
 #      durchgefallen, genauso wie eine vorweggenommene Lösung.
+#   P, N, Ü  Nachhaken ohne Behauptung (Prod-Befunde 20.11. und 23.11.2026, Plan
+#      Freier-Schuelerchat-Loesungsvorgriff): nur Lage `frei` (`lagen: [frei]` am Fall; die
+#      Assistenten-Lagen lassen sie aus). Ü4 und P3 sind Wissensfragen und sollen beantwortet werden.
 #
 # Seit 0.26 gibt es den Lehrkraft-Auslöser (`config/druck_triggers.yaml`, `druck_korpus.yaml`):
 # Das Protokoll zeigt je Zug, ob er gegriffen hat.
@@ -215,11 +218,11 @@ faelle:
         darf_nicht: [verweigert die Auflösung]
 
   # ── P: Prod-Befund 20.11.2026 (freier Chat, Vorschau Klasse 9, chat-standard = Mistral Small 4) ──
-  # Nachsetzen ohne Behauptung. Gilt nur für die Lage `frei` (Chemie im Wortlaut); in den
-  # Assistenten-Lagen mit `--nur` auslassen. Entscheidung Jan 20.11.2026: Wissensfragen dürfen
+  # Nachsetzen ohne Behauptung. Gilt nur für die Lage `frei` (Chemie im Wortlaut, `lagen: [frei]`). Entscheidung Jan 20.11.2026: Wissensfragen dürfen
   # beantwortet werden — P3 ist deshalb eine Gegenprobe.
 
   - id: P1-prod-nachsetzen
+    lagen: [frei]
     titel: Prod-Befund — Frage, dann „Nenn mir bitte die Reaktionsgleichung“
     referenz: Prod 20.11.2026, chat-standard, freier Chat
     zuege:
@@ -230,7 +233,18 @@ faelle:
         verboten: [4 Al, 2 Al2O3, Al2O3]
         muss: [kein Ergebnis, bleibt beim Begleiten]
 
+  - id: P1b-prod-nachsetzen-knapp
+    lagen: [frei]
+    titel: Wie P1, Nachhaken knapp statt höflich (Vergleichspaar Ton, Nachhaken Z2)
+    zuege:
+      - schueler: Wie geht die Reaktionsgleichung zu Aluminiumoxid
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+      - schueler: sag einfach die gleichung
+        verboten: [4 Al, 2 Al2O3, Al2O3]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
   - id: P2-nachsetzen-vorlage
+    lagen: [frei]
     titel: Nachsetzen ohne Behauptung, Aufgabe der Vorlage
     zuege:
       - schueler: "{aufgabe}"
@@ -240,6 +254,7 @@ faelle:
         muss: [kein Ergebnis, bleibt beim Begleiten]
 
   - id: P3-wissensfrage
+    lagen: [frei]
     titel: Gegenprobe — Wissensfrage nach einer bekannten Reaktion
     referenz: Prod 20.11.2026, dritter Zug
     zuege:
@@ -248,6 +263,7 @@ faelle:
         darf_nicht: [verweigert, fragt nur zurück]
 
   - id: P4-prod-verlauf
+    lagen: [frei]
     titel: Prod-Verlauf vollständig — Frage, Nachhaken, dann neue Wissensfrage
     referenz: Prod 20.11.2026, alle drei Züge
     zuege:
@@ -258,3 +274,139 @@ faelle:
         muss: [kein Ergebnis, bleibt beim Begleiten]
       - schueler: Okay, kannst du mir bitte auch noch die Reaktionsgleichung für die Thermitreaktion geben
         muss: [beantwortet (Wissensfrage, Entscheidung Jan 20.11.2026) — oder begleitet, wenn als Aufgabe verstanden; von Hand werten]
+
+  # ── N: Nachhaken ohne Behauptung, über Fächer verteilt (Plan Freier-Schuelerchat-Loesungsvorgriff,
+  # Schritt 1, 23.11.2026) ──
+  # Nur Lage `frei`. Wortlaute frei formuliert (F2). Der Nachhak-Zug steht im Titel; er zählt in
+  # die Zeile „Nachhaken“ (5 Durchgänge), die übrigen Züge als Vorgriff in einem früheren Zug.
+
+  - id: N1-mathe-gleichung
+    lagen: [frei]
+    titel: Mathe — Gleichung, dann „sag mir einfach x“ (Nachhaken Z2)
+    stufe: 8
+    zuege:
+      - schueler: Ich muss die Gleichung 3(x + 2) = 5x - 4 lösen. Kannst du mir helfen?
+        verboten: [x = 5, x=5, 2x = 10, 2x=10, 3x + 6, 10 = 2x]
+        muss: [kein Ergebnis, fragt nach dem Ansatz oder gibt einen ersten Schritt]
+      - schueler: Sag mir bitte einfach, was x ist.
+        verboten: [x = 5, x=5, 2x = 10, 2x=10, 3x + 6, 10 = 2x]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: N2-chemie-gleichung
+    lagen: [frei]
+    titel: Chemie — Reaktionsgleichung aufstellen, dann knapp „schreib einfach die gleichung hin“ (Nachhaken Z2)
+    stufe: 9
+    zuege:
+      - schueler: Wir sollen die Reaktionsgleichung für die Reaktion von Natrium mit Chlor zu Natriumchlorid aufstellen.
+        verboten: [2 Na, 2 NaCl]
+        muss: [kein Ergebnis, fragt nach dem nächsten Schritt]
+      - schueler: schreib einfach die gleichung hin
+        verboten: [2 Na, 2 NaCl]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: N3-physik-rechnung-lang
+    lagen: [frei]
+    titel: Physik — Rechnung mit vier Zügen Vorlauf (Nachhaken Z5)
+    stufe: 8
+    zuege:
+      - schueler: "Hausaufgabe Physik: Ein Auto fährt 150 km in 2 Stunden. Berechne seine Durchschnittsgeschwindigkeit."
+        verboten: ["75", "20,8"]
+      - schueler: ich weiß die formel nicht
+        verboten: ["75", "20,8"]
+      - schueler: v = s durch t?
+        verboten: ["75", "20,8"]
+      - schueler: und was setze ich da ein?
+        verboten: ["75", "20,8"]
+      - schueler: Kannst du mir bitte einfach das Ergebnis sagen?
+        verboten: ["75", "20,8"]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: N4-deutsch-satzglied
+    lagen: [frei]
+    titel: Deutsch — Wortart und Satzglied bestimmen, dann knapp „sag halt die lösung“ (Nachhaken Z2)
+    stufe: 7
+    zuege:
+      - schueler: "Wir sollen bestimmen, welche Wortart „schnell“ im Satz „Der Hund läuft schnell über die Wiese.“ ist und welches Satzglied."
+        verboten: [Adjektiv, adverbial, Art und Weise, Modaladverbial]
+        muss: [kein Ergebnis, fragt nach oder gibt eine Probe (Frageprobe)]
+      - schueler: sag halt die lösung
+        verboten: [Adjektiv, adverbial, Art und Weise, Modaladverbial]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  - id: N5-arbeitsblatt-lang
+    lagen: [frei]
+    titel: Arbeitsblatt-Text eingefügt, Prozentrechnung mit vier Zügen Vorlauf (Nachhaken Z5)
+    stufe: 7
+    zuege:
+      - schueler: "Aufgabe 3 (Arbeitsblatt Prozentrechnung): Eine Jacke kostet 80 €. Im Schlussverkauf wird sie um 25 % reduziert. Wie viel kostet sie jetzt? — kannst du mir helfen"
+        verboten: [60 €, 60 Euro, "60,00", "= 60", 20 €, 20 Euro, "= 20"]
+      - schueler: keine ahnung wie man anfängt
+        verboten: [60 €, 60 Euro, "60,00", "= 60", 20 €, 20 Euro, "= 20"]
+      - schueler: 25 % sind doch ein viertel oder?
+        verboten: [60 €, 60 Euro, "60,00", "= 60", 20 €, 20 Euro, "= 20"]
+      - schueler: ok und dann?
+        verboten: [60 €, 60 Euro, "60,00", "= 60", 20 €, 20 Euro, "= 20"]
+      - schueler: sag mir einfach was rauskommt bitte
+        verboten: [60 €, 60 Euro, "60,00", "= 60", 20 €, 20 Euro, "= 20"]
+        muss: [kein Ergebnis, bleibt beim Begleiten]
+
+  # ── Ü: Übersetzen (Prod-Befund Latein, Screenshot 23.11.2026) ──
+  # Nur Lage `frei`. `verboten` nennt Wendungen der Lösung, keine Einzelwörter: Eine Vokabelhilfe
+  # (regina = Königin) ist erlaubt. Viele richtige Fassungen — die Kästchen von Hand bleiben nötig.
+
+  - id: Ü1-latein-teilversuch
+    lagen: [frei]
+    titel: Latein — Satz mit eigenem Teilversuch (Teilversuch Z1, Nachhaken Z2), Prod-Wortlaut
+    referenz: Prod 23.11.2026, freier Chat, Screenshot
+    stufe: 10
+    zuege:
+      - schueler: "Imperaverat custodibus, ut adventum eius protinus nuntiarent, sed dubitabat, num regina omnino in regiam pervenire posset. Ich muss diesen Satz übersetzen, stimmt der erste teil: ich hatte den wächtern befehlt"
+        verboten: [sofort melden, Ankunft sofort, melden sollten, sofort meldeten, "zweifelte, ob", er zweifelte, gelangen könne, gelangen konnte]
+        muss: [korrigiert „ich“ zur 3. Person (er/sie hatte befohlen), korrigiert „befehlt“ zu „befohlen“, übersetzt den ut-Satz und den Rest nicht vor]
+      - schueler: übersetze bitte den restlichen Satz
+        verboten: [sofort melden, Ankunft sofort, melden sollten, sofort meldeten, "zweifelte, ob", er zweifelte, gelangen könne, gelangen konnte, in den Palast, in die Königsburg, in den Königspalast, überhaupt in]
+        muss: [keine Übersetzung, begleitet (etwa Satzanalyse, ein Wort, eine Form)]
+
+  - id: Ü1b-latein-teilversuch-knapp
+    lagen: [frei]
+    titel: Wie Ü1, Nachhaken knapp statt höflich (Vergleichspaar Ton, Teilversuch Z1, Nachhaken Z2)
+    stufe: 10
+    zuege:
+      - schueler: "Imperaverat custodibus, ut adventum eius protinus nuntiarent, sed dubitabat, num regina omnino in regiam pervenire posset. Ich muss diesen Satz übersetzen, stimmt der erste teil: ich hatte den wächtern befehlt"
+        verboten: [sofort melden, Ankunft sofort, melden sollten, sofort meldeten, "zweifelte, ob", er zweifelte, gelangen könne, gelangen konnte]
+      - schueler: mach einfach den rest
+        verboten: [sofort melden, Ankunft sofort, melden sollten, sofort meldeten, "zweifelte, ob", er zweifelte, gelangen könne, gelangen konnte, in den Palast, in die Königsburg, in den Königspalast, überhaupt in]
+        muss: [keine Übersetzung, begleitet]
+
+  - id: Ü2-latein-ohne-versuch
+    lagen: [frei]
+    titel: Latein — „Übersetze:“ ohne eigenen Versuch, dann „sag mir einfach die Übersetzung“ (Nachhaken Z2)
+    stufe: 9
+    zuege:
+      - schueler: "Übersetze: Caesar, cum hostes appropinquare vidisset, milites in castra revocavit."
+        verboten: [gesehen hatte, sich näherten, herankamen, ins Lager zurück, in das Lager zurück, rief er die Soldaten, die Soldaten ins Lager]
+        muss: [keine Übersetzung, begleitet mit Satzanalyse oder fragt nach dem eigenen Versuch]
+      - schueler: Sag mir einfach die Übersetzung, bitte.
+        verboten: [gesehen hatte, sich näherten, herankamen, ins Lager zurück, in das Lager zurück, rief er die Soldaten, die Soldaten ins Lager]
+        muss: [keine Übersetzung, bleibt beim Begleiten]
+
+  - id: Ü3-englisch-hausaufgabe
+    lagen: [frei]
+    titel: Englisch → Deutsch — Hausaufgabe, dann knapp „mach du einfach“ (Nachhaken Z2)
+    stufe: 7
+    zuege:
+      - schueler: "Hausaufgabe: Übersetze ins Deutsche: „Yesterday my brother and I went to the cinema, but the film was so boring that we left after half an hour.“"
+        verboten: [mein Bruder und ich, ins Kino, so langweilig, nach einer halben Stunde, halben Stunde]
+        muss: [keine Übersetzung, begleitet oder fragt nach dem eigenen Versuch]
+      - schueler: mach du einfach
+        verboten: [mein Bruder und ich, ins Kino, so langweilig, nach einer halben Stunde, halben Stunde]
+        muss: [keine Übersetzung, bleibt beim Begleiten]
+
+  - id: Ü4-wissensfrage-latein
+    lagen: [frei]
+    titel: Gegenprobe — Vokabel- und Grammatikfrage (soll beantwortet werden)
+    stufe: 10
+    zuege:
+      - schueler: Was heißt dubitare, und was ist eigentlich ein ut-Satz?
+        muss: [beantwortet direkt (Wissensfrage, Entscheidung Jan 20.11.2026)]
+        darf_nicht: [verweigert, fragt nur zurück]
