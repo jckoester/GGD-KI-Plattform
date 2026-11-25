@@ -82,6 +82,15 @@ class AbschnittLage:
 
 
 @dataclass
+class Sequenzbilanz:
+    sequenz_id: str
+    titel: Optional[str]
+    soll: Optional[int]
+    geplant: Optional[float]
+    wochen: float
+
+
+@dataclass
 class Kapitelbilanz:
     kapitel_id: str
     titel: Optional[str]
@@ -89,6 +98,8 @@ class Kapitelbilanz:
     # Geplante Stunden; ein Abschnitt mit mehreren Kapiteln teilt seine Stunden gleich auf.
     geplant: Optional[float]
     wochen: float
+    # Bei sequenzgenauer Planung (BD Schritt 7): die Sequenzen des Kapitels, aufklappbar
+    sequenzen: list[Sequenzbilanz] = field(default_factory=list)
 
 
 @dataclass
@@ -101,6 +112,8 @@ class Planlage:
     kapitel: list[Kapitelbilanz]
     # Kapitel des Curriculums, die kein Abschnitt nennt (BD F5)
     kapitel_ohne_abschnitt: list[str]
+    # Bei sequenzgenauer Planung: Sequenzen, die kein Abschnitt nennt
+    sequenzen_ohne_abschnitt: list[str] = field(default_factory=list)
 
     @property
     def frei(self) -> int:
@@ -167,13 +180,15 @@ def lage(
     *,
     wochenstunden: Optional[float] = None,
     kapitel: Iterable[dict] = (),
+    planungsart: str = "kapitel",
 ) -> Planlage:
     """Legt die Abschnitte auf den Kalender des Schuljahrs.
 
-    `abschnitte`: in Planreihenfolge, je `{id, titel, wochen, kapitel_ids, notiz}`; gelesen
-    werden `id`, `wochen` und `kapitel_ids`.
-    `kapitel`: die Kapitel des Curriculums der Stufe, je `{id, titel, std}` — für die Bilanz und
-    den Hinweis auf Kapitel ohne Abschnitt.
+    `abschnitte`: in Planreihenfolge, je `{id, titel, wochen, kapitel_ids, sequenz_ids, notiz}`;
+    gelesen werden `id`, `wochen` und das Bezugsfeld der Planungsart.
+    `kapitel`: die Kapitel des Curriculums der Stufe, je `{id, titel, std, sequenzen}` — für die
+    Bilanz und den Hinweis auf Kapitel (und Sequenzen) ohne Abschnitt.
+    `planungsart`: `kapitel` oder `sequenz` (BD Schritt 7).
     """
     wochen = unterrichtswochen(cfg)
     n = len(wochen)
@@ -213,18 +228,15 @@ def lage(
         belegt=pos - 1,
         abschnitte=lagen,
         ferienabschnitte=ferienabschnitte(cfg, wochen),
-        **_bilanz(abschnitte, lagen, list(kapitel), wochenstunden),
+        **(_sequenzbilanz(abschnitte, lagen, list(kapitel), wochenstunden) if planungsart == "sequenz"
+           else _bilanz(abschnitte, lagen, list(kapitel), wochenstunden)),
     )
 
 
 def _bilanz(abschnitte: list[dict], lagen: list[AbschnittLage], kapitel: list[dict],
             wochenstunden: Optional[float]) -> dict:
     """Stunden und Wochen je Kapitel; ein Abschnitt teilt sich gleich auf seine Kapitel auf."""
-    wochen_je: dict[str, float] = {}
-    for a, l in zip(abschnitte, lagen):
-        ids = list(dict.fromkeys(str(k) for k in (a.get("kapitel_ids") or [])))
-        for k in ids:
-            wochen_je[k] = wochen_je.get(k, 0) + l.wochen / len(ids)
+    wochen_je = _anteile(abschnitte, lagen, "kapitel_ids")
 
     bekannt = {str(k["id"]): k for k in kapitel}
     reihenfolge = [str(k["id"]) for k in kapitel] + [k for k in wochen_je if k not in bekannt]
@@ -241,3 +253,53 @@ def _bilanz(abschnitte: list[dict], lagen: list[AbschnittLage], kapitel: list[di
         "kapitel": bilanz,
         "kapitel_ohne_abschnitt": [kid for kid in bekannt if kid not in wochen_je],
     }
+
+
+def _anteile(abschnitte: list[dict], lagen: list[AbschnittLage], feld: str) -> dict[str, float]:
+    """Wochen je genannter Einheit; ein Abschnitt teilt sich gleich auf seine Einheiten auf."""
+    wochen_je: dict[str, float] = {}
+    for a, l in zip(abschnitte, lagen):
+        ids = list(dict.fromkeys(str(k) for k in (a.get(feld) or [])))
+        for k in ids:
+            wochen_je[k] = wochen_je.get(k, 0) + l.wochen / len(ids)
+    return wochen_je
+
+
+def _sequenzbilanz(abschnitte: list[dict], lagen: list[AbschnittLage], kapitel: list[dict],
+                   wochenstunden: Optional[float]) -> dict:
+    """Bilanz bei sequenzgenauer Planung: je Sequenz, zusammengefasst je Kapitel.
+
+    Soll eines Kapitels ist die Summe der Sequenz-Stunden, wo Sequenzen welche tragen; sonst die
+    Stunden des Kapitels. Sequenzen, die nicht (mehr) im Curriculum stehen, erscheinen einzeln
+    am Ende, ohne Titel — wie fremde Kapitel bei kapitelgenauer Planung.
+    """
+    wochen_je = _anteile(abschnitte, lagen, "sequenz_ids")
+    stunden = (lambda w: round(w * wochenstunden, 1) if wochenstunden else None)
+    bilanz, bekannt, ohne_kapitel = [], set(), []
+    for k in kapitel:
+        seqs = []
+        for sq in k.get("sequenzen") or []:
+            sid = str(sq["id"])
+            bekannt.add(sid)
+            w = wochen_je.get(sid, 0)
+            seqs.append(Sequenzbilanz(sequenz_id=sid, titel=sq.get("titel"), soll=sq.get("std"),
+                                      geplant=stunden(w), wochen=round(w, 2)))
+        std_seq = [x.soll for x in seqs if x.soll is not None]
+        w_kap = sum(wochen_je.get(x.sequenz_id, 0) for x in seqs)
+        if w_kap == 0:
+            ohne_kapitel.append(str(k["id"]))
+        bilanz.append(Kapitelbilanz(
+            kapitel_id=str(k["id"]), titel=k.get("titel"),
+            soll=sum(std_seq) if std_seq else k.get("std"),
+            geplant=stunden(w_kap), wochen=round(w_kap, 2), sequenzen=seqs,
+        ))
+    for sid, w in wochen_je.items():
+        if sid not in bekannt:
+            bilanz.append(Kapitelbilanz(kapitel_id=sid, titel=None, soll=None, geplant=stunden(w),
+                                        wochen=round(w, 2)))
+    return {
+        "kapitel": bilanz,
+        "kapitel_ohne_abschnitt": ohne_kapitel,
+        "sequenzen_ohne_abschnitt": [x.sequenz_id for b in bilanz for x in b.sequenzen if x.wochen == 0],
+    }
+

@@ -21,6 +21,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Schuljahrs gelegt, mit Ferien, Halbjahr, Überhang und Stundenbilanz je Kapitel.
 - Endpunkte `/context/verlaufsplaene` (Liste, Anlegen, Lesen, Speichern, Beschließen, Löschen); die allgemeinen
   Schreibwege weisen Verlaufspläne ab.
+- Jahresverlaufsplan: Planungsart sequenz- oder kapitelgenau (Abschnitte nennen Lernsequenzen oder Kapitel), Wechsel
+  mit Umrechnung; das Raster entfällt.
 - Kalender je Schuljahr: neben `config/school_year.yaml` gelten `config/school_year_JJJJ-JJ.yaml` für kommende
   und vergangene Schuljahre.
 

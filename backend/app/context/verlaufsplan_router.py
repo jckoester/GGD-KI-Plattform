@@ -13,6 +13,8 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,16 +40,20 @@ class Abschnitt(BaseModel):
     # Richtgröße 1–6 (F2); länger geht, bis zu einem ganzen Schuljahr
     wochen: int = Field(ge=1, le=45)
     kapitel_ids: list[UUID] = Field(default_factory=list, max_length=20)
+    # Bei sequenzgenauer Planung (Schritt 7) — es gilt das Feld der Planungsart
+    sequenz_ids: list[UUID] = Field(default_factory=list, max_length=40)
     notiz: str = Field(default="", max_length=2000)
 
 
 class PlanSpeichern(BaseModel):
     abschnitte: list[Abschnitt] = Field(default_factory=list, max_length=60)
-    # Blocklänge, mit der der Editor neue Abschnitte anlegt (1 = wochengenau)
-    raster: Optional[int] = Field(default=None, ge=1, le=6)
+    # Wechsel der Planungsart: Die Abschnitte kommen in der alten Art und werden umgerechnet.
+    # Ein Raster gibt es seit Schritt 7 nicht mehr — die Dauer jedes Abschnitts regelt das.
+    planungsart: Optional[Literal["sequenz", "kapitel"]] = None
 
 
 class PlanAnlegen(PlanSpeichern):
+    planungsart: Literal["sequenz", "kapitel"] = "sequenz"
     subject_id: int
     stufe: int = Field(ge=1, le=13)
     schuljahr: str
@@ -60,16 +66,20 @@ class PlanAnlegen(PlanSpeichern):
         return v
 
 
-def _metadata(alt: dict, daten: PlanSpeichern) -> dict:
+def _metadata(alt: dict, daten: PlanSpeichern, abschnitte_roh: Optional[list[dict]] = None) -> dict:
+    """Metadaten des Plans aus der Eingabe. `abschnitte_roh` sind schon umgerechnete Abschnitte
+    (Wechsel der Planungsart); sonst die aus `daten`."""
     abschnitte = []
-    for a in daten.abschnitte:
-        d = a.model_dump(mode="json")
+    for a in abschnitte_roh if abschnitte_roh is not None else [x.model_dump(mode="json") for x in daten.abschnitte]:
+        d = dict(a)
         d["id"] = d["id"] or uuid4().hex[:12]
         d["titel"] = d["titel"].strip()
         d["notiz"] = d["notiz"].strip()
-        d["kapitel_ids"] = list(dict.fromkeys(d["kapitel_ids"]))
+        d["kapitel_ids"] = list(dict.fromkeys(d.get("kapitel_ids") or []))
+        d["sequenz_ids"] = list(dict.fromkeys(d.get("sequenz_ids") or []))
         abschnitte.append(d)
-    return {**alt, "abschnitte": abschnitte, "raster": daten.raster}
+    meta = {k: v for k, v in alt.items() if k != "raster"}
+    return {**meta, "abschnitte": abschnitte, "planungsart": daten.planungsart or vp.planungsart(alt)}
 
 
 @router.get("")
@@ -121,7 +131,7 @@ async def verlaufsplan_anlegen(
     except IntegrityError:
         raise HTTPException(status_code=409, detail=(
             f"Für {fach.name} Kl. {daten.stufe} gibt es {daten.schuljahr} schon einen Plan."))
-    await vp.kapitelkanten_abgleichen(db, plan)
+    await vp.bezugskanten_abgleichen(db, plan)
     await db.commit()
     await db.refresh(plan)
     return await vp.voll(db, plan, user)
@@ -156,8 +166,16 @@ async def verlaufsplan_speichern(
     """Der ganze Plan auf einmal — Abschnitte in Planreihenfolge und Raster. Ein beschlossener
     Plan bleibt beschlossen (F8: Änderungen danach gehen direkt)."""
     plan = await _zum_schreiben(db, plan_id, user)
-    plan.metadata_ = _metadata(plan.metadata_ or {}, daten)
-    await vp.kapitelkanten_abgleichen(db, plan)
+    alt = plan.metadata_ or {}
+    roh = None
+    if daten.planungsart and daten.planungsart != vp.planungsart(alt):
+        roh = [a.model_dump(mode="json") for a in daten.abschnitte]
+        bezug = {str(k) for a in roh for k in (a.get("sequenz_ids") or []) + (a.get("kapitel_ids") or [])}
+        roh = vp.umrechnen(roh, daten.planungsart,
+                           kapitel_von=await vp.kapitel_der_sequenzen(db, bezug),
+                           sequenzen_von=await vp.sequenzen_der_kapitel(db, bezug))
+    plan.metadata_ = _metadata(alt, daten, roh)
+    await vp.bezugskanten_abgleichen(db, plan)
     await db.commit()
     await db.refresh(plan)
     return await vp.voll(db, plan, user)
@@ -214,8 +232,11 @@ async def verlaufsplan_uebernehmen(
 
     alt = (quelle.metadata_ or {}).get("abschnitte", [])
     curricula = await vp.curricula_der_stufe(db, quelle.subject_id, quelle.min_grade)
-    titel = await vp.kapiteltitel(db, {str(k) for a in alt for k in a.get("kapitel_ids") or []})
-    abschnitte, entfallen = vp.kapitel_abbilden(alt, curricula, titel)
+    art = vp.planungsart(quelle)
+    alte_ids = {str(k) for a in alt for k in a.get(vp.BEZUGSFELD[art]) or []}
+    titel = await vp.knotentitel(db, alte_ids, vp.BEZUGSTYP[art])
+    kapitel_alt = await vp.kapiteltitel_der_sequenzen(db, alte_ids) if art == vp.SEQUENZ else {}
+    abschnitte, entfallen = vp.bezuege_abbilden(alt, curricula, art, titel, kapitel_alt)
     abschnitte = [{**a, "id": uuid4().hex[:12]} for a in abschnitte]
 
     plan = ContextNode(
@@ -225,7 +246,7 @@ async def verlaufsplan_uebernehmen(
         read_scope="school", write_scope="subject", write_scope_group_id=gruppe,
         owner_pseudonym=user.sub,
         metadata_={"schuljahr": daten.schuljahr, "abschnitte": abschnitte,
-                   "raster": (quelle.metadata_ or {}).get("raster"),
+                   "planungsart": vp.planungsart(quelle),
                    "uebernommen_aus": str(quelle.id)},
     )
     try:
@@ -235,7 +256,7 @@ async def verlaufsplan_uebernehmen(
     except IntegrityError:
         raise HTTPException(status_code=409, detail=(
             f"Für {fach.name} Kl. {quelle.min_grade} gibt es {daten.schuljahr} schon einen Plan."))
-    await vp.kapitelkanten_abgleichen(db, plan)
+    await vp.bezugskanten_abgleichen(db, plan)
     await db.commit()
     await db.refresh(plan)
     return {**await vp.voll(db, plan, user), "kapitel_entfallen": entfallen}

@@ -56,7 +56,18 @@ async def welt(db):
         db.add(ContextEdge(from_node_id=k.id, to_node_id=cur.id, relation="part_of"))
         kap.append(k)
     await db.flush()
-    return {"fach": fach, "kapitel": kap}
+    # Lernsequenzen: zwei in „Ähnlichkeit“, eine in „Pythagoras“
+    seq = []
+    for kap_i, titel, std, r in [(0, "Strahlensätze", 6, 0), (0, "Zentrische Streckung", 6, 1), (1, "Satzgruppe", 20, 0)]:
+        ls = ContextNode(category="knowledge", content_type="lernsequenz", title=titel, status="active",
+                         subject_id=fach.id, read_scope="school", write_scope="private", owner_pseudonym="x",
+                         metadata_={"std": std, "reihenfolge": r})
+        db.add(ls)
+        await db.flush()
+        db.add(ContextEdge(from_node_id=ls.id, to_node_id=kap[kap_i].id, relation="part_of"))
+        seq.append(ls)
+    await db.flush()
+    return {"fach": fach, "kapitel": kap, "sequenzen": seq}
 
 
 def _person(sub, *rollen):
@@ -95,7 +106,7 @@ async def _anlegen(db, welt, **kw):
     daten = {"subject_id": welt["fach"].id, "stufe": 9, "schuljahr": "2025/26",
              "abschnitte": [{"titel": "Ähnlichkeit", "wochen": 4, "kapitel_ids": [str(welt["kapitel"][0].id)]},
                             {"titel": "Pythagoras", "wochen": 6, "kapitel_ids": [str(welt["kapitel"][1].id)]}],
-             "raster": 4, **kw}
+             "planungsart": "kapitel", **kw}
     async with _client(db, FS()) as c:
         return await c.post("/context/verlaufsplaene", json=daten)
 
@@ -150,11 +161,11 @@ async def test_speichern_beschliessen_loeschen(db, welt):
     plan_id = (await _anlegen(db, welt)).json()["id"]
     async with _client(db, FS()) as c:
         r = await c.put(f"/context/verlaufsplaene/{plan_id}", json={
-            "abschnitte": [{"titel": " Wahrscheinlichkeit ", "wochen": 8}], "raster": 1})
+            "abschnitte": [{"titel": " Wahrscheinlichkeit ", "wochen": 8}]})
         assert r.status_code == 200
         p = r.json()
         assert [a["titel"] for a in p["abschnitte"]] == ["Wahrscheinlichkeit"]
-        assert p["raster"] == 1 and p["lage"]["abschnitte"][0]["lang"]
+        assert p["planungsart"] == "kapitel" and p["lage"]["abschnitte"][0]["lang"]
         # Kapitel nicht mehr genannt: Kanten weg, beide als „ohne Abschnitt“
         assert len(p["lage"]["kapitel_ohne_abschnitt"]) == 2
         assert (await db.execute(ContextEdge.__table__.select().where(
@@ -229,7 +240,7 @@ async def test_aus_dem_archiv_uebernehmen(db, welt):
     alt = ContextNode(category="knowledge", content_type="verlaufsplan", title="alt", status="active",
                       subject_id=welt["fach"].id, min_grade=9, max_grade=9, read_scope="school",
                       write_scope="private", owner_pseudonym=MITGLIED,
-                      metadata_={"schuljahr": "2024/25", "raster": 4, "abschnitte": [
+                      metadata_={"schuljahr": "2024/25", "abschnitte": [
                           {"id": "a1", "titel": "Ähnlichkeit", "wochen": 4, "kapitel_ids": [str(heute_kap.id)], "notiz": "n"},
                           {"id": "a2", "titel": "Pythagoras", "wochen": 6, "kapitel_ids": [str(alt_kap.id)], "notiz": ""},
                           {"id": "a3", "titel": "Weg", "wochen": 2, "kapitel_ids": [str(uuid.uuid4())], "notiz": ""},
@@ -247,7 +258,7 @@ async def test_aus_dem_archiv_uebernehmen(db, welt):
         r = await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})
         assert r.status_code == 201, r.text
         p = r.json()
-        assert p["status"] == "draft" and p["schuljahr"] == "2025/26" and p["raster"] == 4
+        assert p["status"] == "draft" and p["schuljahr"] == "2025/26" and p["planungsart"] == "kapitel"
         assert [a["titel"] for a in p["abschnitte"]] == ["Ähnlichkeit", "Pythagoras", "Weg"]
         assert [a["wochen"] for a in p["abschnitte"]] == [4, 6, 2]
         assert all(a["id"] not in ("a1", "a2", "a3") for a in p["abschnitte"])
@@ -262,3 +273,93 @@ async def test_aus_dem_archiv_uebernehmen(db, welt):
         assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})).status_code == 409
         assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2024/25"})).status_code == 422
         assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2026"})).status_code == 422
+
+
+# ── Schritt 7: Planungsart ────────────────────────────────────────────────────
+
+async def _kanten(db, plan_id):
+    return {k.to_node_id for k in (await db.execute(
+        ContextEdge.__table__.select().where(ContextEdge.from_node_id == uuid.UUID(plan_id)))).all()}
+
+
+async def test_sequenzgenau_ist_vorgabe(db, welt):
+    s = welt["sequenzen"]
+    async with _client(db, FS()) as c:
+        r = await c.post("/context/verlaufsplaene", json={
+            "subject_id": welt["fach"].id, "stufe": 9, "schuljahr": "2025/26",
+            "abschnitte": [{"titel": "Strahlen", "wochen": 2, "sequenz_ids": [str(s[0].id), str(s[1].id)]}]})
+    assert r.status_code == 201, r.text
+    p = r.json()
+    assert p["planungsart"] == "sequenz" and "raster" not in p
+    assert p["abschnitte"][0]["sequenz_ids"] == [str(s[0].id), str(s[1].id)]
+    # Sequenzen je Kapitel, mit Stunden
+    kap = p["curricula"][0]["kapitel"]
+    assert [x["titel"] for x in kap[0]["sequenzen"]] == ["Strahlensätze", "Zentrische Streckung"]
+    assert kap[1]["sequenzen"][0]["std"] == 20
+    assert await _kanten(db, p["id"]) == {s[0].id, s[1].id}
+    # Bilanz je Kapitel mit Sequenzen (Unterschritt 2): 2 Wochen × 4 Std. auf zwei Sequenzen
+    b = {k["titel"]: k for k in p["lage"]["kapitel"]}
+    assert (b["Ähnlichkeit"]["soll"], b["Ähnlichkeit"]["geplant"]) == (12, 8.0)
+    assert [x["geplant"] for x in b["Ähnlichkeit"]["sequenzen"]] == [4.0, 4.0]
+    assert p["lage"]["sequenzen_ohne_abschnitt"] == [str(s[2].id)]
+    assert p["lage"]["kapitel_ohne_abschnitt"] == [str(welt["kapitel"][1].id)]
+
+
+async def test_planungsart_wechseln(db, welt):
+    s, k = welt["sequenzen"], welt["kapitel"]
+    async with _client(db, FS()) as c:
+        p = (await c.post("/context/verlaufsplaene", json={
+            "subject_id": welt["fach"].id, "stufe": 9, "schuljahr": "2025/26",
+            "abschnitte": [{"id": "a", "wochen": 2, "sequenz_ids": [str(s[0].id), str(s[1].id)]},
+                           {"id": "b", "wochen": 5, "sequenz_ids": [str(s[2].id)]}]})).json()
+        # sequenz → kapitel: verlustfrei, ohne Doppel
+        r = await c.put(f"/context/verlaufsplaene/{p['id']}", json={
+            "planungsart": "kapitel", "abschnitte": p["abschnitte"]})
+        assert r.status_code == 200, r.text
+        q = r.json()
+        assert q["planungsart"] == "kapitel"
+        assert [a["kapitel_ids"] for a in q["abschnitte"]] == [[str(k[0].id)], [str(k[1].id)]]
+        assert await _kanten(db, p["id"]) == {k[0].id, k[1].id}
+        # kapitel → sequenz: alle Sequenzen des Kapitels
+        r = await c.put(f"/context/verlaufsplaene/{p['id']}", json={
+            "planungsart": "sequenz",
+            "abschnitte": [{"id": "a", "wochen": 2, "kapitel_ids": [str(k[0].id)]}]})
+        q = r.json()
+        assert q["planungsart"] == "sequenz"
+        assert q["abschnitte"][0]["sequenz_ids"] == [str(s[0].id), str(s[1].id)]
+        assert await _kanten(db, p["id"]) == {s[0].id, s[1].id}
+        # Ohne Angabe bleibt die Planungsart
+        q = (await c.put(f"/context/verlaufsplaene/{p['id']}", json={"abschnitte": []})).json()
+        assert q["planungsart"] == "sequenz"
+
+
+async def test_sequenzgenau_uebernehmen(db, welt):
+    """Alte Fassung einer Sequenz (archiviert, unter einem archivierten Kapitel gleichen Titels)
+    findet sich im heutigen Curriculum wieder; die Planungsart kommt mit."""
+    alt_kap = ContextNode(category="knowledge", content_type="kapitel", title="Ähnlichkeit", status="archived",
+                          subject_id=welt["fach"].id, read_scope="school", write_scope="private", owner_pseudonym="x")
+    db.add(alt_kap)
+    await db.flush()
+    alt_seq = ContextNode(category="knowledge", content_type="lernsequenz", title="Strahlensätze", status="archived",
+                          subject_id=welt["fach"].id, read_scope="school", write_scope="private", owner_pseudonym="x")
+    db.add(alt_seq)
+    await db.flush()
+    db.add(ContextEdge(from_node_id=alt_seq.id, to_node_id=alt_kap.id, relation="part_of"))
+    s = welt["sequenzen"]
+    alt = ContextNode(category="knowledge", content_type="verlaufsplan", title="alt", status="active",
+                      subject_id=welt["fach"].id, min_grade=9, max_grade=9, read_scope="school",
+                      write_scope="private", owner_pseudonym=MITGLIED,
+                      metadata_={"schuljahr": "2024/25", "planungsart": "sequenz", "abschnitte": [
+                          {"id": "a1", "wochen": 2, "sequenz_ids": [str(alt_seq.id), str(s[1].id)]},
+                          {"id": "a2", "wochen": 1, "sequenz_ids": [str(uuid.uuid4())]},
+                      ]})
+    db.add(alt)
+    await db.flush()
+    async with _client(db, FS()) as c:
+        r = await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})
+    assert r.status_code == 201, r.text
+    p = r.json()
+    assert p["planungsart"] == "sequenz"
+    assert [a["sequenz_ids"] for a in p["abschnitte"]] == [[str(s[0].id), str(s[1].id)], []]
+    assert p["kapitel_entfallen"] == 1
+    assert await _kanten(db, p["id"]) == {s[0].id, s[1].id}

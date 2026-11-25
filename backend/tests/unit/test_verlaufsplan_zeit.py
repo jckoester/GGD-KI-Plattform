@@ -182,3 +182,41 @@ class TestKapitelbilanz:
         k1 = plan.kapitel[0]
         assert (k1.geplant, k1.wochen) == (None, 3.0)   # doppelt genannt zählt einmal
         assert plan.abschnitte[0].stunden is None
+
+
+class TestSequenzbilanz:
+    """Sequenzgenaue Planung (BD Schritt 7): je Sequenz, zusammengefasst je Kapitel."""
+    KAPITEL = [
+        {"id": "k1", "titel": "Ähnlichkeit", "std": 99, "sequenzen": [
+            {"id": "s1", "titel": "Strahlensätze", "std": 6}, {"id": "s2", "titel": "Streckung", "std": 6}]},
+        {"id": "k2", "titel": "Pythagoras", "std": 20, "sequenzen": [{"id": "s3", "titel": "Satzgruppe", "std": None}]},
+        {"id": "k3", "titel": "Kreise", "std": 8, "sequenzen": []},
+    ]
+
+    def test_je_sequenz_und_je_kapitel(self):
+        plan = _l([{"wochen": 2, "sequenz_ids": ["s1", "s2"]},
+                   {"wochen": 1, "sequenz_ids": ["s1"]},
+                   {"wochen": 1, "sequenz_ids": ["fremd"]}],
+                  wochenstunden=4, kapitel=self.KAPITEL, planungsart="sequenz")
+        k = {b.kapitel_id: b for b in plan.kapitel}
+        # Soll aus den Sequenzen (6 + 6), nicht aus dem Kapitel (99)
+        assert (k["k1"].soll, k["k1"].geplant, k["k1"].wochen) == (12, 12.0, 3.0)
+        assert [(x.sequenz_id, x.geplant, x.wochen) for x in k["k1"].sequenzen] == [("s1", 8.0, 2.0), ("s2", 4.0, 1.0)]
+        # Sequenzen ohne Stunden: Soll des Kapitels
+        assert (k["k2"].soll, k["k2"].geplant) == (20, 0)
+        assert k["k3"].soll == 8 and k["k3"].sequenzen == []
+        # Fremde Sequenz am Ende, ohne Titel
+        assert (k["fremd"].titel, k["fremd"].geplant) == (None, 4.0)
+        assert [b.kapitel_id for b in plan.kapitel] == ["k1", "k2", "k3", "fremd"]
+        assert plan.kapitel_ohne_abschnitt == ["k2", "k3"]
+        assert plan.sequenzen_ohne_abschnitt == ["s3"]
+
+    def test_kapitelfelder_zaehlen_bei_sequenzgenau_nicht(self):
+        plan = _l([{"wochen": 2, "kapitel_ids": ["k1"]}], kapitel=self.KAPITEL, planungsart="sequenz")
+        assert plan.kapitel[0].wochen == 0 and plan.kapitel_ohne_abschnitt == ["k1", "k2", "k3"]
+
+    def test_kapitelgenau_unveraendert(self):
+        plan = _l([{"wochen": 2, "kapitel_ids": ["k1"], "sequenz_ids": ["s3"]}], wochenstunden=4,
+                  kapitel=self.KAPITEL)
+        assert (plan.kapitel[0].soll, plan.kapitel[0].geplant) == (99, 8.0)
+        assert plan.kapitel[0].sequenzen == [] and plan.sequenzen_ohne_abschnitt == []
