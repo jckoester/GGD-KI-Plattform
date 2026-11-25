@@ -105,9 +105,9 @@ Kontolöschung nimmt Verbindungen (als Zugangstoken) und `oauth_codes` mit.
 | `leitperspektiven` | `lies_leitperspektiven` | `leitperspektiven_lesen` des Assistenten |
 | `leitlinie_uebersicht` | `lies_uebersicht` | `leitlinien_uebersicht` (AU); nimmt das **Kürzel**, `je_fach` mit Fachnamen |
 | `curricula_finden` | `lies_curricula` | eigene Abfrage über alle Fächer, Regel wie `_lesbare_curricula` |
-| `curriculum_lesen` | `lies_curriculum` | `_lesbares_curriculum` + `entwurf_lesen` |
+| `curriculum_lesen` | `lies_curriculum` | `_lesbares_curriculum` + `entwurf_lesen`; seit 0.58 dazu `querverweise` (`app/context/querverweise.py`, `verweise_kompakt`) — **nur hier**, nicht in `entwurf_lesen`: Der Curriculum-Assistent bekäme sonst eine neue Bedingung im gemessenen Prompt |
 | `curriculum_abdeckung` | `lies_abdeckung` | `abdeckung_kompakt` |
-| `bildungsplan_kompetenzen` | `lies_kompetenzen` | `kompetenzen_lesen`; ein ungespeicherter `ContextNode` trägt Fach, Fassung und Stufen |
+| `bildungsplan_kompetenzen` | `lies_kompetenzen` | `kompetenzen_lesen`; ein ungespeicherter `ContextNode` trägt Fach, Fassung und Stufen; seit 0.58 mit `bereich` je Kompetenz `querverweise` |
 | `curriculum_yaml` (0.56) | `lies_curriculum_yaml` | `_lesbares_curriculum` + `build_curriculum_export_dict` — der YAML-Export |
 | `curriculum_yaml_pruefen` (0.56) | `lies_yaml_pruefung` | `curriculum_yaml.durchlauf(…, speichern=False)`: der Import als Entwurf im Savepoint, verworfen ([YAML-Import](curriculum-yaml-import.md)); ohne Fachschaft `ok: false` mit Meldung |
 

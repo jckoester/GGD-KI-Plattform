@@ -311,6 +311,29 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
 - Ohne passenden Assistenten öffnet der Knopf den Chat trotzdem; die Chatseite nennt die fehlende
   Fähigkeit (`einstiegsFaehigkeit` → `curriculum_planning`).
 
+## Querverweise in andere Fächer (seit 0.58)
+
+Der Bildungsplan nennt an Kompetenzen, wo ein anderes Fach anschließt; der Import legt das als
+Kanten `related_to` an (`scripts/import_bildungsplan.py`, Kasten `box--f`). Gelesen wird es in
+`app/context/querverweise.py`, ausgeliefert über **einen** Weg, `POST /context/querverweise`
+mit `{kompetenz_ids, nur_veroeffentlicht}` (POST wegen der Listenlänge, in `vorschau.ERLAUBT`).
+
+- **Nur Bildungsplan-Knoten** (`ik_kompetenz`, `leitidee`, `pk_kompetenz`) als Quelle und Ziel;
+  andere IDs werden übergangen. Deshalb keine Prüfung am Curriculum — derselbe Weg dient
+  Lesesicht, Editor (auch ungespeicherte Kompetenzen) und Bildungsplan-Ansicht.
+- **Beide Richtungen**, ein Fach nie auf sich selbst. **Bereiche** (`leitidee`) bleiben
+  Bereiche: Gut die Hälfte der Verweise im Plan zielt auf einen Bereich.
+- **Archivierte Ziele** werden über (Fach, Typ, Nummer, Stufenband aus `bp_id`) auf die aktive,
+  sonst künftige Fassung umgelenkt; ohne Treffer fallen sie weg. Das Band gehört in den
+  Schlüssel, weil Nummern sich zwischen Bändern wiederholen. Künftige Ziele tragen
+  `ab_schuljahr` (`gilt_ab_schuljahr`).
+- **Fundstellen** (mit Person): `leitlinien_fundstellen` auf die Ziele, gefiltert auf
+  Curricula **des Zielfachs**; ein Bereich zählt über seine Kompetenzen (`part_of`, auch über
+  Unterbereiche). Entwürfe wie in der Leitlinien-Übersicht.
+- Anzeige: `lib/components/Querverweise.svelte`, Logik `lib/querverweise.js`. Export:
+  `faecher_je_kompetenz` → „↔ PH, CH“ in PDF (`.ik-qv`) und DOCX/ODT. MCP: siehe
+  [MCP](mcp.md).
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

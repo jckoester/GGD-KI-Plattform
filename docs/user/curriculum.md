@@ -225,6 +225,27 @@ musst dich also nicht darum kümmern, ob eine Kompetenz zur richtigen Edition ge
 Das ist kein Schönheitsfehler, sondern die ehrliche Auskunft: Dieselbe Kompetenz taucht
 dann an mehreren Stellen auf, und keine behauptet, sie allein abzudecken.
 
+### Querverweise in andere Fächer
+
+An vielen Kompetenzen nennt der Bildungsplan selbst, wo ein **anderes Fach** anschließt. Hat
+eine verknüpfte Kompetenz solche Verweise, stehen hinter ihrer Nummer kleine Marken mit dem
+Kürzel des Fachs in seiner Farbe, etwa **PH** oder **BNT**. Ein Klick klappt die Liste auf:
+
+- welche Kompetenz oder welcher **Bereich** des anderen Fachs gemeint ist, mit Stufen und
+  Nummer — der Bildungsplan verweist oft auf einen ganzen Bereich, nicht auf eine einzelne
+  Kompetenz;
+- **wo das andere Fach die Stelle behandelt**: in welchem Curriculum und Kapitel, Entwürfe als
+  solche gekennzeichnet. Steht dort „in keinem Curriculum … verknüpft“, hat die andere
+  Fachschaft die Stelle noch nicht eingeplant — ein guter Anlass für eine Absprache.
+
+Die Verweise kommen aus dem Bildungsplan und lassen sich nicht bearbeiten. Du siehst sie in
+beide Richtungen: auch, wenn nur das andere Fach auf deins verweist. Gilt die Fassung des
+anderen Fachs erst später, steht „ab Schuljahr …“ dabei. Dieselben Marken findest du in der
+Bibliothek unter **Bildungspläne** und — beim Bearbeiten — unter den gewählten Kompetenzen.
+
+Eigene Bezüge, die der Bildungsplan nicht nennt, trägst du weiter in den **Hinweisen** ein
+(nächster Abschnitt).
+
 ### Hinweise, Leitperspektiven und Leitlinien
 
 Im Feld **Hinweise** schreibst du Freitext. Mit `@` verweist du zusätzlich auf
@@ -448,9 +469,10 @@ anlegen](#ein-curriculum-anlegen)).
 Über **Export** erhältst du das Curriculum als:
 
 - **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte; Begriffe und
-  Fachmethoden stehen als eigene Zeilen unter der Konkretisierung; der Rahmen steht vor dem ersten Kapitel
+  Fachmethoden stehen als eigene Zeilen unter der Konkretisierung; der Rahmen steht vor dem ersten Kapitel;
+  hinter einer Kompetenz stehen die Fächer ihrer Querverweise, etwa „↔ PH, CH“
 - **DOCX** (Word) oder **ODT** (LibreOffice) — zum Weiterbearbeiten außerhalb der Plattform,
-  im Querformat und mit Formeln als bearbeitbare Formeln
+  im Querformat und mit Formeln als bearbeitbare Formeln; Querverweise wie im PDF
 - **YAML** — die maschinenlesbare Fassung; Begriffe und Fachmethoden gehen als Namen mit
   und werden in einer anderen Plattform gegen deren Bibliothek abgeglichen
 

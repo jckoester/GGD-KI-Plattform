@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.58.0] – 2026-11-25
+
+### Neu
+
+- Querverweise in andere Fächer: Wo der Bildungsplan an einer Kompetenz auf ein anderes Fach verweist, zeigen
+  Curriculum (Lesen und Bearbeiten) und Bildungsplan-Ansicht eine Marke mit dem Fach; aufgeklappt Kompetenz oder
+  Bereich und wo das andere Fach die Stelle in seinem Curriculum behandelt.
+- Export PDF, DOCX und ODT: hinter einer Kompetenz die Fächer ihrer Querverweise.
+- Schnittstelle für KI-Abos: `curriculum_lesen` und `bildungsplan_kompetenzen` liefern die Querverweise mit.
+
 ## [0.57.1] – 2026-11-25
 
 ### Geändert
