@@ -2,7 +2,8 @@
     /**
      * Jahresverlaufspläne der Fachschaften (BD, Schritt 5): je Fach die Pläne des laufenden und
      * kommenden Schuljahrs, darunter eingeklappt das Archiv (F10). Die Fachschaft legt hier neue
-     * Pläne an. `?fach=` öffnet ein Fach gezielt (Verweis aus Curricula und Curriculum).
+     * Pläne an. Fachfilter wie bei den Curricula (Schritt 7); `?fach=` wählt ein Fach gezielt
+     * (Verweis aus Curricula und Curriculum).
      */
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
@@ -10,7 +11,9 @@
     import { PLANUNGSARTEN, ausgangspunkte, schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
-    import { myGroups } from '$lib/stores/myGroups.js'
+    import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
+    import { faecherFiltern } from '$lib/curriculum_baender.js'
+    import FaecherFilter from '$lib/components/FaecherFilter.svelte'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import PageBody from '$lib/components/PageBody.svelte'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
@@ -34,22 +37,29 @@
             .finally(() => (laedt = false))
     })
 
-    const gewaehlt = $derived(Number($page.url.searchParams.get('fach')) || null)
     const istAdmin = $derived(!!$user?.roles?.includes('admin'))
     // Fachschaft (oder Admin) darf anlegen; der Server prüft es ohnehin.
     const fachschaften = $derived(new Set($myGroups.filter((g) => g.type === 'subject_department' && g.subject_id != null)
         .map((g) => g.subject_id)))
 
-    const faecher = $derived.by(() => {
-        const mitPlan = new Set((antwort?.plaene ?? []).map((p) => p.subject_id))
-        return [...($subjects ?? [])]
-            .filter((f) => mitPlan.has(f.id) || fachschaften.has(f.id) || f.id === gewaehlt)
-            .sort((a, b) => (fachschaften.has(b.id) - fachschaften.has(a.id)) || a.name.localeCompare(b.name, 'de'))
-    })
+    // Eigene Fächer wie bei den Curricula: Unterrichtsgruppen und Fachschaften.
+    const eigene = $derived([...new Set([
+        ...$myTeachingGroups.filter((g) => g.subject_id).map((g) => g.subject_id),
+        ...fachschaften,
+    ])])
+    const anzahl = $derived((antwort?.plaene ?? []).reduce((m, p) => ({ ...m, [p.subject_id]: (m[p.subject_id] ?? 0) + 1 }), {}))
+
+    // Filter: „Meine Fächer“, „Alle Fächer“ (eigene und solche mit Plänen) oder ein Fach.
+    let filter = $state(null)
+    let fachWahl = $state($page.url.searchParams.get('fach') ?? '')
+    const filterWert = $derived(filter ?? (eigene.length ? 'eigene' : 'alle'))
+    const faecher = $derived(faecherFiltern($subjects, {
+        eigene, filter: filterWert, fachId: fachWahl ? Number(fachWahl) : null, anzahl,
+    }))
     const jahre = $derived(schuljahreZumAnlegen(antwort?.aktuelles_schuljahr))
 
     // Anlegen
-    let neu = $state({})   // je Fach: { stufe, schuljahr, raster }
+    let neu = $state({})   // je Fach: { stufe, schuljahr, planungsart, quelle }
     let anlegeFehler = $state({})
     $effect(() => {
         for (const f of faecher) {
@@ -96,16 +106,20 @@
         <LoadingBanner message="Pläne werden geladen…" />
     {:else if fehler}
         <ErrorBanner message={fehler} />
-    {:else if faecher.length === 0}
-        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Noch keine Jahresverlaufspläne. Anlegen kann die Fachschaft eines Fachs.</p>
     {:else}
+        <FaecherFilter faecher={$subjects} {eigene} wert={filterWert} bind:fachWahl onwahl={(w) => (filter = w)} />
+        {#if faecher.length === 0}
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                {filterWert === 'eigene' && !fachWahl ? 'Du bist in keinem Fach Mitglied der Fachschaft oder einer Unterrichtsgruppe.' : 'Noch keine Jahresverlaufspläne. Anlegen kann die Fachschaft eines Fachs.'}
+            </p>
+        {/if}
         <div class="space-y-3">
             {#each faecher as fach (fach.id)}
                 {@const plaene = teilen((antwort?.plaene ?? []).filter((p) => p.subject_id === fach.id))}
                 {@const darf = istAdmin || fachschaften.has(fach.id)}
                 <details
                     class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-4"
-                    open={gewaehlt ? gewaehlt === fach.id : fachschaften.has(fach.id)}
+                    open={!!fachWahl || eigene.includes(fach.id)}
                 >
                     <summary class="cursor-pointer flex items-baseline gap-2">
                         <span class="text-lg font-semibold text-light-tx dark:text-dark-tx">{fach.name}</span>

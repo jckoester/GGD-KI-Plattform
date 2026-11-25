@@ -109,7 +109,15 @@ describe('Liste und Abdeckungsseite', () => {
   })
 
   it('Dropdown bei „Meine Fächer“ nur mit eigenen Fächern', () => {
-    const curricula = readFileSync(resolve(__dirname, '../routes/(app)/knowledge/curricula/+page.svelte'), 'utf-8')
-    expect(curricula).toMatch(/\.filter\(\(f\) => filterWert !== 'eigene' \|\| mySubjectIds\.includes\(f\.id\)\)/)
+    const filter = readFileSync(resolve(__dirname, 'components/FaecherFilter.svelte'), 'utf-8')
+    expect(filter).toMatch(/\.filter\(\(f\) => wert !== 'eigene' \|\| eigene\.includes\(f\.id\)\)/)
+  })
+
+  it('Curricula und Jahresverlaufspläne teilen den Fachfilter (0.59)', () => {
+    for (const seite of ['curricula/+page.svelte', 'year-plans/+page.svelte']) {
+      const text = readFileSync(resolve(__dirname, `../routes/(app)/knowledge/${seite}`), 'utf-8')
+      expect(text).toContain('<FaecherFilter')
+      expect(text).toContain('faecherFiltern(')
+    }
   })
 })
