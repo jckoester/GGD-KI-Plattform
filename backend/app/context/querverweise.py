@@ -95,9 +95,14 @@ async def _umlenken(db: AsyncSession, alte: list[ContextNode]) -> dict[UUID, Con
     return {k.id: bester[_schluessel(k)] for k in alte if _schluessel(k) in bester}
 
 
-async def querverweise(db: AsyncSession, kompetenz_ids: list[UUID]) -> dict[str, list[dict]]:
+async def querverweise(db: AsyncSession, kompetenz_ids: list[UUID], user=None, *,
+                       nur_veroeffentlicht: bool = False) -> dict[str, list[dict]]:
     """Je Kompetenz (ID als Text) die Querverweise in andere Fächer, sortiert nach Fach und
-    Nummer. Kompetenzen ohne Querverweis fehlen in der Rückgabe."""
+    Nummer. Kompetenzen ohne Querverweis fehlen in der Rückgabe.
+
+    Mit ``user`` trägt jeder Verweis ``fundstellen`` (Schritt 5, F5): wo das **andere** Fach
+    das Ziel in seinem Curriculum behandelt — nur was ``user`` lesen darf, Entwürfe
+    gekennzeichnet (wie die Leitlinien-Übersicht, AU F3)."""
     ids = set(kompetenz_ids)
     if not ids:
         return {}
@@ -152,7 +157,68 @@ async def querverweise(db: AsyncSession, kompetenz_ids: list[UUID]) -> dict[str,
         for e in liste:
             del e["_sort"]
         aus[str(quelle_id)] = liste
+    if user is not None and aus:
+        await _fundstellen_anhaengen(db, aus, user, nur_veroeffentlicht)
     return aus
+
+
+async def _bereich_kompetenzen(db: AsyncSession, bereich_ids: set[UUID]) -> dict[UUID, set[UUID]]:
+    """Je Bereich die Kompetenzen darunter, auch über Unterbereiche (`part_of`)."""
+    unter: dict[UUID, set[UUID]] = {b: {b} for b in bereich_ids}   # Bereich → Teilbäume
+    offen = set(bereich_ids)
+    for _ in range(4):   # Bildungspläne gliedern höchstens drei Ebenen unter dem Fach
+        if not offen:
+            break
+        zeilen = (await db.execute(sa.select(ContextEdge.from_node_id, ContextEdge.to_node_id)
+                  .join(ContextNode, ContextNode.id == ContextEdge.from_node_id).where(
+            ContextEdge.relation == "part_of", ContextEdge.to_node_id.in_(offen),
+            ContextNode.content_type == "leitidee"))).all()
+        offen = set()
+        for kind, eltern in zeilen:
+            for b, menge in unter.items():
+                if eltern in menge and kind not in menge:
+                    menge.add(kind)
+                    offen.add(kind)
+    alle = set().union(*unter.values()) if unter else set()
+    zeilen = (await db.execute(sa.select(ContextEdge.from_node_id, ContextEdge.to_node_id)
+              .join(ContextNode, ContextNode.id == ContextEdge.from_node_id).where(
+        ContextEdge.relation == "part_of", ContextEdge.to_node_id.in_(alle),
+        ContextNode.content_type == "ik_kompetenz"))).all()
+    aus: dict[UUID, set[UUID]] = {b: set() for b in bereich_ids}
+    for ik, eltern in zeilen:
+        for b, menge in unter.items():
+            if eltern in menge:
+                aus[b].add(ik)
+    return aus
+
+
+async def _fundstellen_anhaengen(db: AsyncSession, aus: dict[str, list[dict]], user,
+                                 nur_veroeffentlicht: bool) -> None:
+    """Eine Kompetenz zählt als behandelt, wenn eine Lernsequenz sie verknüpft; ein Bereich
+    (F3 a), wenn eine seiner Kompetenzen verknüpft ist. Gezählt wird nur ein Curriculum des
+    Zielfachs — ein Verweis aus den Hinweisen eines dritten Fachs ist keine Behandlung."""
+    from app.context.leitlinien_uebersicht import leitlinien_fundstellen
+
+    eintraege = [e for liste in aus.values() for e in liste]
+    bereiche = {UUID(e["ziel_id"]) for e in eintraege if e["typ"] == "bereich"}
+    unter = await _bereich_kompetenzen(db, bereiche) if bereiche else {}
+    gesucht = {UUID(e["ziel_id"]) for e in eintraege if e["typ"] == "ik"} | set().union(*unter.values(), set())
+    treffer: dict[str, list[dict]] = defaultdict(list)
+    for f in await leitlinien_fundstellen(db, list(gesucht), user, nur_veroeffentlicht=nur_veroeffentlicht):
+        treffer[f["ziel_id"]].append(f)
+
+    for e in eintraege:
+        ids = [str(i) for i in unter.get(UUID(e["ziel_id"]), set())] if e["typ"] == "bereich" else [e["ziel_id"]]
+        gesehen, liste = set(), []
+        for i in ids:
+            for f in treffer.get(i, []):
+                if f["fach_id"] != e["fach_id"] or (f["curriculum_id"], f["kapitel_id"]) in gesehen:
+                    continue
+                gesehen.add((f["curriculum_id"], f["kapitel_id"]))
+                liste.append({"curriculum_id": f["curriculum_id"], "curriculum": f["curriculum"],
+                              "kapitel_id": f["kapitel_id"], "kapitel": f["kapitel"],
+                              "status": f["status"], "stufen": f["stufen"]})
+        e["fundstellen"] = liste
 
 
 def _nr_sortierbar(nr: str | None) -> tuple:

@@ -48,6 +48,11 @@ ERLAUBT = {
     "add_chat_context_node": ("heftet nur aktive Bausteine an", None),
     "knoten_beim_anlegen_anheften": ("heftet nur aktive Bausteine an", None),
     "begriffe_im_curriculum_aufloesen": ("POST, gleicht nur Namen ab, ändert nichts", None),
+    # AY Teil 1 (25.11.2026): Fundstellen der Querverweise — liest Curricula nur, Entwürfe für
+    # Lehrkräfte gekennzeichnet; POST wegen der Länge der ID-Liste.
+    "querverweise_lesen": ("POST, liest nur Querverweise und Fundstellen", None),
+    "querverweise": ("liest nur (Bildungsplan, Fundstellen)", None),
+    "_fundstellen_anhaengen": ("liest nur Fundstellen über `leitlinien_fundstellen`", None),
     "create_edge": ("Kante in einen Entwurf braucht danach das Bearbeitungsrecht",
                     "pruefe_entwurf_bearbeiten"),
     "curriculum_veroeffentlichen": ("veröffentlichen erst nach dem Recht dazu", "darf_veroeffentlichen"),

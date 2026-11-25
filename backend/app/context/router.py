@@ -1880,11 +1880,13 @@ async def querverweise_lesen(
     liest nur und steht deshalb in `vorschau.ERLAUBT`. Ein Leserecht je Curriculum braucht es
     nicht: Die Funktion nimmt nur Bildungsplan-Knoten als Quelle und Ziel, die alle lesen
     dürfen; andere IDs übergeht sie. So deckt ein Weg Lesesicht, Bearbeitung (auch noch nicht
-    gespeicherte Kompetenzen) und Bildungsplan-Ansicht ab.
+    gespeicherte Kompetenzen) und Bildungsplan-Ansicht ab. Die Fundstellen im anderen Fach
+    (Schritt 5) folgen dem Leserecht der Person — Entwürfe nur, wer sie lesen darf.
     """
     from app.context.querverweise import querverweise
 
-    return await querverweise(db, payload.kompetenz_ids)
+    return await querverweise(db, payload.kompetenz_ids, user,
+                              nur_veroeffentlicht=payload.nur_veroeffentlicht)
 
 
 @router.post("/curricula/{curriculum_id}/begriffe/aufloesen", response_model=list[dict])

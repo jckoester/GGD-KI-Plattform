@@ -534,6 +534,16 @@ class QuerverweiseAnfrage(BaseModel):
     """Kompetenzen, deren Querverweise in andere Fächer gesucht sind (AY Teil 1). Obergrenze:
     der größte Fachplan (Deutsch, etwa 1.250 inhaltsbezogene Kompetenzen) mit Luft."""
     kompetenz_ids: list[UUID] = Field(default_factory=list, max_length=3000)
+    nur_veroeffentlicht: bool = False
+
+
+class QuerverweisFundstelle(BaseModel):
+    curriculum_id: str
+    curriculum: str
+    kapitel_id: str
+    kapitel: str
+    status: str  # active · draft
+    stufen: Optional[str] = None
 
 
 class QuerverweisRead(BaseModel):
@@ -552,6 +562,8 @@ class QuerverweisRead(BaseModel):
     max_grade: Optional[int] = None
     status: str
     ab_schuljahr: Optional[int] = None
+    #: Wo das Zielfach die Stelle in einem Curriculum behandelt (Schritt 5).
+    fundstellen: list[QuerverweisFundstelle] = Field(default_factory=list)
 
 
 class CurriculumRead(BaseModel):

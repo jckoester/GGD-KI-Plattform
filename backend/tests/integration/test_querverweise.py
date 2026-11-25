@@ -192,3 +192,83 @@ async def test_endpunkt_begrenzt_die_liste(db_session, welt):
         leer = await c.post("/context/querverweise", json={"kompetenz_ids": []})
     assert r.status_code == 422
     assert leer.status_code == 200 and leer.json() == {}
+
+
+# ── Schritt 5: Fundstellen im anderen Fach ─────────────────────────────────────
+
+def _teil(typ, titel, fach, status, **kw):
+    return ContextNode(category="knowledge", content_type=typ, title=titel, status=status,
+                       subject_id=fach.id, read_scope="school", write_scope="school",
+                       owner_pseudonym="system", **kw)
+
+
+async def _curriculum(db, fach, titel, status, verknuepft):
+    """Curriculum → Kapitel → Lernsequenz, die Lernsequenz verweist (`references`) auf `verknuepft`."""
+    cur = _teil("curriculum", titel, fach, status, min_grade=7, max_grade=8, metadata_={"bp_version": "2016.V3"})
+    kap = _teil("kapitel", f"Kapitel {titel}", fach, status, metadata_={"reihenfolge": 1})
+    ls = _teil("lernsequenz", f"LS {titel}", fach, status)
+    db.add_all([cur, kap, ls])
+    await db.flush()
+    db.add_all([ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
+                ContextEdge(from_node_id=ls.id, to_node_id=kap.id, relation="part_of")]
+               + [ContextEdge(from_node_id=ls.id, to_node_id=z.id, relation="references") for z in verknuepft])
+    await db.flush()
+    return cur
+
+
+@pytest_asyncio.fixture
+async def mit_curricula(db_session, welt):
+    db = db_session
+    # Eine Kompetenz im Physik-Bereich „Schwingungen“, über einen Unterbereich
+    unterbereich = _bp("leitidee", "3.4.3.1 Pendel", welt["ph"], f"BP_{TOKEN}_PH.V3_IK_11-12-BF_03_01",
+                       min_grade=11, max_grade=12)
+    pendel = _bp("ik_kompetenz", "3.4.3.1(2) Fadenpendel", welt["ph"], f"BP_{TOKEN}_PH.V3_IK_11-12-BF_03_01_02",
+                 min_grade=11, max_grade=12)
+    db.add_all([unterbereich, pendel])
+    await db.flush()
+    db.add_all([ContextEdge(from_node_id=unterbereich.id, to_node_id=welt["ph_bereich"].id, relation="part_of"),
+                ContextEdge(from_node_id=pendel.id, to_node_id=unterbereich.id, relation="part_of")])
+    await db.flush()
+    welt["ph_veroeffentlicht"] = await _curriculum(db, welt["ph"], f"PH 7/8 {TOKEN}", "active", [welt["ph_ik"]])
+    welt["ph_entwurf"] = await _curriculum(db, welt["ph"], f"PH Kursstufe {TOKEN}", "draft", [pendel])
+    # Ein Chemie-Curriculum, das die Physik-Kompetenz (etwa über die Hinweise) verknüpft: keine Behandlung durch Physik
+    welt["ch_fremd"] = await _curriculum(db, welt["ch"], f"CH 7/8 {TOKEN}", "active", [welt["ph_ik"]])
+    return welt
+
+
+def _fund(liste, nr):
+    return {(f["curriculum"], f["status"]) for f in next(e for e in liste if e["nr"] == nr)["fundstellen"]}
+
+
+async def test_fundstellen_fuer_lehrkraft_mit_entwurf_und_bereich(db_session, mit_curricula):
+    w = mit_curricula
+    liste = (await querverweise(db_session, [w["quelle"].id], _person("teacher")))[str(w["quelle"].id)]
+    assert _fund(liste, "3.2.1(3)") == {(w["ph_veroeffentlicht"].title, "active")}, "nur das Zielfach zählt"
+    assert _fund(liste, "3.4.3") == {(w["ph_entwurf"].title, "draft")}, "Bereich: über seine Kompetenzen"
+    assert _fund(liste, "3.3.1(2)") == set()
+
+
+async def test_fundstellen_ohne_entwuerfe_fuer_schuelerinnen_und_mit_filter(db_session, mit_curricula):
+    w = mit_curricula
+    for person, filter_ in ((_person("student"), False), (_person("teacher"), True)):
+        liste = (await querverweise(db_session, [w["quelle"].id], person,
+                                    nur_veroeffentlicht=filter_))[str(w["quelle"].id)]
+        assert _fund(liste, "3.4.3") == set()
+        assert _fund(liste, "3.2.1(3)") == {(w["ph_veroeffentlicht"].title, "active")}
+
+
+async def test_ohne_person_keine_fundstellen(db_session, mit_curricula):
+    liste = (await querverweise(db_session, [mit_curricula["quelle"].id]))[str(mit_curricula["quelle"].id)]
+    assert all("fundstellen" not in e for e in liste)
+
+
+async def test_endpunkt_liefert_fundstellen(db_session, mit_curricula):
+    w = mit_curricula
+    async with _client(db_session, _person("teacher")) as c:
+        r = await c.post("/context/querverweise", json={"kompetenz_ids": [str(w["quelle"].id)],
+                                                        "nur_veroeffentlicht": True})
+    assert r.status_code == 200
+    bereich = next(e for e in r.json()[str(w["quelle"].id)] if e["typ"] == "bereich")
+    assert bereich["fundstellen"] == []
+    ik = next(e for e in r.json()[str(w["quelle"].id)] if e["nr"] == "3.2.1(3)")
+    assert [f["curriculum"] for f in ik["fundstellen"]] == [w["ph_veroeffentlicht"].title]

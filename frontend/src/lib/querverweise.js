@@ -57,6 +57,21 @@ export function zeilenText(eintrag) {
     return teile.join(' · ')
 }
 
+/**
+ * Fundstelle im anderen Fach (Schritt 5): „PH 7/8 › Kapitel Mechanik“, Entwürfe gekennzeichnet.
+ * Kapitel und Curriculum heißen in der Plattform oft ähnlich — beide stehen da, damit man
+ * weiß, wo man nachsieht.
+ */
+export function fundstelleText(f) {
+    const ort = [f?.curriculum, f?.kapitel].filter(Boolean).join(' › ')
+    return f?.status === 'draft' ? `${ort} (Entwurf)` : ort
+}
+
+/** Pfad zur Fundstelle: das Curriculum des anderen Fachs, aufgeklappt beim Kapitel. */
+export function fundstellePfad(f) {
+    return `/knowledge/curriculum/${f.curriculum_id}#kapitel-${f.kapitel_id}`
+}
+
 /** Kurzer Text für Tooltip und Bildschirmleser: „Bezug zu Physik (2), Chemie“. */
 export function bezugText(liste) {
     const f = faecher(liste)

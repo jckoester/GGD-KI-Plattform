@@ -10,7 +10,9 @@
      */
     import { page } from "$app/stores";
     import { bausteinPfad } from "$lib/rueckweg.js";
-    import { bezugText, faecher, kuenftigText, zeilenText, fachKuerzel } from "$lib/querverweise.js";
+    import {
+        bezugText, faecher, kuenftigText, zeilenText, fachKuerzel, fundstelleText, fundstellePfad,
+    } from "$lib/querverweise.js";
     import SubjectIcon from "./SubjectIcon.svelte";
 
     let { liste = [] } = $props();
@@ -58,17 +60,35 @@
                    border-l-2 border-light-ui-3 dark:border-dark-ui-3 pl-2"
         >
             {#each liste as e (e.ziel_id)}
-                <li class="flex items-start gap-1">
-                    <SubjectIcon name={e.icon} size={12} color={e.color} class="mt-0.5 shrink-0" />
-                    <a
-                        href={bausteinPfad(e.ziel_id, $page.url)}
-                        class="underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark"
-                    >
-                        <span class="font-medium">{fachKuerzel(e)}</span>
-                        {zeilenText(e)}
-                    </a>
-                    {#if kuenftigText(e)}
-                        <span class="text-light-tx-2 dark:text-dark-tx-2">({kuenftigText(e)})</span>
+                <li>
+                    <div class="flex items-start gap-1">
+                        <SubjectIcon name={e.icon} size={12} color={e.color} class="mt-0.5 shrink-0" />
+                        <a
+                            href={bausteinPfad(e.ziel_id, $page.url)}
+                            class="underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark"
+                        >
+                            <span class="font-medium">{fachKuerzel(e)}</span>
+                            {zeilenText(e)}
+                        </a>
+                        {#if kuenftigText(e)}
+                            <span class="text-light-tx-2 dark:text-dark-tx-2">({kuenftigText(e)})</span>
+                        {/if}
+                    </div>
+                    <!-- Wo das andere Fach die Stelle behandelt (Schritt 5) -->
+                    {#if e.fundstellen?.length}
+                        <ul class="ml-4 text-light-tx-2 dark:text-dark-tx-2">
+                            {#each e.fundstellen as f (f.curriculum_id + f.kapitel_id)}
+                                <li>
+                                    behandelt in
+                                    <a href={fundstellePfad(f)} class="underline hover:text-primary dark:hover:text-primary-dark"
+                                        >{fundstelleText(f)}</a>
+                                </li>
+                            {/each}
+                        </ul>
+                    {:else if e.fundstellen}
+                        <div class="ml-4 text-light-tx-2 dark:text-dark-tx-2">
+                            in keinem Curriculum von {e.fach} verknüpft
+                        </div>
                     {/if}
                 </li>
             {/each}

@@ -4,6 +4,8 @@ import {
     fachKuerzel,
     faecher,
     fehlendeIds,
+    fundstellePfad,
+    fundstelleText,
     kompetenzIdsImCurriculum,
     kompetenzIdsImFachplan,
     kuenftigText,
@@ -96,4 +98,11 @@ describe('kompetenzIdsImFachplan', () => {
         expect(kompetenzIdsImFachplan(plan)).toEqual(['a', 'b'])
     })
     it('ohne Plan', () => expect(kompetenzIdsImFachplan(null)).toEqual([]))
+})
+
+describe('Fundstellen', () => {
+    const f = { curriculum_id: 'c1', curriculum: 'PH 7/8', kapitel_id: 'k1', kapitel: 'Mechanik', status: 'active' }
+    it('Text', () => expect(fundstelleText(f)).toBe('PH 7/8 › Mechanik'))
+    it('Entwurf gekennzeichnet', () => expect(fundstelleText({ ...f, status: 'draft' })).toBe('PH 7/8 › Mechanik (Entwurf)'))
+    it('Pfad', () => expect(fundstellePfad(f)).toBe('/knowledge/curriculum/c1#kapitel-k1'))
 })
