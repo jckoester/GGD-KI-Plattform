@@ -12,7 +12,7 @@
         beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
     import {
-        PLANUNGSARTEN, abschnittFarbe, bezugText, bilanzStand, einheiten, hinweise, uebernahmeZiele,
+        PLANUNGSARTEN, abschnittFarbe, bezugText, einheiten, hinweise, uebernahmeZiele,
         wochenText, zeitraumText, zumSpeichern,
     } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
@@ -25,6 +25,7 @@
     import WarningBanner from '$lib/components/WarningBanner.svelte'
     import VerlaufsplanZeitleiste from '$lib/components/VerlaufsplanZeitleiste.svelte'
     import VerlaufsplanEditor from '$lib/components/VerlaufsplanEditor.svelte'
+    import VerlaufsplanBilanz from '$lib/components/VerlaufsplanBilanz.svelte'
 
     $effect(() => {
         if ($user && !userHasAnyRole($user, ['teacher', 'admin'])) goto('/chat')
@@ -157,7 +158,6 @@
     })
 
     const knopf = 'px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 disabled:opacity-40'
-    const stand = { 'passt': 'text-light-gr dark:text-dark-gr', 'zu wenig': 'text-light-or dark:text-dark-or', 'zu viel': 'text-light-or dark:text-dark-or' }
 </script>
 
 <svelte:head><title>{plan?.titel ?? 'Jahresverlaufsplan'}</title></svelte:head>
@@ -288,41 +288,7 @@
             </section>
         {/if}
 
-        <!-- Stundenbilanz je Kapitel -->
-        {#if plan.lage?.kapitel?.length}
-            <section>
-                <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-2">Stunden je Kapitel</h2>
-                {#if band}
-                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2">Das Curriculum gilt für mehrere Stufen; „Soll“ ist die Stundenzahl für das ganze Band.</p>
-                {/if}
-                {#if !plan.wochenstunden}
-                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2">Ohne Wochenstunden im Curriculum zählt die Bilanz nur Wochen.</p>
-                {/if}
-                <table class="text-sm">
-                    <thead>
-                        <tr class="text-left text-light-tx-2 dark:text-dark-tx-2 border-b border-light-ui-3 dark:border-dark-ui-3">
-                            <th class="py-1 pr-4">Kapitel</th><th class="py-1 pr-4">Soll</th><th class="py-1 pr-4">Geplant</th><th class="py-1 pr-4">Wochen</th><th class="py-1"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each plan.lage.kapitel as k (k.kapitel_id)}
-                            {@const s = bilanzStand(k, plan.wochenstunden)}
-                            <tr class="border-b border-light-ui-2 dark:border-dark-ui-2 text-light-tx dark:text-dark-tx">
-                                <td class="py-1 pr-4">{k.titel ?? 'nicht mehr im Curriculum'}</td>
-                                <td class="py-1 pr-4">{k.soll ?? '–'}</td>
-                                <td class="py-1 pr-4">{k.geplant ?? '–'}</td>
-                                <td class="py-1 pr-4">{k.wochen}</td>
-                                <td class="py-1 {s ? stand[s] : ''}">{s ?? ''}</td>
-                            </tr>
-                        {/each}
-                    </tbody>
-                </table>
-                {#if plan.lage.kapitel_ohne_abschnitt.length}
-                    <p class="mt-2 text-sm text-light-or dark:text-dark-or">
-                        Ohne Abschnitt: {plan.lage.kapitel_ohne_abschnitt.map((k) => e.titel[k] ?? k).join(', ')}
-                    </p>
-                {/if}
-            </section>
-        {/if}
+        <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band} titel={e.titel}
+            planungsart={plan.planungsart} />
     {/if}
 </PageBody>
