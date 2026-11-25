@@ -23,6 +23,7 @@
         CalendarRange,
         Archive,
     Check,
+        ChartGantt,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -378,6 +379,14 @@
                         {/each}
 
                         {#if $zeigtEintrag('curricula')}
+                        <!-- Jahresverlaufspläne (0.59, BD), vor den Curricula (Hierarchie Jan: Verlaufsplan – Curriculum – Bildungsplan): dieselbe Darstellungsstufe wie die Curricula —
+                             bewusst derselbe Schlüssel, ein eigener fehlte in der Schuldatei `ui_levels.yaml`
+                             und bliebe auf Prod unsichtbar, bis jemand ihn von Hand nachträgt. -->
+                        <SidebarLink href="/knowledge/year-plans"
+                            aktiv={$page.url.pathname.startsWith('/knowledge/year-plans')}>
+                            <ChartGantt class="w-4 h-4" />
+                            Jahresverlaufspläne
+                        </SidebarLink>
                         <SidebarLink href="/knowledge/curricula"
                             aktiv={$page.url.pathname === '/knowledge/curricula'}>
                             <BookOpen class="w-4 h-4" />

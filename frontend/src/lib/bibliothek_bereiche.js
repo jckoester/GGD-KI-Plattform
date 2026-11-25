@@ -6,7 +6,7 @@
  * Bis 0.47 lag unter `/knowledge` die Liste aller Bausteine; sie steht jetzt unter
  * `/knowledge/all`.
  */
-import { Archive, BookOpen, Database, FolderHeart, ShieldCheck } from 'lucide-svelte'
+import { Archive, BookOpen, ChartGantt, Database, FolderHeart, ShieldCheck } from 'lucide-svelte'
 
 /**
  * @param {{ istLehrkraft: boolean, zeigt: (eintrag: string) => boolean }} p
@@ -29,6 +29,13 @@ export function bibliothekBereiche({ istLehrkraft, zeigt }) {
         },
     ]
     if (zeigt('curricula')) {
+        // 0.59 (BD): vor den Curricula (Verlaufsplan – Curriculum – Bildungsplan), auf ihrer Darstellungsstufe.
+        bereiche.push({
+            href: '/knowledge/year-plans',
+            titel: 'Jahresverlaufspläne',
+            text: 'Wann im Schuljahr was dran ist — je Fach und Klassenstufe, auf dem Kalender der Schule.',
+            icon: ChartGantt,
+        })
         bereiche.push({
             href: '/knowledge/curricula',
             titel: 'Curricula',

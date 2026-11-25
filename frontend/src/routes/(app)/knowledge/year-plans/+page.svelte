@@ -18,6 +18,7 @@
     import PageBody from '$lib/components/PageBody.svelte'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
     import ListenZeile from '$lib/components/ListenZeile.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
@@ -92,6 +93,7 @@
 <svelte:head><title>Jahresverlaufspläne</title></svelte:head>
 
 <PageBody breit>
+    <StufenHinweis eintrag="curricula" />
     <ZurueckLink href="/knowledge" label="Bibliothek" />
     <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">Jahresverlaufspläne</h1>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1 mb-5">

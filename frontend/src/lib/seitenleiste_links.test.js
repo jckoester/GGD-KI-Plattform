@@ -77,6 +77,21 @@ describe('Übersicht der Bibliothek (0.48)', () => {
         }
     })
 
+    it('Jahresverlaufspläne (0.59): Kachel und Seitenleiste, auf der Stufe der Curricula', () => {
+        expect(alle.map((b) => b.href)).toContain('/knowledge/year-plans')
+        // Derselbe Stufenschlüssel wie die Curricula — ohne ihn fehlte die Kachel nicht mit
+        const ohneCurricula = bibliothekBereiche({ istLehrkraft: true, zeigt: (e) => e !== 'curricula' })
+        expect(ohneCurricula.map((b) => b.href)).not.toContain('/knowledge/year-plans')
+        const sidebar = lies('Sidebar.svelte')
+        const block = sidebar.slice(sidebar.indexOf("$zeigtEintrag('curricula')"), sidebar.indexOf("$zeigtEintrag('education_plans')"))
+        expect(block).toContain('href="/knowledge/year-plans"')
+        // Reihenfolge (Jan): Jahresverlaufspläne – Curricula – Bildungspläne
+        expect(block.indexOf('/knowledge/year-plans')).toBeLessThan(block.indexOf('/knowledge/curricula'))
+        const kacheln = alle.map((b) => b.href)
+        expect(kacheln.indexOf('/knowledge/year-plans')).toBe(kacheln.indexOf('/knowledge/curricula') - 1)
+        expect(kacheln.indexOf('/knowledge/curricula')).toBeLessThan(kacheln.indexOf('/knowledge/education-plans'))
+    })
+
     it('der Kopf „Bibliothek“ führt auf die Übersicht', () => {
         expect(lies('Sidebar.svelte')).toMatch(/<SidebarBereich\s+href="\/knowledge"\s+label="Bibliothek"/)
     })
