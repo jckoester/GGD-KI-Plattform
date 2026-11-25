@@ -1991,6 +1991,51 @@ export async function getCurriculum(curriculumId) {
  * Querverweise des Bildungsplans in andere Fächer, je Kompetenz (AY Teil 1).
  * Kompetenzen ohne Querverweis fehlen in der Antwort. POST nur wegen der Länge der Liste.
  */
+// ── Jahresverlaufspläne der Fachschaften (BD, 0.59) ─────────────────────────
+
+async function _verlaufsplan(pfad, { method = 'GET', body } = {}, fehltext) {
+  const res = await fetch(`${BASE}/context/verlaufsplaene${pfad}`, {
+    method,
+    credentials: 'include',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const detail = typeof data.detail === 'string' ? data.detail : fehltext
+    throw new ApiError(res.status, detail)
+  }
+  return res.status === 204 ? null : res.json()
+}
+
+/** Pläne eines Fachs (oder alle), mit laufendem Schuljahr und `darf_anlegen`. */
+export function getVerlaufsplaene(subjectId) {
+  const q = subjectId != null ? `?subject_id=${encodeURIComponent(subjectId)}` : ''
+  return _verlaufsplan(q, {}, 'Jahresverlaufspläne konnten nicht geladen werden')
+}
+
+export function getVerlaufsplan(id) {
+  return _verlaufsplan(`/${id}`, {}, 'Jahresverlaufsplan konnte nicht geladen werden')
+}
+
+/** Neuer Plan als Entwurf: `{subject_id, stufe, schuljahr, raster?, abschnitte?}`. */
+export function createVerlaufsplan(daten) {
+  return _verlaufsplan('', { method: 'POST', body: daten }, 'Jahresverlaufsplan konnte nicht angelegt werden')
+}
+
+/** Den ganzen Plan speichern: `{abschnitte, raster}`. */
+export function saveVerlaufsplan(id, daten) {
+  return _verlaufsplan(`/${id}`, { method: 'PUT', body: daten }, 'Jahresverlaufsplan konnte nicht gespeichert werden')
+}
+
+export function beschliesseVerlaufsplan(id) {
+  return _verlaufsplan(`/${id}/beschliessen`, { method: 'POST' }, 'Beschluss konnte nicht vermerkt werden')
+}
+
+export function deleteVerlaufsplan(id) {
+  return _verlaufsplan(`/${id}`, { method: 'DELETE' }, 'Jahresverlaufsplan konnte nicht gelöscht werden')
+}
+
 export async function getQuerverweise(kompetenzIds) {
   const res = await fetch(`${BASE}/context/querverweise`, {
     method: 'POST',

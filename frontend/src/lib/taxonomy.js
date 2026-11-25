@@ -105,7 +105,6 @@ export const PLANUNG_CONTENT_TYPES = [
 // keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
 export const RUHENDE_CONTENT_TYPES = new Set([
-  "verlaufsplan",
   "pruefungsanforderung",
   "lernplan",
   "schuelertext",

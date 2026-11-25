@@ -436,12 +436,11 @@ categories:
       # Lesen wie das Curriculum (`school`, Jan 25.11.2026): kein Geheimnis; Schüler:innen
       # bekommen ihn nirgends angeboten (BD F11), eine harte Sperre wäre ein neuer Scope.
       # Kein Embedding: Strukturknoten, gesucht wird er über Fach, Stufe und Schuljahr.
-      # Ruht, bis es den Editor gibt (BD Schritt 5) — vorher kein Weg, ihn anzulegen.
+      # Aktiv seit BD Schritt 5: angelegt unter /knowledge/year-plans (eigene Endpunkte).
       - key: verlaufsplan
         label_de: "Jahresverlaufsplan"
         icon: ChartGantt
         scope_defaults: {read_scope: school, write_scope: subject}
-        ui_status: ruhend
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
         icon: ClipboardCheck

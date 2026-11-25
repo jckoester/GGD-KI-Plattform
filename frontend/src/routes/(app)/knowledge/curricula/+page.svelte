@@ -102,6 +102,7 @@
                 </h1>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                     {totalCurricula} Curricula in {Object.values(anzahlJeFach).filter((n) => n > 0).length} Fächern
+                    · <a href="/knowledge/year-plans" class="text-light-bl dark:text-dark-bl hover:underline">Jahresverlaufspläne</a>
                 </p>
             </div>
         </div>
@@ -159,6 +160,9 @@
                             <span class="text-lg font-semibold text-light-tx dark:text-dark-tx">{subject.name}</span>
                             <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">({anzahlJeFach[subject.id] ?? 0})</span>
                         </summary>
+                        <a href="/knowledge/year-plans?fach={subject.id}" class="mt-2 inline-block text-xs text-light-bl dark:text-dark-bl hover:underline">
+                            Jahresverlaufspläne {subject.name}
+                        </a>
                         <div class="mt-3">
                             <CurriculumList
                                 subjectId={subject.id}

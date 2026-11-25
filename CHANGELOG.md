@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Jahresverlaufspläne der Fachschaften (`/knowledge/year-plans`): je Fach, Klassenstufe und Schuljahr Abschnitte
+  in Unterrichtswochen auf dem Kalender der Schule, mit Zeitleiste, Stundenbilanz je Kapitel, Entwurf und Beschluss,
+  Archiv früherer Schuljahre. Verlinkt aus den Curricula.
+
 ### Intern
 
 - Knotentyp `verlaufsplan` (Jahresverlaufsplan der Fachschaft, noch ohne Oberfläche). Migration 0114:

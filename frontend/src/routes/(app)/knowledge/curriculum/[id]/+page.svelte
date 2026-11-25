@@ -197,6 +197,9 @@
                         {#if totalStd > 0}
                             · Gesamt: {totalStd} Std.
                         {/if}
+                        {#if curriculum.subject_id}
+                            · <a href="/knowledge/year-plans?fach={curriculum.subject_id}" class="text-light-bl dark:text-dark-bl hover:underline">Jahresverlaufspläne</a>
+                        {/if}
                     </p>
                 </div>
                 <div bind:this={topActionsEl} class="flex flex-wrap justify-end gap-2">
