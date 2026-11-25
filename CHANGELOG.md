@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.57.1] – 2026-11-25
+
 ### Geändert
 
 - Leitplanke „Keine Komplettlösungen“ für Schüler:innen gilt ausdrücklich auch für Übersetzungen und Texte: Eine
