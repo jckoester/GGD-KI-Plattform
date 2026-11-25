@@ -157,6 +157,50 @@ async def kapitelkanten_abgleichen(db: AsyncSession, plan: ContextNode) -> None:
         db.add(ContextEdge(from_node_id=plan.id, to_node_id=ziel, relation="references"))
 
 
+# ── Aus einem anderen Schuljahr übernehmen (Schritt 6) ────────────────────────
+
+
+def kapitel_abbilden(abschnitte: list[dict], curricula: list[dict],
+                     titel_alt: Optional[dict[str, str]] = None) -> tuple[list[dict], int]:
+    """Die Kapitel eines alten Plans auf die Curricula von heute legen.
+
+    Ein Kapitel, das noch im veröffentlichten Curriculum der Stufe steht, bleibt. Hat das
+    Curriculum inzwischen eine neue Fassung (neue Knoten), findet es sich über den **gleichen
+    Titel** wieder — nur bei genau einem Treffer, sonst wäre es geraten. Der Rest fällt weg und
+    wird gezählt, damit die Oberfläche es sagen kann.
+    """
+    heute = {k["id"]: k for c in curricula for k in c["kapitel"]}
+    nach_titel: dict[str, list[str]] = {}
+    for k in heute.values():
+        nach_titel.setdefault(k["titel"].strip().casefold(), []).append(k["id"])
+    titel_alt = titel_alt or {}
+    entfallen = 0
+    aus = []
+    for a in abschnitte:
+        ids = []
+        for kid in a.get("kapitel_ids") or []:
+            kid = str(kid)
+            if kid in heute:
+                ids.append(kid)
+                continue
+            treffer = nach_titel.get((titel_alt.get(kid) or "").strip().casefold(), [])
+            if len(treffer) == 1:
+                ids.append(treffer[0])
+            else:
+                entfallen += 1
+        aus.append({**a, "kapitel_ids": list(dict.fromkeys(ids))})
+    return aus, entfallen
+
+
+async def kapiteltitel(db: AsyncSession, ids: set[str]) -> dict[str, str]:
+    """Titel der Kapitel eines alten Plans — auch archivierter, für die Zuordnung per Titel."""
+    if not ids:
+        return {}
+    zeilen = await db.execute(sa.select(ContextNode.id, ContextNode.title).where(
+        ContextNode.id.in_([UUID(i) for i in ids]), ContextNode.content_type == "kapitel"))
+    return {str(i): t for i, t in zeilen}
+
+
 # ── Darstellung ───────────────────────────────────────────────────────────────
 
 
@@ -212,6 +256,9 @@ async def voll(db: AsyncSession, plan: ContextNode, user) -> dict:
         if cfg else None,
         "darf_bearbeiten": schreiben,
         "darf_beschliessen": schreiben and plan.status == ENTWURF,
+        # Übernehmen in ein späteres Schuljahr geht auch aus dem Archiv (F10, Schritt 6)
+        "darf_uebernehmen": await darf_bearbeiten(db, plan, user),
+        "aktuelles_schuljahr": aktuelles_schuljahr(),
     }
 
 

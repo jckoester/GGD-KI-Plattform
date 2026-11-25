@@ -215,3 +215,50 @@ async def test_allgemeine_wege_sind_gesperrt(db, welt):
                 "read_scope": "school", "write_scope": "private"}),
         ]:
             assert r.status_code == 422 and r.json()["detail"] == vp.EIGENER_WEG, r.text
+
+
+# ── Schritt 6: aus dem Vorjahr übernehmen ─────────────────────────────────────
+
+async def test_aus_dem_archiv_uebernehmen(db, welt):
+    # Alte Fassung eines Kapitels (archiviert, gleicher Titel wie das heutige „Pythagoras“)
+    alt_kap = ContextNode(category="knowledge", content_type="kapitel", title="Pythagoras", status="archived",
+                          subject_id=welt["fach"].id, read_scope="school", write_scope="private", owner_pseudonym="x")
+    db.add(alt_kap)
+    await db.flush()
+    heute_kap = welt["kapitel"][0]
+    alt = ContextNode(category="knowledge", content_type="verlaufsplan", title="alt", status="active",
+                      subject_id=welt["fach"].id, min_grade=9, max_grade=9, read_scope="school",
+                      write_scope="private", owner_pseudonym=MITGLIED,
+                      metadata_={"schuljahr": "2024/25", "raster": 4, "abschnitte": [
+                          {"id": "a1", "titel": "Ähnlichkeit", "wochen": 4, "kapitel_ids": [str(heute_kap.id)], "notiz": "n"},
+                          {"id": "a2", "titel": "Pythagoras", "wochen": 6, "kapitel_ids": [str(alt_kap.id)], "notiz": ""},
+                          {"id": "a3", "titel": "Weg", "wochen": 2, "kapitel_ids": [str(uuid.uuid4())], "notiz": ""},
+                      ]})
+    db.add(alt)
+    await db.flush()
+
+    async with _client(db, LK()) as c:
+        assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})).status_code == 403
+    async with _client(db, FS()) as c:
+        r = await c.get(f"/context/verlaufsplaene/{alt.id}")
+        assert r.json()["darf_uebernehmen"] and not r.json()["darf_bearbeiten"]
+        assert r.json()["aktuelles_schuljahr"] == "2025/26"
+
+        r = await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})
+        assert r.status_code == 201, r.text
+        p = r.json()
+        assert p["status"] == "draft" and p["schuljahr"] == "2025/26" and p["raster"] == 4
+        assert [a["titel"] for a in p["abschnitte"]] == ["Ähnlichkeit", "Pythagoras", "Weg"]
+        assert [a["wochen"] for a in p["abschnitte"]] == [4, 6, 2]
+        assert all(a["id"] not in ("a1", "a2", "a3") for a in p["abschnitte"])
+        assert [a["kapitel_ids"] for a in p["abschnitte"]] == [
+            [str(heute_kap.id)], [str(welt["kapitel"][1].id)], []]
+        assert p["kapitel_entfallen"] == 1
+        assert p["lage"]["abschnitte"][1]["ueber_ferien"] == ["Herbstferien"]  # neuer Kalender
+        # Die Quelle bleibt unverändert
+        await db.refresh(alt)
+        assert alt.metadata_["abschnitte"][1]["kapitel_ids"] == [str(alt_kap.id)]
+
+        assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2025/26"})).status_code == 409
+        assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2024/25"})).status_code == 422
+        assert (await c.post(f"/context/verlaufsplaene/{alt.id}/uebernehmen", json={"schuljahr": "2026"})).status_code == 422

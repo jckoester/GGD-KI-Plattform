@@ -2032,6 +2032,11 @@ export function beschliesseVerlaufsplan(id) {
   return _verlaufsplan(`/${id}/beschliessen`, { method: 'POST' }, 'Beschluss konnte nicht vermerkt werden')
 }
 
+/** Als Entwurf in ein anderes (späteres) Schuljahr übernehmen; Antwort mit `kapitel_entfallen`. */
+export function uebernehmeVerlaufsplan(id, schuljahr) {
+  return _verlaufsplan(`/${id}/uebernehmen`, { method: 'POST', body: { schuljahr } }, 'Plan konnte nicht übernommen werden')
+}
+
 export function deleteVerlaufsplan(id) {
   return _verlaufsplan(`/${id}`, { method: 'DELETE' }, 'Jahresverlaufsplan konnte nicht gelöscht werden')
 }

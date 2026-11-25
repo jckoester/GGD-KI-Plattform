@@ -93,6 +93,20 @@ export function schuljahreZumAnlegen(aktuell) {
     return [aktuell, `${start}/${String((start + 1) % 100).padStart(2, '0')}`]
 }
 
+/** Wohin sich ein Plan übernehmen lässt: laufendes und nächstes Schuljahr, ohne sein eigenes. */
+export function uebernahmeZiele(aktuell, eigenes) {
+    return schuljahreZumAnlegen(aktuell).filter((j) => j !== eigenes)
+}
+
+/** Pläne, die sich als Ausgangspunkt für einen neuen Plan anbieten: gleiches Fach, gleiche
+ *  Stufe, anderes Schuljahr, neueste zuerst (Schritt 6). */
+export function ausgangspunkte(plaene, fachId, stufe, schuljahr) {
+    if (!stufe) return []
+    return (plaene ?? [])
+        .filter((p) => p.subject_id === fachId && p.stufe === stufe && p.schuljahr !== schuljahr)
+        .sort((a, b) => (a.schuljahr < b.schuljahr ? 1 : -1))
+}
+
 /** Pläne eines Fachs: laufende und kommende vorn, das Archiv getrennt (BD F10). */
 export function teilen(plaene) {
     const aktuell = []

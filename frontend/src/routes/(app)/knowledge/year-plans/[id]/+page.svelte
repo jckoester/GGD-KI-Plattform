@@ -9,10 +9,11 @@
     import { onDestroy } from 'svelte'
     import { Undo2 } from 'lucide-svelte'
     import {
-        beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan,
+        beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
     import {
-        RICHTGROESSE, abschnittFarbe, bilanzStand, hinweise, wochenText, zeitraumText, zumSpeichern,
+        RICHTGROESSE, abschnittFarbe, bilanzStand, hinweise, uebernahmeZiele, wochenText, zeitraumText,
+        zumSpeichern,
     } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
@@ -120,6 +121,22 @@
         }
     }
 
+    // Übernehmen in ein anderes Schuljahr (Schritt 6)
+    const ziele = $derived(plan ? uebernahmeZiele(plan.aktuelles_schuljahr, plan.schuljahr) : [])
+    let ziel = $state('')
+    $effect(() => { if (!ziele.includes(ziel)) ziel = ziele.at(-1) ?? '' })
+    const entfallen = $derived(Number($page.url.searchParams.get('entfallen')) || 0)
+
+    async function inSchuljahrUebernehmen() {
+        await speichern()
+        try {
+            const neu = await uebernehmeVerlaufsplan(plan.id, ziel)
+            goto(`/knowledge/year-plans/${neu.id}${neu.kapitel_entfallen ? `?entfallen=${neu.kapitel_entfallen}` : ''}`)
+        } catch (e) {
+            speicherFehler = e.message
+        }
+    }
+
     onDestroy(() => {
         if (timer) speichern()
     })
@@ -173,6 +190,19 @@
         </div>
 
         {#if speicherFehler}<div class="mb-3"><ErrorBanner message={speicherFehler} /></div>{/if}
+        {#if entfallen}
+            <div class="mb-3"><WarningBanner message="Übernommen. {entfallen} {entfallen === 1 ? 'Kapitelbezug fand' : 'Kapitelbezüge fanden'} sich im heutigen Curriculum nicht wieder und {entfallen === 1 ? 'ist' : 'sind'} entfallen." /></div>
+        {/if}
+        {#if plan.darf_uebernehmen && ziele.length}
+            <div class="mb-4 flex flex-wrap items-center gap-2 text-sm text-light-tx dark:text-dark-tx" data-abschnitt="uebernehmen">
+                <span>{plan.archiviert ? 'Als Ausgangspunkt für ein neues Schuljahr:' : 'Für ein anderes Schuljahr:'}</span>
+                <select bind:value={ziel} aria-label="Schuljahr"
+                    class="rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm">
+                    {#each ziele as j (j)}<option value={j}>{j}</option>{/each}
+                </select>
+                <button type="button" class={knopf} onclick={inSchuljahrUebernehmen}>Als Entwurf übernehmen</button>
+            </div>
+        {/if}
         {#if plan.kalender_fehlt}
             <div class="mb-3"><InfoBanner message="Für {plan.schuljahr} liegt der Kalender der Schule noch nicht vor. Der Plan zählt deshalb nur Wochen, ohne Daten und Ferien." /></div>
         {/if}

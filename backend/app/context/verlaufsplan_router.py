@@ -178,6 +178,69 @@ async def verlaufsplan_beschliessen(
     return await vp.voll(db, plan, user)
 
 
+class Uebernehmen(BaseModel):
+    schuljahr: str
+
+    @field_validator("schuljahr")
+    @classmethod
+    def _schuljahr(cls, v: str) -> str:
+        if not ist_schuljahr(v):
+            raise ValueError("Schuljahr in der Form „2027/28“.")
+        return v
+
+
+@router.post("/{plan_id}/uebernehmen", status_code=201)
+async def verlaufsplan_uebernehmen(
+    plan_id: UUID, daten: Uebernehmen,
+    db: AsyncSession = Depends(get_db), user: JwtPayload = Depends(lehrkraft),
+):
+    """Einen Plan — meist den des Vorjahrs aus dem Archiv — als **Entwurf** in ein späteres
+    Schuljahr übernehmen (BD Schritt 6). Reihenfolge und Dauern legen sich auf den neuen Kalender;
+    Kapitel werden auf die Curricula von heute abgebildet. Neu schreiben bleibt die Regel, das hier
+    ist nur der Ausgangspunkt."""
+    quelle = await vp.lade(db, plan_id)
+    if quelle is None:
+        raise NICHT_GEFUNDEN
+    if not await vp.darf_bearbeiten(db, quelle, user):
+        raise HTTPException(status_code=403, detail=NUR_FACHSCHAFT)
+    if daten.schuljahr < vp.aktuelles_schuljahr():
+        raise HTTPException(status_code=422, detail="Für vergangene Schuljahre legst du keinen Plan mehr an.")
+    if daten.schuljahr == (quelle.metadata_ or {}).get("schuljahr"):
+        raise HTTPException(status_code=422, detail="Wähle ein anderes Schuljahr als das des Plans.")
+    fach = await db.get(Subject, quelle.subject_id)
+    gruppe = await vp.fachschaftsgruppe(db, quelle.subject_id)
+    if gruppe is None:
+        raise HTTPException(status_code=422, detail=f"{fach.name} hat keine Fachschaft in der Plattform.")
+
+    alt = (quelle.metadata_ or {}).get("abschnitte", [])
+    curricula = await vp.curricula_der_stufe(db, quelle.subject_id, quelle.min_grade)
+    titel = await vp.kapiteltitel(db, {str(k) for a in alt for k in a.get("kapitel_ids") or []})
+    abschnitte, entfallen = vp.kapitel_abbilden(alt, curricula, titel)
+    abschnitte = [{**a, "id": uuid4().hex[:12]} for a in abschnitte]
+
+    plan = ContextNode(
+        category="knowledge", content_type=vp.TYP, status=ENTWURF,
+        title=f"Jahresverlaufsplan {fach.name} Kl. {quelle.min_grade} {daten.schuljahr}",
+        subject_id=quelle.subject_id, min_grade=quelle.min_grade, max_grade=quelle.max_grade,
+        read_scope="school", write_scope="subject", write_scope_group_id=gruppe,
+        owner_pseudonym=user.sub,
+        metadata_={"schuljahr": daten.schuljahr, "abschnitte": abschnitte,
+                   "raster": (quelle.metadata_ or {}).get("raster"),
+                   "uebernommen_aus": str(quelle.id)},
+    )
+    try:
+        async with db.begin_nested():
+            db.add(plan)
+            await db.flush()
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail=(
+            f"Für {fach.name} Kl. {quelle.min_grade} gibt es {daten.schuljahr} schon einen Plan."))
+    await vp.kapitelkanten_abgleichen(db, plan)
+    await db.commit()
+    await db.refresh(plan)
+    return {**await vp.voll(db, plan, user), "kapitel_entfallen": entfallen}
+
+
 @router.delete("/{plan_id}", status_code=204)
 async def verlaufsplan_loeschen(
     plan_id: UUID, db: AsyncSession = Depends(get_db), user: JwtPayload = Depends(lehrkraft),

@@ -17,6 +17,10 @@ Zahl der Unterrichtswochen die Jahreszusage bestimmt.
   Jahrgangs.
 - **Jahrgangswechsel** greift beim nächsten Zuteilungslauf, sobald das SSO-System die
   Person in die neue Gruppe verschoben hat.
+- **Jahresverlaufspläne** (seit 0.59) des alten Schuljahrs wandern ins Archiv und sind nur noch
+  lesbar. Die Fachschaften übernehmen sie bei Bedarf als Entwurf ins neue Jahr („Als Entwurf
+  übernehmen“). Ihre Daten behalten sie nur, wenn der alte Kalender als Jahresdatei liegen
+  bleibt (Schritt 1).
 
 ## Was zu tun ist
 

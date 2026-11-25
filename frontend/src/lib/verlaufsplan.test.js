@@ -109,3 +109,24 @@ describe('Speichern', () => {
         expect(aus).toEqual({ raster: 2, abschnitte: [{ id: 'x', titel: 'A', wochen: 3, kapitel_ids: ['k'], notiz: '' }] })
     })
 })
+
+describe('Übernehmen (Schritt 6)', () => {
+    it('Ziele: laufendes und nächstes, ohne das eigene', async () => {
+        const { uebernahmeZiele } = await import('./verlaufsplan.js')
+        expect(uebernahmeZiele('2025/26', '2024/25')).toEqual(['2025/26', '2026/27'])
+        expect(uebernahmeZiele('2025/26', '2025/26')).toEqual(['2026/27'])
+    })
+    it('Ausgangspunkte: gleiches Fach und gleiche Stufe, anderes Jahr, neueste zuerst', async () => {
+        const { ausgangspunkte } = await import('./verlaufsplan.js')
+        const plaene = [
+            { id: 1, subject_id: 3, stufe: 9, schuljahr: '2023/24' },
+            { id: 2, subject_id: 3, stufe: 9, schuljahr: '2024/25' },
+            { id: 3, subject_id: 3, stufe: 9, schuljahr: '2025/26' },
+            { id: 4, subject_id: 3, stufe: 8, schuljahr: '2024/25' },
+            { id: 5, subject_id: 4, stufe: 9, schuljahr: '2024/25' },
+        ]
+        expect(ausgangspunkte(plaene, 3, 9, '2025/26').map((p) => p.id)).toEqual([2, 1])
+        expect(ausgangspunkte(plaene, 3, NaN, '2025/26')).toEqual([])
+        expect(ausgangspunkte(plaene, 3, 0, '2025/26')).toEqual([])
+    })
+})

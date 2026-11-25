@@ -6,8 +6,8 @@
      */
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
-    import { createVerlaufsplan, getVerlaufsplaene } from '$lib/api.js'
-    import { schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
+    import { createVerlaufsplan, getVerlaufsplaene, uebernehmeVerlaufsplan } from '$lib/api.js'
+    import { ausgangspunkte, schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { myGroups } from '$lib/stores/myGroups.js'
@@ -53,13 +53,19 @@
     let anlegeFehler = $state({})
     $effect(() => {
         for (const f of faecher) {
-            if (!neu[f.id] && jahre.length) neu[f.id] = { stufe: '', schuljahr: jahre[0], raster: 1 }
+            if (!neu[f.id] && jahre.length) neu[f.id] = { stufe: '', schuljahr: jahre[0], raster: 1, quelle: '' }
         }
     })
     async function anlegen(fach) {
         const f = neu[fach.id]
         anlegeFehler[fach.id] = null
         try {
+            if (f.quelle) {
+                // Aus einem anderen Schuljahr übernehmen (Schritt 6): Stufe und Raster kommen von dort
+                const p = await uebernehmeVerlaufsplan(f.quelle, f.schuljahr)
+                goto(`/knowledge/year-plans/${p.id}${p.kapitel_entfallen ? `?entfallen=${p.kapitel_entfallen}` : ''}`)
+                return
+            }
             const p = await createVerlaufsplan({
                 subject_id: fach.id, stufe: Number(f.stufe), schuljahr: f.schuljahr, raster: Number(f.raster), abschnitte: [],
             })
@@ -121,6 +127,7 @@
 
                     {#if darf && neu[fach.id]}
                         {@const f = neu[fach.id]}
+                        {@const quellen = ausgangspunkte(antwort?.plaene, fach.id, Number(f.stufe), f.schuljahr)}
                         <form class="mt-3 flex flex-wrap items-end gap-2" onsubmit={(e) => { e.preventDefault(); anlegen(fach) }}>
                             <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">Klassenstufe
                                 <select class="{feld} block" bind:value={f.stufe} required>
@@ -139,6 +146,14 @@
                                     {#each [2, 3, 4, 5, 6] as w (w)}<option value={w}>in Blöcken von {w} Wochen</option>{/each}
                                 </select>
                             </label>
+                            {#if quellen.length}
+                                <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">Ausgangspunkt
+                                    <select class="{feld} block" bind:value={f.quelle}>
+                                        <option value="">leer</option>
+                                        {#each quellen as q (q.id)}<option value={q.id}>Plan {q.schuljahr} übernehmen</option>{/each}
+                                    </select>
+                                </label>
+                            {/if}
                             <button type="submit"
                                 class="px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90">
                                 Neuer Plan
