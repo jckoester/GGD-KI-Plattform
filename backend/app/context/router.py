@@ -67,6 +67,7 @@ from app.context.schemas import (
     KollisionsZeileRead,
     ZielZaehlung,
 )
+from app.context.verlaufsplan import pruefe_eigener_weg
 from app.context.curriculum_entwurf import (
     CURRICULUM_TYPEN, ENTWURF, LESBARE_STATUS, darf_entwurf_bearbeiten, darf_entwurf_lesen, darf_loeschen, darf_schreiben,
     darf_veroeffentlichen, erbe_entwurf, fachvorsitz_zugeordnet, pruefe_anlegen, pruefe_entwurf_bearbeiten,
@@ -670,6 +671,7 @@ async def copy_node(
     # Nachbereitung unverändert mit und hängte die Stunde in keine Einheit.
     from app.context.taxonomy import PLANUNG_CONTENT_TYPES
 
+    pruefe_eigener_weg(source.content_type)  # Jahresverlaufsplan (BD): eigene Endpunkte
     if source.content_type in PLANUNG_CONTENT_TYPES:
         raise HTTPException(
             status_code=422,
@@ -824,6 +826,7 @@ async def create_node(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
+    pruefe_eigener_weg(payload.content_type)  # Jahresverlaufsplan (BD): eigene Endpunkte
     try:
         validate_content_type(payload.category, payload.content_type)
         validate_node_metadata(payload.content_type, payload.metadata_)
@@ -983,8 +986,10 @@ async def update_node(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
+    pruefe_eigener_weg(node.content_type)  # Jahresverlaufsplan (BD): eigene Endpunkte
 
     update_data = payload.model_dump(exclude_unset=True, by_alias=False)
+    pruefe_eigener_weg(update_data.get("content_type"))
 
     # Die Bildungsplan-Edition eines Curriculums ist kein Etikett: Sie bestimmt, gegen
     # welche Edition die IK-/PK-Verweise aufgelöst wurden. Über diesen generischen Weg
@@ -1264,6 +1269,7 @@ async def verwalte_node(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Baustein nicht gefunden")
     await _check_write_permission(node, user, db)
+    pruefe_eigener_weg(node.content_type)  # Jahresverlaufsplan (BD): eigene Endpunkte
 
     vektor_vorher = await eingabe_mit_aliasen(db, node)
     if payload.title is not None:
@@ -1342,6 +1348,7 @@ async def delete_node(
     # `force` — der Planer löscht Stunden (`DELETE /planning/lessons/{id}`) und Einheiten selbst.
     from app.context.taxonomy import PLANUNG_CONTENT_TYPES
 
+    pruefe_eigener_weg(node.content_type)  # Jahresverlaufsplan (BD): eigene Endpunkte
     if node.content_type in PLANUNG_CONTENT_TYPES:
         raise HTTPException(
             status_code=422,

@@ -11,6 +11,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Entwurf auch für Verlaufspläne, höchstens ein Plan je Fach, Jahrgangsstufe und Schuljahr.
 - Zeitrechnung des Verlaufsplans (`app/planning/verlaufsplan_zeit.py`): Abschnitte auf den Kalender des
   Schuljahrs gelegt, mit Ferien, Halbjahr, Überhang und Stundenbilanz je Kapitel.
+- Endpunkte `/context/verlaufsplaene` (Liste, Anlegen, Lesen, Speichern, Beschließen, Löschen); die allgemeinen
+  Schreibwege weisen Verlaufspläne ab.
+- Kalender je Schuljahr: neben `config/school_year.yaml` gelten `config/school_year_JJJJ-JJ.yaml` für kommende
+  und vergangene Schuljahre.
 
 ## [0.58.0] – 2026-11-25
 

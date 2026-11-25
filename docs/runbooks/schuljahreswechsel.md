@@ -24,6 +24,14 @@ Zahl der Unterrichtswochen die Jahreszusage bestimmt.
 
 Beginn, Ende, Halbjahreswechsel, Ferien, Feiertage, bewegliche Ferientage.
 
+> **Die alte Fassung nicht wegwerfen (seit 0.59).** Bevor Sie die Datei umstellen, legen Sie
+> sie unter ihrem Jahresnamen daneben ab: `config/school_year_2025-26.yaml` (Schrägstrich als
+> Bindestrich). Die Jahresverlaufspläne vergangener Schuljahre zeigen sonst nur noch
+> Wochennummern statt Daten. Ebenso gilt: Liegt `config/school_year_2027-28.yaml` schon vor
+> Schuljahresbeginn bereit, können die Fachschaften ihre Pläne für das kommende Jahr mit
+> echten Daten schreiben. Diese Jahresdateien wirken ohne Neustart; eine Datei, deren
+> `schuljahr` nicht zum Namen passt, wird ignoriert.
+
 Der Ferienimport nimmt Arbeit ab (`/settings` → Ferien übernehmen). Er **ergänzt und
 ersetzt nicht**: Von der Schule selbst gelegte Tage (Reisewoche, letzter Schultag) stehen
 in keinem Ferienkalender und würden sonst verschwinden.

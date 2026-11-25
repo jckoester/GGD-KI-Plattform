@@ -74,7 +74,7 @@ class AbschnittLage:
     halbjahreswechsel: bool = False
     # Wochen, die über das Schuljahr hinausreichen
     ausserhalb: int = 0
-    stunden: Optional[int] = None
+    stunden: Optional[float] = None
 
     @property
     def lang(self) -> bool:
@@ -165,7 +165,7 @@ def lage(
     abschnitte: Iterable[dict],
     cfg: SchoolYearConfig,
     *,
-    wochenstunden: Optional[int] = None,
+    wochenstunden: Optional[float] = None,
     kapitel: Iterable[dict] = (),
 ) -> Planlage:
     """Legt die Abschnitte auf den Kalender des Schuljahrs.
@@ -218,7 +218,7 @@ def lage(
 
 
 def _bilanz(abschnitte: list[dict], lagen: list[AbschnittLage], kapitel: list[dict],
-            wochenstunden: Optional[int]) -> dict:
+            wochenstunden: Optional[float]) -> dict:
     """Stunden und Wochen je Kapitel; ein Abschnitt teilt sich gleich auf seine Kapitel auf."""
     wochen_je: dict[str, float] = {}
     for a, l in zip(abschnitte, lagen):

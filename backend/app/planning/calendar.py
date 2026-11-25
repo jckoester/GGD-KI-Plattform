@@ -7,6 +7,7 @@ SCHOOL_YEAR_PATH-Umgebungsvariable überschreibt den Pfad.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -90,12 +91,68 @@ _DEFAULT_PATH = aufloesen(
 )
 
 
-@lru_cache(maxsize=1)
-def load_school_year(path: Path | None = None) -> SchoolYearConfig:
-    p = path or _DEFAULT_PATH
+def _lies(p: Path) -> SchoolYearConfig:
     with open(p, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return SchoolYearConfig.model_validate(data)
+
+
+@lru_cache(maxsize=1)
+def load_school_year(path: Path | None = None) -> SchoolYearConfig:
+    return _lies(path or _DEFAULT_PATH)
+
+
+_SCHULJAHR = re.compile(r"(\d{4})/(\d{2})")
+
+
+def ist_schuljahr(schuljahr: str | None) -> bool:
+    """„2027/28“ — vier Ziffern, Schrägstrich, die zwei folgenden."""
+    m = _SCHULJAHR.fullmatch(schuljahr or "")
+    return bool(m) and (int(m.group(1)) + 1) % 100 == int(m.group(2))
+
+
+def naechstes_schuljahr(schuljahr: str) -> str:
+    start = int(schuljahr[:4]) + 1
+    return f"{start}/{(start + 1) % 100:02d}"
+
+
+def kalenderdatei(schuljahr: str) -> Path:
+    """Wo der Kalender eines bestimmten Schuljahrs liegt: neben `school_year.yaml`,
+    als `school_year_2027-28.yaml` (BD, Jan 25.11.2026)."""
+    return _DEFAULT_PATH.parent / f"school_year_{schuljahr.replace('/', '-')}.yaml"
+
+
+@lru_cache(maxsize=8)
+def _kalender_aus(pfad: str, _stand: float) -> SchoolYearConfig:
+    return _lies(Path(pfad))
+
+
+def kalender_fuer(schuljahr: str) -> SchoolYearConfig | None:
+    """Der Kalender eines Schuljahrs — oder None, wenn die Plattform ihn nicht kennt.
+
+    Der laufende kommt aus `school_year.yaml`. Andere Jahre liegen als eigene Datei daneben
+    (:func:`kalenderdatei`): das **kommende**, weil die Fachschaften ihren Jahresverlaufsplan vor
+    dem Schuljahr schreiben, und **vergangene**, damit archivierte Pläne ihre Daten behalten.
+    Wer `school_year.yaml` zum Schuljahreswechsel tauscht, lässt die alte Fassung unter ihrem
+    Jahresnamen liegen (Runbook `schuljahreswechsel.md`).
+
+    Eine Jahresdatei, deren `schuljahr` nicht zum Namen passt, gilt als fehlend — ein falscher
+    Kalender sähe aus wie ein richtiger. Zwischengespeichert nach Änderungszeit: Eine neu
+    abgelegte oder korrigierte Datei wirkt ohne Neustart.
+    """
+    if not ist_schuljahr(schuljahr):
+        return None
+    aktuell = load_school_year()
+    if aktuell.schuljahr == schuljahr:
+        return aktuell
+    pfad = kalenderdatei(schuljahr)
+    if not pfad.is_file():
+        return None
+    try:
+        cfg = _kalender_aus(str(pfad), pfad.stat().st_mtime)
+    except Exception:  # kaputte Datei: wie fehlend, der Plan zeigt dann nur Wochen
+        return None
+    return cfg if cfg.schuljahr == schuljahr else None
 
 
 def is_schoolday(d: date, cfg: SchoolYearConfig | None = None) -> bool:
