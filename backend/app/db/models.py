@@ -1407,9 +1407,10 @@ class ContextNode(Base):
             "'lfdb_baustein','lfdb_themenblock','lfdb_kompetenz')",
             name="check_context_nodes_upcoming_typ",
         ),
-        # Entwürfe nur im Curriculum-Baum (0.45, Alembic 0106) — nur dort verbirgt eine Regel sie.
+        # Entwürfe im Curriculum-Baum (0.45, Alembic 0106) und am Jahresverlaufsplan (BD, 0114).
+        # Die Leseregel für Entwürfe (`pruefe_entwurf_lesen`) prüft den Status, nicht den Typ.
         CheckConstraint(
-            "status <> 'draft' OR content_type IN ('curriculum','kapitel','lernsequenz')",
+            "status <> 'draft' OR content_type IN ('curriculum','kapitel','lernsequenz','verlaufsplan')",
             name="check_context_nodes_draft_typ",
         ),
         CheckConstraint(
@@ -1469,6 +1470,14 @@ class ContextNode(Base):
         # Nachschlagen nach Titel (Migrationen 0053/0054, im Modell seit 0.34, `alembic check`):
         # exakter Treffer und Teiltreffer auf dem normalisierten Titel. Der Ausdruck kommt aus
         # derselben Quelle wie die Abfrage — weichen beide ab, bleibt der Index ungenutzt.
+        # Ein Jahresverlaufsplan je Fach, Jahrgangsstufe und Schuljahr (BD, Alembic 0114).
+        # Gelöschte und archivierte zählen nicht mit.
+        Index(
+            "uq_context_nodes_verlaufsplan", "subject_id", "min_grade",
+            text("(metadata ->> 'schuljahr')"),
+            unique=True,
+            postgresql_where=text("content_type = 'verlaufsplan' AND status IN ('draft','active')"),
+        ),
         Index("idx_context_nodes_titel_nachschlagen", text(titel_normalisiert_sql("title"))),
         Index("idx_context_nodes_titel_trigramm",
               literal_column(titel_normalisiert_sql("title")).label("titel_norm"),

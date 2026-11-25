@@ -103,6 +103,8 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "sozialform": None,
     "operator": None,
     "jahresplan": None,
+    # Ruht nach dem Schuljahr über `metadata.schuljahr` (Archiv), läuft nicht ab (BD).
+    "verlaufsplan": None,
     "pruefungsanforderung": None,
     "lfdb_baustein": None,
     "lfdb_themenblock": None,
@@ -568,6 +570,9 @@ MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
     # Aspekt ein; die Leitlinie nennt, zu welchem Rahmenwerk ein Aspekt gehört.
     "leitbild": ("kuerzel",),
     "leitbild_aspekt": ("leitlinie", "kuerzel"),
+    # `verlaufsplan` (BD) fehlt hier bewusst: Seine Abschnitte sind erst mit den ausgerechneten
+    # Daten verständlich und gehen über eine eigene Funktion an den Jahresplan-Assistenten
+    # (BD Schritt 10, mit Messung) — nicht als rohes Metadata.
 }
 
 

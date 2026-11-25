@@ -426,6 +426,22 @@ categories:
         label_de: "Jahresplan"
         icon: CalendarRange
         scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
+      # Jahresverlaufsplan der Fachschaft (Päckchen BD, 0.59): wann im Schuljahr was dran ist,
+      # je Fach, Jahrgangsstufe und Schuljahr. Abschnitte mit Dauer in Unterrichtswochen in
+      # `metadata.abschnitte`; die Daten rechnet die Plattform aus dem Kalender des Schuljahrs.
+      # Existenz: eigener Pfleger (Fachschaft statt Lehrkraft), eigener Ort (neben den
+      # Curricula) und eigene Zeitrechnung — kein Feld am `jahresplan`, der einer Gruppe gehört.
+      # Klasse K2 (Fachschafts-Struktur). In `planung_content_types`: nicht in Suche und Liste
+      # der Bibliothek (BD F9), Kopieren und Löschen über die eigenen Endpunkte.
+      # Lesen wie das Curriculum (`school`, Jan 25.11.2026): kein Geheimnis; Schüler:innen
+      # bekommen ihn nirgends angeboten (BD F11), eine harte Sperre wäre ein neuer Scope.
+      # Kein Embedding: Strukturknoten, gesucht wird er über Fach, Stufe und Schuljahr.
+      # Ruht, bis es den Editor gibt (BD Schritt 5) — vorher kein Weg, ihn anzulegen.
+      - key: verlaufsplan
+        label_de: "Jahresverlaufsplan"
+        icon: ChartGantt
+        scope_defaults: {read_scope: school, write_scope: subject}
+        ui_status: ruhend
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
         icon: ClipboardCheck
@@ -842,6 +858,8 @@ planung_content_types:
   - jahresplan
   - unterrichtseinheit
   - unterrichtsstunde
+  # Jahresverlaufsplan der Fachschaft (BD, 0.59) — nicht in der Bibliothek (F9).
+  - verlaufsplan
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und

@@ -168,7 +168,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 11/2026: 29 von 44 Typen mit Embedding.
+`taxonomy.yaml`. Stand 11/2026: 29 von 45 Typen mit Embedding.
 
 ### 5. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -502,6 +502,7 @@ flowchart LR
     curriculum[curriculum]:::plain
     kapitel["kapitel ◆"]:::emb
     lernsequenz[lernsequenz]:::plain
+    verlaufsplan[verlaufsplan]:::plain
   end
 
   subgraph UP["Unterrichtsplanung (private/group)"]
@@ -557,6 +558,8 @@ flowchart LR
   lernsequenz -->|references| lpa
   lernsequenz -->|references| lb
   lernsequenz -->|references| lba
+  %% Jahresverlaufsplan (BD, 0.59): Abschnitte nennen Kapitel; Erzeuger folgt mit den Endpunkten
+  verlaufsplan -.->|references| kapitel
 
   %% Unterrichtsplanung (planning/service.py, router.py, assistant_tools.py)
   ue -->|part_of| jahresplan

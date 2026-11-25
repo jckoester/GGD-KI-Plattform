@@ -7,8 +7,10 @@ from app.context.search import Suchprofil
 APP = Path(__file__).resolve().parents[2] / "app"
 
 
-def test_die_drei_planungstypen():
-    assert set(taxonomy.PLANUNG_CONTENT_TYPES) == {"jahresplan", "unterrichtseinheit", "unterrichtsstunde"}
+def test_die_planungstypen():
+    # Seit 0.59 (BD) dazu der Jahresverlaufsplan der Fachschaft: ebenfalls nicht in der Bibliothek.
+    assert set(taxonomy.PLANUNG_CONTENT_TYPES) == {
+        "jahresplan", "unterrichtseinheit", "unterrichtsstunde", "verlaufsplan"}
     assert set(taxonomy.PLANUNG_CONTENT_TYPES) <= set(taxonomy.CONTENT_TYPE_TO_CATEGORY)
 
 

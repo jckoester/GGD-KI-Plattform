@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Intern
+
+- Knotentyp `verlaufsplan` (Jahresverlaufsplan der Fachschaft, noch ohne Oberfläche). Migration 0114:
+  Entwurf auch für Verlaufspläne, höchstens ein Plan je Fach, Jahrgangsstufe und Schuljahr.
+
 ## [0.58.0] – 2026-11-25
 
 ### Neu

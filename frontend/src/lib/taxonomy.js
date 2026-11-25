@@ -34,6 +34,7 @@ export const CONTENT_TYPES = {
     "sozialform",
     "operator",
     "jahresplan",
+    "verlaufsplan",
     "pruefungsanforderung"
   ],
   "artifact": [
@@ -96,13 +97,15 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
 export const PLANUNG_CONTENT_TYPES = [
   "jahresplan",
   "unterrichtseinheit",
-  "unterrichtsstunde"
+  "unterrichtsstunde",
+  "verlaufsplan"
 ]
 
 // Typen mit `ui_status: ruhend` — erscheinen in keiner Auswahl, keinem Filter und
 // keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
 export const RUHENDE_CONTENT_TYPES = new Set([
+  "verlaufsplan",
   "pruefungsanforderung",
   "lernplan",
   "schuelertext",
@@ -569,6 +572,7 @@ export const CONTENT_TYPE_LABELS = {
   "sozialform": "Sozialform",
   "operator": "Operator",
   "jahresplan": "Jahresplan",
+  "verlaufsplan": "Jahresverlaufsplan",
   "pruefungsanforderung": "Prüfungsanforderung",
   "unterrichtsstunde": "Unterrichtsstunde",
   "unterrichtseinheit": "Unterrichtseinheit",
@@ -696,6 +700,10 @@ export const SCOPE_DEFAULTS = {
   "jahresplan": [
     "group_teachers",
     "group_teachers"
+  ],
+  "verlaufsplan": [
+    "school",
+    "subject"
   ],
   "pruefungsanforderung": [
     "school",

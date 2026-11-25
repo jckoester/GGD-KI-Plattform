@@ -133,8 +133,8 @@ describe("Taxonomie-Zusicherungen", () => {
 // ── Unterrichtsplanung in der Bibliothek (0.40) ───────────────────────────────
 
 describe("Planung in der Bibliothek (0.40)", () => {
-    it("die drei Planungstypen", () => {
-        expect([...PLANUNG_CONTENT_TYPES].sort()).toEqual(["jahresplan", "unterrichtseinheit", "unterrichtsstunde"])
+    it("die Planungstypen, seit 0.59 mit dem Jahresverlaufsplan", () => {
+        expect([...PLANUNG_CONTENT_TYPES].sort()).toEqual(["jahresplan", "unterrichtseinheit", "unterrichtsstunde", "verlaufsplan"])
         expect(istPlanung("unterrichtsstunde")).toBe(true)
         expect(istPlanung("fachbegriff")).toBe(false)
     })
