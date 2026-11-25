@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from fastapi import FastAPI
 
 from app.auth import tokens
@@ -253,3 +254,42 @@ async def test_curriculum_yaml_und_pruefen(db, welt):
 
         aus, _ = await _ruf(rpc, "curriculum_yaml_pruefen", yaml="a: &x 1\nb: *x\n")
         assert not aus["ok"] and "Anker" in aus["fehler"][0]
+
+
+async def test_querverweise_in_curriculum_und_kompetenzen(db, welt):
+    """AY Teil 1 (F7): Querverweise des Bildungsplans in ein anderes Fach, mit Fundstelle."""
+    chemie = Subject(slug=f"mwc-{TOKEN}", name=f"Chemie {TOKEN}", fach_code=f"C{TOKEN[:4]}".upper())
+    db.add(chemie)
+    await db.flush()
+    ziel = _knoten("ik_kompetenz", "3.2.2(4) Stoffe und Licht", read_scope="global", subject_id=chemie.id,
+                   bp_version=BP, min_grade=7, max_grade=8, owner_pseudonym="system",
+                   metadata_={"kompetenz_nr": "3.2.2(4)"})
+    cur = _knoten("curriculum", f"Chemie 7/8 {TOKEN}", "active", subject_id=chemie.id, min_grade=7, max_grade=8,
+                  metadata_={"jahrgangsstufe": "7/8", "bp_version": BP, "fach": chemie.name})
+    kap = _knoten("kapitel", f"Stoffe {TOKEN}", "active", subject_id=chemie.id, metadata_={"reihenfolge": 1})
+    ls = _knoten("lernsequenz", f"LS {TOKEN}", "active", subject_id=chemie.id, metadata_={"reihenfolge": 1})
+    db.add_all([ziel, cur, kap, ls])
+    await db.flush()
+    komp = (await db.execute(sa.select(ContextNode).where(
+        ContextNode.subject_id == welt["fach"].id, ContextNode.content_type == "ik_kompetenz",
+        ContextNode.title.like("3.2.1(1)%")))).scalar_one()
+    db.add_all([ContextEdge(from_node_id=komp.id, to_node_id=ziel.id, relation="related_to"),
+                ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
+                ContextEdge(from_node_id=ls.id, to_node_id=kap.id, relation="part_of"),
+                ContextEdge(from_node_id=ls.id, to_node_id=ziel.id, relation="references")])
+    await db.flush()
+
+    async with _verbunden(db) as rpc:
+        aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(welt["aktiv"].id))
+        assert not fehler
+        assert aus["querverweise"] == [{"ik": "3.2.1(1)", "verweise": [{
+            "fach": chemie.name, "kuerzel": chemie.fach_code, "art": "Kompetenz", "nr": "3.2.2(4)",
+            "titel": "Stoffe und Licht", "stufen": "7/8",
+            "behandelt_in": [f"{cur.title} › {kap.title}"]}]}]
+
+        aus, fehler = await _ruf(rpc, "bildungsplan_kompetenzen", fach=welt["fach"].fach_code,
+                                 jahrgangsstufe="7/8", bp_version=BP, bereich="optik")
+        assert not fehler
+        k1, k2 = [k for b in aus["bereiche"] for k in b["kompetenzen"]]
+        assert [v["nr"] for v in k1["querverweise"]] == ["3.2.2(4)"]
+        assert "querverweise" not in k2

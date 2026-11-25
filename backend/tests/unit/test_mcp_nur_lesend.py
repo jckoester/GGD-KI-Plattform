@@ -36,6 +36,11 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.db.models", "ContextNode"): "Abfragen; ein ungespeicherter Knoten trägt das Band",
     ("app.db.models", "Subject"): "Abfragen",
     ("app.version", "plattformversion"): "Versionsangabe",
+    # AY Teil 1 (25.11.2026): Querverweise des Bildungsplans — nur SELECT
+    ("app.context.querverweise", "querverweise"): "liest Kanten, Knoten, Fächer und Fundstellen",
+    ("app.context.querverweise", "ik_ids_im_baum"): "rechnet nur",
+    ("app.context.querverweise", "verweise_kompakt"): "rechnet nur",
+    ("app.context.curriculum_assistent", "kompetenzen_des_bands"): "liest die Kompetenzen eines Bands",
     ("app.ratelimit.drossel", "pruefe"): "Drossel, zählt im Speicher",
     ("app.mcp", "werkzeuge"): "eigenes Paket",
     ("app.mcp.auth", "SCOPE"): "eigenes Paket",

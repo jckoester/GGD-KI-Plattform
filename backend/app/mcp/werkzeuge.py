@@ -161,8 +161,23 @@ async def _curriculum_fuer_werkzeug(db: AsyncSession, user, curriculum_id: str):
 async def lies_curriculum(db: AsyncSession, user, curriculum_id: str) -> dict:
     from app.context.curriculum_assistent import entwurf_lesen
 
-    aus = await entwurf_lesen(db, user, await _curriculum_fuer_werkzeug(db, user, curriculum_id))
+    from app.context.querverweise import ik_ids_im_baum, querverweise, verweise_kompakt
+    from app.context.service import load_curriculum_tree
+
+    cur = await _curriculum_fuer_werkzeug(db, user, curriculum_id)
+    aus = await entwurf_lesen(db, user, cur)
     aus["status"] = "entwurf" if aus.get("status") == "draft" else "veröffentlicht"
+    # Querverweise des Bildungsplans in andere Fächer (AY Teil 1, F7) — nur hier, nicht im
+    # Curriculum-Assistenten: Dort wären sie eine neue Bedingung für den gemessenen Prompt.
+    tree = await load_curriculum_tree(db, cur.id)
+    nr_je_id = {str(ik["node_id"]): ik.get("nr")
+                for kap in tree.get("kapitel") or [] for ls in kap.get("lernsequenzen") or []
+                for e in (ls.get("metadata") or {}).get("eintraege") or [] if isinstance(e, dict)
+                for ik in e.get("ik") or [] if isinstance(ik, dict) and ik.get("node_id")}
+    qv = await querverweise(db, ik_ids_im_baum(tree), user)
+    if qv:
+        aus["querverweise"] = [{"ik": nr_je_id.get(kid), "verweise": verweise_kompakt(liste)}
+                               for kid, liste in qv.items()]
     return aus
 
 
@@ -243,7 +258,23 @@ async def lies_kompetenzen(db: AsyncSession, user, fach: str, jahrgangsstufe: st
                        metadata_={"fach": s.name, "bp_version": bp, "jahrgangsstufe": jahrgangsstufe.strip()})
     aus = await lesen(db, band, bereich, "pk" if typ == "pk" else "ik")
     aus["fassungen"] = sorted(fassungen)
+    if typ != "pk" and aus.get("bereiche"):
+        await _querverweise_an_kompetenzen(db, user, band, aus)
     return aus
+
+
+async def _querverweise_an_kompetenzen(db: AsyncSession, user, band, aus: dict) -> None:
+    """An jede gezeigte Kompetenz ihre Querverweise in andere Fächer (AY Teil 1, F7)."""
+    from app.context.curriculum_assistent import kompetenzen_des_bands
+    from app.context.querverweise import querverweise, verweise_kompakt
+
+    iks, _ = await kompetenzen_des_bands(db, band)
+    id_je_nr = {(k.metadata_ or {}).get("kompetenz_nr"): k.id for k in iks}
+    gezeigt = [k for b in aus["bereiche"] for k in b.get("kompetenzen") or []]
+    qv = await querverweise(db, [id_je_nr[k["nr"]] for k in gezeigt if k.get("nr") in id_je_nr], user)
+    for k in gezeigt:
+        if liste := qv.get(str(id_je_nr.get(k.get("nr")))):
+            k["querverweise"] = verweise_kompakt(liste)
 
 
 # ── Registrierung ─────────────────────────────────────────────────────────────
@@ -298,7 +329,9 @@ def registrieren(server: MCPServer, sitzung: Callable[[], AsyncSession] | None =
     @server.tool(annotations=LESEND, structured_output=False, description=(
         "Ein Curriculum mit Rahmenangaben, Kapiteln, Lernsequenzen und Einträgen: Kompetenzen als Nummern "
         "(ik, ik_teilweise, pk), Begriffe, Hinweise mit Verweisen auf Leitperspektiven und Leitlinien als "
-        "Kürzel. Die Texte der Kompetenzen liefert bildungsplan_kompetenzen."))
+        "Kürzel. Die Texte der Kompetenzen liefert bildungsplan_kompetenzen. Unter querverweise: wo der "
+        "Bildungsplan an den verknüpften Kompetenzen auf ein anderes Fach verweist (Kompetenz oder Bereich) "
+        "und in welchem Curriculum dieses Fach die Stelle behandelt."))
     async def curriculum_lesen(
         curriculum_id: Annotated[str, Field(description="Kennung aus curricula_finden.")],
     ) -> dict:
@@ -334,7 +367,8 @@ def registrieren(server: MCPServer, sitzung: Callable[[], AsyncSession] | None =
 
     @server.tool(annotations=LESEND, structured_output=False, description=(
         "Kompetenzen des Bildungsplans für ein Fach und eine Jahrgangsstufe. Ohne bereich: Übersicht der "
-        "Bereiche mit Anzahl und Nummern. Mit bereich: die Kompetenzen mit Nummer und Text."))
+        "Bereiche mit Anzahl und Nummern. Mit bereich: die Kompetenzen mit Nummer und Text, dazu "
+        "querverweise, wo der Bildungsplan auf ein anderes Fach verweist."))
     async def bildungsplan_kompetenzen(
         fach: Annotated[str, Field(description="Fachname oder Kürzel, etwa 'Mathematik' oder 'M'.")],
         jahrgangsstufe: Annotated[str, Field(description="Stufe oder Band, etwa '7' oder '7/8'.")],

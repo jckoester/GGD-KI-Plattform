@@ -50,6 +50,16 @@ class TestBuildPdfKapitel:
         assert e["pk_items"] == [{"html": "2.2.1 Begründen"}]
 
     @pytest.mark.asyncio
+    async def test_querverweise_kompakt_an_der_ik(self):
+        """AY Teil 1 (F7): an der IK nur die Fächer der Querverweise, ohne Verweis kein Feld."""
+        tree = _tree_with_entry(
+            entry={"ik": [{"node_id": "ik1", "nr": "3.1.1"}, {"node_id": "ik2", "nr": "3.1.2"}], "pk": []},
+        )
+        e = (await _build_pdf_kapitel(tree, {"ik1": "↔ PH, CH"}))[0]["lernsequenzen"][0]["eintraege"][0]
+        assert e["ik_items"] == [{"html": "3.1.1", "partiell": False, "querverweise": "↔ PH, CH"},
+                                 {"html": "3.1.2", "partiell": False}]
+
+    @pytest.mark.asyncio
     async def test_fallback_to_nr_and_pk_id(self):
         """Ohne passenden Ref-Titel fällt der Text auf nr bzw. pk_id zurück."""
         tree = _tree_with_entry(

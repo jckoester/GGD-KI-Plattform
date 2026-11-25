@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context.curriculum_begriffe import FELDER, namen_fuer_export, namen_fuer_yaml
 from app.context.curriculum_rahmen import rahmen_abschnitte
 from app.context.editions import BP_STATUS_CURRICULUM
+from app.context.querverweise import faecher_je_kompetenz
 from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
@@ -341,7 +342,7 @@ async def _formeln_in_teilen(teile: list[dict]) -> list[dict]:
     return teile
 
 
-async def _build_pdf_kapitel(tree: dict) -> list[dict]:
+async def _build_pdf_kapitel(tree: dict, querverweise: dict[str, str] | None = None) -> list[dict]:
     """Reichert die Curriculum-Struktur fürs PDF-Template an.
 
     - IK/PK als Volltext (Knoten-Titel aus ik_refs/pk_refs), Fallback nr/pk_id
@@ -370,10 +371,14 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
                     if isinstance(ik, dict):
                         text = ik_title_by_id.get(ik.get("node_id")) or ik.get("nr") or ""
                         if text:
-                            ik_items.append({
+                            item = {
                                 "html": await render_markdown_inline_for_pdf(text),
                                 "partiell": bool(ik.get("partiell")),
-                            })
+                            }
+                            # AY Teil 1 (F7): kompakt die Fächer der Querverweise
+                            if qv := (querverweise or {}).get(str(ik.get("node_id"))):
+                                item["querverweise"] = qv
+                            ik_items.append(item)
                     elif isinstance(ik, str) and ik:
                         ik_items.append({
                             "html": await render_markdown_inline_for_pdf(ik),
@@ -462,7 +467,7 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
         meta=meta,
         entwurf=entwurf_vermerk(tree),
         rahmen=await _build_pdf_rahmen(meta),
-        kapitel=await _build_pdf_kapitel(tree),
+        kapitel=await _build_pdf_kapitel(tree, await faecher_je_kompetenz(db, tree)),
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
     return pdf_bytes
@@ -475,8 +480,9 @@ _SPALTEN_ANTEILE = (0.24, 0.28, 0.26, 0.22)
 _KOPF = ["PK", "IK", "Konkretisierung", "Hinweise & Material"]
 
 
-def _ik_pk_texte(e: dict, ls: dict) -> tuple[list[str], list[str]]:
-    """IK- und PK-Volltexte wie im PDF (`_build_pdf_kapitel`); teilweise IK mit „(T)"."""
+def _ik_pk_texte(e: dict, ls: dict, querverweise: dict[str, str] | None = None) -> tuple[list[str], list[str]]:
+    """IK- und PK-Volltexte wie im PDF (`_build_pdf_kapitel`); teilweise IK mit „(T)",
+    Querverweise kompakt mit ihren Fächern („↔ PH, CH“, AY Teil 1)."""
     ik_titel = {r["node_id"]: r.get("title") for r in ls.get("ik_refs", [])}
     pk_titel = {r["node_id"]: r.get("title") for r in ls.get("pk_refs", [])}
     iks, pks = [], []
@@ -484,7 +490,8 @@ def _ik_pk_texte(e: dict, ls: dict) -> tuple[list[str], list[str]]:
         if isinstance(ik, dict):
             t = ik_titel.get(ik.get("node_id")) or ik.get("nr") or ""
             if t:
-                iks.append(t + (" (T)" if ik.get("partiell") else ""))
+                qv = (querverweise or {}).get(str(ik.get("node_id")))
+                iks.append(t + (" (T)" if ik.get("partiell") else "") + (f" {qv}" if qv else ""))
         elif isinstance(ik, str) and ik:
             iks.append(ik)
     for pk in e.get("pk") or []:
@@ -550,6 +557,7 @@ async def render_curriculum_office(
     from app.config import settings
     from app.export import office as o
 
+    qv_faecher = await faecher_je_kompetenz(db, tree)  # AY Teil 1 (F7)
     teile: dict[str, str] = {}
     gerueste = []  # (kapitel, [(ls, [eintrag-Schlüssel])])
     for k, kap in enumerate(tree.get("kapitel", [])):
@@ -558,7 +566,7 @@ async def render_curriculum_office(
             schluessel = []
             for i, e in enumerate((ls.get("metadata") or {}).get("eintraege", [])):
                 s = f"{k}.{l}.{i}"
-                iks, pks = _ik_pk_texte(e, ls)
+                iks, pks = _ik_pk_texte(e, ls, qv_faecher)
                 teile[f"pk{s}"] = _liste(pks)
                 teile[f"ik{s}"] = _liste(iks)
                 teile[f"ko{s}"] = e.get("konkretisierung") or ""

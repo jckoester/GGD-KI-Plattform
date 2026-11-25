@@ -223,3 +223,58 @@ async def _fundstellen_anhaengen(db: AsyncSession, aus: dict[str, list[dict]], u
 
 def _nr_sortierbar(nr: str | None) -> tuple:
     return tuple(int(z) for z in re.findall(r"\d+", nr or ""))
+
+
+# ── Kompakte Formen für Export und MCP (Schritt 6) ──────────────────────────────
+
+
+def fach_kuerzel(e: dict) -> str:
+    """Wie `fachKuerzel` im Frontend: Bildungsplan-Code, sonst die ersten drei Buchstaben."""
+    return e.get("fach_code") or (e.get("fach") or "?")[:3]
+
+
+def ik_ids_im_baum(tree: dict) -> list[UUID]:
+    """Die verknüpften Kompetenzen eines Curriculum-Baums (`load_curriculum_tree`)."""
+    ids: list[UUID] = []
+    for kap in tree.get("kapitel") or []:
+        for ls in kap.get("lernsequenzen") or []:
+            for e in (ls.get("metadata") or {}).get("eintraege") or []:
+                for ik in (e.get("ik") if isinstance(e, dict) else None) or []:
+                    if isinstance(ik, dict) and ik.get("node_id"):
+                        try:
+                            ids.append(UUID(str(ik["node_id"])))
+                        except ValueError:
+                            continue
+    return list(dict.fromkeys(ids))
+
+
+async def faecher_je_kompetenz(db: AsyncSession, tree: dict) -> dict[str, str]:
+    """Für den Export (F7): je Kompetenz nur die Fächer der Querverweise, „↔ PH, CH“."""
+    aus = {}
+    for kid, liste in (await querverweise(db, ik_ids_im_baum(tree))).items():
+        kuerzel = list(dict.fromkeys(fach_kuerzel(e) for e in liste))
+        if kuerzel:
+            aus[kid] = "↔ " + ", ".join(kuerzel)
+    return aus
+
+
+def verweise_kompakt(liste: list[dict]) -> list[dict]:
+    """Für MCP: Fach, Art, Nummer, Titel, Stufen; Fundstellen als „Curriculum › Kapitel“."""
+    aus = []
+    for e in liste:
+        stufen_ = (f"{e['min_grade']}/{e['max_grade']}" if e.get("min_grade") and e.get("max_grade")
+                   and e["min_grade"] != e["max_grade"] else
+                   str(e.get("min_grade") or e.get("max_grade") or "") or None)
+        eintrag = {"fach": e["fach"], "kuerzel": fach_kuerzel(e),
+                   "art": "Bereich" if e["typ"] == "bereich" else "Kompetenz",
+                   "nr": e.get("nr"), "titel": e.get("titel")}
+        if stufen_:
+            eintrag["stufen"] = stufen_
+        if e.get("status") == KUENFTIG:
+            eintrag["kuenftige_fassung"] = e.get("ab_schuljahr") or True
+        if "fundstellen" in e:
+            eintrag["behandelt_in"] = [
+                f"{f['curriculum']} › {f['kapitel']}" + (" (Entwurf)" if f["status"] == "draft" else "")
+                for f in e["fundstellen"]]
+        aus.append(eintrag)
+    return aus

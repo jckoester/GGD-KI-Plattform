@@ -153,3 +153,13 @@ async def test_rahmen_vor_dem_ersten_kapitel():
 
 async def test_ohne_rahmen_kein_abschnitt():
     assert "Rahmen" not in _klartext(await _docx(_baum()))
+
+
+def test_ik_texte_mit_querverweisen():
+    """AY Teil 1 (F7): Fächer der Querverweise kompakt hinter dem Titel, nach „(T)“."""
+    from app.context.curriculum_export import _ik_pk_texte
+
+    e = {"ik": [{"node_id": "a", "nr": "3.1.1", "partiell": True}, {"node_id": "b", "nr": "3.1.2"}]}
+    ls = {"ik_refs": [{"node_id": "a", "title": "3.1.1 Zahlen"}]}
+    iks, _ = _ik_pk_texte(e, ls, {"a": "↔ PH"})
+    assert iks == ["3.1.1 Zahlen (T) ↔ PH", "3.1.2"]
