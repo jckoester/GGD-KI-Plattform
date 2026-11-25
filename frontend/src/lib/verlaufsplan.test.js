@@ -167,3 +167,25 @@ describe('Übernehmen (Schritt 6)', () => {
         expect(ausgangspunkte(plaene, 3, 0, '2025/26')).toEqual([])
     })
 })
+
+describe('Übersicht (Schritt 7)', () => {
+    it('nach Schuljahr, darin nach Stufe', async () => {
+        const { nachSchuljahr } = await import('./verlaufsplan.js')
+        const g = nachSchuljahr([
+            { id: 1, schuljahr: '2026/27', stufe: 7 },
+            { id: 2, schuljahr: '2025/26', stufe: 9 },
+            { id: 3, schuljahr: '2025/26', stufe: 7 },
+        ], '2025/26')
+        expect(g.map((x) => [x.schuljahr, x.text, x.plaene.map((p) => p.id)])).toEqual([
+            ['2025/26', 'laufendes Schuljahr', [3, 2]],
+            ['2026/27', 'kommendes Schuljahr', [1]],
+        ])
+        expect(nachSchuljahr(undefined, '2025/26')).toEqual([])
+    })
+    it('Zusatz der Zeile', async () => {
+        const { zeilenZusatz } = await import('./verlaufsplan.js')
+        expect(zeilenZusatz({ status: 'draft', wochen: 1, planungsart: 'sequenz' })).toBe(' · 1 Woche geplant · sequenzgenau')
+        expect(zeilenZusatz({ status: 'active', beschlossen_am: '2026-11-25', wochen: 37, planungsart: 'kapitel' }))
+            .toBe(' · beschlossen am 25.11.2026 · 37 Wochen geplant · kapitelgenau')
+    })
+})

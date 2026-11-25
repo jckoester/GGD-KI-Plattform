@@ -52,6 +52,7 @@ describe('Zurück', () => {
         ['routes/(admin)/settings/texts/+page.svelte', '/settings'],
         ['routes/(admin)/statistics/costs/+page.svelte', '/statistics'],
         ['routes/(app)/knowledge/curricula/+page.svelte', '/knowledge'],
+        ['routes/(app)/knowledge/year-plans/+page.svelte', '/knowledge'],
         ['routes/(app)/knowledge/education-plans/+page.svelte', '/knowledge'],
         ['routes/(app)/knowledge/collections/[type]/+page.svelte', '/knowledge'],
     ])('%s führt auf die Oberseite %s', (rel, ziel) => {

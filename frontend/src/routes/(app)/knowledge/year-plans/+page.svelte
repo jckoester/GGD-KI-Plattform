@@ -8,7 +8,7 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { createVerlaufsplan, getVerlaufsplaene, uebernehmeVerlaufsplan } from '$lib/api.js'
-    import { PLANUNGSARTEN, ausgangspunkte, schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
+    import { PLANUNGSARTEN, ausgangspunkte, nachSchuljahr, schuljahreZumAnlegen, teilen, zeilenZusatz } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
@@ -17,6 +17,7 @@
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import PageBody from '$lib/components/PageBody.svelte'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
+    import ListenZeile from '$lib/components/ListenZeile.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
@@ -85,18 +86,13 @@
         }
     }
 
-    function statusText(p) {
-        if (p.status === 'draft') return 'Entwurf'
-        return p.beschlossen_am ? `beschlossen am ${p.beschlossen_am.split('-').reverse().join('.')}` : 'beschlossen'
-    }
-
     const feld = 'rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm text-light-tx dark:text-dark-tx'
 </script>
 
 <svelte:head><title>Jahresverlaufspläne</title></svelte:head>
 
 <PageBody breit>
-    <ZurueckLink href="/knowledge/curricula" label="Curricula" />
+    <ZurueckLink href="/knowledge" label="Bibliothek" />
     <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">Jahresverlaufspläne</h1>
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1 mb-5">
         Wann im Schuljahr was dran ist — je Fach, Klassenstufe und Schuljahr, auf dem Kalender der Schule.
@@ -126,14 +122,22 @@
                         <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">({plaene.aktuell.length})</span>
                     </summary>
 
-                    <div class="mt-3 space-y-1">
-                        {#each plaene.aktuell as p (p.id)}
-                            <a href="/knowledge/year-plans/{p.id}"
-                               class="flex flex-wrap items-baseline gap-x-3 rounded px-2 py-1 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2">
-                                <span class="font-medium text-light-bl dark:text-dark-bl">Kl. {p.stufe} · {p.schuljahr}</span>
-                                <span class="text-sm {p.status === 'draft' ? 'text-light-or dark:text-dark-or' : 'text-light-tx-2 dark:text-dark-tx-2'}">{statusText(p)}</span>
-                                <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">{p.wochen} Wochen geplant</span>
-                            </a>
+                    <!-- Je Schuljahr, darin je Stufe; Zeilen wie die Curricula (ListenZeile) -->
+                    <div class="mt-3 space-y-4">
+                        {#each nachSchuljahr(plaene.aktuell, antwort?.aktuelles_schuljahr) as g (g.schuljahr)}
+                            <div>
+                                <h4 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-1.5">
+                                    {g.schuljahr}{#if g.text} <span class="font-normal text-light-tx-2 dark:text-dark-tx-2">· {g.text}</span>{/if}
+                                </h4>
+                                <div class="space-y-1.5">
+                                    {#each g.plaene as p (p.id)}
+                                        <ListenZeile href="/knowledge/year-plans/{p.id}" titel="Klasse {p.stufe}"
+                                            zusatz={zeilenZusatz(p)} entwurf={p.status === 'draft'}
+                                            entwurfHinweis="Noch nicht beschlossen — lesen können ihn alle Lehrkräfte, bearbeiten die Fachschaft"
+                                            bearbeitbar={darf} />
+                                    {/each}
+                                </div>
+                            </div>
                         {:else}
                             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Kein Plan für das laufende oder kommende Schuljahr.</p>
                         {/each}
@@ -180,13 +184,10 @@
                     {#if plaene.archiv.length}
                         <details class="mt-3">
                             <summary class="cursor-pointer text-sm text-light-tx-2 dark:text-dark-tx-2">Archiv ({plaene.archiv.length})</summary>
-                            <div class="mt-1 space-y-1">
+                            <div class="mt-2 space-y-1.5">
                                 {#each plaene.archiv as p (p.id)}
-                                    <a href="/knowledge/year-plans/{p.id}"
-                                       class="flex flex-wrap items-baseline gap-x-3 rounded px-2 py-1 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2">
-                                        <span class="text-light-bl dark:text-dark-bl">Kl. {p.stufe} · {p.schuljahr}</span>
-                                        <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">{statusText(p)}</span>
-                                    </a>
+                                    <ListenZeile href="/knowledge/year-plans/{p.id}" titel="Klasse {p.stufe} · {p.schuljahr}"
+                                        zusatz={zeilenZusatz(p)} entwurf={p.status === 'draft'} />
                                 {/each}
                             </div>
                         </details>

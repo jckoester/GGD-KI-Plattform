@@ -174,6 +174,36 @@ export function teilen(plaene) {
     return { aktuell: aktuell.sort(ordnung), archiv: archiv.sort((a, b) => -ordnung(a, b)) }
 }
 
+/**
+ * Laufende und kommende Pläne nach Schuljahr gruppiert, darin nach Stufe (Übersicht, Schritt 7).
+ * `[{ schuljahr, text, plaene }]`; `text` sagt „laufendes“ oder „kommendes Schuljahr“.
+ */
+export function nachSchuljahr(plaene, aktuell) {
+    const gruppen = new Map()
+    for (const p of plaene ?? []) {
+        if (!gruppen.has(p.schuljahr)) gruppen.set(p.schuljahr, [])
+        gruppen.get(p.schuljahr).push(p)
+    }
+    return [...gruppen.entries()]
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+        .map(([schuljahr, liste]) => ({
+            schuljahr,
+            text: schuljahr === aktuell ? 'laufendes Schuljahr' : schuljahr > aktuell ? 'kommendes Schuljahr' : '',
+            plaene: [...liste].sort((x, y) => (x.stufe ?? 0) - (y.stufe ?? 0)),
+        }))
+}
+
+/** Grauer Zusatz einer Planzeile: Beschluss, verplante Wochen, Planungsart. */
+export function zeilenZusatz(p) {
+    const teile = []
+    if (p.status !== 'draft') {
+        teile.push(p.beschlossen_am ? `beschlossen am ${p.beschlossen_am.split('-').reverse().join('.')}` : 'beschlossen')
+    }
+    teile.push(`${p.wochen} ${p.wochen === 1 ? 'Woche' : 'Wochen'} geplant`)
+    teile.push(p.planungsart === 'sequenz' ? 'sequenzgenau' : 'kapitelgenau')
+    return ' · ' + teile.join(' · ')
+}
+
 /** Bilanz eines Kapitels: „passt“, „zu wenig“, „zu viel“ oder `null` ohne Zahlen. Ein Spielraum
  *  von einer Wochenstunde gilt als passend. */
 export function bilanzStand(kapitel, wochenstunden) {

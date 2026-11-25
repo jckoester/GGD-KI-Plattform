@@ -20,6 +20,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import CurriculumYamlImportDialog from '$lib/components/CurriculumYamlImportDialog.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+    import ListenZeile from '$lib/components/ListenZeile.svelte'
 
     let { subjectId = null, subjectFachCode = null, showNewButton = true } = $props()
 
@@ -59,44 +60,20 @@
 </script>
 
 {#snippet zeile(curr)}
-    <a
+    <!-- Rahmen und Marken gemeinsam mit den Jahresverlaufsplänen (ListenZeile, 0.59).
+         Entwurf (0.45): seit 0.52 für alle Lehrkräfte, „ersetzt …“ steht in der Zeile (AZ, F1).
+         „Bearbeitbar“ seit 0.45 vom Backend (`darf_schreiben`, Curriculum-Regel samt Fachvorsitz). -->
+    <ListenZeile
         href={`/knowledge/curriculum/${curr.id}`}
-        class="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-light-ui-3 dark:border-dark-ui-3
-           hover:border-primary dark:hover:border-primary-dark hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
-           transition-colors"
-    >
-        <div class="flex-1 min-w-0">
-            <span class="font-medium text-light-tx dark:text-dark-tx">{curr.title}</span>
-            <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                · Klasse {curr.jahrgangsstufe || '?'}
-                {#if curr.ersetzt}
-                    · ersetzt „{curr.ersetzt.title ?? 'veröffentlichtes Curriculum'}“
-                {/if}
-                {#if curr.status === 'draft' && curr.zuletzt_geaendert}
-                    · zuletzt geändert {new Date(curr.zuletzt_geaendert).toLocaleDateString('de-DE')}
-                {/if}
-            </span>
-        </div>
-        <!-- Entwurf (0.45): seit 0.52 für alle Lehrkräfte, „ersetzt …“ steht in der Zeile (AZ, F1) -->
-        {#if curr.status === 'draft'}
-            <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                       bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye"
-                title="Noch nicht veröffentlicht — lesen können ihn alle Lehrkräfte, bearbeiten die Fachschaft"
-            >
-                Entwurf
-            </span>
-        {/if}
-        <!-- Seit 0.45 vom Backend (`darf_schreiben`, Curriculum-Regel samt Fachvorsitz). -->
-        {#if curr.darf_schreiben}
-            <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                       bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl"
-            >
-                Bearbeitbar
-            </span>
-        {/if}
-    </a>
+        titel={curr.title}
+        zusatz={` · Klasse ${curr.jahrgangsstufe || '?'}`
+            + (curr.ersetzt ? ` · ersetzt „${curr.ersetzt.title ?? 'veröffentlichtes Curriculum'}“` : '')
+            + (curr.status === 'draft' && curr.zuletzt_geaendert
+                ? ` · zuletzt geändert ${new Date(curr.zuletzt_geaendert).toLocaleDateString('de-DE')}` : '')}
+        entwurf={curr.status === 'draft'}
+        entwurfHinweis="Noch nicht veröffentlicht — lesen können ihn alle Lehrkräfte, bearbeiten die Fachschaft"
+        bearbeitbar={!!curr.darf_schreiben}
+    />
 {/snippet}
 
 {#snippet fassungInhalt(f)}
