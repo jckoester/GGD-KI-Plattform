@@ -4,13 +4,17 @@
      * geplant, Wochen und Einstufung; bei sequenzgenauer Planung je Kapitel aufklappbar die
      * Sequenzen (Jan, 25.11.2026). Gerechnet hat der Server (`lage.kapitel`).
      *
-     * Props: `lage`, `wochenstunden`, `band` (Curriculum über mehrere Stufen), `titel` (ID → Titel),
-     * `planungsart`.
+     * Jede Zeile beginnt mit einem Symbol für ihre Abdeckung (zweiter Durchgang, Jan 25.11.2026):
+     * eingetragen, teilweise (nur einige Sequenzen des Kapitels), fehlt — statt eines
+     * Hinweisblocks darunter, der vom Plan ablenkte.
+     *
+     * Props: `lage`, `wochenstunden`, `band` (Curriculum über mehrere Stufen), `planungsart`.
      */
     import { ChevronDown, ChevronRight } from 'lucide-svelte'
     import { bilanzStand } from '$lib/verlaufsplan.js'
+    import AbdeckungSymbol from '$lib/components/AbdeckungSymbol.svelte'
 
-    let { lage, wochenstunden = null, band = false, titel = {}, planungsart = 'kapitel' } = $props()
+    let { lage, wochenstunden = null, band = false, planungsart = 'kapitel' } = $props()
 
     let offen = $state({})
     const sequenzgenau = $derived(planungsart === 'sequenz')
@@ -19,8 +23,17 @@
         'zu wenig': 'text-light-or dark:text-dark-or',
         'zu viel': 'text-light-or dark:text-dark-or',
     }
-    const ohneKapitel = $derived((lage?.kapitel_ohne_abschnitt ?? []).map((k) => titel[k] ?? k))
-    const ohneSequenzen = $derived(sequenzgenau ? (lage?.sequenzen_ohne_abschnitt ?? []).length : 0)
+    const ohneKapitel = $derived(new Set(lage?.kapitel_ohne_abschnitt ?? []))
+    const ohneSequenzen = $derived(new Set(sequenzgenau ? (lage?.sequenzen_ohne_abschnitt ?? []) : []))
+    const fehlendeIn = (k) => (k.sequenzen ?? []).filter((x) => ohneSequenzen.has(x.sequenz_id)).length
+
+    /** Abdeckung einer Kapitelzeile: eingetragen, teilweise (nur einige Sequenzen), fehlt. */
+    function kapitelZustand(k) {
+        if (ohneKapitel.has(k.kapitel_id)) return ['fehlt', 'Kein Abschnitt nennt dieses Kapitel']
+        const n = sequenzgenau ? fehlendeIn(k) : 0
+        if (n) return ['teil', `${n} ${n === 1 ? 'Sequenz' : 'Sequenzen'} ohne Abschnitt — aufklappen zeigt, welche`]
+        return ['voll', 'Im Plan eingetragen']
+    }
 </script>
 
 {#if lage?.kapitel?.length}
@@ -42,19 +55,23 @@
             {#each lage.kapitel as k (k.kapitel_id)}
                 {@const s = bilanzStand(k, wochenstunden)}
                 {@const hatSeq = sequenzgenau && k.sequenzen?.length > 0}
+                {@const [zustand, hinweis] = kapitelZustand(k)}
                 <tbody>
                     <tr class="border-b border-light-ui-2 dark:border-dark-ui-2 text-light-tx dark:text-dark-tx">
                         <td class="py-1 pr-4">
-                            {#if hatSeq}
-                                <button type="button" class="inline-flex items-center gap-1 hover:underline"
-                                    aria-expanded={!!offen[k.kapitel_id]}
-                                    onclick={() => (offen[k.kapitel_id] = !offen[k.kapitel_id])}>
-                                    {#if offen[k.kapitel_id]}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}
-                                    {k.titel ?? 'nicht mehr im Curriculum'}
-                                </button>
-                            {:else}
-                                <span class={sequenzgenau ? 'pl-5' : ''}>{k.titel ?? 'nicht mehr im Curriculum'}</span>
-                            {/if}
+                            <span class="inline-flex items-center gap-1.5">
+                                <AbdeckungSymbol {zustand} text={hinweis} />
+                                {#if hatSeq}
+                                    <button type="button" class="inline-flex items-center gap-1 hover:underline"
+                                        aria-expanded={!!offen[k.kapitel_id]}
+                                        onclick={() => (offen[k.kapitel_id] = !offen[k.kapitel_id])}>
+                                        {#if offen[k.kapitel_id]}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}
+                                        {k.titel ?? 'nicht mehr im Curriculum'}
+                                    </button>
+                                {:else}
+                                    <span class={sequenzgenau ? 'pl-5' : ''}>{k.titel ?? 'nicht mehr im Curriculum'}</span>
+                                {/if}
+                            </span>
                         </td>
                         <td class="py-1 pr-4">{k.soll ?? '–'}</td>
                         <td class="py-1 pr-4">{k.geplant ?? '–'}</td>
@@ -65,7 +82,16 @@
                         {#each k.sequenzen as sq (sq.sequenz_id)}
                             {@const ss = bilanzStand(sq, wochenstunden)}
                             <tr class="border-b border-light-ui-2 dark:border-dark-ui-2 text-light-tx-2 dark:text-dark-tx-2">
-                                <td class="py-0.5 pr-4 pl-8">{sq.titel ?? 'nicht mehr im Curriculum'}{#if sq.wochen === 0}<span class="text-light-or dark:text-dark-or"> · ohne Abschnitt</span>{/if}</td>
+                                <td class="py-0.5 pr-4 pl-6">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        {#if ohneSequenzen.has(sq.sequenz_id)}
+                                            <AbdeckungSymbol zustand="fehlt" text="Kein Abschnitt nennt diese Sequenz" />
+                                        {:else}
+                                            <AbdeckungSymbol zustand="voll" text="Im Plan eingetragen" />
+                                        {/if}
+                                        {sq.titel ?? 'nicht mehr im Curriculum'}
+                                    </span>
+                                </td>
                                 <td class="py-0.5 pr-4">{sq.soll ?? '–'}</td>
                                 <td class="py-0.5 pr-4">{sq.geplant ?? '–'}</td>
                                 <td class="py-0.5 pr-4">{sq.wochen}</td>
@@ -76,13 +102,5 @@
                 </tbody>
             {/each}
         </table>
-        {#if ohneKapitel.length}
-            <p class="mt-2 text-sm text-light-or dark:text-dark-or">Kapitel ohne Abschnitt: {ohneKapitel.join(', ')}</p>
-        {/if}
-        {#if ohneSequenzen}
-            <p class="mt-1 text-sm text-light-or dark:text-dark-or">
-                {ohneSequenzen} {ohneSequenzen === 1 ? 'Sequenz' : 'Sequenzen'} ohne Abschnitt — aufklappen zeigt, welche.
-            </p>
-        {/if}
     </section>
 {/if}

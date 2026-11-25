@@ -288,7 +288,7 @@
             </section>
         {/if}
 
-        <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band} titel={e.titel}
+        <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band}
             planungsart={plan.planungsart} />
     {/if}
 </PageBody>
