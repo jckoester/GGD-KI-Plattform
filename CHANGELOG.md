@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.58.1] – 2026-11-25
+
+### Behoben
+
+- Schaltpläne im Chat blieben seit 0.41 leer: Der Diagramm-Zoom verschob den Bildausschnitt neben die Zeichnung.
+- Schaltpläne im Dunkelmodus auf heller Karte, wie Strukturformeln.
+
 ## [0.58.0] – 2026-11-25
 
 ### Neu
