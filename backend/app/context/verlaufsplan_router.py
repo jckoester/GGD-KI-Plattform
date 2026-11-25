@@ -50,6 +50,10 @@ class PlanSpeichern(BaseModel):
     # Wechsel der Planungsart: Die Abschnitte kommen in der alten Art und werden umgerechnet.
     # Ein Raster gibt es seit Schritt 7 nicht mehr — die Dauer jedes Abschnitts regelt das.
     planungsart: Optional[Literal["sequenz", "kapitel"]] = None
+    # Nur beim ausdrücklichen Wechsel: Abschnitte von der bisherigen Art umrechnen. Ohne dieses
+    # Kennzeichen gelten sie, wie sie kommen — so stellt „Rückgängig“ einen früheren Stand samt
+    # Art wieder her, ohne dass aus einzelnen Sequenzen alle Sequenzen eines Kapitels werden.
+    umrechnen: bool = False
 
 
 class PlanAnlegen(PlanSpeichern):
@@ -168,7 +172,7 @@ async def verlaufsplan_speichern(
     plan = await _zum_schreiben(db, plan_id, user)
     alt = plan.metadata_ or {}
     roh = None
-    if daten.planungsart and daten.planungsart != vp.planungsart(alt):
+    if daten.umrechnen and daten.planungsart and daten.planungsart != vp.planungsart(alt):
         roh = [a.model_dump(mode="json") for a in daten.abschnitte]
         bezug = {str(k) for a in roh for k in (a.get("sequenz_ids") or []) + (a.get("kapitel_ids") or [])}
         roh = vp.umrechnen(roh, daten.planungsart,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    abschnittFarbe, bilanzStand, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
+    abschnittFarbe, bezugText, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
     umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern,
 } from './verlaufsplan.js'
 import { ueColorIndex } from './planner.js'
@@ -68,12 +68,49 @@ describe('Farbe', () => {
         expect(abschnittFarbe({ kapitel_ids: [] }, reihe)).toBeNull()
         expect(abschnittFarbe({ kapitel_ids: ['fremd'] }, reihe)).toBeNull()
     })
+    it('sequenzgenau: nach dem Kapitel der ersten Sequenz', () => {
+        const reihe = ['k1', 'k2']
+        const opt = { planungsart: 'sequenz', kapitelVon: { s1: 'k1', s3: 'k2' } }
+        expect(abschnittFarbe({ sequenz_ids: ['s3', 's1'], kapitel_ids: ['k1'] }, reihe, opt)).toBe(ueColorIndex(1))
+        expect(abschnittFarbe({ sequenz_ids: ['fremd'] }, reihe, opt)).toBeNull()
+    })
+})
+
+describe('Planungsart (Schritt 7)', () => {
+    const CURRICULA = [{ kapitel: [
+        { id: 'k1', titel: 'Ähnlichkeit', std: 12, sequenzen: [{ id: 's1', titel: 'Strahlensätze', std: 6 }] },
+        { id: 'k2', titel: 'Pythagoras', std: 20, sequenzen: [] },
+    ] }]
+    it('Bezugsfeld', () => {
+        expect(bezugsfeld('sequenz')).toBe('sequenz_ids')
+        expect(bezugsfeld('kapitel')).toBe('kapitel_ids')
+        expect(bezugsfeld(undefined)).toBe('kapitel_ids')
+    })
+    it('Einheiten der Curricula', () => {
+        const e = einheiten(CURRICULA)
+        expect(e.kapitelReihenfolge).toEqual(['k1', 'k2'])
+        expect(e.kapitelVon).toEqual({ s1: 'k1' })
+        expect([e.titel.s1, e.std.s1, e.std.k2]).toEqual(['Strahlensätze', 6, 20])
+        expect(einheiten(undefined).kapitelReihenfolge).toEqual([])
+    })
+    it('Dauervorschlag aus Stunden', () => {
+        expect(dauerVorschlag(8, 4)).toBe(2)
+        expect(dauerVorschlag(6, 4)).toBe(2)
+        expect(dauerVorschlag(1, 4)).toBe(1)
+        expect(dauerVorschlag(null, 4)).toBeNull()
+        expect(dauerVorschlag(8, null)).toBeNull()
+    })
+    it('Bezugstext je Planungsart', () => {
+        const { titel } = einheiten(CURRICULA)
+        const a = { sequenz_ids: ['s1', 'weg'], kapitel_ids: ['k2'] }
+        expect(bezugText(a, 'sequenz', titel)).toBe('Strahlensätze, nicht mehr im Curriculum')
+        expect(bezugText(a, 'kapitel', titel)).toBe('Pythagoras')
+    })
 })
 
 describe('Anlegen und Liste', () => {
-    it('neuer Abschnitt mit Raster', () => {
-        expect(neuerAbschnitt(4).wochen).toBe(4)
-        expect(neuerAbschnitt(null).wochen).toBe(1)
+    it('neuer Abschnitt: eine Woche, ohne Bezüge', () => {
+        expect(neuerAbschnitt()).toEqual({ id: null, titel: '', wochen: 1, kapitel_ids: [], sequenz_ids: [], notiz: '' })
     })
     it('laufendes und nächstes Schuljahr', () => {
         expect(schuljahreZumAnlegen('2025/26')).toEqual(['2025/26', '2026/27'])
@@ -105,8 +142,8 @@ describe('Bilanz', () => {
 
 describe('Speichern', () => {
     it('nur die gespeicherten Felder', () => {
-        const aus = zumSpeichern([{ id: 'x', titel: 'A', wochen: '3', kapitel_ids: ['k'], notiz: '', von_woche: 1 }], 2)
-        expect(aus).toEqual({ raster: 2, abschnitte: [{ id: 'x', titel: 'A', wochen: 3, kapitel_ids: ['k'], notiz: '' }] })
+        const aus = zumSpeichern([{ id: 'x', titel: 'A', wochen: '3', kapitel_ids: ['k'], notiz: '', von_woche: 1 }], 'sequenz')
+        expect(aus).toEqual({ planungsart: 'sequenz', abschnitte: [{ id: 'x', titel: 'A', wochen: 3, kapitel_ids: ['k'], sequenz_ids: [], notiz: '' }] })
     })
 })
 

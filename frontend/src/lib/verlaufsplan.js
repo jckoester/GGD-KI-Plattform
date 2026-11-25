@@ -55,16 +55,73 @@ export function wochenBisZuDenFerien(vonWoche, ferienabschnitte) {
     return null
 }
 
+/** Planungsart (BD Schritt 7): Abschnitte nennen Lernsequenzen (Vorgabe) oder Kapitel. */
+export const PLANUNGSARTEN = [
+    { wert: 'sequenz', text: 'sequenzgenau' },
+    { wert: 'kapitel', text: 'kapitelgenau' },
+]
+
+/** Das Feld eines Abschnitts, das zur Planungsart gehört. */
+export function bezugsfeld(planungsart) {
+    return planungsart === 'sequenz' ? 'sequenz_ids' : 'kapitel_ids'
+}
+
+/**
+ * Was die Curricula der Stufe für die Auswahl hergeben: Kapitel in Reihenfolge, je Sequenz ihr
+ * Kapitel, Titel und Stunden je ID — eine Stelle für Editor, Tabelle und Farben.
+ */
+export function einheiten(curricula) {
+    const kapitelReihenfolge = []
+    const kapitelVon = {}
+    const titel = {}
+    const std = {}
+    for (const c of curricula ?? []) {
+        for (const k of c.kapitel ?? []) {
+            kapitelReihenfolge.push(k.id)
+            titel[k.id] = k.titel
+            std[k.id] = k.std ?? null
+            for (const sq of k.sequenzen ?? []) {
+                kapitelVon[sq.id] = k.id
+                titel[sq.id] = sq.titel
+                std[sq.id] = sq.std ?? null
+            }
+        }
+    }
+    return { kapitelReihenfolge, kapitelVon, titel, std }
+}
+
+/** Das erste Kapitel eines Abschnitts — bei Sequenzen das Kapitel der ersten Sequenz. */
+export function erstesKapitel(abschnitt, planungsart, kapitelVon = {}) {
+    const erste = abschnitt?.[bezugsfeld(planungsart)]?.[0]
+    if (!erste) return null
+    return planungsart === 'sequenz' ? (kapitelVon[erste] ?? null) : String(erste)
+}
+
 /** Farbe eines Abschnitts: die seines ersten Kapitels in der Reihenfolge des Curriculums. */
-export function abschnittFarbe(abschnitt, kapitelReihenfolge, dark = false) {
-    const erstes = abschnitt?.kapitel_ids?.[0]
-    const i = erstes ? kapitelReihenfolge.indexOf(String(erstes)) : -1
+export function abschnittFarbe(abschnitt, kapitelReihenfolge, { planungsart = 'kapitel', kapitelVon = {}, dark = false } = {}) {
+    const kap = erstesKapitel(abschnitt, planungsart, kapitelVon)
+    const i = kap ? kapitelReihenfolge.indexOf(kap) : -1
     return i < 0 ? null : ueColorIndex(i, dark)
 }
 
-/** Eine neue, leere Zeile mit der Blocklänge des Plans. */
-export function neuerAbschnitt(raster) {
-    return { id: null, titel: '', wochen: raster || 1, kapitel_ids: [], notiz: '' }
+/**
+ * Dauervorschlag aus Stunden (Jan, 25.11.2026): `aufrunden(Stunden ÷ Wochenstunden)`, mindestens 1.
+ * `null`, wenn Stunden oder Wochenstunden fehlen.
+ */
+export function dauerVorschlag(stunden, wochenstunden) {
+    if (!stunden || !wochenstunden) return null
+    return Math.max(1, Math.ceil(stunden / wochenstunden))
+}
+
+/** Bezeichnung der Bezüge eines Abschnitts, für Tabelle und Auswahl. */
+export function bezugText(abschnitt, planungsart, titel) {
+    return (abschnitt?.[bezugsfeld(planungsart)] ?? []).map((id) => titel[id] ?? 'nicht mehr im Curriculum').join(', ')
+}
+
+/** Eine neue, leere Zeile: eine Woche; wählt man Sequenzen oder Kapitel, schlägt der Editor die Dauer vor. */
+export const VORGABE_WOCHEN = 1
+export function neuerAbschnitt() {
+    return { id: null, titel: '', wochen: VORGABE_WOCHEN, kapitel_ids: [], sequenz_ids: [], notiz: '' }
 }
 
 /** Abschnitt `i` um `schritt` Plätze verschieben (−1 hoch, +1 runter); am Rand unverändert. */
@@ -128,14 +185,15 @@ export function bilanzStand(kapitel, wochenstunden) {
 }
 
 /** Der Plan, wie ihn `PUT` erwartet — ohne berechnete Felder. */
-export function zumSpeichern(abschnitte, raster) {
+export function zumSpeichern(abschnitte, planungsart) {
     return {
-        raster: raster ?? null,
+        planungsart: planungsart ?? 'kapitel',
         abschnitte: (abschnitte ?? []).map((a) => ({
             id: a.id ?? null,
             titel: a.titel ?? '',
             wochen: Number(a.wochen) || 1,
             kapitel_ids: [...(a.kapitel_ids ?? [])],
+            sequenz_ids: [...(a.sequenz_ids ?? [])],
             notiz: a.notiz ?? '',
         })),
     }

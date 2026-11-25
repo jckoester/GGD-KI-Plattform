@@ -6,11 +6,12 @@
      * Ferienwochen haben keine Spalte — der Plan zählt nur Unterrichtswochen (BD F1). Wochen nach
      * Schuljahresende (Überhang) sind schraffiert.
      *
-     * Props: `abschnitte` (gespeichert), `lage` (vom Server), `kapitelReihenfolge` (für die Farben).
+     * Props: `abschnitte` (gespeichert), `lage` (vom Server), `kapitelReihenfolge` und `kapitelVon`
+     * (Kapitel je Sequenz) für die Farben, `planungsart`.
      */
     import { abschnittFarbe, hinweise, zeitraumText } from '$lib/verlaufsplan.js'
 
-    let { abschnitte = [], lage, kapitelReihenfolge = [] } = $props()
+    let { abschnitte = [], lage, kapitelReihenfolge = [], kapitelVon = {}, planungsart = 'kapitel' } = $props()
 
     const spalten = $derived(Math.max(lage?.unterrichtswochen ?? 0, lage?.belegt ?? 0, 1))
     // Trenner nach dem letzten Abschnitt vor den Ferien — nicht nach dem Schuljahresende.
@@ -32,7 +33,7 @@
             <!-- Abschnitte -->
             {#each lage.abschnitte as l, i (l.id ?? i)}
                 {@const a = abschnitte[i] ?? {}}
-                {@const farbe = abschnittFarbe(a, kapitelReihenfolge)}
+                {@const farbe = abschnittFarbe(a, kapitelReihenfolge, { planungsart, kapitelVon })}
                 <div
                     role="listitem"
                     class="h-9 rounded border border-light-ui-3 dark:border-dark-ui-3 px-1 overflow-hidden

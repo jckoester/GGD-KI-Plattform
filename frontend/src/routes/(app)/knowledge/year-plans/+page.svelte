@@ -7,7 +7,7 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { createVerlaufsplan, getVerlaufsplaene, uebernehmeVerlaufsplan } from '$lib/api.js'
-    import { ausgangspunkte, schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
+    import { PLANUNGSARTEN, ausgangspunkte, schuljahreZumAnlegen, teilen } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { myGroups } from '$lib/stores/myGroups.js'
@@ -53,7 +53,7 @@
     let anlegeFehler = $state({})
     $effect(() => {
         for (const f of faecher) {
-            if (!neu[f.id] && jahre.length) neu[f.id] = { stufe: '', schuljahr: jahre[0], raster: 1, quelle: '' }
+            if (!neu[f.id] && jahre.length) neu[f.id] = { stufe: '', schuljahr: jahre[0], planungsart: 'sequenz', quelle: '' }
         }
     })
     async function anlegen(fach) {
@@ -61,13 +61,13 @@
         anlegeFehler[fach.id] = null
         try {
             if (f.quelle) {
-                // Aus einem anderen Schuljahr übernehmen (Schritt 6): Stufe und Raster kommen von dort
+                // Aus einem anderen Schuljahr übernehmen (Schritt 6): Stufe und Planungsart kommen von dort
                 const p = await uebernehmeVerlaufsplan(f.quelle, f.schuljahr)
                 goto(`/knowledge/year-plans/${p.id}${p.kapitel_entfallen ? `?entfallen=${p.kapitel_entfallen}` : ''}`)
                 return
             }
             const p = await createVerlaufsplan({
-                subject_id: fach.id, stufe: Number(f.stufe), schuljahr: f.schuljahr, raster: Number(f.raster), abschnitte: [],
+                subject_id: fach.id, stufe: Number(f.stufe), schuljahr: f.schuljahr, planungsart: f.planungsart, abschnitte: [],
             })
             goto(`/knowledge/year-plans/${p.id}`)
         } catch (e) {
@@ -140,12 +140,13 @@
                                     {#each jahre as j (j)}<option value={j}>{j}</option>{/each}
                                 </select>
                             </label>
-                            <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">Planung
-                                <select class="{feld} block" bind:value={f.raster}>
-                                    <option value={1}>wochengenau</option>
-                                    {#each [2, 3, 4, 5, 6] as w (w)}<option value={w}>in Blöcken von {w} Wochen</option>{/each}
-                                </select>
-                            </label>
+                            {#if !f.quelle}
+                                <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">Planung
+                                    <select class="{feld} block" bind:value={f.planungsart}>
+                                        {#each PLANUNGSARTEN as p (p.wert)}<option value={p.wert}>{p.text}</option>{/each}
+                                    </select>
+                                </label>
+                            {/if}
                             {#if quellen.length}
                                 <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">Ausgangspunkt
                                     <select class="{feld} block" bind:value={f.quelle}>

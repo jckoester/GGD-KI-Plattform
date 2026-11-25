@@ -12,8 +12,8 @@
         beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
     import {
-        RICHTGROESSE, abschnittFarbe, bilanzStand, hinweise, uebernahmeZiele, wochenText, zeitraumText,
-        zumSpeichern,
+        PLANUNGSARTEN, abschnittFarbe, bezugText, bilanzStand, einheiten, hinweise, uebernahmeZiele,
+        wochenText, zeitraumText, zumSpeichern,
     } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
@@ -37,7 +37,7 @@
 
     // Arbeitsstand des Editors und Speichern
     let abschnitte = $state([])
-    let raster = $state(1)
+    let planungsart = $state('sequenz')
     let speichert = $state(false)
     let speicherFehler = $state(null)
     let verlauf = $state([])          // frühere gespeicherte Stände, für Rückgängig
@@ -57,14 +57,12 @@
     function uebernehmen(p) {
         plan = p
         abschnitte = p.abschnitte.map((a) => ({ ...a }))
-        raster = p.raster ?? 1
-        zuletzt = zumSpeichern(abschnitte, raster)
+        planungsart = p.planungsart
+        zuletzt = zumSpeichern(abschnitte, planungsart)
         pageTitle.set(p.titel)
     }
 
-    const kapitelReihenfolge = $derived((plan?.curricula ?? []).flatMap((c) => c.kapitel.map((k) => k.id)))
-    const kapitelTitel = $derived(Object.fromEntries(
-        (plan?.curricula ?? []).flatMap((c) => c.kapitel.map((k) => [k.id, k.titel]))))
+    const e = $derived(einheiten(plan?.curricula))
     const band = $derived((plan?.curricula ?? []).some((c) => c.band))
 
     function geaendert() {
@@ -73,15 +71,20 @@
         timer = setTimeout(speichern, 700)
     }
 
-    async function speichern({ zurueck = false } = {}) {
+    async function speichern({ zurueck = false, umrechnen = false } = {}) {
         clearTimeout(timer)
-        const stand = zumSpeichern(abschnitte, raster)
-        if (JSON.stringify(stand) === JSON.stringify(zuletzt)) return
+        const stand = zumSpeichern(abschnitte, planungsart)
+        if (!umrechnen && JSON.stringify(stand) === JSON.stringify(zuletzt)) return
         speichert = true
         try {
-            const p = await saveVerlaufsplan(plan.id, stand)
+            const p = await saveVerlaufsplan(plan.id, umrechnen ? { ...stand, umrechnen: true } : stand)
             if (!zurueck && zuletzt) verlauf = [...verlauf.slice(-19), zuletzt]
             zuletzt = stand
+            if (umrechnen) {
+                // Der Server hat die Abschnitte auf die neue Art umgerechnet — die gelten jetzt.
+                abschnitte = p.abschnitte.map((a) => ({ ...a }))
+                zuletzt = zumSpeichern(abschnitte, planungsart)
+            }
             // Plan mit neuer Lage übernehmen; die Zeilen des Editors (`abschnitte`) bleiben, wie sie
             // sind — wer während des Speicherns weitertippt, verliert nichts.
             plan = p
@@ -97,8 +100,20 @@
         if (!vorher) return
         verlauf = verlauf.slice(0, -1)
         abschnitte = vorher.abschnitte.map((a) => ({ ...a }))
-        raster = vorher.raster ?? 1
+        planungsart = vorher.planungsart
         await speichern({ zurueck: true })
+    }
+
+    /** Planungsart wechseln (Schritt 7): Der Server rechnet die Abschnitte um; Rückgängig geht. */
+    async function artWechseln(neu) {
+        if (neu === planungsart) return
+        const text = neu === 'kapitel'
+            ? 'Auf kapitelgenau umstellen? Jede Sequenz wird zu ihrem Kapitel.'
+            : 'Auf sequenzgenau umstellen? Jedes Kapitel wird zu allen seinen Sequenzen.'
+        if (!confirm(text)) return
+        await speichern()
+        planungsart = neu
+        await speichern({ umrechnen: true })
     }
 
     async function beschliessen() {
@@ -209,7 +224,8 @@
 
         {#if plan.lage}
             <section class="mb-5">
-                <VerlaufsplanZeitleiste abschnitte={bearbeiten ? abschnitte : plan.abschnitte} lage={plan.lage} {kapitelReihenfolge} />
+                <VerlaufsplanZeitleiste abschnitte={bearbeiten ? abschnitte : plan.abschnitte} lage={plan.lage}
+                    kapitelReihenfolge={e.kapitelReihenfolge} kapitelVon={e.kapitelVon} planungsart={bearbeiten ? planungsart : plan.planungsart} />
                 <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
                     {plan.lage.belegt} von {plan.lage.unterrichtswochen} Unterrichtswochen verplant{#if plan.lage.frei}, {plan.lage.frei} frei{/if}
                 </p>
@@ -222,16 +238,14 @@
         {#if bearbeiten}
             <section class="mb-6">
                 <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx mb-3">
-                    Neue Abschnitte mit
-                    <select bind:value={raster} onchange={geaendert}
+                    Planung
+                    <select value={planungsart} onchange={(ev) => { const neu = ev.currentTarget.value; ev.currentTarget.value = planungsart; artWechseln(neu) }}
                         class="rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm">
-                        <option value={1}>1 Woche (wochengenau)</option>
-                        {#each Array.from({ length: RICHTGROESSE - 1 }, (_, k) => k + 2) as w (w)}
-                            <option value={w}>{w} Wochen</option>
-                        {/each}
+                        {#each PLANUNGSARTEN as p (p.wert)}<option value={p.wert}>{p.text}</option>{/each}
                     </select>
                 </label>
-                <VerlaufsplanEditor bind:abschnitte {raster} lage={plan.lage} curricula={plan.curricula} onaenderung={geaendert} />
+                <VerlaufsplanEditor bind:abschnitte {planungsart} wochenstunden={plan.wochenstunden}
+                    lage={plan.lage} curricula={plan.curricula} onaenderung={geaendert} />
             </section>
         {:else}
             <section class="mb-6">
@@ -243,13 +257,13 @@
                             <thead>
                                 <tr class="text-left text-light-tx-2 dark:text-dark-tx-2 border-b border-light-ui-3 dark:border-dark-ui-3">
                                     <th class="py-1 pr-2">Nr.</th><th class="py-1 pr-2">Wochen</th><th class="py-1 pr-2">Zeitraum</th>
-                                    <th class="py-1 pr-2">Thema</th><th class="py-1 pr-2">Kapitel</th><th class="py-1">Notiz</th>
+                                    <th class="py-1 pr-2">Thema</th><th class="py-1 pr-2">{plan.planungsart === 'sequenz' ? 'Sequenzen' : 'Kapitel'}</th><th class="py-1">Notiz</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {#each plan.abschnitte as a, i (a.id ?? i)}
                                     {@const l = plan.lage?.abschnitte?.[i]}
-                                    {@const farbe = abschnittFarbe(a, kapitelReihenfolge)}
+                                    {@const farbe = abschnittFarbe(a, e.kapitelReihenfolge, { planungsart: plan.planungsart, kapitelVon: e.kapitelVon })}
                                     <tr class="border-b border-light-ui-2 dark:border-dark-ui-2 align-top text-light-tx dark:text-dark-tx">
                                         <td class="py-1 pr-2">
                                             <span class="inline-block w-2.5 h-2.5 rounded-full mr-1 {farbe ? '' : 'bg-light-ui-3 dark:bg-dark-ui-3'}"
@@ -263,7 +277,7 @@
                                             {a.titel || '–'}
                                             {#if l && hinweise(l).length}<div class="text-xs text-light-tx-2 dark:text-dark-tx-2">{hinweise(l).join(' · ')}</div>{/if}
                                         </td>
-                                        <td class="py-1 pr-2">{(a.kapitel_ids ?? []).map((k) => kapitelTitel[k] ?? 'nicht mehr im Curriculum').join(', ')}</td>
+                                        <td class="py-1 pr-2">{bezugText(a, plan.planungsart, e.titel)}</td>
                                         <td class="py-1 text-light-tx-2 dark:text-dark-tx-2">{a.notiz}</td>
                                     </tr>
                                 {/each}
@@ -305,7 +319,7 @@
                 </table>
                 {#if plan.lage.kapitel_ohne_abschnitt.length}
                     <p class="mt-2 text-sm text-light-or dark:text-dark-or">
-                        Ohne Abschnitt: {plan.lage.kapitel_ohne_abschnitt.map((k) => kapitelTitel[k] ?? k).join(', ')}
+                        Ohne Abschnitt: {plan.lage.kapitel_ohne_abschnitt.map((k) => e.titel[k] ?? k).join(', ')}
                     </p>
                 {/if}
             </section>

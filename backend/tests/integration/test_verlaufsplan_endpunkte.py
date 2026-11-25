@@ -314,7 +314,7 @@ async def test_planungsart_wechseln(db, welt):
                            {"id": "b", "wochen": 5, "sequenz_ids": [str(s[2].id)]}]})).json()
         # sequenz → kapitel: verlustfrei, ohne Doppel
         r = await c.put(f"/context/verlaufsplaene/{p['id']}", json={
-            "planungsart": "kapitel", "abschnitte": p["abschnitte"]})
+            "planungsart": "kapitel", "umrechnen": True, "abschnitte": p["abschnitte"]})
         assert r.status_code == 200, r.text
         q = r.json()
         assert q["planungsart"] == "kapitel"
@@ -322,7 +322,7 @@ async def test_planungsart_wechseln(db, welt):
         assert await _kanten(db, p["id"]) == {k[0].id, k[1].id}
         # kapitel → sequenz: alle Sequenzen des Kapitels
         r = await c.put(f"/context/verlaufsplaene/{p['id']}", json={
-            "planungsart": "sequenz",
+            "planungsart": "sequenz", "umrechnen": True,
             "abschnitte": [{"id": "a", "wochen": 2, "kapitel_ids": [str(k[0].id)]}]})
         q = r.json()
         assert q["planungsart"] == "sequenz"
@@ -331,6 +331,14 @@ async def test_planungsart_wechseln(db, welt):
         # Ohne Angabe bleibt die Planungsart
         q = (await c.put(f"/context/verlaufsplaene/{p['id']}", json={"abschnitte": []})).json()
         assert q["planungsart"] == "sequenz"
+        # Rückgängig: Art wechselt ohne `umrechnen`, die Abschnitte gelten wie geschickt
+        q = (await c.put(f"/context/verlaufsplaene/{p['id']}", json={
+            "planungsart": "kapitel", "abschnitte": [{"id": "a", "wochen": 2, "kapitel_ids": [str(k[1].id)],
+                                                      "sequenz_ids": [str(s[0].id)]}]})).json()
+        assert q["planungsart"] == "kapitel"
+        assert q["abschnitte"][0]["kapitel_ids"] == [str(k[1].id)]
+        assert q["abschnitte"][0]["sequenz_ids"] == [str(s[0].id)]
+        assert await _kanten(db, p["id"]) == {k[1].id}
 
 
 async def test_sequenzgenau_uebernehmen(db, welt):
