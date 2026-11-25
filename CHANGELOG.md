@@ -16,6 +16,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Kalender je Schuljahr: neben `config/school_year.yaml` gelten `config/school_year_JJJJ-JJ.yaml` für kommende
   und vergangene Schuljahre.
 
+## [0.58.1] – 2026-11-25
+
+### Behoben
+
+- Schaltpläne im Chat blieben seit 0.41 leer: Der Diagramm-Zoom verschob den Bildausschnitt neben die Zeichnung.
+- Schaltpläne im Dunkelmodus auf heller Karte, wie Strukturformeln.
+
 ## [0.58.0] – 2026-11-25
 
 ### Neu
