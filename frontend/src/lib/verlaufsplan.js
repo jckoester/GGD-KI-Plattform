@@ -204,6 +204,23 @@ export function zeilenZusatz(p) {
     return ' · ' + teile.join(' · ')
 }
 
+/**
+ * Verweise aus einem Curriculum auf die Jahresverlaufspläne seiner Stufen im laufenden Schuljahr
+ * (Schritt 7, Unterschritt 10). Je Stufe mit Plan ein Link; gibt es keinen, ein Link auf die Liste
+ * des Fachs. `[{ href, text }]`.
+ */
+export function planVerweise(plaene, { fachId, stufen = [], aktuell }) {
+    const treffer = stufen
+        .map((st) => (plaene ?? []).find((p) => p.subject_id === fachId && p.stufe === st && p.schuljahr === aktuell))
+        .filter(Boolean)
+    if (!treffer.length) return [{ href: `/knowledge/year-plans?fach=${fachId}`, text: 'Jahresverlaufspläne' }]
+    const mehrere = treffer.length > 1
+    return treffer.map((p) => ({
+        href: `/knowledge/year-plans/${p.id}`,
+        text: mehrere ? `Jahresverlaufsplan Kl. ${p.stufe}` : 'Jahresverlaufsplan',
+    }))
+}
+
 /** Bilanz eines Kapitels: „passt“, „zu wenig“, „zu viel“ oder `null` ohne Zahlen. Ein Spielraum
  *  von einer Wochenstunde gilt als passend. */
 export function bilanzStand(kapitel, wochenstunden) {

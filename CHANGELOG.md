@@ -9,7 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Jahresverlaufspläne der Fachschaften (`/knowledge/year-plans`): je Fach, Klassenstufe und Schuljahr Abschnitte
   in Unterrichtswochen auf dem Kalender der Schule, mit Zeitleiste, Stundenbilanz je Kapitel, Entwurf und Beschluss,
-  Archiv früherer Schuljahre. Verlinkt aus den Curricula.
+  Archiv früherer Schuljahre. In der Bibliothek mit eigenem Eintrag und Kachel; das Curriculum verlinkt den Plan seiner
+  Stufe.
 - Jahresverlaufsplan aus einem früheren Schuljahr als Entwurf übernehmen; Kapitel werden auf das heutige
   Curriculum abgebildet.
 

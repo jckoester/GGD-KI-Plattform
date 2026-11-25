@@ -189,3 +189,31 @@ describe('Übersicht (Schritt 7)', () => {
             .toBe(' · beschlossen am 25.11.2026 · 37 Wochen geplant · kapitelgenau')
     })
 })
+
+describe('Verweise aus dem Curriculum (Schritt 7)', () => {
+    const plaene = [
+        { id: 'a', subject_id: 3, stufe: 7, schuljahr: '2025/26' },
+        { id: 'b', subject_id: 3, stufe: 8, schuljahr: '2025/26' },
+        { id: 'c', subject_id: 3, stufe: 9, schuljahr: '2026/27' },
+        { id: 'd', subject_id: 4, stufe: 9, schuljahr: '2025/26' },
+    ]
+    it('Band: je Stufe ein Link', async () => {
+        const { planVerweise } = await import('./verlaufsplan.js')
+        expect(planVerweise(plaene, { fachId: 3, stufen: [7, 8], aktuell: '2025/26' })).toEqual([
+            { href: '/knowledge/year-plans/a', text: 'Jahresverlaufsplan Kl. 7' },
+            { href: '/knowledge/year-plans/b', text: 'Jahresverlaufsplan Kl. 8' },
+        ])
+    })
+    it('eine Stufe: ein Link ohne Stufe im Text', async () => {
+        const { planVerweise } = await import('./verlaufsplan.js')
+        expect(planVerweise(plaene, { fachId: 3, stufen: [8], aktuell: '2025/26' }))
+            .toEqual([{ href: '/knowledge/year-plans/b', text: 'Jahresverlaufsplan' }])
+    })
+    it('ohne Plan im laufenden Jahr: die Liste des Fachs', async () => {
+        const { planVerweise } = await import('./verlaufsplan.js')
+        expect(planVerweise(plaene, { fachId: 3, stufen: [9], aktuell: '2025/26' }))
+            .toEqual([{ href: '/knowledge/year-plans?fach=3', text: 'Jahresverlaufspläne' }])
+        expect(planVerweise(undefined, { fachId: 4, stufen: [], aktuell: '2025/26' }))
+            .toEqual([{ href: '/knowledge/year-plans?fach=4', text: 'Jahresverlaufspläne' }])
+    })
+})

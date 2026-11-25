@@ -19,6 +19,10 @@
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import { FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
+    import { getVerlaufsplaene } from "$lib/api.js";
+    import { planVerweise } from "$lib/verlaufsplan.js";
+    import { stufen as bandStufen } from "$lib/curriculum_rahmen.js";
+    import { user, userHasAnyRole } from "$lib/stores/user.js";
 
     let curriculum = $state(null);
     const totalStd = $derived(curriculumStd(curriculum));
@@ -82,6 +86,25 @@
             exporting = false;
         }
     }
+
+    // Jahresverlaufspläne der Stufen dieses Curriculums im laufenden Schuljahr (0.59, BD Schritt 7)
+    let verlaufsplaene = $state(null);
+    // Nur für Lehrkräfte: Curricula lesen auch Schüler:innen, Jahresverlaufspläne nicht (BD F11).
+    const lehrkraft = $derived(!!$user && userHasAnyRole($user, ["teacher", "admin"]));
+    $effect(() => {
+        const fach = curriculum?.subject_id;
+        if (!fach || !lehrkraft) return;
+        let abgebrochen = false;
+        getVerlaufsplaene(fach)
+            .then((a) => { if (!abgebrochen) verlaufsplaene = a; })
+            .catch(() => { if (!abgebrochen) verlaufsplaene = null; }); // ohne Pläne bleibt der Link auf die Liste
+        return () => { abgebrochen = true; };
+    });
+    const planLinks = $derived(lehrkraft && curriculum?.subject_id ? planVerweise(verlaufsplaene?.plaene, {
+        fachId: curriculum.subject_id,
+        stufen: bandStufen(curriculum.metadata?.jahrgangsstufe),
+        aktuell: verlaufsplaene?.aktuelles_schuljahr,
+    }) : []);
 
     $effect(() => {
         const id = $page.params.id;
@@ -197,9 +220,9 @@
                         {#if totalStd > 0}
                             · Gesamt: {totalStd} Std.
                         {/if}
-                        {#if curriculum.subject_id}
-                            · <a href="/knowledge/year-plans?fach={curriculum.subject_id}" class="text-light-bl dark:text-dark-bl hover:underline">Jahresverlaufspläne</a>
-                        {/if}
+                        {#each planLinks as l (l.href)}
+                            · <a href={l.href} class="text-light-bl dark:text-dark-bl hover:underline">{l.text}</a>
+                        {/each}
                     </p>
                 </div>
                 <div bind:this={topActionsEl} class="flex flex-wrap justify-end gap-2">
