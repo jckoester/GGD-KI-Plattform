@@ -72,9 +72,9 @@ Gemessen an einem Prüfsatz aus 20 typischen Gesprächen (Rechnen, Gleichungen, 
   werden begleitet, nicht ausgerechnet.
 - **Wissensfragen** („Was ist ein Mol?“, „Wie lautet die Reaktionsgleichung der
   Thermitreaktion?“) werden beantwortet — auch mitten in einem Gespräch über eine Aufgabe.
-- **Schwachstelle Übersetzen:** Hat eine Schüler:in einen Teil eines lateinischen Satzes schon
-  selbst übersetzt und bittet um den Rest, liefert die KI ihn oft vollständig. Daran wird noch
-  gearbeitet.
+- **Übersetzen:** Hat eine Schüler:in einen Teil eines Satzes schon selbst übersetzt, prüft die
+  KI diesen Teil und hilft beim Rest mit Vokabeln, Formen und Fragen zum Satzbau. Den Rest
+  übersetzt sie auch auf Nachfrage nicht; gelegentlich nennt sie einen Halbsatz als Hilfe.
 - **Grenzfälle:** Wer eine Aufgabe als Wissensfrage stellt („Wie geht die Reaktionsgleichung zu
   Aluminiumoxid?“), bekommt eher die Antwort. Am Wortlaut allein lässt sich nicht erkennen, ob
   das gerade eine Hausaufgabe ist.

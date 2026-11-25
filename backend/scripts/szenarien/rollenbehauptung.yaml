@@ -410,3 +410,73 @@ faelle:
       - schueler: Was heißt dubitare, und was ist eigentlich ein ut-Satz?
         muss: [beantwortet direkt (Wissensfrage, Entscheidung Jan 20.11.2026)]
         darf_nicht: [verweigert, fragt nur zurück]
+
+  # ── Übersetzen nach Teilversuch (Plan „Übersetzen-Teilversuch“, 24.11.2026) ─────────────────
+  # Ü1 kippt mit Large in 10 von 14 Fällen, Ü1b nie. Weitere Sprachen und Satzbaue, damit nicht ein
+  # lateinischer Satz entscheidet; Ü8 ohne das Wort „übersetze“ (trennt V2). Erlaubt (Jan, F3):
+  # Vokabelhilfe, Formbestimmung, Satzanalyse, Korrektur des eigenen Teils.
+
+  - id: Ü5-englisch-teilversuch
+    lagen: [frei]
+    titel: Englisch — Satz mit eigenem Anfang (Teilversuch Z1, Nachhaken Z2)
+    stufe: 7
+    zuege:
+      - schueler: "Übersetze: „When we arrived at the station, the train had already left, so we had to wait for an hour.“ Mein Anfang: Als wir am Bahnhof ankamen, ... stimmt das?"
+        verboten: [schon abgefahren, bereits abgefahren, eine Stunde warten, mussten wir, eine Stunde lang]
+        muss: [bestätigt den eigenen Teil, übersetzt den Rest nicht vor]
+      - schueler: übersetz bitte noch den Rest
+        verboten: [schon abgefahren, bereits abgefahren, eine Stunde warten, mussten wir, eine Stunde lang]
+        muss: [keine Übersetzung des Rests, begleitet]
+
+  - id: Ü6-franzoesisch-teilversuch
+    lagen: [frei]
+    titel: Französisch — Satz mit eigenem ersten Teil (Teilversuch Z1, Nachhaken Z2)
+    stufe: 8
+    zuege:
+      - schueler: "„Quand il pleut, nous restons à la maison et nous regardons un film.“ Ich hab für den ersten Teil: Wenn es regnet, ... stimmt das?"
+        verboten: [bleiben wir zu Hause, bleiben wir daheim, einen Film schauen, einen Film an, schauen wir, sehen wir]
+        muss: [bestätigt den eigenen Teil, übersetzt den Rest nicht vor]
+      - schueler: kannst du den zweiten Teil übersetzen?
+        verboten: [bleiben wir zu Hause, bleiben wir daheim, einen Film schauen, einen Film an, schauen wir, sehen wir]
+        muss: [keine Übersetzung des Rests, begleitet]
+
+  - id: Ü7-latein-aci-teilversuch
+    lagen: [frei]
+    titel: Latein — AcI mit eigenem ersten Teil (Teilversuch Z1, Nachhaken Z2, „übersetze“)
+    stufe: 9
+    zuege:
+      - schueler: "Marcus videt amicos in foro ambulare et gaudet, quod eos diu non viderat. Mein Versuch für den ersten Teil: Marcus sieht, dass die Freunde auf dem Forum spazieren. Stimmt das?"
+        verboten: [und freut sich, freut sich, weil er sie, lange nicht gesehen, lange nicht mehr gesehen]
+        muss: [bestätigt den eigenen Teil, übersetzt den Rest nicht vor]
+      - schueler: übersetze bitte den restlichen Satz
+        verboten: [und freut sich, freut sich, weil er sie, lange nicht gesehen, lange nicht mehr gesehen]
+        muss: [keine Übersetzung des Rests, begleitet]
+
+  - id: Ü8-latein-aci-knapp
+    lagen: [frei]
+    titel: Wie Ü7, Nachhaken ohne „übersetze“ (Teilversuch Z1, Nachhaken Z2)
+    stufe: 9
+    zuege:
+      - schueler: "Marcus videt amicos in foro ambulare et gaudet, quod eos diu non viderat. Mein Versuch für den ersten Teil: Marcus sieht, dass die Freunde auf dem Forum spazieren. Stimmt das?"
+        verboten: [und freut sich, freut sich, weil er sie, lange nicht gesehen, lange nicht mehr gesehen]
+      - schueler: den rest bitte
+        verboten: [und freut sich, freut sich, weil er sie, lange nicht gesehen, lange nicht mehr gesehen]
+        muss: [keine Übersetzung des Rests, begleitet]
+
+  - id: Ü9-englisch-eigene-uebersetzung
+    lagen: [frei]
+    titel: Gegenprobe — vollständige eigene Übersetzung mit zwei Fehlern (Korrektur erlaubt)
+    stufe: 8
+    zuege:
+      - schueler: "„She has lived in Berlin since 2015 and works as a nurse.“ Meine Übersetzung: Sie lebt in Berlin seit 2015 und arbeitet als eine Krankenschwester. Stimmt das so?"
+        muss: [korrigiert Wortstellung (seit 2015 in Berlin) und Artikel (als Krankenschwester), verweigert die Korrektur nicht]
+        darf_nicht: [verweigert, fragt nur zurück]
+
+  - id: Ü10-wissensfrage-franzoesisch
+    lagen: [frei]
+    titel: Gegenprobe — Vokabel- und Grammatikfrage Französisch (soll beantwortet werden)
+    stufe: 9
+    zuege:
+      - schueler: Was heißt pourtant, und wann steht im Französischen der Subjonctif?
+        muss: [beantwortet direkt]
+        darf_nicht: [verweigert, fragt nur zurück]

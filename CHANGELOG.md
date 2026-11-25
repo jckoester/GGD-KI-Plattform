@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Leitplanke „Keine Komplettlösungen“ für Schüler:innen gilt ausdrücklich auch für Übersetzungen und Texte: Eine
+  vollständige Lösung gibt es nur für den selbst versuchten Teil; beim Übersetzen ist der nächste Schritt eine
+  Vokabel, eine Form oder eine Frage zum Satzbau.
+
+### Nach dem Update
+
+- In `config/pedagogy.yaml` den Text von `no_complete_homework_solutions` aus `config/pedagogy.example.yaml`
+  übernehmen (die Datei wird beim Update nicht überschrieben) und das Backend neu starten.
+
 ## [0.57.0] – 2026-11-24
 
 ### Neu
