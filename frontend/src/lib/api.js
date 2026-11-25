@@ -1987,6 +1987,24 @@ export async function getCurriculum(curriculumId) {
  * Namen gegen die Begriffe des Curriculum-Fachs abgleichen (0.44, AQ) — Format wie
  * `curriculum.begriffe`. `namen`: `[{name, fassung?}]`.
  */
+/**
+ * Querverweise des Bildungsplans in andere Fächer, je Kompetenz (AY Teil 1).
+ * Kompetenzen ohne Querverweis fehlen in der Antwort. POST nur wegen der Länge der Liste.
+ */
+export async function getQuerverweise(kompetenzIds) {
+  const res = await fetch(`${BASE}/context/querverweise`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kompetenz_ids: kompetenzIds }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Querverweise konnten nicht geladen werden')
+  }
+  return res.json()
+}
+
 export async function aufloesenCurriculumBegriffe(curriculumId, namen) {
   const res = await fetch(`${BASE}/context/curricula/${curriculumId}/begriffe/aufloesen`, {
     method: 'POST',

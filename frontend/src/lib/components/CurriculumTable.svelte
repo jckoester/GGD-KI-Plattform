@@ -21,7 +21,9 @@
     import CurriculumAbdeckung from "./CurriculumAbdeckung.svelte";
     import { untrack } from "svelte";
     import { page } from "$app/stores";
-    import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl } from "$lib/api.js";
+    import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl, getQuerverweise } from "$lib/api.js";
+    import Querverweise from "./Querverweise.svelte";
+    import { fehlendeIds, kompetenzIdsImCurriculum, uebernehmen } from "$lib/querverweise.js";
     import { myFachschaften } from "$lib/stores/myGroups.js";
     import {
         aufloesungsMap,
@@ -106,6 +108,29 @@
         onchange();
         if (feld === "begriffe") pruefeBegriffe(neu);
     }
+
+    // ── Querverweise in andere Fächer (AY Teil 1) ──────────────────────────────
+    // Nachgeladen, nicht im Baum: Der Baum bleibt schlank, und in der Bearbeitung kommen
+    // auch neu gewählte Kompetenzen dazu — nur die noch unbekannten werden gefragt.
+    let querverweise = $state(new Map());
+    let qvTimer = null;
+    $effect(() => {
+        const ids = kompetenzIdsImCurriculum(curriculum);
+        untrack(() => {
+            const fehlend = fehlendeIds(ids, querverweise);
+            if (!fehlend.length) return;
+            clearTimeout(qvTimer);
+            qvTimer = setTimeout(async () => {
+                try {
+                    const antwort = await getQuerverweise(fehlend);
+                    querverweise = uebernehmen(querverweise, fehlend, antwort);
+                } catch {
+                    // Ohne Querverweise bleibt die Tabelle, wie sie war.
+                }
+            }, editMode ? 400 : 0);
+        });
+    });
+    const qvVon = (nodeId) => (nodeId && querverweise.get(nodeId)) || [];
 
     // Lokaler State für Edit-Mode
     let showContextMenu = $state(null); // { type: 'kapitel'|'ls'|'eintrag', id: string, x: number, y: number }
@@ -987,6 +1012,12 @@
                                             onchange();
                                         }}
                                     />
+                                    {#each normalizeIk(eintrag.ik).filter((ik) => qvVon(ik.node_id).length) as ik (ik.node_id)}
+                                        <div class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                            {ik.nr}
+                                            <Querverweise liste={qvVon(ik.node_id)} />
+                                        </div>
+                                    {/each}
                                 {:else}
                                     {#each normalizeIk(eintrag.ik) as ik}
                                         {#if ik.node_id}
@@ -998,6 +1029,7 @@
                                             >
                                                 {ik.nr}{#if ik.veraltet}&nbsp;⚠{/if}
                                             </a>
+                                            <Querverweise liste={qvVon(ik.node_id)} />
                                         {:else}
                                             <span
                                                 class="inline-block mr-1 {ik.veraltet ? 'line-through text-light-re dark:text-dark-re' : 'text-light-tx dark:text-dark-tx'}"

@@ -2,7 +2,9 @@
     import { goto, beforeNavigate } from "$app/navigation";
     import { tick, untrack } from "svelte";
     import { page } from "$app/stores";
-    import { getFachplanBySubject, getContextNodes } from "$lib/api.js";
+    import { getFachplanBySubject, getContextNodes, getQuerverweise } from "$lib/api.js";
+    import Querverweise from "./Querverweise.svelte";
+    import { kompetenzIdsImFachplan, uebernehmen, fehlendeIds } from "$lib/querverweise.js";
     import { sortOperatorsByTitle, formatAfb } from "$lib/operators.js";
     // Kompetenzen führen ihre Formeln im Titel (`… die Zahl \(\pi\) …`) — hier wird nur
     // Mathematik gerendert, kein Markdown: Titel sind einzeilig, und ein `_` darin ist Text.
@@ -83,11 +85,24 @@
             (ld.unter_leitideen ?? []).reduce((s, u) => s + countIk(u), 0);
     }
 
+    // Querverweise in andere Fächer (AY Teil 1, F6) — nachgeladen, ohne die Ansicht aufzuhalten.
+    let querverweise = $state(new Map());
+    async function ladeQuerverweise(plan) {
+        const fehlend = fehlendeIds(kompetenzIdsImFachplan(plan), querverweise);
+        if (!fehlend.length) return;
+        try {
+            querverweise = uebernehmen(querverweise, fehlend, await getQuerverweise(fehlend));
+        } catch {
+            // Ohne Querverweise bleibt die Ansicht, wie sie war.
+        }
+    }
+
     async function load(band = null, bpVersion = null) {
         loading = true;
         error = null;
         try {
             data = await getFachplanBySubject(subjectId, band, bpVersion);
+            ladeQuerverweise(data);
             // Band aus Response übernehmen falls noch keins gesetzt
             if (!selectedBand && data?.selected_band) {
                 selectedBand = data.selected_band;
@@ -506,15 +521,21 @@
             {#if ld.ik_kompetenzen?.length > 0}
                 <div class="p-3 space-y-1">
                     {#each ld.ik_kompetenzen as ik (ik.id)}
-                        <button
-                            onclick={() => navigateToNode(ik.id)}
-                            class="w-full flex items-center gap-3 p-2 rounded
-                                   hover:bg-light-bg-2 dark:hover:bg-dark-bg-2
-                                   text-light-tx dark:text-dark-tx text-sm transition-colors"
-                        >
-                            <NodeTypeIcon contentType="ik_kompetenz" size={16} />
-                            <span class="flex-1 text-left">{@html renderInlineMath(ik.title)}</span>
-                        </button>
+                        <div class="rounded hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors">
+                            <button
+                                onclick={() => navigateToNode(ik.id)}
+                                class="w-full flex items-center gap-3 p-2
+                                       text-light-tx dark:text-dark-tx text-sm"
+                            >
+                                <NodeTypeIcon contentType="ik_kompetenz" size={16} />
+                                <span class="flex-1 text-left">{@html renderInlineMath(ik.title)}</span>
+                            </button>
+                            {#if querverweise.get(ik.id)?.length}
+                                <div class="pl-9 pb-1 -mt-1">
+                                    <Querverweise liste={querverweise.get(ik.id)} />
+                                </div>
+                            {/if}
+                        </div>
                     {/each}
                 </div>
             {/if}
