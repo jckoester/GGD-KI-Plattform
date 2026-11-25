@@ -142,6 +142,7 @@ ERLAUBT: dict[str, str] = {
     "app.upload.router.upload_session": "Datei für den Chat",
     "app.feedback.router.create_feedback": "Rückmeldung aus der Vorschau (ADR-020, feedback.preview)",
     "app.context.router.search_context_nodes": "rechnet nur",
+    "app.context.router.querverweise_lesen": "liest nur (POST wegen der Länge der ID-Liste)",
     "app.context.router.add_chat_context_node": "Baustein an einen Vorschau-Chat heften (`darf_chat_sehen`)",
     "app.context.router.remove_chat_context_node": "Baustein von einem Vorschau-Chat nehmen (`darf_chat_sehen`)",
     "app.api.pii.pii_scan": "rechnet nur",

@@ -51,6 +51,8 @@ from app.context.schemas import (
     CurriculumRead,
     CurriculumMetaUpdate,
     BegriffeAufloesenAnfrage,
+    QuerverweisRead,
+    QuerverweiseAnfrage,
     CurriculumDraftConfirmed,
     CurriculumCreate,
     FachplanTreeRead,
@@ -1864,6 +1866,25 @@ async def _lesbares_curriculum(db: AsyncSession, curriculum_id: UUID, user: JwtP
         "read_scope": node.read_scope, "owner_pseudonym": node.owner_pseudonym,
         "status": node.status, "subject_id": node.subject_id}, user)
     return node
+
+
+@router.post("/querverweise", response_model=dict[str, list[QuerverweisRead]])
+async def querverweise_lesen(
+    payload: QuerverweiseAnfrage,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Querverweise des Bildungsplans in andere Fächer, je Kompetenz (AY Teil 1, Schritt 3).
+
+    POST nur wegen der Länge der Liste (ein Fachplan hat bis zu 1.250 Kompetenzen) — der Weg
+    liest nur und steht deshalb in `vorschau.ERLAUBT`. Ein Leserecht je Curriculum braucht es
+    nicht: Die Funktion nimmt nur Bildungsplan-Knoten als Quelle und Ziel, die alle lesen
+    dürfen; andere IDs übergeht sie. So deckt ein Weg Lesesicht, Bearbeitung (auch noch nicht
+    gespeicherte Kompetenzen) und Bildungsplan-Ansicht ab.
+    """
+    from app.context.querverweise import querverweise
+
+    return await querverweise(db, payload.kompetenz_ids)
 
 
 @router.post("/curricula/{curriculum_id}/begriffe/aufloesen", response_model=list[dict])

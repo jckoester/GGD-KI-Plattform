@@ -1,7 +1,7 @@
 """Pydantic-Schemas für die Context-Nodes-API."""
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
@@ -528,6 +528,30 @@ class BegriffName(BaseModel):
 class BegriffeAufloesenAnfrage(BaseModel):
     """Namen zum Abgleich gegen die Begriffe eines Curriculum-Fachs (0.44, AQ)."""
     namen: list[BegriffName] = Field(default_factory=list, max_length=200)
+
+
+class QuerverweiseAnfrage(BaseModel):
+    """Kompetenzen, deren Querverweise in andere Fächer gesucht sind (AY Teil 1). Obergrenze:
+    der größte Fachplan (Deutsch, etwa 1.250 inhaltsbezogene Kompetenzen) mit Luft."""
+    kompetenz_ids: list[UUID] = Field(default_factory=list, max_length=3000)
+
+
+class QuerverweisRead(BaseModel):
+    """Ein Querverweis des Bildungsplans in ein anderes Fach (`app/context/querverweise.py`)."""
+    ziel_id: str
+    typ: str  # ik · bereich · pk
+    fach_id: int
+    fach: str
+    fach_code: Optional[str] = None
+    fach_slug: str
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    nr: Optional[str] = None
+    titel: str
+    min_grade: Optional[int] = None
+    max_grade: Optional[int] = None
+    status: str
+    ab_schuljahr: Optional[int] = None
 
 
 class CurriculumRead(BaseModel):

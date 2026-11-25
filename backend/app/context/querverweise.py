@@ -17,9 +17,10 @@ Entschieden (Jan, 25.11.2026, Plan ``Querverweise-im-Curriculum-AY1-Plan``):
   Nummern sich zwischen den Bändern wiederholen („3.2.1(3)“ steht in V2 für 7/8 und in V3
   für 9/10). Ein künftiges Ziel bleibt und trägt ``ab_schuljahr``.
 
-Leserecht: Ziele sind nur Bildungsplan-Knoten (die drei Typen unten), und die liest jede
-angemeldete Person. Eine Prüfung je Nutzer:in braucht es deshalb hier nicht — das Curriculum,
-aus dem die Kompetenzen stammen, prüft der Aufrufer.
+Leserecht: Quellen und Ziele sind nur Bildungsplan-Knoten (die drei Typen unten), und die
+liest jede angemeldete Person. Andere IDs in der Anfrage werden still übergangen. Eine Prüfung
+je Nutzer:in braucht es deshalb nicht — und ein Endpunkt genügt für Curriculum (auch
+ungespeicherte Kompetenzen in der Bearbeitung) und Bildungsplan-Ansicht.
 """
 from __future__ import annotations
 
@@ -117,7 +118,8 @@ async def querverweise(db: AsyncSession, kompetenz_ids: list[UUID]) -> dict[str,
     ziele: dict[UUID, dict[UUID, ContextNode]] = defaultdict(dict)
     for quelle_id, ziel_id in paare:
         quelle, ziel = knoten.get(quelle_id), knoten.get(ziel_id)
-        if quelle is None or ziel is None or ziel.content_type not in ZIELTYPEN:
+        if (quelle is None or ziel is None or quelle.content_type not in ZIELTYPEN
+                or ziel.content_type not in ZIELTYPEN):
             continue
         if ziel.status not in _SICHTBAR:
             ziel = umgelenkt.get(ziel.id)

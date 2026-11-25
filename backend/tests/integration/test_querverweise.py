@@ -128,3 +128,67 @@ async def test_gegenrichtung_und_leere_eingaben(db_session, welt):
     assert str(welt["gleiches_fach"].id) not in await querverweise(db_session, [welt["gleiches_fach"].id])
     assert await querverweise(db_session, []) == {}
 
+
+
+# ── Schritt 3: Endpunkt POST /context/querverweise ─────────────────────────────
+
+def _client(db, user):
+    import httpx
+    from fastapi import FastAPI
+
+    from app.auth.dependencies import get_current_user
+    from app.context.router import router
+    from app.db.session import get_db
+
+    app = FastAPI()
+    app.include_router(router)
+
+    async def _db():
+        yield db
+
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = lambda: user
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+
+
+def _person(*rollen):
+    from app.auth.jwt import JwtPayload
+
+    return JwtPayload(sub=f"qv-{TOKEN}", roles=list(rollen), grade="8" if "student" in rollen else None,
+                      jti="j", iat=0, exp=9999999999)
+
+
+async def test_endpunkt_liefert_je_kompetenz_auch_fuer_schuelerinnen(db_session, welt):
+    async with _client(db_session, _person("student")) as c:
+        r = await c.post("/context/querverweise", json={"kompetenz_ids": [
+            str(welt["quelle"].id), str(welt["gleiches_fach"].id)]})
+    assert r.status_code == 200
+    aus = r.json()
+    assert set(aus) == {str(welt["quelle"].id)}
+    assert {e["typ"] for e in aus[str(welt["quelle"].id)]} == {"ik", "bereich"}
+    assert aus[str(welt["quelle"].id)][0]["fach_slug"] == welt["ma"].slug
+
+
+async def test_endpunkt_uebergeht_knoten_ausserhalb_des_bildungsplans(db_session, welt):
+    """Eine private Notiz mit Kante auf eine Kompetenz verrät über diesen Weg nichts."""
+    notiz = ContextNode(category="knowledge", content_type="note", title=f"Notiz {TOKEN}",
+                        read_scope="private", write_scope="private", owner_pseudonym="jemand",
+                        subject_id=welt["ma"].id)
+    db_session.add(notiz)
+    await db_session.flush()
+    db_session.add(_kante(notiz, welt["quelle"]))
+    await db_session.flush()
+    async with _client(db_session, _person("teacher")) as c:
+        r = await c.post("/context/querverweise", json={"kompetenz_ids": [str(notiz.id)]})
+        r2 = await c.post("/context/querverweise", json={"kompetenz_ids": [str(welt["quelle"].id)]})
+    assert r.status_code == 200 and r.json() == {}
+    assert str(notiz.id) not in {e["ziel_id"] for e in r2.json()[str(welt["quelle"].id)]}
+
+
+async def test_endpunkt_begrenzt_die_liste(db_session, welt):
+    async with _client(db_session, _person("teacher")) as c:
+        r = await c.post("/context/querverweise",
+                         json={"kompetenz_ids": [str(uuid.uuid4()) for _ in range(3001)]})
+        leer = await c.post("/context/querverweise", json={"kompetenz_ids": []})
+    assert r.status_code == 422
+    assert leer.status_code == 200 and leer.json() == {}
