@@ -111,5 +111,5 @@ async def verlaufsplan_rueckgaengig(
     except vg.NichtMehrRueckgaengig:
         raise HTTPException(status_code=409, detail=NICHT_MEHR) from None
     if not geloescht:
-        raise HTTPException(status_code=404, detail="Zu diesem Lauf gibt es keine Einheiten mehr.")
+        raise HTTPException(status_code=404, detail="Die angelegten Einheiten gibt es nicht mehr.")
     return {"einheiten": geloescht}

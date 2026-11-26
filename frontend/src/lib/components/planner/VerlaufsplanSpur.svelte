@@ -7,7 +7,10 @@
      * „heute“. Ein Block ist ein Link auf den Plan in der Bibliothek, mit `?back=` zurück in den Planer. Ohne Plan ein Satz mit
      * Verweis auf die Pläne des Fachs; ohne Fach nichts.
      *
-     * Props: `antwort` (von `getVerlaufsplanDerGruppe`), `fachName`, `zu` (bindable), `onUmschalten`.
+     * „Einheiten anlegen …“ öffnet den Dialog (Schritt 5, `onEinheiten`) — nur mit Kalender.
+     *
+     * Props: `antwort` (von `getVerlaufsplanDerGruppe`), `fachName`, `zu` (bindable), `onUmschalten`,
+     * `onEinheiten`.
      */
     import { page } from '$app/stores'
     import { mitRueckweg } from '$lib/rueckweg.js'
@@ -15,7 +18,7 @@
     import VerlaufsplanZeitleiste from '$lib/components/VerlaufsplanZeitleiste.svelte'
     import { einheiten, spurKopf, spurOhnePlan } from '$lib/verlaufsplan.js'
 
-    let { antwort = null, fachName = '', zu = $bindable(false), onUmschalten = () => {} } = $props()
+    let { antwort = null, fachName = '', zu = $bindable(false), onUmschalten = () => {}, onEinheiten = null } = $props()
 
     const plan = $derived(antwort?.plan ?? null)
     const ohne = $derived(spurOhnePlan(antwort, fachName))
@@ -39,7 +42,15 @@
                 <span id="verlaufsplan-spur-titel" class="font-semibold uppercase tracking-wide">Jahresverlaufsplan der Fachschaft</span>
                 <span class="truncate">{spurKopf(plan)}</span>
             </button>
-            <a href={planPfad} class="flex-shrink-0 text-xs text-light-bl dark:text-dark-bl hover:underline">Plan öffnen</a>
+            <div class="flex-shrink-0 flex items-center gap-3">
+                {#if onEinheiten && plan.lage}
+                    <button type="button" onclick={onEinheiten}
+                        class="px-2.5 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors">
+                        Einheiten anlegen …
+                    </button>
+                {/if}
+                <a href={planPfad} class="text-xs text-light-bl dark:text-dark-bl hover:underline">Plan öffnen</a>
+            </div>
         </div>
         {#if !zu}
             <div id="verlaufsplan-spur-leiste" class="mt-2">

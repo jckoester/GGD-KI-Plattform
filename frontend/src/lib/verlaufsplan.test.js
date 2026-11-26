@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, PUFFER_TITEL, pufferUmschalten, abschnittFarbe, bezugText, entwurfHinweis, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
-    umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern, spurKopf, spurOhnePlan, wochenThemen,
+    umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern, spurKopf, spurOhnePlan, wochenThemen, vorschauSumme, GRUND_TEXT, anlegenKnopf, laufMeldung, vorschlagHinweise, vorschlagStand,
 } from './verlaufsplan.js'
 import { ueColorIndex } from './planner.js'
 
@@ -272,5 +272,40 @@ describe('Spur im Planer (Teil B)', () => {
             .toBe('Für Klasse 9 in Mathematik gibt es im Schuljahr 2026/27 noch keinen Jahresverlaufsplan der Fachschaft.')
         expect(spurOhnePlan({ grund: 'keine_stufe', plan: null })).toMatch(/unter Unterricht festlegen/)
         expect(spurOhnePlan({ grund: 'kein_fach', plan: null })).toBe('')
+    })
+})
+
+describe('Einheiten aus dem Plan (Teil B, Schritt 5)', () => {
+    it('Stand und Hinweise je Vorschlag', () => {
+        expect(vorschlagStand({ anlegen: true, stunden: 4 })).toBe('neu, belegt 4 Stunden')
+        expect(vorschlagStand({ anlegen: true, stunden: 0, ohne_termine: true })).toBe('neu, noch ohne Termine')
+        expect(vorschlagStand({ anlegen: false, grund: 'puffer' })).toBe(GRUND_TEXT.puffer)
+        expect(vorschlagStand({ anlegen: false, grund: 'unbekannt' })).toBe('übersprungen')
+        expect(vorschlagHinweise({ anlegen: true, belegt: 1, kapitel_fehlt: true })).toEqual([
+            'Das Kapitel ist nicht mehr im Curriculum; die Einheit bekommt keins.',
+            '1 Stunde in diesen Wochen ist schon belegt und bleibt, wie sie ist.',
+        ])
+        expect(vorschlagHinweise({ anlegen: true, belegt: 2 })[0]).toBe('2 Stunden in diesen Wochen sind schon belegt und bleiben, wie sie sind.')
+        expect(vorschlagHinweise({ anlegen: false, belegt: 2 })).toEqual([])
+        expect(vorschlagHinweise({ anlegen: false, grund: 'vorbei', kapitel_fehlt: true })).toEqual([])
+    })
+
+    it('Knopf und Meldung', () => {
+        expect(anlegenKnopf({ neu: 3 })).toBe('3 Einheiten anlegen')
+        expect(anlegenKnopf({ neu: 1 })).toBe('1 Einheit anlegen')
+        expect(anlegenKnopf({ neu: 0 })).toBe('Nichts anzulegen')
+        expect(laufMeldung({ einheiten: 2, stunden: 1 })).toBe('2 Einheiten aus dem Jahresverlaufsplan angelegt, 1 Stunde belegt.')
+        expect(laufMeldung({ einheiten: 0 })).toBe('Es gab nichts anzulegen.')
+        expect(laufMeldung({ einheiten: 1, stunden: 0 })).toBe('1 Einheit aus dem Jahresverlaufsplan angelegt.')
+        expect(vorschauSumme({ neu: 2, stunden: 9 })).toBe('Neu: 2 Einheiten, zusammen 9 Stunden. Danach kannst du das Anlegen rückgängig machen.')
+        expect(vorschauSumme({ neu: 2, stunden: 0 })).toMatch(/^Neu: 2 Einheiten, noch ohne Termine\./)
+        expect(vorschauSumme({ neu: 0 })).toBe('Aus diesem Plan ist nichts mehr anzulegen.')
+    })
+
+    it('Jeder Grund des Servers hat einen Text', () => {
+        // app/planning/verlaufsplan_vorlage.py
+        for (const g of ['puffer', 'kapitel_vorhanden', 'schon_angelegt', 'vorbei', 'nach_schuljahresende', 'belegt']) {
+            expect(GRUND_TEXT[g]).toBeTruthy()
+        }
     })
 })

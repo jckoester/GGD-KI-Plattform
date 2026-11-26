@@ -15,6 +15,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Kapitel, Beschreibung und Zahl der freien Unterrichtsstunden; Puffer und Kapitel mit Einheit werden übersprungen.
 - `POST …/verlaufsplan/anlegen` legt je Abschnitt eine Einheit an und belegt ihre freien Unterrichtsstunden;
   `POST …/verlaufsplan/rueckgaengig` nimmt einen Lauf zurück, solange seine Einheiten keine Stunden haben.
+- Planer: „Einheiten anlegen …“ in der Leiste des Jahresverlaufsplans öffnet eine Vorschau je Abschnitt und legt
+  die Einheiten an; danach lässt sich das Anlegen rückgängig machen.
 
 ## [0.59.0] – 2026-11-26
 

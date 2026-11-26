@@ -323,3 +323,61 @@ export function wochenThemen(antwort) {
     }
     return ergebnis
 }
+
+// ── Einheiten aus dem Plan anlegen (BD Teil B, Schritt 5) ─────────────────────
+
+/** Warum ein Abschnitt keine Einheit bekommt (`grund` der Vorschau). */
+export const GRUND_TEXT = {
+    puffer: 'Puffer — keine Einheit',
+    kapitel_vorhanden: 'übersprungen: Kapitel hat schon eine Einheit',
+    schon_angelegt: 'schon aus dem Plan angelegt',
+    vorbei: 'übersprungen: liegt in der Vergangenheit',
+    nach_schuljahresende: 'übersprungen: liegt nach dem Schuljahresende',
+    belegt: 'übersprungen: Stunden dieser Wochen schon belegt',
+}
+
+/** „4 Stunden“, „1 Stunde“, „keine Stunde“. */
+export function stundenText(n) {
+    if (!n) return 'keine Stunde'
+    return n === 1 ? '1 Stunde' : `${n} Stunden`
+}
+
+/** „3 Einheiten“, „1 Einheit“. */
+export function einheitenText(n) {
+    return n === 1 ? '1 Einheit' : `${n} Einheiten`
+}
+
+/** Was in der Zeile eines Vorschlags rechts steht. */
+export function vorschlagStand(v) {
+    if (!v.anlegen) return GRUND_TEXT[v.grund] ?? 'übersprungen'
+    if (v.ohne_termine) return 'neu, noch ohne Termine'
+    return `neu, belegt ${stundenText(v.stunden)}`
+}
+
+/** Hinweise zu einem neuen Vorschlag: Kapitel nicht mehr im Curriculum, belegte Stunden. */
+export function vorschlagHinweise(v) {
+    const h = []
+    if (v.anlegen && v.kapitel_fehlt) h.push('Das Kapitel ist nicht mehr im Curriculum; die Einheit bekommt keins.')
+    if (v.anlegen && v.belegt) h.push(`${stundenText(v.belegt)} in diesen Wochen ${v.belegt === 1 ? 'ist' : 'sind'} schon belegt und ${v.belegt === 1 ? 'bleibt' : 'bleiben'}, wie ${v.belegt === 1 ? 'sie ist' : 'sie sind'}.`)
+    return h
+}
+
+/** Satz unter der Vorschau: „Neu: 3 Einheiten, zusammen 24 Stunden.“ bzw. „…, noch ohne Termine.“ */
+export function vorschauSumme(vorschau) {
+    if (!vorschau?.neu) return 'Aus diesem Plan ist nichts mehr anzulegen.'
+    const teil = vorschau.stunden ? `zusammen ${stundenText(vorschau.stunden)}` : 'noch ohne Termine'
+    return `Neu: ${einheitenText(vorschau.neu)}, ${teil}. Danach kannst du das Anlegen rückgängig machen.`
+}
+
+/** Beschriftung des Knopfs im Dialog. */
+export function anlegenKnopf(vorschau) {
+    if (!vorschau?.neu) return 'Nichts anzulegen'
+    return `${einheitenText(vorschau.neu)} anlegen`
+}
+
+/** Meldung nach dem Anlegen (`{einheiten, stunden}`). */
+export function laufMeldung(lauf) {
+    if (!lauf?.einheiten) return 'Es gab nichts anzulegen.'
+    const teil = lauf.stunden ? `, ${stundenText(lauf.stunden)} belegt` : ''
+    return `${einheitenText(lauf.einheiten)} aus dem Jahresverlaufsplan angelegt${teil}.`
+}

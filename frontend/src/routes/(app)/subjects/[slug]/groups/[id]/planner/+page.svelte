@@ -51,8 +51,9 @@
   import LoeschenDialog from '$lib/components/planner/LoeschenDialog.svelte'
   // Jahresverlaufsplan der Fachschaft als Spur (BD Teil B, Schritt 2)
   import VerlaufsplanSpur from '$lib/components/planner/VerlaufsplanSpur.svelte'
-  import { getVerlaufsplanDerGruppe } from '$lib/api.js'
-  import { SPUR_SCHLUESSEL, wochenThemen } from '$lib/verlaufsplan.js'
+  import VerlaufsplanEinheitenDialog from '$lib/components/planner/VerlaufsplanEinheitenDialog.svelte'
+  import { getVerlaufsplanDerGruppe, nimmVerlaufsplanLaufZurueck } from '$lib/api.js'
+  import { SPUR_SCHLUESSEL, laufMeldung, wochenThemen } from '$lib/verlaufsplan.js'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -182,6 +183,40 @@
     patchPreferences({ [SPUR_SCHLUESSEL]: zu }).catch(() => {})
   }
 
+  // Einheiten aus dem Plan anlegen (Schritt 5): Dialog, danach eine Leiste mit „Rückgängig“.
+  let einheitenDialog = $state(false)
+  let lauf = $state(null)          // {lauf_id, einheiten, stunden, groupId}
+  let laufFehler = $state(null)
+  let laufZurueck = $state(false)
+  // `id`: die Gruppe der Anfrage — kommt die Antwort nach einem Wechsel der Gruppe, gilt sie nicht hier.
+  function angelegt(l, id) {
+    if (id !== groupId) return
+    laufFehler = null
+    lauf = l?.lauf_id ? { ...l, groupId: id } : null
+    loadOverview()
+  }
+  async function laufRueckgaengig() {
+    if (!lauf || laufZurueck) return
+    laufZurueck = true
+    laufFehler = null
+    const id = lauf.groupId
+    try {
+      await nimmVerlaufsplanLaufZurueck(id, lauf.lauf_id)
+      if (id === groupId) { lauf = null; loadOverview() }
+    } catch (e) {
+      if (id !== groupId) return
+      laufFehler = e.message
+      // 404: die Einheiten gibt es nicht mehr; 409: sie haben schon Stunden — beides wird nicht anders,
+      // also kein Knopf mehr, nur die Meldung (mit ✕), und den Stand neu laden.
+      if (e.status === 404 || e.status === 409) {
+        lauf = { ...lauf, endgueltig: true }
+        loadOverview()
+      }
+    } finally {
+      laufZurueck = false
+    }
+  }
+
   async function loadOverview() {
     loading = true
     error = null
@@ -211,6 +246,9 @@
     // Nur die Adresse innerhalb des Planers geändert (Ansicht, Einheit) — nichts neu zu laden.
     if (nav.from && nav.from.url.pathname === nav.to?.url.pathname) return
     verlaufsplan = null   // Spur und Wochenthemen der vorigen Gruppe nicht stehen lassen
+    lauf = null           // Rückgängig gilt nur für die Gruppe, in der angelegt wurde
+    laufFehler = null
+    einheitenDialog = false
     if (groupId) loadOverview()
   })
 
@@ -751,6 +789,27 @@
   </div>
 {/if}
 
+<!-- Ansage für Screenreader: eine Region, die immer da ist — erst mit dem Text eingefügt, ginge sie
+     oft verloren, zumal der Fokus gerade aus dem Dialog zurückspringt. -->
+<div class="sr-only" role="status">{lauf && lauf.groupId === groupId ? laufMeldung(lauf) : ''}</div>
+{#if lauf && lauf.groupId === groupId}
+  <div class="px-4 pt-2">
+    <div class="flex items-center gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
+      <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">{laufMeldung(lauf)}</span>
+      {#if !lauf.endgueltig}
+      <button type="button" onclick={laufRueckgaengig} disabled={laufZurueck}
+        class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+               text-light-tx dark:text-dark-tx hover:bg-light-bg dark:hover:bg-dark-bg transition-colors disabled:opacity-50"
+      >{laufZurueck ? 'Wird zurückgenommen …' : 'Rückgängig'}</button>
+      {/if}
+      <button onclick={() => { lauf = null; laufFehler = null }} aria-label="Schließen"
+        class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx">✕</button>
+    </div>
+    {#if laufFehler}<div class="mt-2"><ErrorBanner message={laufFehler} /></div>{/if}
+  </div>
+{/if}
+
 {#if patchError}
   <div class="px-4 pt-2">
     <ErrorBanner message={patchError} />
@@ -826,7 +885,8 @@
   {#if ersetztJahr}
     <div class="px-4 pt-3"><WarningBanner message={ersetztJahr} /></div>
   {/if}
-  <VerlaufsplanSpur antwort={verlaufsplan} fachName={subject?.name ?? ''} bind:zu={spurZu} onUmschalten={spurUmschalten} />
+  <VerlaufsplanSpur antwort={verlaufsplan} fachName={subject?.name ?? ''} bind:zu={spurZu} onUmschalten={spurUmschalten}
+    onEinheiten={() => (einheitenDialog = true)} />
   <!-- UE-Legende -->
   <UnitLegend
     units={overview.units}
@@ -869,6 +929,8 @@
 {/if}
 
 <!-- Modals -->
+<VerlaufsplanEinheitenDialog open={einheitenDialog} {groupId} onClose={() => (einheitenDialog = false)} onAngelegt={angelegt} />
+
 <AusfallDialog
   open={!!ausfallDialog}
   modus={ausfallDialog?.modus ?? 'eintragen'}

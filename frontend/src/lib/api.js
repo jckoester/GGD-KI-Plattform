@@ -2550,6 +2550,35 @@ export async function getVerlaufsplanDerGruppe(groupId) {
     return res.json()
 }
 
+async function _verlaufsplanGruppe(groupId, pfad, { method = 'GET', body } = {}, fehltext) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/verlaufsplan/${pfad}`, {
+        method,
+        credentials: 'include',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new ApiError(res.status, typeof data.detail === 'string' ? data.detail : fehltext)
+    }
+    return res.json()
+}
+
+/** Was „Einheiten aus dem Jahresverlaufsplan anlegen“ täte, je Abschnitt (BD Teil B, Schritt 3). */
+export function getVerlaufsplanVorschau(groupId) {
+    return _verlaufsplanGruppe(groupId, 'vorschau', {}, 'Vorschau konnte nicht geladen werden')
+}
+
+/** Legt die Einheiten an; `{lauf_id, einheiten, stunden}`. */
+export function legeVerlaufsplanEinheitenAn(groupId) {
+    return _verlaufsplanGruppe(groupId, 'anlegen', { method: 'POST' }, 'Einheiten konnten nicht angelegt werden')
+}
+
+/** Nimmt einen Lauf zurück, solange seine Einheiten keine Stunden haben. */
+export function nimmVerlaufsplanLaufZurueck(groupId, laufId) {
+    return _verlaufsplanGruppe(groupId, 'rueckgaengig', { method: 'POST', body: { lauf_id: laufId } }, 'Rückgängig ging nicht')
+}
+
 export async function getPlanningOverview(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')
