@@ -11,6 +11,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   laufenden Schuljahr mit der Zuordnung Woche → Abschnitt.
 - Planer einer Gruppe: Über der Jahresübersicht steht die Ablaufleiste des Jahresverlaufsplans der Fachschaft
   (einklappbar, Klick öffnet den Plan), im Kopf jeder Woche das Thema ihres Abschnitts. Ohne Plan ein Hinweis.
+- `GET /planning/groups/{id}/verlaufsplan/vorschau`: je Abschnitt des Plans, ob eine Einheit entstünde, mit Titel,
+  Kapitel, Beschreibung und Zahl der freien Unterrichtsstunden; Puffer und Kapitel mit Einheit werden übersprungen.
+- `POST …/verlaufsplan/anlegen` legt je Abschnitt eine Einheit an und belegt ihre freien Unterrichtsstunden;
+  `POST …/verlaufsplan/rueckgaengig` nimmt einen Lauf zurück, solange seine Einheiten keine Stunden haben.
 
 ## [0.59.0] – 2026-11-26
 
