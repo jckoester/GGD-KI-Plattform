@@ -282,7 +282,7 @@ async def test_anlegen_und_rueckgaengig(db, welt, monkeypatch):
     assert [s.label for s in snap] == ["Vor: Einheiten aus dem Jahresverlaufsplan"]
 
     # Ein zweiter Lauf legt nichts doppelt an
-    assert (await _post(db, g, "anlegen")).json() == {"lauf_id": None, "einheiten": 0, "stunden": 0}
+    assert (await _post(db, g, "anlegen")).json() == {"lauf_id": None, "einheiten": 0, "stunden": 0, "angelegt": []}
     # Die Vorschau sagt es
     v = (await _vorschau(db, g)).json()["vorschlaege"]
     assert [x["grund"] for x in v] == ["schon_angelegt", "puffer", "schon_angelegt"]
@@ -389,3 +389,33 @@ async def test_geloeschter_abschnitt_zaehlt_wieder_ueber_das_kapitel(db, welt, m
         assert r.status_code == 200, r.text
     (v,) = (await _vorschau(db, g)).json()["vorschlaege"]
     assert (v["anlegen"], v["grund"]) == (False, "kapitel_vorhanden")
+
+
+async def test_anlegen_mit_auslassen_und_eigenem_titel(db, welt, monkeypatch):
+    """0.61 (F1a): Der Assistent lässt Abschnitte weg und ändert Titel — nach der Nummer der Vorschau."""
+    from datetime import date
+
+    from app.context import verlaufsplan as vp
+    from app.planning import verlaufsplan_gruppe as vg
+
+    monkeypatch.setattr(vp, "heute", lambda: date(2025, 9, 1))
+    await _anlegen(db, welt, abschnitte=[
+        {"titel": "", "wochen": 1, "kapitel_ids": [str(welt["kapitel"][0].id)]},
+        {"titel": "Projekt", "wochen": 1},
+        {"titel": "", "wochen": 1, "kapitel_ids": [str(welt["kapitel"][1].id)]},
+    ])
+    g = await _gruppe(db, welt)
+    gid = g.id
+    await _termine(db, g, [date(2025, 9, 15), date(2025, 9, 22), date(2025, 9, 29)])
+    pg = await vg.plan_der_gruppe(db, g)
+    voll = await vp.voll(db, pg.plan, _lk())
+    r = await vg.anlegen(db, g, pg.plan, voll, _lk(), auslassen=[2], titel={3: "  Satzgruppe des Pythagoras  ", 9: "x"})
+    assert (r["einheiten"], r["stunden"]) == (2, 2)
+    assert r["angelegt"] == [{"nr": 1, "titel": "Ähnlichkeit", "kapitel": "Ähnlichkeit", "stunden": 1},
+                             {"nr": 3, "titel": "Satzgruppe des Pythagoras", "kapitel": "Pythagoras", "stunden": 1}]
+    assert sorted(e.title for e in await _einheiten(db, gid)) == ["Satzgruppe des Pythagoras", "Ähnlichkeit"]
+    # Der ausgelassene Abschnitt bleibt in der Vorschau anlegbar
+    v = (await _vorschau(db, g)).json()["vorschlaege"]
+    assert [(x["nr"], x["anlegen"]) for x in v] == [(1, False), (2, True), (3, False)]
+    # Alles ausgelassen: nichts, auch kein Snapshot-Lauf
+    assert (await vg.anlegen(db, g, pg.plan, voll, _lk(), auslassen=[2]))["lauf_id"] is None

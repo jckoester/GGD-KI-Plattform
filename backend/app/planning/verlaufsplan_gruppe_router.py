@@ -50,15 +50,6 @@ KEIN_PLAN = "Für diese Gruppe gibt es im laufenden Schuljahr keinen Jahresverla
 KEIN_KALENDER = "Für dieses Schuljahr liegt der Kalender der Schule noch nicht vor."
 
 
-def _vorschlag_dict(v, curricula: list[dict]) -> dict:
-    return {
-        "index": v.index, "nr": v.nr, "abschnitt_id": v.abschnitt_id, "titel": v.titel, "wochen": v.wochen,
-        "anlegen": v.anlegen, "grund": v.grund, "kapitel_id": v.kapitel_id, "kapitel_titel": v.kapitel_titel,
-        "kapitel_fehlt": v.kapitel_fehlt, "beschreibung": v.beschreibung, "stunden": v.stunden, "belegt": v.belegt,
-        "ohne_termine": v.ohne_termine, "farbe": vg.farbe_des_kapitels(v.kapitel_id, curricula),
-    }
-
-
 async def _plan_mit_lage(group_id: int, db: AsyncSession, user):
     group = await require_group_teacher(group_id, user, db)
     pg = await plan_der_gruppe(db, group)
@@ -78,7 +69,7 @@ async def verlaufsplan_vorschau(
     liste = await vorschlaege(db, group, pg.plan, voll["lage"])
     return {
         "plan_id": voll["id"], "titel": voll["titel"], "status": voll["status"], "schuljahr": pg.schuljahr,
-        "vorschlaege": [_vorschlag_dict(v, voll["curricula"]) for v in liste],
+        "vorschlaege": [vg.vorschlag_dict(v, voll["curricula"]) for v in liste],
         "neu": sum(1 for v in liste if v.anlegen),
         "stunden": sum(v.stunden for v in liste),
     }

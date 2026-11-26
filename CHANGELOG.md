@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Anlegen aus dem Jahresverlaufsplan: einzelne Abschnitte auslassen und Titel ändern (für den Assistenten); die Antwort
+  nennt die angelegten Einheiten.
+
 ## [0.60.0] – 2026-11-26
 
 ### Neu

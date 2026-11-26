@@ -198,12 +198,42 @@ def farbe_des_kapitels(kapitel_id: Optional[str], curricula: list[dict]) -> Opti
     return reihenfolge.index(kapitel_id) % FARBEN if kapitel_id in reihenfolge else None
 
 
-async def anlegen(db: AsyncSession, group: Group, plan: ContextNode, voll: dict, user) -> dict:
+def vorschlag_dict(v, curricula: list[dict]) -> dict:
+    """Ein Vorschlag als JSON — dieselbe Form für den Dialog im Planer und den Assistenten (0.61)."""
+    return {
+        "index": v.index, "nr": v.nr, "abschnitt_id": v.abschnitt_id, "titel": v.titel, "wochen": v.wochen,
+        "anlegen": v.anlegen, "grund": v.grund, "kapitel_id": v.kapitel_id, "kapitel_titel": v.kapitel_titel,
+        "kapitel_fehlt": v.kapitel_fehlt, "beschreibung": v.beschreibung, "stunden": v.stunden, "belegt": v.belegt,
+        "ohne_termine": v.ohne_termine, "farbe": farbe_des_kapitels(v.kapitel_id, curricula),
+    }
+
+
+#: Höchstlänge eines eigenen Titels (wie `UnitCreate`/Abschnitt im Plan)
+TITEL_MAX = 200
+
+
+def _anpassen(liste: list, auslassen, titel) -> list:
+    """Wünsche der Lehrkraft aus dem Chat (0.61, F1a): Abschnitte weglassen, Titel ändern — nach der
+    Nummer `nr` der Vorschau. Termine, Kapitel und Regeln bleiben beim Server."""
+    weg = {int(n) for n in auslassen or []}
+    neu = {int(n): str(t).strip()[:TITEL_MAX] for n, t in (titel or {}).items() if str(t).strip()}
+    aus = [v for v in liste if v.nr not in weg]
+    for v in aus:
+        if v.nr in neu:
+            v.titel = neu[v.nr]
+    return aus
+
+
+async def anlegen(db: AsyncSession, group: Group, plan: ContextNode, voll: dict, user, *,
+                  auslassen=None, titel: Optional[dict] = None) -> dict:
     """Legt je Vorschlag mit `anlegen` eine Einheit an und belegt ihre Termine (FB3–FB6).
 
     Vorher ein Snapshot (Verlauf des Planers, wie bei jeder Änderung); dann alles in **einer**
     Transaktion. Jede Einheit trägt `metadata.aus_verlaufsplan` = Plan, Abschnitt und Lauf — daran
     erkennt die Vorschau, was schon angelegt ist, und :func:`rueckgaengig`, was zum Lauf gehört.
+
+    `auslassen` (Nummern) und `titel` ({Nummer: Titel}) nutzt nur der Assistent (0.61, F1a); der
+    Knopf im Planer legt alles an. Die Nummern sind die `nr` der Vorschau.
     """
     from datetime import datetime, timezone
     from uuid import uuid4
@@ -211,20 +241,21 @@ async def anlegen(db: AsyncSession, group: Group, plan: ContextNode, voll: dict,
     from app.planning.service import create_unit_node
     from app.planning.snapshots import create_snapshot
 
-    nichts = {"lauf_id": None, "einheiten": 0, "stunden": 0}
-    if not any(v.anlegen for v in await vorschlaege(db, group, plan, voll["lage"])):
+    nichts = {"lauf_id": None, "einheiten": 0, "stunden": 0, "angelegt": []}
+    if not _anpassen([v for v in await vorschlaege(db, group, plan, voll["lage"]) if v.anlegen], auslassen, titel):
         return nichts
     # `create_snapshot` committet selbst. Danach die Gruppe sperren und **neu** rechnen: Ein zweiter
     # Aufruf (Doppelklick) wartet hier, bis der erste committet hat, und findet dann seine Einheiten
     # als `schon_angelegt` — sonst entstünde alles doppelt.
     snapshot = await create_snapshot(db, group.id, reason="edit", label=SNAPSHOT_LABEL, created_by=user.sub)
     await db.execute(sa.select(Group.id).where(Group.id == group.id).with_for_update())
-    liste = [v for v in await vorschlaege(db, group, plan, voll["lage"]) if v.anlegen]
+    liste = _anpassen([v for v in await vorschlaege(db, group, plan, voll["lage"]) if v.anlegen], auslassen, titel)
     if not liste:
         return nichts
     lauf = uuid4().hex
     jetzt = datetime.now(timezone.utc)
     stunden = 0
+    angelegt = []
     for v in liste:
         ue = await create_unit_node(
             db, group.id, group.subject_id, user, v.titel,
@@ -251,8 +282,11 @@ async def anlegen(db: AsyncSession, group: Group, plan: ContextNode, voll: dict,
                 .execution_options(synchronize_session=False)
             )).scalars().all()
             stunden += len(getroffen)
+        else:
+            getroffen = []
+        angelegt.append({"nr": v.nr, "titel": v.titel, "kapitel": v.kapitel_titel, "stunden": len(getroffen)})
     await db.commit()
-    return {"lauf_id": lauf, "einheiten": len(liste), "stunden": stunden}
+    return {"lauf_id": lauf, "einheiten": len(liste), "stunden": stunden, "angelegt": angelegt}
 
 
 class NichtMehrRueckgaengig(Exception):
