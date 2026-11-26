@@ -2540,6 +2540,16 @@ export async function getGruppenInhalt(groupId) {
     return res.json()
 }
 
+/**
+ * Jahresverlaufsplan der Fachschaft für Fach, Stufe und laufendes Schuljahr der Gruppe (BD Teil B):
+ * `{schuljahr, subject_id, stufe, grund, plan, abschnitt_je_woche}`.
+ */
+export async function getVerlaufsplanDerGruppe(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/verlaufsplan`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Jahresverlaufsplan konnte nicht geladen werden')
+    return res.json()
+}
+
 export async function getPlanningOverview(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')

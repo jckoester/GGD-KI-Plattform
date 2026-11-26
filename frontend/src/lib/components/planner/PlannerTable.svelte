@@ -24,6 +24,8 @@
         onAusfallTag = null,
         onAusfallZurueck = null,
         onAusfallWeg = null,
+        // Thema des Jahresverlaufsplans je Woche (BD Teil B): {'2026-W38': {nr, titel, puffer, farbe}}
+        wochenThemen = {},
     } = $props();
 
     // ⚠️ **Übergangsregel.** Ob ein Termin vorläufig ist, steht seit Migration `0066`
@@ -174,6 +176,17 @@
                         <span class="font-normal opacity-70"
                             >{weekRangeLabel(item)}</span
                         >
+                        {#if wochenThemen[item.key]}
+                            {@const t = wochenThemen[item.key]}
+                            <span class="ml-auto min-w-0 flex items-center gap-1.5 font-normal"
+                                title="Jahresverlaufsplan der Fachschaft: {t.nr}. {t.titel}">
+                                <span class="w-2 h-2 rounded-full flex-shrink-0 {t.puffer ? 'verlaufsplan-puffer' : t.farbe ? '' : 'bg-light-ui-3 dark:bg-dark-ui-3'}"
+                                    style={t.farbe ? `background-color: ${t.farbe}` : undefined} aria-hidden="true"></span>
+                                <span class="truncate max-w-[22rem] {t.puffer ? 'italic' : ''}"
+                                    ><span class="sr-only">Jahresverlaufsplan: </span>{t.nr}. {t.titel}</span
+                                >
+                            </span>
+                        {/if}
                     </div>
                 </div>
 

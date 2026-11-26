@@ -12,19 +12,19 @@
      * - Mindestbreite je Woche; ist die Leiste breiter als der Platz, scrollt sie waagerecht und
      *   springt im laufenden Schuljahr einmal zu „heute“.
      * - Maus über einem Block hebt ihn hier und in Tabelle/Editor hervor (`hervor`, bindable);
-     *   Klick ruft `onwahl(i)`.
+     *   Klick ruft `onwahl(i)`. Mit `href` (Spur im Planer) sind die Blöcke Links auf den Plan.
      *
      * Gerechnet wird das Raster in `$lib/ablaufleiste.js`.
      *
      * Props: `abschnitte`, `lage`, `kapitelReihenfolge`, `kapitelVon`, `planungsart`, `aktuell`
-     * (laufendes Schuljahr), `hervor`, `onwahl`.
+     * (laufendes Schuljahr), `hervor`, `onwahl`, `href`.
      */
     import { abschnittFarbe, hinweise, wochenText, zeitraumText } from '$lib/verlaufsplan.js'
     import { bloecke, freiStuecke, heuteSpalte, monate, raster } from '$lib/ablaufleiste.js'
 
     let {
         abschnitte = [], lage, kapitelReihenfolge = [], kapitelVon = {}, planungsart = 'kapitel',
-        aktuell = false, hervor = $bindable(null), onwahl = () => {},
+        aktuell = false, hervor = $bindable(null), onwahl = () => {}, href = null,
     } = $props()
 
     const r = $derived(raster(lage))
@@ -124,22 +124,24 @@
                     {@const farbe = abschnittFarbe(a, kapitelReihenfolge, { planungsart, kapitelVon })}
                     {@const text = tooltip(a, l)}
                     {#each b.stuecke as st, k (k)}
-                        <button
-                            type="button"
+                        <svelte:element
+                            this={href ? 'a' : 'button'}
+                            type={href ? undefined : 'button'}
+                            href={href ?? undefined}
                             class="relative h-10 rounded overflow-hidden px-1 text-xs leading-tight flex items-center
                                    justify-center text-center cursor-pointer transition-shadow
                                    {a.puffer ? 'verlaufsplan-puffer text-light-tx dark:text-dark-tx' : farbe ? 'text-on-fill' : 'bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx dark:text-dark-tx'}
                                    {hervor === b.i ? 'ring-2 ring-offset-1 ring-light-tx dark:ring-dark-tx ring-offset-light-bg dark:ring-offset-dark-bg z-10' : ''}"
                             style="grid-row: 3; grid-column: {st.von} / {st.bis};{farbe && !a.puffer ? ` background-color: ${farbe};` : ''}"
                             title={text}
-                            aria-label={st.beschriftung ? text : undefined}
+                            aria-label={st.beschriftung ? (href ? `${text} – Plan öffnen` : text) : undefined}
                             aria-hidden={st.beschriftung ? undefined : 'true'}
                             tabindex={st.beschriftung ? 0 : -1}
                             onmouseenter={() => (hervor = b.i)}
                             onmouseleave={() => (hervor = null)}
                             onfocus={() => (hervor = b.i)}
                             onblur={() => (hervor = null)}
-                            onclick={() => onwahl(b.i)}
+                            onclick={href ? undefined : () => onwahl(b.i)}
                         >
                             {@render wochenlinien(st.wochen)}
                             {#if st.beschriftung === 'titel'}
@@ -147,7 +149,7 @@
                             {:else if st.beschriftung === 'nummer'}
                                 <span class="relative font-medium {a.puffer ? grundPuffer : ''}">{b.nr}</span>
                             {/if}
-                        </button>
+                        </svelte:element>
                     {/each}
                 {/each}
 

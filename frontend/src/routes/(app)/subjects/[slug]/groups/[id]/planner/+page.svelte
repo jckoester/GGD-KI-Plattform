@@ -49,6 +49,10 @@
   import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
   import { deleteLesson } from '$lib/api.js'
   import LoeschenDialog from '$lib/components/planner/LoeschenDialog.svelte'
+  // Jahresverlaufsplan der Fachschaft als Spur (BD Teil B, Schritt 2)
+  import VerlaufsplanSpur from '$lib/components/planner/VerlaufsplanSpur.svelte'
+  import { getVerlaufsplanDerGruppe } from '$lib/api.js'
+  import { SPUR_SCHLUESSEL, wochenThemen } from '$lib/verlaufsplan.js'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -59,8 +63,13 @@
   // Die Adresse gewinnt; ohne `?ansicht=` gilt die gemerkte (Plan F2/F3) — so öffnen die
   // Kachel auf `/planning`, das Menü und der Rückweg aus dem Stundenentwurf sie von selbst.
   let gemerkt = $state(null)
+  // Spur des Jahresverlaufsplans: eingeklappt oder nicht, gemerkt wie die Ansicht
+  let spurZu = $state(false)
   getPreferences()
-    .then((p) => (gemerkt = planungsAnsichtAusEinstellungen(p)))
+    .then((p) => {
+      gemerkt = planungsAnsichtAusEinstellungen(p)
+      spurZu = p?.[SPUR_SCHLUESSEL] === true
+    })
     .catch(() => (gemerkt = JAHR))
   const ansicht = $derived(planungsAnsichtAusAdresse($page.url.searchParams) ?? gemerkt)
   const einheitSchluessel = $derived($page.url.searchParams.get('einheit'))
@@ -159,6 +168,20 @@
     return neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p })
   }
 
+  // Ohne Plan oder bei einem Fehler bleibt die Spur weg — der Planer selbst hängt nicht daran.
+  let verlaufsplan = $state(null)
+  const themen = $derived(wochenThemen(verlaufsplan))
+  // Nur die Antwort der aktuellen Gruppe übernehmen — beim Wechsel der Gruppe bleibt die Seite stehen.
+  function ladeVerlaufsplan() {
+    const id = groupId
+    getVerlaufsplanDerGruppe(id)
+      .then((v) => { if (id === groupId) verlaufsplan = v })
+      .catch(() => { if (id === groupId) verlaufsplan = null })
+  }
+  function spurUmschalten(zu) {
+    patchPreferences({ [SPUR_SCHLUESSEL]: zu }).catch(() => {})
+  }
+
   async function loadOverview() {
     loading = true
     error = null
@@ -170,6 +193,7 @@
       // Geparktes überlebt die Sitzung — es muss beim Öffnen sichtbar sein, nicht
       // erst nach dem nächsten Neuaufbau.
       ladeParkplatz()
+      ladeVerlaufsplan()
       // Ebenso Stunden ohne Termin (0.42.3) — sie stehen sonst nirgends in der Jahresübersicht.
       ladeInhalt()
     } catch (e) {
@@ -186,6 +210,7 @@
   afterNavigate((nav) => {
     // Nur die Adresse innerhalb des Planers geändert (Ansicht, Einheit) — nichts neu zu laden.
     if (nav.from && nav.from.url.pathname === nav.to?.url.pathname) return
+    verlaufsplan = null   // Spur und Wochenthemen der vorigen Gruppe nicht stehen lassen
     if (groupId) loadOverview()
   })
 
@@ -801,6 +826,7 @@
   {#if ersetztJahr}
     <div class="px-4 pt-3"><WarningBanner message={ersetztJahr} /></div>
   {/if}
+  <VerlaufsplanSpur antwort={verlaufsplan} fachName={subject?.name ?? ''} bind:zu={spurZu} onUmschalten={spurUmschalten} />
   <!-- UE-Legende -->
   <UnitLegend
     units={overview.units}
@@ -824,6 +850,7 @@
       halbjahreswechsel={overview.halbjahreswechsel}
       beginn={overview.beginn}
       ende={overview.ende}
+      wochenThemen={themen}
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
       onUnpark={einplanen}

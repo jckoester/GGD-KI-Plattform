@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, PUFFER_TITEL, pufferUmschalten, abschnittFarbe, bezugText, entwurfHinweis, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
-    umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern,
+    umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern, spurKopf, spurOhnePlan, wochenThemen,
 } from './verlaufsplan.js'
 import { ueColorIndex } from './planner.js'
 
@@ -241,5 +241,36 @@ describe('Puffer', () => {
         expect(bezugText({ puffer: true }, 'sequenz', {})).toBe('Puffer')
         expect(zumSpeichern([{ wochen: 2, puffer: true }], 'kapitel').abschnitte[0].puffer).toBe(true)
         expect(zumSpeichern([{ wochen: 2 }], 'kapitel').abschnitte[0].puffer).toBe(false)
+    })
+})
+
+describe('Spur im Planer (Teil B)', () => {
+    const KAP = [{ kapitel: [{ id: 'k1', titel: 'Ähnlichkeit', sequenzen: [{ id: 's1' }] }, { id: 'k2', titel: 'Pythagoras' }] }]
+    const ANTWORT = {
+        schuljahr: '2026/27', stufe: 9, grund: null,
+        plan: {
+            stufe: 9, status: 'active', beschlossen_am: '2026-10-03', planungsart: 'sequenz', curricula: KAP,
+            abschnitte: [{ titel: 'Strahlensätze', sequenz_ids: ['s1'] }, { titel: '', puffer: true }, { titel: '' }],
+        },
+        abschnitt_je_woche: { '2026-W38': 0, '2026-W39': 1, '2026-W40': 2, '2026-W41': 7 },
+    }
+
+    it('Thema, Puffer und Farbe je Woche', () => {
+        const t = wochenThemen(ANTWORT)
+        expect(t['2026-W38']).toEqual({ nr: 1, titel: 'Strahlensätze', puffer: false, farbe: ueColorIndex(0, false) })
+        expect(t['2026-W39']).toEqual({ nr: 2, titel: 'Puffer', puffer: true, farbe: null })
+        expect(t['2026-W40']).toEqual({ nr: 3, titel: 'ohne Thema', puffer: false, farbe: null })
+        expect(t['2026-W41']).toBeUndefined()   // Index ohne Abschnitt
+        expect(wochenThemen({ plan: null })).toEqual({})
+    })
+
+    it('Kopf und Sätze ohne Plan', () => {
+        expect(spurKopf(ANTWORT.plan)).toBe('Klasse 9 · beschlossen am 03.10.')
+        expect(spurKopf({ stufe: 9, status: 'draft' })).toBe('Klasse 9 · Entwurf')
+        expect(spurOhnePlan(ANTWORT)).toBe('')
+        expect(spurOhnePlan({ grund: 'kein_plan', stufe: 9, schuljahr: '2026/27', plan: null }, 'Mathematik'))
+            .toBe('Für Klasse 9 in Mathematik gibt es im Schuljahr 2026/27 noch keinen Jahresverlaufsplan der Fachschaft.')
+        expect(spurOhnePlan({ grund: 'keine_stufe', plan: null })).toMatch(/unter Unterricht festlegen/)
+        expect(spurOhnePlan({ grund: 'kein_fach', plan: null })).toBe('')
     })
 })

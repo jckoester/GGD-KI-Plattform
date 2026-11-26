@@ -19,6 +19,7 @@
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import PageBody from '$lib/components/PageBody.svelte'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
+    import { rueckwegAus } from '$lib/rueckweg.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
@@ -182,7 +183,9 @@
 <svelte:head><title>{plan?.titel ?? 'Jahresverlaufsplan'}</title></svelte:head>
 
 <PageBody breit>
-    <ZurueckLink href={plan ? `/knowledge/year-plans?fach=${plan.subject_id}` : '/knowledge/year-plans'} label="Jahresverlaufspläne" />
+    <!-- Aus dem Planer einer Gruppe (BD Teil B) mit `?back=` zurück dorthin -->
+    {@const zurueck = rueckwegAus($page.url.searchParams)}
+    <ZurueckLink href={zurueck ?? (plan ? `/knowledge/year-plans?fach=${plan.subject_id}` : '/knowledge/year-plans')} label={zurueck ? 'Planung' : 'Jahresverlaufspläne'} />
 
     {#if laedt}
         <LoadingBanner message="Plan wird geladen…" />

@@ -273,3 +273,53 @@ export function zumSpeichern(abschnitte, planungsart) {
         })),
     }
 }
+
+// ── Spur im Planer der Gruppe (BD Teil B, Schritt 2) ─────────────────────────
+
+/** Gemerkt in den Einstellungen: ob die Ablaufleiste im Planer eingeklappt ist. */
+export const SPUR_SCHLUESSEL = 'verlaufsplan_spur_zu'
+
+/**
+ * Der Satz, wenn eine Gruppe keinen Plan hat (Antwort von `GET /planning/groups/{id}/verlaufsplan`).
+ * Leer, wenn es einen Plan gibt oder die Gruppe kein Fach hat — dann zeigt der Planer gar nichts.
+ */
+export function spurOhnePlan(antwort, fachName = '') {
+    if (!antwort || antwort.plan) return ''
+    const fach = fachName ? ` in ${fachName}` : ''
+    if (antwort.grund === 'kein_plan') {
+        return `Für Klasse ${antwort.stufe}${fach} gibt es im Schuljahr ${antwort.schuljahr} noch keinen Jahresverlaufsplan der Fachschaft.`
+    }
+    if (antwort.grund === 'keine_stufe') {
+        return 'Die Klassenstufe dieser Gruppe ist nicht bekannt, deshalb fehlt der Jahresverlaufsplan der Fachschaft. Du kannst sie unter Unterricht festlegen.'
+    }
+    return ''
+}
+
+/** Kopfzeile der Spur: „Klasse 9 · beschlossen am 03.10.“ bzw. „Klasse 9 · Entwurf“. */
+export function spurKopf(plan) {
+    if (!plan) return ''
+    const stand = plan.status === 'draft' ? 'Entwurf' : plan.beschlossen_am ? `beschlossen am ${tagText(plan.beschlossen_am)}` : 'beschlossen'
+    return `Klasse ${plan.stufe} · ${stand}`
+}
+
+/**
+ * Thema des Plans je Planerwoche: `{ '2026-W38': {nr, titel, puffer, farbe} }`. Die Zuordnung
+ * Woche → Abschnitt rechnet der Server (`abschnitt_je_woche`, ISO-Woche wie `wochenSchluessel`).
+ */
+export function wochenThemen(antwort) {
+    const plan = antwort?.plan
+    if (!plan) return {}
+    const { kapitelReihenfolge, kapitelVon } = einheiten(plan.curricula)
+    const ergebnis = {}
+    for (const [woche, i] of Object.entries(antwort.abschnitt_je_woche ?? {})) {
+        const a = plan.abschnitte?.[i]
+        if (!a) continue
+        ergebnis[woche] = {
+            nr: i + 1,
+            titel: a.puffer ? (a.titel || PUFFER_TITEL) : (a.titel || 'ohne Thema'),
+            puffer: !!a.puffer,
+            farbe: a.puffer ? null : abschnittFarbe(a, kapitelReihenfolge, { planungsart: plan.planungsart, kapitelVon }),
+        }
+    }
+    return ergebnis
+}
