@@ -5,27 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.60.0] – 2026-11-26
+
 ### Neu
 
-- Planer einer Gruppe: `GET /planning/groups/{id}/verlaufsplan` liefert den Jahresverlaufsplan von Fach und Stufe im
-  laufenden Schuljahr mit der Zuordnung Woche → Abschnitt.
-- Planer einer Gruppe: Über der Jahresübersicht steht die Ablaufleiste des Jahresverlaufsplans der Fachschaft
-  (einklappbar, Klick öffnet den Plan), im Kopf jeder Woche das Thema ihres Abschnitts. Ohne Plan ein Hinweis.
-- `GET /planning/groups/{id}/verlaufsplan/vorschau`: je Abschnitt des Plans, ob eine Einheit entstünde, mit Titel,
-  Kapitel, Beschreibung und Zahl der freien Unterrichtsstunden; Puffer und Kapitel mit Einheit werden übersprungen.
-- `POST …/verlaufsplan/anlegen` legt je Abschnitt eine Einheit an und belegt ihre freien Unterrichtsstunden;
-  `POST …/verlaufsplan/rueckgaengig` nimmt einen Lauf zurück, solange seine Einheiten keine Stunden haben.
-- Planer: „Einheiten anlegen …“ in der Leiste des Jahresverlaufsplans öffnet eine Vorschau je Abschnitt und legt
-  die Einheiten an; danach lässt sich das Anlegen rückgängig machen.
-- Schnittstelle für KI-Abos (MCP): neue Werkzeuge `verlaufsplaene_finden` und `verlaufsplan_lesen` für die
-  Jahresverlaufspläne der Fachschaften.
-- Jahresverlaufsplan als PDF, DOCX oder ODT exportieren (Querformat): Abschnitte mit Wochen, Zeitraum, Bezug,
-  Hinweisen und Notiz, dazu die Stunden je Kapitel.
+- Planer einer Gruppe: Über der Jahresübersicht steht der Jahresverlaufsplan der Fachschaft für Fach, Klassenstufe
+  und laufendes Schuljahr (einklappbar, Blöcke verlinken den Plan), im Kopf jeder Woche das Thema ihres Abschnitts.
+- „Einheiten anlegen …“: je Abschnitt eine Einheit mit Kapitel, belegt mit den freien Unterrichtsstunden seiner
+  Wochen; Vorschau vorher, Rückgängig danach. Vorhandenes wird nicht überschrieben.
+- Jahresverlaufsplan als PDF, DOCX oder ODT exportieren (Querformat, Stunden je Kapitel auf eigener Seite).
+- Schnittstelle für KI-Abos (MCP): `verlaufsplaene_finden` und `verlaufsplan_lesen`; die Berechtigung heißt jetzt
+  „Curricula, Jahresverlaufspläne, Bildungspläne und Leitlinien lesen — für KI-Programme“.
 
 ### Behoben
 
-- MCP `curricula_finden`: Ein Fachkürzel wie „M“ findet nur noch sein Fach, nicht jedes Fach, dessen Name es
-  enthält.
+- MCP `curricula_finden`: Ein Fachkürzel wie „M“ findet nur noch sein Fach.
+- Auswahllisten der Jahresverlaufspläne und der Fächerfilter: Der Pfeil steht nicht mehr im Text.
 
 ## [0.59.0] – 2026-11-26
 

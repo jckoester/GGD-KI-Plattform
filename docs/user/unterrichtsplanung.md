@@ -57,6 +57,42 @@ Damit arbeitest du so:
 
 ---
 
+### Der Jahresverlaufsplan der Fachschaft
+
+Hat deine Fachschaft für das Fach und die Klassenstufe der Gruppe einen
+[Jahresverlaufsplan](jahresverlaufsplan.md) für das laufende Schuljahr, steht er über der
+Jahresübersicht — als Ablaufleiste mit den Ferien und der Linie **heute**, auch wenn er noch ein
+Entwurf ist. Im Kopf jeder Woche steht klein das Thema des Abschnitts, der in dieser Woche dran
+ist, mit einem Punkt in seiner Farbe; ein Puffer steht kursiv. Die Leiste lässt sich mit einem
+Klick auf ihre Überschrift einklappen; die Plattform merkt sich das. Ein Klick auf einen Block
+oder auf **Plan öffnen** führt zum Plan, **Zurück** wieder in den Planer.
+
+Gibt es keinen Plan, sagt eine Zeile das und verweist auf die Pläne des Fachs. Ist die
+Klassenstufe der Gruppe nicht bekannt, legst du sie unter [Unterricht](#der-jahrgang-einer-unterrichtsgruppe)
+fest.
+
+#### Einheiten aus dem Plan anlegen
+
+**Einheiten anlegen …** neben **Plan öffnen** legt dir die Einheiten nach dem Plan an. Vorher
+zeigt dir eine Vorschau je Abschnitt, was geschieht:
+
+- Je Abschnitt entsteht **eine Einheit** mit dem Thema des Abschnitts als Titel und seinem
+  ersten Kapitel. Weitere Kapitel, die Lernsequenzen und die Notiz stehen in ihrer Beschreibung.
+- Die Einheit bekommt die **freien Unterrichtsstunden** in den Wochen des Abschnitts — ohne
+  Einheit, ohne Stundenentwurf und nicht angepinnt. Prüfungen, Ausfall und belegte Stunden
+  bleiben, wie sie sind; vergangene Stunden auch.
+- **Übersprungen** werden Puffer, Abschnitte, deren Kapitel in diesem Schuljahr schon eine
+  Einheit der Gruppe hat, Abschnitte in der Vergangenheit oder nach dem Schuljahresende und
+  solche, deren Stunden alle schon belegt sind. Was du schon einmal aus dem Plan angelegt hast,
+  kommt nicht doppelt.
+- Hat ein Abschnitt noch keine Termine — etwa weil das zweite Halbjahr noch nicht erzeugt ist —,
+  entsteht die Einheit trotzdem, noch ohne Stunden.
+
+Nach dem Anlegen steht oben „5 Einheiten aus dem Jahresverlaufsplan angelegt, 38 Stunden
+belegt.“ mit **Rückgängig**. Das löscht genau diese Einheiten wieder und gibt ihre Stunden frei
+— solange du in ihnen noch keine Stunde angelegt hast. Danach löschst du einzelne Einheiten wie
+gewohnt.
+
 ### Wenn keine Kapitel zur Auswahl stehen
 
 Beim Anlegen einer Unterrichtseinheit kannst du sie mit einem Kapitel des

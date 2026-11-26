@@ -128,6 +128,22 @@ heutigen Curriculum wieder — bei einer neuen Fassung über den gleichen Titel.
 eindeutig wiederfindet, fällt weg; die Seite sagt dir, wie viele Bezüge das waren. Puffer bleiben
 Puffer.
 
+## Exportieren
+
+Unter dem Kopf der Seite steht **Exportieren: PDF · DOCX · ODT** — für die Akte der Fachschaft
+oder zum Weiterbearbeiten in Word oder LibreOffice. Die Datei ist im Querformat: Kopf mit
+Stand (Entwurf oder Datum des Beschlusses), eine Tabelle der Abschnitte mit Wochen, Zeitraum,
+Sequenzen oder Kapiteln, Hinweisen und Notiz, und auf einer eigenen Seite die Stunden je
+Kapitel. Exportieren kann jede Lehrkraft, die den Plan lesen kann. Im Editor wird vorher
+gespeichert.
+
+## Im Planer deiner Gruppe
+
+Im [Planer](unterrichtsplanung.md#der-jahresverlaufsplan-der-fachschaft) einer Gruppe steht der
+Plan ihres Fachs und ihrer Klassenstufe über der Jahresübersicht, und das Thema jeder Woche
+steht im Kopf der Woche. Von dort legst du auch die Einheiten der Gruppe nach dem Plan an —
+mit Vorschau und Rückgängig.
+
 ## Häufige Fragen
 
 **Warum beginnt mein Plan nicht am ersten Schultag?** Er beginnt in der ersten
@@ -137,5 +153,8 @@ beginnt.
 **Kann ich einen Abschnitt auf ein Datum legen?** Nein, nur über Reihenfolge und Dauer. So
 stimmt der Plan auch, wenn sich Ferien oder Feiertage verschieben.
 
-**Wo sehe ich den Plan in meiner Unterrichtsplanung?** Noch nicht — das kommt mit einem der
-nächsten Releases.
+**Wo sehe ich den Plan in meiner Unterrichtsplanung?** Im Planer jeder Gruppe des Fachs und der
+Klassenstufe, über der Jahresübersicht (siehe [Im Planer deiner Gruppe](#im-planer-deiner-gruppe)).
+
+**Kann ein KI-Programm den Plan lesen?** Ja, wenn eine Lehrkraft eines verbunden hat (siehe
+[KI-Programme verbinden](profil.md#ki-programme-verbinden)) — auch Entwürfe, samt Notizen.

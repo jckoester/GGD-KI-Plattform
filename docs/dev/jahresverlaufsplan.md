@@ -51,6 +51,7 @@ eigenem Weg kommen in `EIGENE_WEGE`.
 | POST | `/context/verlaufsplaene/{id}/beschliessen` | Entwurf → beschlossen |
 | POST | `/context/verlaufsplaene/{id}/uebernehmen` | Kopie als Entwurf in ein anderes Schuljahr |
 | DELETE | `/context/verlaufsplaene/{id}` | Löschen |
+| GET | `/context/verlaufsplaene/{id}/export?format=pdf\|docx\|odt` | Export (seit 0.60), jede Lehrkraft |
 
 Der Router steht in `main.py` **vor** `context_router`, sonst fängt dessen `/{node_id}` die Pfade ab.
 Pläne vergangener Schuljahre (`ist_archiviert`) sind nur lesbar (409); Übernehmen geht auch aus dem
@@ -109,14 +110,74 @@ Abschnitt über Ferien zerfällt in Stücke (`raster().stuecke`); die Wochenlini
 ein inneres Raster mit derselben Fuge. Schraffuren: Ferien `planner-ferien-band` (wie im Planer der
 Gruppe), Puffer `verlaufsplan-puffer` (gegenläufig, neutral) in `routes/layout.css`.
 
+## Im Planer der Gruppe (0.60, Teil B)
+
+**Welcher Plan:** `app/planning/verlaufsplan_gruppe.py`, `plan_der_gruppe` — Fach der Gruppe,
+Stufe über `_group_grade` (`jahrgang_aus`: Festlegung, kleinste Klasse, Name), laufendes
+Schuljahr, Entwurf oder beschlossen (Jan, FB2). Gründe ohne Plan: `kein_fach`, `keine_stufe`,
+`kein_plan`. Bekommen Pläne Varianten (Todo), wählt die Gruppe hier.
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET | `/planning/groups/{id}/verlaufsplan` | Plan (`vp.voll`) und `abschnitt_je_woche` (ISO-Woche „2026-W38“ wie `wochenSchluessel` im Planer) |
+| GET | `…/verlaufsplan/vorschau` | Vorschläge je Abschnitt, schreibt nichts |
+| POST | `…/verlaufsplan/anlegen` | Einheiten anlegen und Termine belegen; Antwort `{lauf_id, einheiten, stunden}` |
+| POST | `…/verlaufsplan/rueckgaengig` | `{lauf_id}`: die Einheiten des Laufs löschen; 409 mit Stunden, 404 ohne Einheiten |
+
+Router `app/planning/verlaufsplan_gruppe_router.py`, nur Lehrkräfte der Gruppe
+(`require_group_teacher`).
+
+**Vorschau** — `app/planning/verlaufsplan_vorlage.py`, `vorschau()` ist rein; den Datenbankteil
+macht `vorschlaege()`. Regeln (FB3–FB5, Jan 26.11.2026, und eigene Festlegungen im Docstring):
+
+- je Abschnitt ohne Puffer eine Einheit; Titel = Thema, sonst Kapiteltitel, sonst „Abschnitt n“;
+  Kapitel = erstes (sequenzgenau: das der ersten Sequenz); Rest und Notiz in `content`;
+- ersetztes Kapitel → Nachfolger über `metadata.kopie_von` (`nachfolger_der_kapitel`);
+- frei = Kategorie `unterricht`, ohne Einheit, ohne Stunde, nicht angepinnt, ab heute;
+- übersprungen (`grund`): `puffer`, `schon_angelegt` (gleiche `abschnitt_id`), `kapitel_vorhanden`
+  (Einheit der Gruppe in diesem Schuljahr am alten oder neuen Kapitel — Einheiten aus demselben
+  Plan zählen nur über ihren Abschnitt, solange es ihn gibt), `nach_schuljahresende`, `vorbei`,
+  `belegt` (alle künftigen Termine belegt); ohne Termine: `ohne_termine`, Einheit trotzdem.
+
+**Anlegen** (`anlegen`): Snapshot (Grund `edit`, Label „Vor: Einheiten aus dem
+Jahresverlaufsplan“; `create_snapshot` committet selbst), dann die Gruppe `FOR UPDATE` sperren und
+neu rechnen (Doppelklick); Termine mit `populate_existing` (Sitzung `expire_on_commit=False`),
+belegt per bedingtem UPDATE, das nur noch freie trifft. Jede Einheit trägt
+`metadata.aus_verlaufsplan` {plan_id, abschnitt_id, lauf_id, snapshot_id}, das Schuljahr des Plans
+und die Farbe ihres Kapitels (`farbe_des_kapitels`, wie die Leiste).
+
+**Rückgängig** löscht die Einheiten des Laufs; die Termine werden über
+`lesson_slots.ue_node_id ON DELETE SET NULL` frei. Kein Snapshot-Restore — der nähme spätere
+Änderungen mit (Abweichung von FB6). Nicht mehr, sobald eine Einheit eine Stunde hat (am Termin
+oder als Entwurf `part_of`).
+
+**Oberfläche:** `planner/VerlaufsplanSpur.svelte` (Leiste, `href` macht Blöcke zu Links,
+Einstellung `verlaufsplan_spur_zu`), `PlannerTable` (Prop `wochenThemen`),
+`planner/VerlaufsplanEinheitenDialog.svelte`, Leiste mit Rückgängig in der Planerseite; Texte in
+`lib/verlaufsplan.js` (`wochenThemen`, `spurOhnePlan`, `GRUND_TEXT`, `vorschauSumme`, …).
+
+## Für Programme und Export (0.60)
+
+`vp.kompakt(voll, titel_alt=, kapitel_alt=)` ist die Fassung für Programme: Abschnitte mit
+Wochen, Daten, Ferien und Bezügen als Titel mit Kennung, Bilanz, was fehlt — ohne Rechte und
+Curricula-Baum. `vp.alte_titel` holt die Titel archivierter Bezüge (`nicht_mehr_im_curriculum`).
+Darauf bauen die MCP-Werkzeuge `verlaufsplaene_finden` und `verlaufsplan_lesen` ([MCP](mcp.md))
+und der Export: `app/context/verlaufsplan_export.py` (`aufbereiten` rein; PDF mit
+`templates/verlaufsplan_pdf.html`, DOCX/ODT über den Pandoc-AST, beide quer, die Bilanz nach
+`office.SEITENUMBRUCH` auf eigener Seite). Der Jahresplan-Assistent soll `kompakt` in 0.61 lesen.
+
 ## Tests
 
 - `tests/unit/test_verlaufsplan_zeit.py` — Zeitrechnung auf dem Kalender 2025/26, Ränder, Bilanz, Ablaufleiste, Puffer
 - `tests/unit/test_kalender_je_schuljahr.py`, `test_verlaufsplan_umrechnen.py`, `test_verlaufsplan_kapitel_abbilden.py`
 - `tests/integration/test_verlaufsplan_typ.py`, `test_verlaufsplan_endpunkte.py` — Rechte, Archiv, gesperrte allgemeine Wege, Planungsart, Übernehmen, Puffer
+- `tests/unit/test_verlaufsplan_gruppe.py`, `test_verlaufsplan_vorlage.py`, `test_verlaufsplan_kompakt.py`,
+  `test_verlaufsplan_export.py`; `tests/integration/test_verlaufsplan_gruppe.py` (Plan der Gruppe, Vorschau,
+  Anlegen, Rückgängig, Wettläufe), `test_mcp_werkzeuge.py`
 - `frontend/src/lib/verlaufsplan.test.js`, `ablaufleiste.test.js`
 
 ## Ausblick
 
-Mit 0.60 (BD Teil B) soll der Planer einer Gruppe den Plan der Fachschaft als Vorlage für seine
-Einheiten anbieten; Puffer werden dabei übersprungen.
+0.61: Der Jahresplan-Assistent liest den Plan (`kompakt`) und legt Einheiten über denselben Weg
+an wie der Knopf (Vorschau, Anlegen, Rückgängig) — mit Messung. Später: Varianten eines Plans
+für Fächer, die nicht parallel unterrichten können (Todo).

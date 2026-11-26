@@ -613,3 +613,17 @@
     rechnet die Plattform selbst ein. Mit Ablaufleiste, Puffer, Stundenbilanz je Kapitel und
     Beschluss; im nächsten Schuljahr übernimmst du den Plan als Entwurf.
   link: /help/jahresverlaufsplan
+
+- id: "0.60-verlaufsplan-im-planer"
+  version: "0.60.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-26
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Der Jahresverlaufsplan in deinem Planer"
+  text: >-
+    Über der Jahresübersicht deiner Gruppe steht jetzt der Jahresverlaufsplan der Fachschaft, im
+    Kopf jeder Woche ihr Thema. Mit „Einheiten anlegen …“ legst du die Einheiten nach dem Plan an
+    und belegst ihre freien Stunden — mit Vorschau und Rückgängig. Den Plan selbst kannst du als PDF,
+    DOCX oder ODT exportieren.
+  link: /help/unterrichtsplanung#der-jahresverlaufsplan-der-fachschaft
