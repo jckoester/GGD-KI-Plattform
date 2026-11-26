@@ -141,3 +141,15 @@ def test_alles_schon_belegt():
         x.ue_node_id = uuid4()
     (v,) = _lauf([{"id": "a1", "titel": "x", "kapitel_ids": ["k1"]}], slots=s)
     assert (v.anlegen, v.grund, v.belegt) == (False, BELEGT, 4)
+
+
+def test_begonnen_ohne_termine_ist_vorbei():
+    """Gefunden mit der Messung zu 0.61: Ein Abschnitt bis in die laufende Woche, die Gruppe hat aber
+    erst ab nächster Woche Termine — keine leere Einheit."""
+    # Woche 2 (13.10.) läuft, heute ist Mi 15.10.; keine Termine in Woche 1–2
+    (v,) = _lauf([{"id": "x", "kapitel_ids": ["k1"]}],
+                 slots=[s for s in _slots() if s.date >= date(2025, 10, 27)], heute=date(2025, 10, 15))
+    assert (v.anlegen, v.grund) == (False, VORBEI)
+    # Ganz in der Zukunft ohne Termine: weiterhin anlegen (2. Halbjahr noch nicht erzeugt)
+    (w,) = _lauf([{"id": "x", "kapitel_ids": ["k1"]}], slots=[], heute=date(2025, 10, 1))
+    assert (w.anlegen, w.ohne_termine) == (True, True)

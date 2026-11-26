@@ -1987,17 +1987,31 @@ register_tool(ChatTool(
 ))
 
 
+#: Am Snapshot vermerkt, wenn `undo_last_change` ihn zurückgenommen hat (0.61) — im JSON, ohne Migration.
+ZURUECKGENOMMEN = "zurueckgenommen"
+
+
 async def _handle_undo_last_change(args: dict, ctx: ToolContext) -> dict:
+    """Nimmt die letzte Änderung zurück — und beim nächsten Aufruf die davor.
+
+    ⚠️ **Schritt für Schritt (0.61).** `restore_snapshot` legt vorher einen `restore`-Snapshot an
+    (für den Weg zurück). Bis 0.60 nahm diese Funktion immer den jüngsten Snapshot — nach dem
+    ersten Aufruf also diesen `restore`-Snapshot, und ein zweites „Rückgängig“ machte das erste
+    rückgängig: Der Plan pendelte zwischen zwei Ständen (gefunden mit der Messung zu 0.61, elf
+    Aufrufe ohne Fortschritt). Jetzt zählen `restore`-Snapshots nicht, und ein zurückgenommener
+    Snapshot trägt `payload.zurueckgenommen` und wird übersprungen. Der Verlauf im Planer zeigt
+    weiter alle.
+    """
     if ctx.group_id is None:
         return {"error": "Kein Gruppenkontext"}
-    snap = (
+    kandidaten = (
         await ctx.db.execute(
             sa.select(SlotPlanSnapshot)
-            .where(SlotPlanSnapshot.group_id == ctx.group_id)
+            .where(SlotPlanSnapshot.group_id == ctx.group_id, SlotPlanSnapshot.reason != "restore")
             .order_by(SlotPlanSnapshot.created_at.desc())
-            .limit(1)
         )
-    ).scalar_one_or_none()
+    ).scalars().all()
+    snap = next((s for s in kandidaten if not (s.payload or {}).get(ZURUECKGENOMMEN)), None)
     if snap is None:
         return {"ok": False, "error": "Kein Snapshot zum Rückgängigmachen vorhanden"}
     # Nach dem Anlegen aus dem Jahresverlaufsplan (0.61, F3): Der Snapshot davor löschte die neuen
@@ -2010,6 +2024,8 @@ async def _handle_undo_last_change(args: dict, ctx: ToolContext) -> dict:
                 return {"error": "Die letzte Änderung war das Anlegen aus dem Jahresverlaufsplan. Dafür "
                                  "verlaufsplan_anlegen_zuruecknehmen verwenden.", "lauf_id": h.get("lauf_id")}
     label = snap.label
+    # Vor dem Wiederherstellen vermerken: `restore_snapshot` committet (schon beim eigenen Snapshot).
+    snap.payload = {**(snap.payload or {}), ZURUECKGENOMMEN: True}
     await restore_snapshot(ctx.db, snap.id, ctx.user)
     return {"ok": True, "restored_label": label}
 
@@ -2024,7 +2040,8 @@ register_tool(ChatTool(
             "name": "undo_last_change",
             "description": (
                 "Macht die letzte Plan-Änderung der Gruppe rückgängig (stellt den letzten "
-                "Snapshot wieder her). Gibt das Label der rückgängig gemachten Änderung zurück."
+                "Snapshot wieder her); jeder weitere Aufruf nimmt die Änderung davor zurück. "
+                "Gibt das Label der rückgängig gemachten Änderung zurück."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },

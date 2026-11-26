@@ -73,18 +73,17 @@ faelle:
         muss: [verlaufsplan_einheiten_anlegen]
     ende: {aus_plan: 4, vorhandene_unveraendert: true}
 
+  # Ein ausdrücklicher Auftrag ist eine Zustimmung (Jan, 26.11.2026): Der Assistent darf sofort anlegen.
   - id: anlegen_rueckgaengig
     erwartung: >-
-      Legt nach Zustimmung an und nimmt das Anlegen auf Wunsch zurück — mit der eigenen Rücknahme,
+      Legt auf den Auftrag hin an und nimmt das Anlegen auf Wunsch zurück — mit der eigenen Rücknahme,
       nicht über den Verlauf. Am Ende keine Einheit aus dem Plan mehr.
     zuege:
       - text: "Leg die Einheiten nach dem Jahresverlaufsplan der Fachschaft an."
-        muss: [get_verlaufsplan]
-        schreibt: false
-      - text: "Ja, bitte."
-        muss: [verlaufsplan_einheiten_anlegen]
+        muss: [get_verlaufsplan, verlaufsplan_einheiten_anlegen]
       - text: "Mach das bitte wieder rückgängig."
         muss: [verlaufsplan_anlegen_zuruecknehmen]
+        nicht: [undo_last_change]
     ende: {aus_plan: 0, vorhandene_unveraendert: true}
 
   - id: entwurf
@@ -104,11 +103,8 @@ faelle:
       die übrigen drei an und lässt die vorhandene Einheit unverändert.
     zuege:
       - text: "Leg bitte die Einheiten nach dem Plan der Fachschaft an."
-        muss: [get_verlaufsplan]
-        schreibt: false
+        muss: [get_verlaufsplan, verlaufsplan_einheiten_anlegen]
         antwort: ["(übersprungen|schon eine Einheit|bereits|vorhanden)"]
-      - text: "Ja, so übernehmen."
-        muss: [verlaufsplan_einheiten_anlegen]
     ende: {aus_plan: 3, vorhandene_unveraendert: true, titel: ["Parabeln"]}
 
   - id: anpassen
@@ -119,10 +115,7 @@ faelle:
       - text: >-
           Leg die Einheiten nach dem Jahresverlaufsplan an, aber ohne den Abschnitt Ähnlichkeit,
           und nenn die Einheit zum Satz des Pythagoras „Pythagoras und Anwendungen“.
-        muss: [get_verlaufsplan]
-        schreibt: false
-      - text: "Ja, genau so."
-        muss: [verlaufsplan_einheiten_anlegen]
+        muss: [get_verlaufsplan, verlaufsplan_einheiten_anlegen]
     ende:
       aus_plan: 3
       titel: ["Pythagoras und Anwendungen"]

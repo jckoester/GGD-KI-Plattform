@@ -30,9 +30,10 @@ Eigene Festlegungen dieses Schritts (für Jan vermerkt):
   auch die Einheiten umgezogen. Ohne Nachfolger entsteht die Einheit ohne Kapitel (`kapitel_fehlt`).
   Die Kapitelprüfung (FB5) vergleicht altes und neues Kapitel.
 - Sind alle künftigen Unterrichtstermine seiner Wochen schon belegt, wird er übersprungen (`belegt`).
-- Hat ein Abschnitt in seinen Wochen Termine, aber keinen mehr ab heute, ist er vorbei. Hat er gar
-  keine Termine (etwa weil das 2. Halbjahr noch nicht erzeugt ist), entsteht die Einheit trotzdem,
-  mit dem Hinweis `ohne_termine`.
+- Hat ein Abschnitt **schon begonnen** und keinen Termin mehr ab heute, ist er vorbei — auch wenn
+  er gar keine Termine hat (die Gruppe hat ihre Termine erst ab jetzt; gefunden mit der Messung
+  zu 0.61). Liegt er ganz in der Zukunft und hat keine Termine (etwa weil das 2. Halbjahr noch
+  nicht erzeugt ist), entsteht die Einheit trotzdem, mit dem Hinweis `ohne_termine`.
 """
 from __future__ import annotations
 
@@ -174,7 +175,8 @@ def vorschau(
             v.grund = KAPITEL_VORHANDEN
         elif not montage:
             v.grund = NACH_SCHULJAHRESENDE
-        elif (termine and all(s.date < heute for s in termine)) or montage[-1] + timedelta(days=4) < heute:
+        elif ((montage[0] <= heute and not any(s.date >= heute for s in termine))
+              or montage[-1] + timedelta(days=4) < heute):
             v.grund = VORBEI
         elif not v.slot_ids and any(s.date >= heute for s in termine):
             v.grund = BELEGT

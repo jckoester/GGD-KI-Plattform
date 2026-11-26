@@ -132,3 +132,40 @@ async def test_tool_apply_invalid_returns_errors(db_session, seed_rtool_group):
         }, _ctx(db_session))
     assert out["ok"] is False
     assert any("gepinnt" in e for e in out["errors"])
+
+
+@pytest.mark.asyncio
+async def test_undo_geht_schritt_fuer_schritt_zurueck(db_session, seed_rtool_group):
+    """0.61: Ein zweites Rückgängig nimmt die Änderung **davor** zurück — bis dahin pendelte es,
+    weil `restore_snapshot` einen eigenen Snapshot anlegt und der danach der jüngste war."""
+    s = _slot(D0, thema="Original")
+    db_session.add(s)
+    await db_session.flush()
+
+    import sqlalchemy as sa
+
+    from app.db.models import SlotPlanSnapshot
+
+    for neu, label in (("Eins", "erste"), ("Zwei", "zweite")):
+        # Im Test ist alles eine Transaktion, `now()` also gleich — ältere Snapshots zurückdatieren,
+        # wie sie im Betrieb (je Aufruf ein Commit) ohnehin auseinanderliegen.
+        await db_session.execute(sa.update(SlotPlanSnapshot).where(SlotPlanSnapshot.group_id == GROUP_ID)
+                                 .values(created_at=SlotPlanSnapshot.created_at - sa.text("interval '1 minute'")))
+        with _patch_commit(db_session):
+            await _handle_apply_plan_operations({
+                "operations": [{"op": "set_topic", "slot_id": str(s.id), "thema": neu}], "summary": label,
+            }, _ctx(db_session))
+    assert s.thema == "Zwei"
+
+    with _patch_commit(db_session):
+        assert (await _handle_undo_last_change({}, _ctx(db_session)))["restored_label"] == "zweite"
+    await db_session.refresh(s)
+    assert s.thema == "Eins"
+    # Der restore-Snapshot dieses Rückgängig ist jünger als alles andere — er zählt nicht
+    await db_session.execute(sa.update(SlotPlanSnapshot).where(SlotPlanSnapshot.reason != "restore",
+                                                               SlotPlanSnapshot.group_id == GROUP_ID)
+                             .values(created_at=SlotPlanSnapshot.created_at - sa.text("interval '1 minute'")))
+    with _patch_commit(db_session):
+        assert (await _handle_undo_last_change({}, _ctx(db_session)))["restored_label"] == "erste"
+    await db_session.refresh(s)
+    assert s.thema == "Original"

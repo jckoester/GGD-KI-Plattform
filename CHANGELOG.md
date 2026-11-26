@@ -13,6 +13,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Auslassen und Umbenennen), `verlaufsplan_anlegen_zuruecknehmen`; `get_plan_balance` nennt den Plan der Fachschaft.
   `undo_last_change` verweist nach einem Anlegen aus dem Plan auf die eigene Rücknahme.
 
+### Behoben
+
+- Anlegen aus dem Jahresverlaufsplan: Ein Abschnitt, der schon begonnen hat und keinen Termin mehr ab heute hat,
+  gilt als vorbei — vorher entstand eine Einheit ohne Stunden.
+- Planungsassistent: Mehrfaches Rückgängig im Chat geht jetzt Schritt für Schritt zurück, statt zwischen zwei
+  Ständen zu pendeln.
+
 ## [0.60.0] – 2026-11-26
 
 ### Neu

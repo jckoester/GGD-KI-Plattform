@@ -564,6 +564,15 @@ def main() -> None:
                 print(f"\n## {fall['id']} — Plan {fall.get('plan', welt['plan']['status'])}, "
                       f"{len(ausgang['reihe'])} Termine ab {ausgang['daten'][0]:%d.%m.}, Snapshots {ausgang['snapshots']}")
                 print(_einheiten_text(ausgang))
+                # Die Vorschau, wie der Assistent sie bekäme — stimmt die Welt für den Fall?
+                r = client.get(f"/planning/groups/{welt['gruppe']['id']}/verlaufsplan/vorschau")
+                if r.status_code == 200:
+                    v = r.json()
+                    print(f"   Vorschau ({v['status']}): neu {v['neu']}, {v['stunden']} Stunden — "
+                          + "; ".join(f"{x['nr']}. {x['titel']} {'→ neu, ' + str(x['stunden']) + ' Std.' if x['anlegen'] else '(' + str(x['grund']) + ')'}"
+                                      for x in v["vorschlaege"]))
+                else:
+                    print(f"   Vorschau: {r.status_code} {r.json().get('detail')}")
                 for z in fall["zuege"]:
                     print(f"   Lehrkraft: {platzhalter(z['text'], ausgang['daten'])}")
         finally:

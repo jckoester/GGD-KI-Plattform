@@ -86,3 +86,26 @@ async def test_ohne_plan(db, welt, heute):
     erg = await at._handle_get_verlaufsplan({}, ctx)
     assert erg["verlaufsplan"] is None and "keinen Jahresverlaufsplan" in erg["error"]
     assert "keinen Jahresverlaufsplan" in (await at._handle_verlaufsplan_einheiten_anlegen({}, ctx))["error"]
+
+
+async def test_rueckgaengig_ueber_weitere_aenderungen_bis_zum_anlegen(db, welt, heute):
+    """Gefunden mit der Messung zu 0.61: Nach dem Anlegen noch ein Thema gesetzt — das erste
+    Rückgängig nimmt das Thema zurück, das zweite verweist auf die Rücknahme des Anlegens."""
+    g = await _welt(db, welt)
+    ctx = _ctx(db, g)
+    import sqlalchemy as sa
+
+    from app.db.models import SlotPlanSnapshot
+
+    erg = await at._handle_verlaufsplan_einheiten_anlegen({}, ctx)
+    # Eine Transaktion im Test: den Snapshot vor dem Anlegen zurückdatieren (im Betrieb je Aufruf ein Commit)
+    await db.execute(sa.update(SlotPlanSnapshot).where(SlotPlanSnapshot.group_id == g.id)
+                     .values(created_at=SlotPlanSnapshot.created_at - sa.text("interval '1 minute'")))
+    slots = await at._handle_get_lesson_slots({}, ctx)
+    slot = next(x for x in slots if x["ue"])["id"]
+    assert (await at._handle_set_slot_topics({"items": [{"slot_id": slot, "thema": "Neu"}]}, ctx)).get("error") is None
+
+    erstes = await at._handle_undo_last_change({}, ctx)
+    assert erstes["ok"] is True
+    zweites = await at._handle_undo_last_change({}, ctx)
+    assert "verlaufsplan_anlegen_zuruecknehmen" in zweites["error"] and zweites["lauf_id"] == erg["lauf_id"]
