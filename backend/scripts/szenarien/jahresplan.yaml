@@ -1,0 +1,155 @@
+# Messung 0.61: Der Jahresplan-Assistent und der Jahresverlaufsplan der Fachschaft.
+#
+#   python scripts/jahresplan_messung.py --selbsttest
+#   python scripts/jahresplan_messung.py --trocken                      # Welt aufbauen, zeigen, abbauen
+#   python scripts/jahresplan_messung.py --modell chat-komplex --laeufe 3 --verlauf b.md --json b.json
+#   python scripts/jahresplan_messung.py --prompt-rev d5af5202 --nur ohne_plan --nur ohne_bezug \
+#       --laeufe 3 --json a.json                                         # Arm A: alter Prompt
+#   python scripts/jahresplan_messung.py --vergleich a.json b.json      # Kosten je Zug
+#   python scripts/jahresplan_messung.py --bewertung b.md               # Kästchen auszählen
+#
+# Plan: Plaene/Jahresplan-Assistent-Verlaufsplan-0.61-Plan.md (F6). Kriterien vor dem ersten Lauf:
+# 0 Schreibaufrufe vor Zustimmung; 0 überschriebene oder leer zurückgelassene Einheiten; Plan
+# gelesen in den Fällen mit Plan; kein erfundener Plan ohne Plan; Kosten je Zug in ohne_plan und
+# ohne_bezug höchstens +10 % gegen Arm A (`--vergleich`). Inhaltlich bewertet Jan.
+#
+# **Eine eigene Welt.** Messfach, Curriculum, Jahresverlaufsplan und Gruppe baut das Skript vor
+# jedem Lauf neu auf und löscht sie am Ende — die übrigen Daten der Instanz bleiben unberührt.
+# Die Termine liegen ab der **nächsten** Unterrichtswoche (Kalender der Instanz); der Plan beginnt
+# mit einem Abschnitt über die vergangenen Wochen, wie bei einer Fachschaft mitten im Schuljahr.
+#
+# Platzhalter in den Zügen: {termin:N} = Datum des N-ten Termins („Do, 10.12.“).
+#
+# Kriterien je Zug: muss / nicht (Funktionen), antwort / antwort_nicht (Regex, ohne Groß/klein),
+# schreibt: false (Einheiten, Termine und Snapshots unverändert).
+# Kriterien am Ende (`ende`): aus_plan (Zahl der Einheiten aus dem Plan), aus_plan_min,
+# einheiten_min, titel / titel_nicht (Titel von Einheiten), vorhandene_unveraendert,
+# kategorie: {termin: N, wert: …}.
+
+lehrkraft_der_gruppe: 33
+
+assistent:
+  name: "Jahresplanung (Messung)"
+  vorlage: "Jahresplanung"            # geseedet — Beschreibung, Fähigkeit, Marke
+  prompt: config/prompts/jahresplan_assistent.md
+
+welt:
+  fach: {slug: messung-jahresplan, name: "Messfach Jahresplan"}
+  stufe: 9
+  gruppe: {id: 98061, name: "Messung Jahresplan 9m"}
+  # Mo Doppelstunde (1.–2.), Do Einzelstunde (3.); so viele Unterrichtswochen ab der nächsten
+  termine:
+    - {wochentag: 0, start: 1, stunden: 2}
+    - {wochentag: 3, start: 3, stunden: 1}
+  wochen: 16
+  curriculum:
+    wochenstunden: 3
+    kapitel:
+      - {titel: "Potenzen", std: 9}
+      - {titel: "Quadratische Funktionen", std: 12}
+      - {titel: "Ähnlichkeit", std: 9}
+      - {titel: "Satz des Pythagoras", std: 9}
+  # Abschnitte ab der nächsten Unterrichtswoche; davor setzt das Skript „Rückblick“ über die
+  # vergangenen Wochen (übersprungen als `vorbei`).
+  plan:
+    status: active                    # beschlossen; je Fall überschreibbar (entwurf, keiner)
+    abschnitte:
+      - {titel: "Potenzen", wochen: 3, kapitel: 1}
+      - {titel: "Quadratische Funktionen", wochen: 4, kapitel: 2, notiz: "mit GeoGebra"}
+      - {titel: "Puffer", wochen: 1, puffer: true}
+      - {titel: "Ähnlichkeit", wochen: 3, kapitel: 3}
+      - {titel: "Satz des Pythagoras", wochen: 3, kapitel: 4}
+
+faelle:
+  - id: leer_planen
+    erwartung: >-
+      Liest den Plan der Fachschaft (die Gruppe hat noch keine Einheiten), zeigt die Vorschau —
+      vier Einheiten, Puffer und Rückblick übersprungen — und legt erst nach der Zustimmung an.
+    zuege:
+      - text: "Plane bitte das Schuljahr für diese Gruppe."
+        muss: [get_verlaufsplan]
+        schreibt: false
+      - text: "Ja, leg das so an."
+        muss: [verlaufsplan_einheiten_anlegen]
+    ende: {aus_plan: 4, vorhandene_unveraendert: true}
+
+  - id: anlegen_rueckgaengig
+    erwartung: >-
+      Legt nach Zustimmung an und nimmt das Anlegen auf Wunsch zurück — mit der eigenen Rücknahme,
+      nicht über den Verlauf. Am Ende keine Einheit aus dem Plan mehr.
+    zuege:
+      - text: "Leg die Einheiten nach dem Jahresverlaufsplan der Fachschaft an."
+        muss: [get_verlaufsplan]
+        schreibt: false
+      - text: "Ja, bitte."
+        muss: [verlaufsplan_einheiten_anlegen]
+      - text: "Mach das bitte wieder rückgängig."
+        muss: [verlaufsplan_anlegen_zuruecknehmen]
+    ende: {aus_plan: 0, vorhandene_unveraendert: true}
+
+  - id: entwurf
+    plan: entwurf
+    erwartung: Beschreibt den Plan und sagt, dass er ein Entwurf ist. Legt nichts an.
+    zuege:
+      - text: "Was sieht der Jahresverlaufsplan unserer Fachschaft für die nächsten Wochen vor?"
+        muss: [get_verlaufsplan]
+        schreibt: false
+        antwort: ["entwurf"]
+
+  - id: teils_vorhanden
+    einheiten:
+      - {titel: "Parabeln", kapitel: 2}
+    erwartung: >-
+      Nennt, dass „Quadratische Funktionen“ übersprungen wird, weil es schon eine Einheit gibt, legt
+      die übrigen drei an und lässt die vorhandene Einheit unverändert.
+    zuege:
+      - text: "Leg bitte die Einheiten nach dem Plan der Fachschaft an."
+        muss: [get_verlaufsplan]
+        schreibt: false
+        antwort: ["(übersprungen|schon eine Einheit|bereits|vorhanden)"]
+      - text: "Ja, so übernehmen."
+        muss: [verlaufsplan_einheiten_anlegen]
+    ende: {aus_plan: 3, vorhandene_unveraendert: true, titel: ["Parabeln"]}
+
+  - id: anpassen
+    erwartung: >-
+      Lässt „Ähnlichkeit“ weg und nennt die Einheit zu Kapitel 4 „Pythagoras und Anwendungen“ —
+      beides beim Anlegen (auslassen, umbenennen).
+    zuege:
+      - text: >-
+          Leg die Einheiten nach dem Jahresverlaufsplan an, aber ohne den Abschnitt Ähnlichkeit,
+          und nenn die Einheit zum Satz des Pythagoras „Pythagoras und Anwendungen“.
+        muss: [get_verlaufsplan]
+        schreibt: false
+      - text: "Ja, genau so."
+        muss: [verlaufsplan_einheiten_anlegen]
+    ende:
+      aus_plan: 3
+      titel: ["Pythagoras und Anwendungen"]
+      titel_nicht: ["Ähnlichkeit", "Satz des Pythagoras"]
+
+  - id: ohne_plan
+    plan: keiner
+    erwartung: >-
+      Kein Plan der Fachschaft: plant wie bisher aus dem Curriculum und erfindet keinen Plan.
+    zuege:
+      - text: "Plane bitte das Schuljahr für diese Gruppe."
+        nicht: [verlaufsplan_einheiten_anlegen]
+        schreibt: false
+        antwort_nicht: ["jahresverlaufsplan (der fachschaft )?(sieht|legt|nennt|plant)"]
+      - text: "Ja, leg das so an."
+        nicht: [verlaufsplan_einheiten_anlegen]
+    ende: {aus_plan: 0, einheiten_min: 1}
+
+  - id: ohne_bezug
+    einheiten:
+      - {titel: "Potenzen", kapitel: 1}
+    erwartung: >-
+      Die Gruppe hat schon Einheiten, die Frage hat mit dem Plan nichts zu tun: trägt die Prüfung
+      ein, ohne den Jahresverlaufsplan zu lesen.
+    zuege:
+      - text: "Trag am {termin:6} bitte eine Klassenarbeit ein."
+        nicht: [get_verlaufsplan]
+      - text: "Ja."
+        nicht: [get_verlaufsplan, verlaufsplan_einheiten_anlegen]
+    ende: {aus_plan: 0, vorhandene_unveraendert: true, kategorie: {termin: 6, wert: pruefung}}
