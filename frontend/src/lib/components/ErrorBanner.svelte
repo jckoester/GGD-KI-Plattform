@@ -1,5 +1,5 @@
 <script>
-    import { CircleX } from "lucide-svelte";
+    import { CircleX } from "@lucide/svelte";
     let { message } = $props();
 </script>
 

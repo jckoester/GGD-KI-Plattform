@@ -7,7 +7,7 @@
     import { myTeachingGroups } from "$lib/stores/myGroups.js";
     import { gruppenImFach, fachZielSchueler } from "$lib/gruppenseite.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
-    import { LayoutGrid, List } from "lucide-svelte";
+    import { LayoutGrid, List } from "@lucide/svelte";
     import { user } from "$lib/stores/user.js";
     import { groupsConfig } from "$lib/stores/groupsConfig.js";
 

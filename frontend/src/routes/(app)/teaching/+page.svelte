@@ -2,7 +2,7 @@
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
-    import { Check, ChevronRight, Pencil, TriangleAlert, Trash2, X } from "lucide-svelte";
+    import { Check, ChevronRight, Pencil, TriangleAlert, Trash2, X } from "@lucide/svelte";
     import {
         aktuelleTeachingGroups,
         fruehereTeachingGroups,

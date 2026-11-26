@@ -8,7 +8,7 @@
      * begonnenen Entwurf. Die Rechte rechnet das Backend (`CurriculumRead`).
      */
     import { goto } from "$app/navigation";
-    import { CopyPlus, Send, X } from "lucide-svelte";
+    import { CopyPlus, Send, X } from "@lucide/svelte";
     import Dialog from "./Dialog.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import LoadingBanner from "./LoadingBanner.svelte";

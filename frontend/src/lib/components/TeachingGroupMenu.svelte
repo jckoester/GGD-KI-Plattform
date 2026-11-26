@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal } from 'lucide-svelte'
+  import { MoreHorizontal } from '@lucide/svelte'
   import { deleteTeachingGroup } from '$lib/api.js'
 
   let { groupId, onrefresh } = $props()

@@ -4,7 +4,7 @@
     import { budgetBalken, zuwachsKurz } from "$lib/budget_text.js";
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import { crisisAlertTotal } from "$lib/stores/crisisAlerts.js";
-    import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
+    import { Coins, HelpCircle, Info, AlertTriangle } from "@lucide/svelte";
     import UserMenu from "./UserMenu.svelte";
 
     let menuOpen = $state(false);

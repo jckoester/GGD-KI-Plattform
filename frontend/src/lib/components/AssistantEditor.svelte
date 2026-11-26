@@ -24,7 +24,7 @@
         Download,
         Upload,
         Trash2,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";

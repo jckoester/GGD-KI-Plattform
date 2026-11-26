@@ -1,6 +1,6 @@
 <script>
     import { slide } from "svelte/transition";
-    import { ChevronDown, ChevronRight } from "lucide-svelte";
+    import { ChevronDown, ChevronRight } from "@lucide/svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
     import TeachingGroupMenu from "./TeachingGroupMenu.svelte";
     import PotentialGroupMenu from "./PotentialGroupMenu.svelte";

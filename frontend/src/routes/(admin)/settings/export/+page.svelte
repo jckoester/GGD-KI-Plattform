@@ -2,7 +2,7 @@
     import PageBody from '$lib/components/PageBody.svelte';
     import ZurueckLink from '$lib/components/ZurueckLink.svelte';
     import { onMount } from 'svelte';
-    import { FileText, Upload, Trash2, Loader2 } from 'lucide-svelte';
+    import { FileText, Upload, Trash2, Loader2 } from '@lucide/svelte';
     import {
         getExportTemplates, updateExportCss, uploadExportReference, deleteExportReference,
         updateExportProvenance,

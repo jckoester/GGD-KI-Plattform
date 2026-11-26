@@ -10,7 +10,7 @@
         CalendarDays,
         BookOpen,
         ScrollText,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import { onMount } from "svelte";
     import {
         calendarConfigured,

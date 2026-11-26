@@ -1,7 +1,7 @@
 <script>
     import PageBody from "$lib/components/PageBody.svelte";
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
-    import { CalendarDays, Copy, RefreshCw, Save } from "lucide-svelte";
+    import { CalendarDays, Copy, RefreshCw, Save } from "@lucide/svelte";
     import { getHolidayProposal, applyHolidayProposal } from "$lib/api.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";

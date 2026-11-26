@@ -1,7 +1,7 @@
 <script>
     import PageBody from "$lib/components/PageBody.svelte";
     import { onMount } from "svelte";
-    import { Bot, Loader2 } from "lucide-svelte";
+    import { Bot, Loader2 } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import FreigabeWarteschlange from "$lib/components/FreigabeWarteschlange.svelte";

@@ -14,7 +14,7 @@
    * nächsten Tag vergessen — und mit ihm die Stunden, die niemand mehr unterrichtet.
    * Ist er leer, verschwindet er ganz; ein leerer Kasten als Daueranzeige wäre Lärm.
    */
-  import { CircleParking, Trash2 } from 'lucide-svelte'
+  import { CircleParking, Trash2 } from '@lucide/svelte'
   import { deleteParkplatzEintrag } from '$lib/api.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 

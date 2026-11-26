@@ -18,7 +18,7 @@
     import { subjectMap } from "$lib/stores/subjects.js";
     import FachBadge from "$lib/components/FachBadge.svelte";
     import Schlagwoerter from "$lib/components/Schlagwoerter.svelte";
-    import { EyeOff, Eye } from "lucide-svelte";
+    import { EyeOff, Eye } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";

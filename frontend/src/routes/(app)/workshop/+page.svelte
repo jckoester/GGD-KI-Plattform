@@ -10,14 +10,14 @@
     import {
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
         Share2, MessageSquarePlus,
-    } from 'lucide-svelte';
+    } from '@lucide/svelte';
     import { user } from '$lib/stores/user.js';
     import { ANHAENGBARE_ARTEN, produktFuerNeuenChat } from '$lib/produkt_im_chat.js';
     import { getLibrary, deleteArtifact, createDocument, getPreferences, patchPreferences } from '$lib/api.js';
     import { subjects } from '$lib/stores/subjects.js';
     import { ladeProduktarten } from '$lib/produktarten.js';
     import ProduktAngaben from '$lib/components/ProduktAngaben.svelte';
-    import { Pencil, Search, X } from 'lucide-svelte';
+    import { Pencil, Search, X } from '@lucide/svelte';
     import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
     import { triggerDownload } from '$lib/download.js';
     import {

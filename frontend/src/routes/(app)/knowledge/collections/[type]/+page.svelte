@@ -11,7 +11,7 @@
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
-    import { Plus, Archive, Pencil } from "lucide-svelte";
+    import { Plus, Archive, Pencil } from "@lucide/svelte";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { CONTENT_TYPE_LABELS, SCOPE_DEFAULTS } from "$lib/taxonomy.js";
     import {

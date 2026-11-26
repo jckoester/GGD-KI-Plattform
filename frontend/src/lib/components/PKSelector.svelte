@@ -8,7 +8,7 @@
      * - onchange: Callback bei Änderung (newSelectedArray)
      */
 
-    import { X, Search, Check, ChevronDown, ChevronRight } from 'lucide-svelte'
+    import { X, Search, Check, ChevronDown, ChevronRight } from '@lucide/svelte'
     import { getActiveBpVersion } from '$lib/api'
     import { editionLoadPlan } from '$lib/editions'
     import { renderInlineMath } from '$lib/markdown.js'

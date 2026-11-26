@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { Download, CheckCircle } from "lucide-svelte";
+  import { Download, CheckCircle } from "@lucide/svelte";
   import {
     getReaderConversation,
     exportReaderConversation,

@@ -13,7 +13,7 @@
         Search,
         Sigma,
         Hammer,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import { kindLabel } from "$lib/library.js";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { hatteAnhaenge, istAbbruch, istBearbeitbar, letzteEigeneIndex, wirkungsHinweis } from "$lib/chat_bearbeiten.js";

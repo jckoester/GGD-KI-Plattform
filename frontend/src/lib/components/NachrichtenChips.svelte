@@ -13,7 +13,7 @@
     // alle Chips da, gedeckelt an einem Fünftel der sichtbaren Höhe (Jan, 19.11.2026: immer
     // einklappen hilft nicht).
     import { tick } from "svelte";
-    import { ChevronDown, ChevronUp } from "lucide-svelte";
+    import { ChevronDown, ChevronUp } from "@lucide/svelte";
     import ContextChips from "./ContextChips.svelte";
     import ProduktChips from "./ProduktChips.svelte";
     import AttachmentChip from "./AttachmentChip.svelte";

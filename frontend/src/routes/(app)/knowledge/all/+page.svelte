@@ -2,7 +2,7 @@
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
     import { BP_CURRICULUM_CONTENT_TYPES, PLANUNG_CONTENT_TYPES } from "$lib/taxonomy.js";
     import PageBody from '$lib/components/PageBody.svelte'
-    import { FolderHeart } from "lucide-svelte";
+    import { FolderHeart } from "@lucide/svelte";
 </script>
 
 <PageBody breit>

@@ -10,7 +10,7 @@
      * `onnavigate` läuft beim Klick auf den Namen (etwa: Bereich öffnen), die Navigation
      * selbst übernimmt der Link.
      */
-    import { ChevronDown, ChevronRight } from 'lucide-svelte';
+    import { ChevronDown, ChevronRight } from '@lucide/svelte';
 
     let {
         href,

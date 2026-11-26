@@ -18,7 +18,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
-    import { FileDown, Pencil, RefreshCw, Trash2, X } from "lucide-svelte";
+    import { FileDown, Pencil, RefreshCw, Trash2, X } from "@lucide/svelte";
     import { getVerlaufsplaene } from "$lib/api.js";
     import { planVerweise } from "$lib/verlaufsplan.js";
     import { stufen as bandStufen } from "$lib/curriculum_rahmen.js";

@@ -5,7 +5,7 @@
     // hier in einem eigenen, auffälligen Block statt in der Liste: Wer ihn wegklickt,
     // bekommt ihn nicht wieder, und das muss man sehen, bevor man klickt.
     import { onMount } from "svelte";
-    import { KeyRound, Copy, Check, Trash2, Plus, Bot } from "lucide-svelte";
+    import { KeyRound, Copy, Check, Trash2, Plus, Bot } from "@lucide/svelte";
     import { aufteilen } from "$lib/zugangstoken_listen.js";
     import {
         createToken,

@@ -1,5 +1,5 @@
 <script>
-    import { LoaderCircle } from "lucide-svelte";
+    import { LoaderCircle } from "@lucide/svelte";
     let { message = "Lädt…" } = $props();
 </script>
 

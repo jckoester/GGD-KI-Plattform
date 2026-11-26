@@ -17,7 +17,7 @@
      * zeigen.
      */
     import { onMount } from "svelte";
-    import { BookOpen, Download, Upload } from "lucide-svelte";
+    import { BookOpen, Download, Upload } from "@lucide/svelte";
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
     import FachbegriffImportDialog from "$lib/components/FachbegriffImportDialog.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

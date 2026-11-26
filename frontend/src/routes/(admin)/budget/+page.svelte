@@ -2,7 +2,7 @@
     import PageBody from '$lib/components/PageBody.svelte';
     import { onMount } from 'svelte';
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
-    import { PiggyBank, LoaderCircle } from 'lucide-svelte';
+    import { PiggyBank, LoaderCircle } from '@lucide/svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
     import WarningBanner from '$lib/components/WarningBanner.svelte';
     import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';

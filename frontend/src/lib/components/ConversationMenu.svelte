@@ -1,5 +1,5 @@
 <script>
-    import { EllipsisVertical, Pencil, Trash2, BookOpen } from "lucide-svelte";
+    import { EllipsisVertical, Pencil, Trash2, BookOpen } from "@lucide/svelte";
     import { onDestroy } from "svelte";
     import { goto } from "$app/navigation";
     import { deleteConversation, renameConversation, patchConversationContext } from "$lib/api.js";

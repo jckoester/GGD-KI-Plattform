@@ -16,7 +16,7 @@
      */
     import { untrack } from 'svelte'
     import Dialog from '$lib/components/Dialog.svelte'
-    import { Check, Circle } from 'lucide-svelte'
+    import { Check, Circle } from '@lucide/svelte'
     import { getCalendarTeachers, putEinrichtung } from '$lib/api.js'
     import {
         ERSCHEINUNGSBILDER, fachFehltText, faecherLeerText, fertigZeilen, fortschritt, gutZuWissen,

@@ -2,7 +2,7 @@
     // Der Editor eines Dokuments (Phase 19) — seit 0.41 Teil der Produktansicht
     // `/workshop/<id>`. Den Titel ändert der Rahmen der Ansicht (Angaben), nicht der Editor.
     import { onMount } from 'svelte';
-    import { Save, Loader2, Download } from 'lucide-svelte';
+    import { Save, Loader2, Download } from '@lucide/svelte';
     import {
         getDocument, updateDocument, getDocumentExportBlob, saveDocumentExport,
     } from '$lib/api.js';

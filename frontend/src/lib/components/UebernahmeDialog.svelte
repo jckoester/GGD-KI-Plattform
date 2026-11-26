@@ -17,7 +17,7 @@
      * sich geschrieben hat.
      */
     import { onMount } from "svelte"
-    import { Loader2 } from "lucide-svelte"
+    import { Loader2 } from "@lucide/svelte"
     import { bausteinAusArtefakt, getBausteinVorschlag } from "$lib/api.js"
     import {
         ablaufHinweis,

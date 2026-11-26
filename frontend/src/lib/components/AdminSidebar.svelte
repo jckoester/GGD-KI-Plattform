@@ -23,7 +23,7 @@
         Inbox,
         BookOpen,
         ScrollText,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import SidebarLink from "./SidebarLink.svelte";
     import SidebarBereich from "./SidebarBereich.svelte";

@@ -31,7 +31,7 @@
     import { feldSchema } from "$lib/collections.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
-    import { Pencil, Check, X, Download } from "lucide-svelte";
+    import { Pencil, Check, X, Download } from "@lucide/svelte";
     import { IMPORTIERBARE_TYPEN } from "$lib/fachbegriffe_import.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";

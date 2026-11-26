@@ -1,5 +1,5 @@
 <script>
-    import { CalendarDays, MessageSquareWarning, BookOpen, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
+    import { CalendarDays, MessageSquareWarning, BookOpen, PanelLeftClose, PanelLeftOpen } from "@lucide/svelte";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
     import { page } from "$app/stores";
     import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId, activeConversationStunde, activeConversationCurriculum } from "$lib/stores/pageTitle.js";

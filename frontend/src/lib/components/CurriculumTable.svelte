@@ -42,7 +42,7 @@
         ChevronRight,
         FileDown,
         Plus,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
 
     // Tooltip für als „veraltet" markierte Kompetenzen (nach BP-Migration ohne Zwilling).
     const VERALTET_HINT =

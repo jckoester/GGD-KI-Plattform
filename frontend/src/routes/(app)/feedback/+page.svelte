@@ -15,7 +15,7 @@
      * Admins geschrieben ist).
      */
     import { onMount } from "svelte";
-    import { Loader2 } from "lucide-svelte";
+    import { Loader2 } from "@lucide/svelte";
     import { getMyFeedback, getNeuigkeiten, withdrawFeedback } from "$lib/api.js";
     import {
         feedbackFehlertext,

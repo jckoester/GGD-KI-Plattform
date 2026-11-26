@@ -11,7 +11,7 @@
     // Rahmen aus Dialog.svelte (0.34): Escape und ein Klick daneben heißen „Bearbeiten“ — also
     // nichts senden. Der Fokus steht auf „Bearbeiten“, der empfohlenen Aktion, nicht auf der
     // Ankreuzbox, die Dialog.svelte sonst als erstes Eingabefeld wählte.
-    import { TriangleAlert } from "lucide-svelte";
+    import { TriangleAlert } from "@lucide/svelte";
     import Dialog from "$lib/components/Dialog.svelte";
     import {
         PII_CATEGORY_LABELS,

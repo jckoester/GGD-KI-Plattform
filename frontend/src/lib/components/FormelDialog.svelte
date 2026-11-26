@@ -6,7 +6,7 @@
      * Die Vorschau rendert das bereinigte LaTeX mit KaTeX — so, wie es danach im Chat steht.
      * Enter setzt ein, Escape bricht ab (MathLives eigene Escape-Belegung ist entfernt).
      */
-    import { X } from "lucide-svelte";
+    import { X } from "@lucide/svelte";
     import Dialog from "$lib/components/Dialog.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

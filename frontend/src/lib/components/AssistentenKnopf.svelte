@@ -24,7 +24,7 @@
    * Werkzeugleiste (`px-4 py-2`, Symbol 16 px) — etwa im Curriculum neben „Veröffentlichen“
    * und „Rückgängig“.
    */
-  import { Bot, ChevronDown } from 'lucide-svelte'
+  import { Bot, ChevronDown } from '@lucide/svelte'
 
   let {
     kandidaten = [],

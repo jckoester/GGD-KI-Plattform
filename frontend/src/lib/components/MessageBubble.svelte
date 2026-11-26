@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle, BookOpen, Check, FileText, Image, Info, Copy, Pencil, ThumbsUp, ThumbsDown } from 'lucide-svelte';
+    import { AlertCircle, BookOpen, Check, FileText, Image, Info, Copy, Pencil, ThumbsUp, ThumbsDown } from '@lucide/svelte';
     import { goto } from '$app/navigation';
     import { renderInlineMath, renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';

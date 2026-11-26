@@ -8,7 +8,7 @@
     import { getPlanungsArchiv, getPlanungsgruppen } from '$lib/api.js'
     import { anzahl, archivPfad, klassenKurz, menueGruppen, mitBeschriftung, plannerPfad } from '$lib/planung_archiv.js'
     import { subjectMap } from '$lib/stores/subjects.js'
-    import { Archive } from 'lucide-svelte'
+    import { Archive } from '@lucide/svelte'
     import SubjectIcon from '$lib/components/SubjectIcon.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'

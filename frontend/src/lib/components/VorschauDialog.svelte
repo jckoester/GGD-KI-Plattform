@@ -4,7 +4,7 @@
      * Unterrichtsgruppe wählen. Danach lädt die Seite neu — mit dem Vorschau-Token sieht
      * die App aus wie für eine Schüler:in dieses Jahrgangs und dieser Gruppe.
      */
-    import { Eye, Loader2 } from "lucide-svelte";
+    import { Eye, Loader2 } from "@lucide/svelte";
     import Dialog from "./Dialog.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import { betreteVorschau } from "$lib/api.js";

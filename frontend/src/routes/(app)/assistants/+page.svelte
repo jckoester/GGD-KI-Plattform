@@ -18,7 +18,7 @@
     import { subjectMap } from "$lib/stores/subjects.js"
     import Schlagwoerter from "$lib/components/Schlagwoerter.svelte"
     import { user } from "$lib/stores/user.js";
-    import { Bot, Loader2, Copy, Pencil } from "lucide-svelte";
+    import { Bot, Loader2, Copy, Pencil } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let assistants = $state([])

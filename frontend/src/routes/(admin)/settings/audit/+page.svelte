@@ -9,7 +9,7 @@
      * dafür gibt es die 4-Augen-Wege. Ein Klick aufs Pseudonym filtert nach ihm.
      */
     import { onMount } from "svelte";
-    import { ChevronLeft, ChevronRight, ScrollText } from "lucide-svelte";
+    import { ChevronLeft, ChevronRight, ScrollText } from "@lucide/svelte";
     import { getAuditKatalog, getAuditLog } from "$lib/api.js";
     import { datenText, zielText } from "$lib/auditanzeige.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

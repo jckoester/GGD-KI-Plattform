@@ -9,7 +9,7 @@
         getAssistantModelCheck,
         getImageKinds,
     } from "$lib/api.js";
-    import { CloudCog } from "lucide-svelte";
+    import { CloudCog } from "@lucide/svelte";
     import ModelMatrixTable from "$lib/components/ModelMatrixTable.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";

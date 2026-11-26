@@ -8,7 +8,7 @@
      * welche Einträge es schon gibt, und die Wahl: mit Abgrenzung speichern (je Eintrag eine
      * Abgrenzungskante) oder abbrechen und auf den vorhandenen verweisen.
      */
-    import { TriangleAlert } from "lucide-svelte";
+    import { TriangleAlert } from "@lucide/svelte";
 
     let { kollisionen, saving = false, onabgrenzen, onabbrechen } = $props();
 </script>

@@ -26,7 +26,7 @@
     import { renderInlineMath } from "$lib/markdown.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
-    import { Anchor, Archive, Trash2, Download, Upload } from "lucide-svelte";
+    import { Anchor, Archive, Trash2, Download, Upload } from "@lucide/svelte";
 
     let {
         fixedSubjectSlug = null, // gesetzt im Subject-Kontext-Tab

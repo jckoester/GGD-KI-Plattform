@@ -3,7 +3,7 @@
      * Umschalter Liste/Kacheln im Archiv der Planung (0.42, F3). Gemerkt in den
      * Einstellungen (`planung_archiv_ansicht`), für alle drei Ebenen dieselbe Wahl.
      */
-    import { LayoutGrid, List } from 'lucide-svelte'
+    import { LayoutGrid, List } from '@lucide/svelte'
     import { getPreferences, patchPreferences } from '$lib/api.js'
     import { ANSICHT_SCHLUESSEL, ansichtAusEinstellungen } from '$lib/planung_archiv.js'
 

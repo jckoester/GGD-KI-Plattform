@@ -27,7 +27,7 @@
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
-    import { ArrowLeft, Check, Save, Undo2, X } from "lucide-svelte";
+    import { ArrowLeft, Check, Save, Undo2, X } from "@lucide/svelte";
 
     let curriculum = $state(null);
     let draft = $state(null);

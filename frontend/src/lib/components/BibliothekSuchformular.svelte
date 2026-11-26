@@ -7,7 +7,7 @@
      * nicht auseinanderlaufen. Was beim Absenden geschieht, entscheidet die Seite
      * (`onsuchen`); `onfacette` läuft bei jeder Änderung einer Facette.
      */
-    import { Loader2, Search } from "lucide-svelte";
+    import { Loader2, Search } from "@lucide/svelte";
     import { bibliothekTypLabels } from "$lib/knotentypen.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { subjects } from "$lib/stores/subjects.js";

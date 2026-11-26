@@ -16,7 +16,7 @@
      * Backspace im leeren Feld entfernt den letzten Chip. Die Logik steht in
      * `$lib/chip_auswahl.js` (mit Tests).
      */
-    import { X } from "lucide-svelte";
+    import { X } from "@lucide/svelte";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import {
         anzeige,

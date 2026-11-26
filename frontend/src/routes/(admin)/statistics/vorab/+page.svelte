@@ -5,7 +5,7 @@
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import { getVorabStatistik } from "$lib/api.js";
-    import { ScanSearch, Download } from "lucide-svelte";
+    import { ScanSearch, Download } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import {

@@ -9,7 +9,7 @@
      * - onWaehlen(option)
      * - onBleiben()
      */
-    import { Sparkles } from "lucide-svelte";
+    import { Sparkles } from "@lucide/svelte";
     import { beschriftung, einleitung } from "$lib/assistent_vorschlag.js";
 
     let { optionen = [], onWaehlen, onBleiben } = $props();

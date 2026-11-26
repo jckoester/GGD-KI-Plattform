@@ -15,7 +15,7 @@
      *   wo man von Seite zu Seite derselben Art geht (Baustein zu Baustein, Jan 18.11.2026).
      */
     import { afterNavigate } from '$app/navigation';
-    import { ArrowLeft, X } from 'lucide-svelte';
+    import { ArrowLeft, X } from '@lucide/svelte';
 
     let { href, label = undefined, schliessen = false, echt = false } = $props();
 

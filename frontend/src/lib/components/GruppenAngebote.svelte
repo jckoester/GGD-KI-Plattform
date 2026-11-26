@@ -7,7 +7,7 @@
    * Eine falsche Verschmelzung schiebt zwei Jahrespläne ineinander und ist aus
    * Nutzersicht nicht rückgängig zu machen — deshalb entscheidet die Lehrkraft.
    */
-  import { Link2, Plus, EyeOff, Eye } from "lucide-svelte"
+  import { Link2, Plus, EyeOff, Eye } from "@lucide/svelte"
   import {
     getGroupOffers,
     assignGroupOffer,

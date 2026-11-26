@@ -3,7 +3,7 @@
     // Autorisierungsserver den Browser nach `/api/authorize`. Ohne Sitzung zur Anmeldung und
     // zurück; danach entscheidet die Lehrkraft, und der Browser geht an das Programm zurück.
     import { onMount } from "svelte";
-    import { ShieldCheck } from "lucide-svelte";
+    import { ShieldCheck } from "@lucide/svelte";
     import { getOAuthAnfrage, sendOAuthEntscheidung } from "$lib/api.js";
     import { anfrageAusUrl, anmeldeZiel, fehlerText } from "$lib/oauth_zustimmung.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

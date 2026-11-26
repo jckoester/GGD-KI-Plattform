@@ -18,7 +18,7 @@
     X,
     Download,
     Bot,
-  } from "lucide-svelte";
+  } from "@lucide/svelte";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
   import { GETEILT_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
   import SuccessBanner from "$lib/components/SuccessBanner.svelte";

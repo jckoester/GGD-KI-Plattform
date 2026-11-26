@@ -2,7 +2,7 @@
   import PageBody from "$lib/components/PageBody.svelte";
   import ZurueckLink from "$lib/components/ZurueckLink.svelte";
   import { onMount } from "svelte";
-  import { ShieldCheck } from "lucide-svelte";
+  import { ShieldCheck } from "@lucide/svelte";
   import {
     getGuardrailPrompt,
     saveGuardrailPrompt,

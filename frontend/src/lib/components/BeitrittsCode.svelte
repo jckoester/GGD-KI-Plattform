@@ -8,7 +8,7 @@
    * entfernt eine berechtigte Person und merkt es nicht. Zurückgenommen wird deshalb
    * eine **Menge** — die Code-Runde oder ein Tag daraus.
    */
-  import { KeyRound, RefreshCw, Ban } from "lucide-svelte"
+  import { KeyRound, RefreshCw, Ban } from "@lucide/svelte"
   import {
     getJoinCode,
     createJoinCode,

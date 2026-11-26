@@ -6,7 +6,7 @@
     //
     // `variante`: „overlay“ liegt über Bild oder Diagramm (erscheint beim Überfahren),
     // „zeile“ steht unter einer Textantwort.
-    import { BookmarkPlus, Check, FileEdit, Download, Share2, Loader2, AlertCircle } from 'lucide-svelte'
+    import { BookmarkPlus, Check, FileEdit, Download, Share2, Loader2, AlertCircle } from '@lucide/svelte'
     import { speicherText } from '$lib/produktleiste.js'
 
     let {

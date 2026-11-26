@@ -3,7 +3,7 @@
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount, onDestroy, tick } from "svelte";
     import { getSpend, getStatsTeams, getStatsModels } from "$lib/api.js";
-    import { ReceiptEuro, LoaderCircle } from "lucide-svelte";
+    import { ReceiptEuro, LoaderCircle } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { token, beobachteModus } from "$lib/diagrammfarben.js";

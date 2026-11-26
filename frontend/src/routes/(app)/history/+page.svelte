@@ -5,10 +5,10 @@
     import { goto } from "$app/navigation";
     import { getRecentConversations, getVorschauChats } from "$lib/api.js";
     import { kannVorschauBetreten } from "$lib/vorschau.js";
-    import { Loader2, Bot } from "lucide-svelte";
+    import { Loader2, Bot } from "@lucide/svelte";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
-    import { History } from "lucide-svelte";
+    import { History } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";

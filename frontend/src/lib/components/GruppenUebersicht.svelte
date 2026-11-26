@@ -50,7 +50,7 @@
   import ConversationMenu from './ConversationMenu.svelte'
   import NodeTypeIcon from './NodeTypeIcon.svelte'
   import ErrorBanner from './ErrorBanner.svelte'
-  import { Search } from 'lucide-svelte'
+  import { Search } from '@lucide/svelte'
 
   let { group, subject = null, istLehrkraft = false } = $props()
 

@@ -12,7 +12,7 @@
      * gemessen am 01.09.2026 mit „nennen": 59 Treffer, 62 Listenzeilen. Ohne Deckel
      * deckte das Fenster den halben Chat zu.
      */
-    import { CheckSquare, Square } from "lucide-svelte";
+    import { CheckSquare, Square } from "@lucide/svelte";
 
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import {

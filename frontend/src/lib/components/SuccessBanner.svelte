@@ -1,5 +1,5 @@
 <script>
-    import { CircleCheck } from "lucide-svelte";
+    import { CircleCheck } from "@lucide/svelte";
     let { message } = $props();
 </script>
 

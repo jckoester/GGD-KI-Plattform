@@ -18,7 +18,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import WarningBanner from '$lib/components/WarningBanner.svelte'
-    import { FileDown } from 'lucide-svelte'
+    import { FileDown } from '@lucide/svelte'
 
     // Wie die Curricula-Liste: nur Lehrkräfte und Admins.
     $effect(() => {

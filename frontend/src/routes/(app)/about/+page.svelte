@@ -11,7 +11,7 @@
         GitBranch,
         ShieldCheck,
         ShieldBan,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
 
     const authors = [{ name: "Jan Köster", github: "jckoester" }];
 

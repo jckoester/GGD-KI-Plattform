@@ -14,7 +14,7 @@
         MessageSquareText,
         Inbox,
         BookOpen,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import { logout } from "$lib/api.js";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
     import { oeffneVorschau } from "$lib/stores/vorschauDialog.js";

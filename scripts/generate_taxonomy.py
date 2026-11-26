@@ -151,7 +151,7 @@ def _schreibe_icons(cats: dict) -> None:
     dasselbe Paket trug. Zwei Orte für dieselbe Typangabe laufen auseinander —
     hier steht sie einmal, in der Taxonomie.
 
-    **Warum statische Importe.** `lucide-svelte` bringt 1686 Komponenten mit. Einen
+    **Warum statische Importe.** `@lucide/svelte` bringt rund 2400 Komponenten mit. Einen
     Namen zur Laufzeit aufzulösen (`import * as icons`) zöge sie alle ins Bundle.
     Deshalb erzeugt der Generator die Importliste — ein Name, den es nicht gibt,
     bricht dann den Build, statt still auf ein Ersatzsymbol zu fallen.
@@ -177,7 +177,7 @@ def _schreibe_icons(cats: dict) -> None:
         "",
         "import {",
         *(f"    {name}," for name in komponenten),
-        "} from 'lucide-svelte'",
+        "} from '@lucide/svelte'",
         "",
         "/** content_type → Symbol. Vollständig über alle Typen der Taxonomie. */",
         "export const NODE_ICONS = {",

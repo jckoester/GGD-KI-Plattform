@@ -26,7 +26,7 @@ export const BIBLIOTHEKEN = [
             { name: 'highlight.js', paket: 'highlight.js', lizenz: 'BSD-3-Clause' },
             { name: 'js-yaml', paket: 'js-yaml', lizenz: 'MIT' },
             { name: 'KaTeX', paket: 'katex', lizenz: 'MIT' },
-            { name: 'lucide-svelte', paket: 'lucide-svelte', lizenz: 'ISC' },
+            { name: '@lucide/svelte', paket: '@lucide/svelte', lizenz: 'ISC' },
             { name: 'marked', paket: 'marked', lizenz: 'MIT' },
             { name: 'marked-footnote', paket: 'marked-footnote', lizenz: 'MIT' },
             { name: 'MathLive', paket: 'mathlive', lizenz: 'MIT' },

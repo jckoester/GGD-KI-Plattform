@@ -1,5 +1,5 @@
 <script>
-    import { TriangleAlert } from "lucide-svelte";
+    import { TriangleAlert } from "@lucide/svelte";
     let { message } = $props();
 </script>
 

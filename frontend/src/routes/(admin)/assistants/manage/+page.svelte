@@ -13,7 +13,7 @@
         Check,
         Loader2,
         AlertCircle,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";

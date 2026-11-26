@@ -15,7 +15,7 @@
      * - `curricula`: Curricula der Stufe mit Kapiteln und Sequenzen, zur Auswahl
      * - `onaenderung`: nach jeder Änderung
      */
-    import { ArrowDown, ArrowUp, GripVertical, Trash2, Plus } from 'lucide-svelte'
+    import { ArrowDown, ArrowUp, GripVertical, Trash2, Plus } from '@lucide/svelte'
     import {
         RICHTGROESSE, VORGABE_WOCHEN, bezugText, bezugsfeld, dauerVorschlag, einheiten, hinweise,
         neuerAbschnitt, umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText,

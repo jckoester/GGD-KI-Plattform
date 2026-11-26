@@ -21,7 +21,7 @@
   import { subjectMap } from '$lib/stores/subjects.js'
   import ErrorBanner from './ErrorBanner.svelte'
   import NodeTypeIcon from './NodeTypeIcon.svelte'
-  import { Archive, ChevronDown, ChevronRight } from 'lucide-svelte'
+  import { Archive, ChevronDown, ChevronRight } from '@lucide/svelte'
 
   let { subjectId = null } = $props()
 

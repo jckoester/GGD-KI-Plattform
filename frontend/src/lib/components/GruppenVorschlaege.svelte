@@ -9,7 +9,7 @@
      * Props: `onGeaendert()` nach einer Ablehnung (die Seite lädt ihre abgelehnten Kombinationen
      * neu); `onFehler(text)` — ohne sie steht die Meldung im Abschnitt selbst.
      */
-    import { Check, X } from "lucide-svelte";
+    import { Check, X } from "@lucide/svelte";
     import { addExclusion, createTeachingGroup } from "$lib/api.js";
     import { refreshMyGroups } from "$lib/stores/myGroups.js";
     import {

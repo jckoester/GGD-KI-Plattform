@@ -3,7 +3,7 @@
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount } from "svelte";
     import { getAdminUsers, revokeUserSessions } from "$lib/api.js";
-    import { Users, ShieldOff, Search } from "lucide-svelte";
+    import { Users, ShieldOff, Search } from "@lucide/svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";

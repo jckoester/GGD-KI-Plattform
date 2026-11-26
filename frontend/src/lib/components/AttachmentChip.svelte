@@ -1,5 +1,5 @@
 <script>
-  import { Loader2, Paperclip, X, AlertCircle } from 'lucide-svelte'
+  import { Loader2, Paperclip, X, AlertCircle } from '@lucide/svelte'
   import { CHIP_AKZENT, CHIP_FORM, CHIP_ICON } from '$lib/chip_form.js'
 
   let { filename, status, error = null, onremove } = $props()

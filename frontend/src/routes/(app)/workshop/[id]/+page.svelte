@@ -8,7 +8,7 @@
     // Datei: Verweis auf ihr Dokument. Bis 0.41 hatten nur Dokumente eine eigene Ansicht.
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil, MessageSquarePlus } from 'lucide-svelte';
+    import { Download, Copy, Check, Share2, Trash2, Loader2, Files, Pencil, MessageSquarePlus } from '@lucide/svelte';
     import { user } from '$lib/stores/user.js';
     import { ANHAENGBARE_ARTEN, produktFuerNeuenChat } from '$lib/produkt_im_chat.js';
     import { getProduktInfo, produktKopieren, deleteArtifact } from '$lib/api.js';

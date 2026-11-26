@@ -14,7 +14,7 @@
    * gelesen, um fehlende **Gruppen** anzubieten — Wochenmuster und Stunden gehören zur Planung.
    */
   import { onMount, untrack } from "svelte"
-  import { CalendarClock } from "lucide-svelte"
+  import { CalendarClock } from "@lucide/svelte"
   import {
     createTeachingGroupFromTimetable,
     getWeekPatternProposals,

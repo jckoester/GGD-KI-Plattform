@@ -19,7 +19,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import WarningBanner from '$lib/components/WarningBanner.svelte'
-    import { ChevronDown, ChevronRight } from 'lucide-svelte'
+    import { ChevronDown, ChevronRight } from '@lucide/svelte'
 
     $effect(() => {
         if ($user && !userHasAnyRole($user, ['teacher', 'admin'])) goto('/chat')

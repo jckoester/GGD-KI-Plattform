@@ -3,7 +3,7 @@
     import ZurueckLink from "$lib/components/ZurueckLink.svelte";
     import { onMount } from "svelte";
     import { getHeatmap, getStatsTeams, getStatsModels } from "$lib/api.js";
-    import { ChartColumn, ChevronLeft, ChevronRight } from "lucide-svelte";
+    import { ChartColumn, ChevronLeft, ChevronRight } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { bereichText, stufe, stufenBereiche, zellenText } from "$lib/heatmap_stufen.js";

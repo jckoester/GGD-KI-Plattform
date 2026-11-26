@@ -1,6 +1,6 @@
 <script>
     import PageBody from "$lib/components/PageBody.svelte";
-    import { ChartNoAxesCombined, ChartColumn, ReceiptEuro, ScanSearch, ThumbsUp } from "lucide-svelte";
+    import { ChartNoAxesCombined, ChartColumn, ReceiptEuro, ScanSearch, ThumbsUp } from "@lucide/svelte";
 </script>
 <PageBody>
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">

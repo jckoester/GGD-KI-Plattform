@@ -10,7 +10,7 @@
      */
     import { onMount } from "svelte";
     import { getBewertungStatistik } from "$lib/api.js";
-    import { Download, ThumbsUp } from "lucide-svelte";
+    import { Download, ThumbsUp } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { kalenderwoche } from "$lib/vorabstatistik.js";

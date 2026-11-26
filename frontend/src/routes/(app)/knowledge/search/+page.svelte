@@ -14,7 +14,7 @@
         MessageSquarePlus,
         Pin,
         Waypoints,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { onMount } from "svelte";

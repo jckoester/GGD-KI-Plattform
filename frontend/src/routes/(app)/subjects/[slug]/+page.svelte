@@ -34,7 +34,7 @@
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
     import CurriculumList from "$lib/components/CurriculumList.svelte";
     import BildungsplanTree from "$lib/components/BildungsplanTree.svelte";
-    import { Search } from "lucide-svelte";
+    import { Search } from "@lucide/svelte";
 
     const subject = $derived(
         $subjects.find((s) => s.slug === $page.params.slug) ?? null,

@@ -6,7 +6,7 @@
  * Bis 0.47 lag unter `/knowledge` die Liste aller Bausteine; sie steht jetzt unter
  * `/knowledge/all`.
  */
-import { Archive, BookOpen, ChartGantt, Database, FolderHeart, ShieldCheck } from 'lucide-svelte'
+import { Archive, BookOpen, ChartGantt, Database, FolderHeart, ShieldCheck } from '@lucide/svelte'
 
 /**
  * @param {{ istLehrkraft: boolean, zeigt: (eintrag: string) => boolean }} p

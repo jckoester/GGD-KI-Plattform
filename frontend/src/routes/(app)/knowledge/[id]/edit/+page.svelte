@@ -29,7 +29,7 @@
         gueltigeGruppenwahl,
     } from "$lib/stores/myGroups.js";
     import { subjects } from "$lib/stores/subjects.js";
-    import { ArrowLeft } from "lucide-svelte";
+    import { ArrowLeft } from "@lucide/svelte";
     import AliasFeld from "$lib/components/AliasFeld.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";

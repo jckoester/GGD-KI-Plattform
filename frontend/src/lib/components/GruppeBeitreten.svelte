@@ -10,7 +10,7 @@
    * Props (beide optional, 0.47 für die Einrichtung): `gesperrt` — Feld zeigen, aber abgeschaltet
    * (Vorschau: dort lässt sich nichts ändern); `nachBeitritt()` — nach erfolgreichem Beitritt.
    */
-  import { LogIn } from "lucide-svelte"
+  import { LogIn } from "@lucide/svelte"
   import { invalidateAll } from "$app/navigation"
   import { joinGroupByCode } from "$lib/api.js"
   import { beitrittFehler } from "$lib/beitrittscode.js"

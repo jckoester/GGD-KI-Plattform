@@ -48,7 +48,7 @@ import {
     Users,
     Waypoints,
     Zap,
-} from 'lucide-svelte'
+} from '@lucide/svelte'
 
 /** content_type → Symbol. Vollständig über alle Typen der Taxonomie. */
 export const NODE_ICONS = {

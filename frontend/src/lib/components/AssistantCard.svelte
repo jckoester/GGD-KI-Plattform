@@ -1,6 +1,6 @@
 <script>
   import { goto } from '$app/navigation'
-  import { Bot } from 'lucide-svelte'
+  import { Bot } from '@lucide/svelte'
   import SubjectIcon from './SubjectIcon.svelte'
   import ProduktMarken from './ProduktMarken.svelte'
   import { neuerChatPfad } from '$lib/chatziel.js'

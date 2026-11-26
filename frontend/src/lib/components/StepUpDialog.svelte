@@ -5,7 +5,7 @@
   //   direct  → Passwort-Re-Entry im Dialog
   //   redirect→ Weiterleitung zum SSO-Provider (prompt=login) und zurück
   import { onMount } from "svelte";
-  import { ShieldCheck } from "lucide-svelte";
+  import { ShieldCheck } from "@lucide/svelte";
   import { getStepUpChallenge, stepUpDirect } from "$lib/api.js";
   import { ohneStepupFehler } from "$lib/stepup_rueckkehr.js";
   // Rahmen aus Dialog.svelte (0.34): Rolle, Escape (= Abbrechen), Fokus im Dialog und zurück.

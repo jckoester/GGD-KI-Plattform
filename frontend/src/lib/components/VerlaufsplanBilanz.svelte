@@ -10,7 +10,7 @@
      *
      * Props: `lage`, `wochenstunden`, `band` (Curriculum über mehrere Stufen), `planungsart`.
      */
-    import { ChevronDown, ChevronRight } from 'lucide-svelte'
+    import { ChevronDown, ChevronRight } from '@lucide/svelte'
     import { bilanzStand } from '$lib/verlaufsplan.js'
     import AbdeckungSymbol from '$lib/components/AbdeckungSymbol.svelte'
 

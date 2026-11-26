@@ -2,7 +2,7 @@
     import { page } from '$app/stores';
     import { sichtbareHilfe } from '$lib/help-nav.js';
     import { user } from '$lib/stores/user.js';
-    import { ChevronRight, Menu } from 'lucide-svelte';
+    import { ChevronRight, Menu } from '@lucide/svelte';
     import { goto } from '$app/navigation';
 
     let { children } = $props();

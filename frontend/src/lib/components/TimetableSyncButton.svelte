@@ -10,7 +10,7 @@
    * nicht auseinanderlaufen. `kompakt` schaltet auf die schmale Fassung für die
    * Werkzeugleiste des Jahresplans.
    */
-  import { RefreshCw } from "lucide-svelte";
+  import { RefreshCw } from "@lucide/svelte";
   import { getSyncStatus, runTimetableSync } from "$lib/api.js";
   import { abgleichZusammenfassung, fehlendesRaster } from "$lib/stundenplan_abgleich.js";
   import { onMount } from "svelte";

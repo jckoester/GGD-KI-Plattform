@@ -4,7 +4,7 @@
   import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { ShieldCheck } from "lucide-svelte";
+  import { ShieldCheck } from "@lucide/svelte";
   import {
     getAccessRequests,
     approveAccessRequest,

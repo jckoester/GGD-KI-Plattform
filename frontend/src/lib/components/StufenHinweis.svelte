@@ -9,7 +9,7 @@
      * die Oberfläche anders aussieht als in einer Anleitung beschrieben, und bietet an,
      * das zu ändern. Er steht deshalb ÜBER dem Inhalt, nicht an seiner Stelle.
      */
-    import { Info } from "lucide-svelte";
+    import { Info } from "@lucide/svelte";
     import { setzeStufe, stufenRegistry, uiStufe, stufeVon } from "$lib/stores/uiLevel.js";
 
     let { eintrag } = $props();

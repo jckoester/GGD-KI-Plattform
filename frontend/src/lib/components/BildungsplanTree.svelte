@@ -14,7 +14,7 @@
     import ErrorBanner from "./ErrorBanner.svelte";
     import InfoBanner from "./InfoBanner.svelte";
     import { kuenftigHinweis, kuenftigZusatz } from "$lib/bp_fassung.js";
-    import { ChevronDown, ChevronRight, ExternalLink } from "lucide-svelte";
+    import { ChevronDown, ChevronRight, ExternalLink } from "@lucide/svelte";
 
     let { subjectId, initialBpVersion = null } = $props();
 

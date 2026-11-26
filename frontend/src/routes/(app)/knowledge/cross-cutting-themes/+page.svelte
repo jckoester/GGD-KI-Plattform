@@ -9,7 +9,7 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import LfdbTree from '$lib/components/LfdbTree.svelte'
     import LeitlinienAbschnitt from '$lib/components/LeitlinienAbschnitt.svelte'
-    import { TriangleAlert, ChevronDown, ChevronRight, ExternalLink, LayoutGrid } from 'lucide-svelte'
+    import { TriangleAlert, ChevronDown, ChevronRight, ExternalLink, LayoutGrid } from '@lucide/svelte'
     import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Prüfung: nur teacher/admin

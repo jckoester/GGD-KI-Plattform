@@ -12,7 +12,7 @@
      * Darstellung. Warum getrennt: Welche Zeile eine Frage stellt und wann „einspielen"
      * überhaupt lohnt, sind Entscheidungen — die prüft das Projekt im Modul.
      */
-    import { Upload, Loader2, ExternalLink, FileDown } from "lucide-svelte";
+    import { Upload, Loader2, ExternalLink, FileDown } from "@lucide/svelte";
     import { importiereFachbegriffe } from "$lib/api.js";
     import {
         KOLLISION_FOLGEN,

@@ -9,7 +9,7 @@
   import { REITER, aktiverReiter } from '$lib/gruppenseite.js'
   import { groupsConfig } from '$lib/stores/groupsConfig.js'
   import { zeigtEintrag } from '$lib/stores/uiLevel.js'
-  import { CircleCheck, TriangleAlert } from 'lucide-svelte'
+  import { CircleCheck, TriangleAlert } from '@lucide/svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
   import BeitrittsCode from '$lib/components/BeitrittsCode.svelte'

@@ -7,7 +7,7 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { onDestroy } from 'svelte'
-    import { Undo2 } from 'lucide-svelte'
+    import { Undo2 } from '@lucide/svelte'
     import {
         beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'

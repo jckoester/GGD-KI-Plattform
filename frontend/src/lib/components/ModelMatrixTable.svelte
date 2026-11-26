@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { Info, Save } from "lucide-svelte";
+    import { Info, Save } from "@lucide/svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";

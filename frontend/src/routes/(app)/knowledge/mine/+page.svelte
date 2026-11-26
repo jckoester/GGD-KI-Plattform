@@ -56,7 +56,7 @@
     RotateCcw,
     Trash2,
     X,
-  } from 'lucide-svelte'
+  } from '@lucide/svelte'
   import PageBody from '$lib/components/PageBody.svelte'
 
   let daten = $state(null)

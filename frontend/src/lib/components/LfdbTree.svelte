@@ -1,6 +1,6 @@
 <script>
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
-    import { ChevronDown, ChevronRight, ExternalLink } from "lucide-svelte";
+    import { ChevronDown, ChevronRight, ExternalLink } from "@lucide/svelte";
 
     // bausteine: [{ ...node, themenbloecke: [{ ...node, kompetenzen: [node] }] }]
     let { bausteine = [], nodeHref } = $props();

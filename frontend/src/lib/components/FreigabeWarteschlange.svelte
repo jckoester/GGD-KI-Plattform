@@ -11,7 +11,7 @@
      */
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
-    import { AlertCircle, Check, Eye, Loader2, X } from "lucide-svelte";
+    import { AlertCircle, Check, Eye, Loader2, X } from "@lucide/svelte";
     import Dialog from "./Dialog.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import SuccessBanner from "./SuccessBanner.svelte";

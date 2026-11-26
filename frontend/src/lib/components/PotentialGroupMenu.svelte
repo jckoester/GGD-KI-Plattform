@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal, Check, X } from 'lucide-svelte'
+  import { MoreHorizontal, Check, X } from '@lucide/svelte'
   import { createTeachingGroup, addExclusion } from '$lib/api.js'
 
   let { classGroupId, subjectId, className, onrefresh } = $props()

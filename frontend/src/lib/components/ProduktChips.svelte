@@ -2,7 +2,7 @@
     // Angehängte Produkte aus der Werkstatt (0.41, Schritt 10) — neben den Bausteinen
     // (`ContextChips`), in derselben Form, mit dem Werkstatt-Symbol. Nur die Chips; die Reihe
     // und das Einklappen übernimmt `NachrichtenChips` (0.49).
-    import { Hammer, X } from "lucide-svelte";
+    import { Hammer, X } from "@lucide/svelte";
     import { kindLabel } from "$lib/library.js";
     import { CATEGORY_COLORS } from "$lib/taxonomy.js";
     import { CHIP_AKZENT, CHIP_FORM, CHIP_ICON } from "$lib/chip_form.js";

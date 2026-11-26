@@ -3,7 +3,7 @@
   // Die Arten lädt die Komponente selbst (einmal je Sitzung, `ladeProduktarten`) — so braucht
   // keine Seite, die Karten zeigt, etwas weiterzureichen.
   import { onMount } from 'svelte'
-  import { Wrench } from 'lucide-svelte'
+  import { Wrench } from '@lucide/svelte'
   import { BADGE } from '$lib/badges.js'
   import { markenVon } from '$lib/assistentenliste.js'
   import { ladeProduktarten } from '$lib/produktarten.js'

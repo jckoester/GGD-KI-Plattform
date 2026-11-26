@@ -20,7 +20,7 @@
      * topic: { help_topic, label, internal: Contact[], external: Contact[] }
      * Contact: { name, contact?, hours?, email?, phone?, website?, free_of_charge?, anonymous? }
      */
-    import { LifeBuoy, Phone, Mail, Clock, ExternalLink } from "lucide-svelte";
+    import { LifeBuoy, Phone, Mail, Clock, ExternalLink } from "@lucide/svelte";
 
     let { topic } = $props();
 </script>

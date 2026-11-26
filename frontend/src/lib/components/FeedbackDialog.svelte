@@ -17,7 +17,7 @@
      */
     import { onMount } from "svelte";
     import { page } from "$app/stores";
-    import { Loader2, X } from "lucide-svelte";
+    import { Loader2, X } from "@lucide/svelte";
     import { createFeedback } from "$lib/api.js";
     import {
         KATEGORIEN,

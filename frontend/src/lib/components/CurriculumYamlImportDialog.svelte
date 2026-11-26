@@ -8,7 +8,7 @@
      * geprüft werden. Die Regeln stehen in `$lib/curriculum_yaml_import.js`.
      */
     import { goto } from "$app/navigation";
-    import { FileUp, Loader2 } from "lucide-svelte";
+    import { FileUp, Loader2 } from "@lucide/svelte";
     import { importiereCurriculumYaml, pruefeCurriculumYaml } from "$lib/api.js";
     import { dateiLesen, ersetzbar, kannAnlegen, summenText, vorauswahl } from "$lib/curriculum_yaml_import.js";
     import Dialog from "$lib/components/Dialog.svelte";

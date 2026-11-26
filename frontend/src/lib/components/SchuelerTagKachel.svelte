@@ -8,7 +8,7 @@
    * (`docs/user/datenschutz.md`). Eine gemeinsame Komponente mit Rollen-Weichen wäre
    * genau die Stelle, an der später eine Weiche vergessen wird.
    */
-  import { CalendarDays } from "lucide-svelte"
+  import { CalendarDays } from "@lucide/svelte"
   import { fachLink, schuelerLeerSatz } from "$lib/mein_tag.js"
   import SubjectIcon from "$lib/components/SubjectIcon.svelte"
 

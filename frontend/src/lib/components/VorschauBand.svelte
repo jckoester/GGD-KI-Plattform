@@ -7,7 +7,7 @@
      * gegen die alte Sitzung). Danach steht einmal ein Hinweis da.
      */
     import { onDestroy, onMount } from "svelte";
-    import { Eye, Loader2 } from "lucide-svelte";
+    import { Eye, Loader2 } from "@lucide/svelte";
     import { user } from "$lib/stores/user.js";
     import { myGroups } from "$lib/stores/myGroups.js";
     import { verlasseVorschau } from "$lib/api.js";

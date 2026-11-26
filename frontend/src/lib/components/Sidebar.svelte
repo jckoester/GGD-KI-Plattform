@@ -24,7 +24,7 @@
         Archive,
     Check,
         ChartGantt,
-    } from "lucide-svelte";
+    } from "@lucide/svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
         recentConversations,

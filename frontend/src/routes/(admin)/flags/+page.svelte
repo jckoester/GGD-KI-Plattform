@@ -4,7 +4,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { TriangleAlert } from "lucide-svelte";
+  import { TriangleAlert } from "@lucide/svelte";
   import { getFlags, createAccessRequest } from "$lib/api.js";
   import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
   import {

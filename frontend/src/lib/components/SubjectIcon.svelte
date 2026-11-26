@@ -1,6 +1,6 @@
 <script>
     /**
-     * name: lucide-svelte Icon-Name in kebab-case, z.B. 'calculator', 'book-open'.
+     * name: Lucide-Icon-Name (`@lucide/svelte`) in kebab-case, z.B. 'calculator', 'book-open'.
      *       null/undefined → sofort Fallback.
      * size: Pixel-Größe (wird als `size`-Prop an die Lucide-Komponente übergeben).
      * class: Zusätzliche CSS-Klassen.

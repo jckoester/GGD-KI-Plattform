@@ -1,6 +1,6 @@
 <script>
     import { goto } from '$app/navigation'
-    import { MessageSquare } from 'lucide-svelte'
+    import { MessageSquare } from '@lucide/svelte'
     import { user } from '$lib/stores/user.js'
     import { getAssistants, getMeinTag, getMeinTagSchueler, getNeuigkeiten } from '$lib/api.js'
     import { alleSchliessen, aufteilen, schliessen } from '$lib/neuigkeiten.js'

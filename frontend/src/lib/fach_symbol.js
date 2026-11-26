@@ -7,10 +7,11 @@
  * jedes Symbol ein eigener, kleiner Chunk; geladen wird nur, was angezeigt wird.
  *
  * Die `.js`-Dateien unter `dist/icons` decken auch die Aliasse ab (`code-2` → `code-xml`).
+ * Paket seit 0.59 `@lucide/svelte` (Nachfolger von `lucide-svelte`, das bei 1.0.1 stehen blieb).
  */
-const SYMBOLE = import.meta.glob('/node_modules/lucide-svelte/dist/icons/*.js')
+const SYMBOLE = import.meta.glob('/node_modules/@lucide/svelte/dist/icons/*.js')
 
-const PFAD = '/node_modules/lucide-svelte/dist/icons/'
+const PFAD = '/node_modules/@lucide/svelte/dist/icons/'
 
 /**
  * Lader für ein Symbol in kebab-case, oder `null`, wenn es das Symbol nicht gibt.

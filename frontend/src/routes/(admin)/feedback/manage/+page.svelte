@@ -13,7 +13,7 @@
      * angefordert hat.
      */
     import { onMount } from "svelte";
-    import { ChevronDown, ChevronRight, Loader2 } from "lucide-svelte";
+    import { ChevronDown, ChevronRight, Loader2 } from "@lucide/svelte";
     import {
         getAdminFeedback,
         getAdminFeedbackDetail,

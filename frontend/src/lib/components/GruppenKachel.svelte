@@ -8,7 +8,7 @@
    * ergäbe einen dritten Ort, an dem man Gruppen anlegt, und drei Orte heißt: zwei
    * veralten.
    */
-  import { Users, ChevronRight } from "lucide-svelte"
+  import { Users, ChevronRight } from "@lucide/svelte"
   import { myTeachingGroups } from "$lib/stores/myGroups.js"
   import { potentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
   import { getGroupOffers } from "$lib/api.js"

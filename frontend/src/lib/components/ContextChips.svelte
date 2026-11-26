@@ -1,5 +1,5 @@
 <script>
-    import { X } from "lucide-svelte";
+    import { X } from "@lucide/svelte";
     import { CATEGORY_COLORS } from "$lib/taxonomy.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import ContextNodeLabel from "./ContextNodeLabel.svelte";

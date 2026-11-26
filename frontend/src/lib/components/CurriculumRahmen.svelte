@@ -12,7 +12,7 @@
         verplanbar,
         wochenstundenText,
     } from "$lib/curriculum_rahmen.js";
-    import { ChevronDown, ChevronRight } from "lucide-svelte";
+    import { ChevronDown, ChevronRight } from "@lucide/svelte";
     import { untrack } from "svelte";
 
     let {

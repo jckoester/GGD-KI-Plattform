@@ -13,7 +13,7 @@
      *   nodeHref — (id) => Adresse der Detailansicht
      *   zurueck  — Rückweg für die Formulare
      */
-    import { ChevronDown, ChevronRight, ExternalLink, LayoutGrid, Plus } from 'lucide-svelte'
+    import { ChevronDown, ChevronRight, ExternalLink, LayoutGrid, Plus } from '@lucide/svelte'
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import { kuerzelVergleich } from '$lib/hinweise.js'
 

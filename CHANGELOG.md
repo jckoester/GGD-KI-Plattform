@@ -16,6 +16,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Intern
 
+- Symbolpaket `lucide-svelte` (1.0.1, nicht mehr gepflegt) durch den Nachfolger `@lucide/svelte` (1.80) ersetzt.
+
 - Knotentyp `verlaufsplan` (Jahresverlaufsplan der Fachschaft, noch ohne Oberfläche). Migration 0114:
   Entwurf auch für Verlaufspläne, höchstens ein Plan je Fach, Jahrgangsstufe und Schuljahr.
 - Zeitrechnung des Verlaufsplans (`app/planning/verlaufsplan_zeit.py`): Abschnitte auf den Kalender des

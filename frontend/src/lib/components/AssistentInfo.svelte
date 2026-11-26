@@ -8,7 +8,7 @@
      * Assistent bei jeder Nachricht mitbekommt. Dateinamen sind für Schüler:innen unverfänglich
      * und erklären, warum der Assistent etwa mit den Schulwerten rechnet.
      */
-    import { Info } from "lucide-svelte";
+    import { Info } from "@lucide/svelte";
     import { budget } from "$lib/stores/budget.js";
     import { assistentKosten } from "$lib/modellangaben.js";
 

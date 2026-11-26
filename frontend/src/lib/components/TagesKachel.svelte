@@ -8,7 +8,7 @@
    * nicht als Fallunterscheidung hier — sie ist der Inhalt, nicht die Ausnahme.
    */
   import { goto } from "$app/navigation"
-  import { CalendarDays, ChevronRight } from "lucide-svelte"
+  import { CalendarDays, ChevronRight } from "@lucide/svelte"
   import {
     einheitHinweis,
     kennzeichen,

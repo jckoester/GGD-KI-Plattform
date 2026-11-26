@@ -1,5 +1,5 @@
 <script>
-    import { Info, X } from "lucide-svelte";
+    import { Info, X } from "@lucide/svelte";
     /**
      * Info-Hinweis (blau). Optional seit 0.17 (Hinweise auf Neuerungen): ein Titel, ein
      * Link und ein Schließen-Knopf — ohne sie sieht der Hinweis aus wie bisher. Seit 0.43
