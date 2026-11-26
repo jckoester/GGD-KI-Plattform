@@ -339,6 +339,10 @@ def _lage_dict(p: Planlage) -> dict:
                     for k in p.kapitel],
         "kapitel_ohne_abschnitt": p.kapitel_ohne_abschnitt,
         "sequenzen_ohne_abschnitt": p.sequenzen_ohne_abschnitt,
+        # Ablaufleiste (zweiter Durchgang)
+        "wochen": [{"nr": w.index, "montag": w.montag} for w in p.wochen],
+        "ferien": [{"name": m.name, "von": m.von, "bis": m.bis, "nach_woche": m.nach_woche} for m in p.ferien],
+        "halbjahr_ab_woche": p.halbjahr_ab_woche,
     }
 
 

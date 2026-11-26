@@ -14,6 +14,8 @@
      * - `lage`: Lage der zuletzt gespeicherten Fassung, oder null ohne Kalender
      * - `curricula`: Curricula der Stufe mit Kapiteln und Sequenzen, zur Auswahl
      * - `onaenderung`: nach jeder Änderung
+     * - `hervor` (bindable): Nummer (ab 0) des Abschnitts, über dem die Maus steht — hier oder in
+     *   der Ablaufleiste; beide heben ihn hervor (zweiter Durchgang)
      */
     import { ArrowDown, ArrowUp, GripVertical, Trash2, Plus } from '@lucide/svelte'
     import {
@@ -23,7 +25,7 @@
 
     let {
         abschnitte = $bindable([]), planungsart = 'sequenz', wochenstunden = null, lage = null,
-        curricula = [], onaenderung = () => {},
+        curricula = [], onaenderung = () => {}, hervor = $bindable(null),
     } = $props()
 
     const feldName = $derived(bezugsfeld(planungsart))
@@ -91,8 +93,12 @@
     {#each abschnitte as a, i (a.id ?? i)}
         {@const l = lage?.abschnitte?.[i]}
         <li
-            class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 p-2
+            id="abschnitt-{i}"
+            class="rounded-lg border bg-light-bg-2 dark:bg-dark-bg-2 p-2 scroll-mt-24 transition-colors
+                   {hervor === i ? 'border-primary dark:border-primary-dark' : 'border-light-ui-3 dark:border-dark-ui-3'}
                    {gezogen === i ? 'opacity-50' : ''}"
+            onmouseenter={() => (hervor = i)}
+            onmouseleave={() => (hervor = null)}
             draggable="true"
             ondragstart={() => (gezogen = i)}
             ondragend={() => (gezogen = null)}

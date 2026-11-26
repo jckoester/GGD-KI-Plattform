@@ -10,7 +10,7 @@ import pytest
 
 from app.planning.calendar import SchoolYearConfig
 from app.planning.verlaufsplan_zeit import (
-    SCHULJAHRESENDE, ferienabschnitte, lage, wochen_bis_zu_den_ferien,
+    SCHULJAHRESENDE, ferienabschnitte, halbjahr_ab_woche, lage, wochen_bis_zu_den_ferien,
 )
 
 KALENDER_2025_26 = SchoolYearConfig.model_validate({
@@ -220,3 +220,43 @@ class TestSequenzbilanz:
                   kapitel=self.KAPITEL)
         assert (plan.kapitel[0].soll, plan.kapitel[0].geplant) == (99, 8.0)
         assert plan.kapitel[0].sequenzen == [] and plan.sequenzen_ohne_abschnitt == []
+
+
+class TestAblaufleiste:
+    """Was die Ablaufleiste braucht (zweiter Durchgang): Wochen mit Montag, Ferienlücken, Halbjahr."""
+
+    def test_wochen_mit_montag(self):
+        p = _l(MATHE_9)
+        assert len(p.wochen) == p.unterrichtswochen == 37
+        assert (p.wochen[0].index, p.wochen[0].montag) == (1, date(2025, 9, 15))
+        # Nach den Herbstferien geht es mit Woche 7 am 03.11. weiter
+        assert (p.wochen[6].index, p.wochen[6].montag) == (7, date(2025, 11, 3))
+
+    def test_ferien_als_luecken_ohne_sommer(self):
+        p = _l(MATHE_9)
+        assert [(m.name, m.nach_woche) for m in p.ferien] == [
+            ("Herbstferien", 6), ("Weihnachtsferien", 13), ("Faschingsferien", 19),
+            ("Osterferien", 24), ("Pfingstferien", 30),
+        ]
+
+    def test_ferien_nach_der_letzten_woche_sind_keine_luecke(self):
+        cfg = KALENDER_2025_26.model_copy(update={"ferien": [
+            *KALENDER_2025_26.ferien,
+            {"name": "Sommerferien", "von": date(2026, 7, 27), "bis": date(2026, 7, 29)},
+        ]})
+        cfg = SchoolYearConfig.model_validate(cfg.model_dump())
+        assert "Sommerferien" not in [m.name for m in _l(MATHE_9, cfg).ferien]
+
+    def test_halbjahr_beginnt_in_woche_18(self):
+        # Wechsel Montag 02.02.2026; Woche 14 beginnt am 05.01. (Ende der Weihnachtsferien)
+        assert halbjahr_ab_woche(KALENDER_2025_26) == 18
+        assert _l([]).halbjahr_ab_woche == 18
+
+    def test_halbjahr_mitten_in_der_woche_zaehlt_diese_woche(self):
+        cfg = SchoolYearConfig.model_validate({**KALENDER_2025_26.model_dump(), "halbjahreswechsel": "2026-02-06"})
+        assert halbjahr_ab_woche(cfg) == 18
+
+    def test_halbjahr_in_den_ferien_naechste_woche(self):
+        # Wechsel am Mittwoch der Faschingsferien → erste Woche danach (20)
+        cfg = SchoolYearConfig.model_validate({**KALENDER_2025_26.model_dump(), "halbjahreswechsel": "2026-02-18"})
+        assert halbjahr_ab_woche(cfg) == 20

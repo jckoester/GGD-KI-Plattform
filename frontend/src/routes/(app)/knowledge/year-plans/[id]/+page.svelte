@@ -63,6 +63,12 @@
         pageTitle.set(p.titel)
     }
 
+    // Zeile unter dem Titel; „Entwurf“ steht nicht darin, das sagt das Banner (Jan 26.11.2026).
+    const kopfzeile = $derived(plan ? [
+        plan.status !== 'draft' && (plan.beschlossen_am ? `beschlossen am ${plan.beschlossen_am.split('-').reverse().join('.')}` : 'beschlossen'),
+        plan.archiviert && 'Archiv, nur lesbar',
+        plan.wochenstunden && `${plan.wochenstunden} Wochenstunden`,
+    ].filter(Boolean).join(' · ') : '')
     const e = $derived(einheiten(plan?.curricula))
     const band = $derived((plan?.curricula ?? []).some((c) => c.band))
 
@@ -153,6 +159,12 @@
         }
     }
 
+    // Ablaufleiste ↔ Tabelle/Editor (zweiter Durchgang): Hervorheben in beide Richtungen, Klick springt
+    let hervor = $state(null)
+    function zumAbschnitt(i) {
+        document.getElementById(`abschnitt-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+
     onDestroy(() => {
         if (timer) speichern()
     })
@@ -177,15 +189,9 @@
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
                 <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">{plan.titel}</h1>
-                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                    {#if plan.status === 'draft'}
-                        Entwurf
-                    {:else}
-                        beschlossen{#if plan.beschlossen_am} am {plan.beschlossen_am.split('-').reverse().join('.')}{/if}
-                    {/if}
-                    {#if plan.archiviert} · Archiv, nur lesbar{/if}
-                    {#if plan.wochenstunden} · {plan.wochenstunden} Wochenstunden{/if}
-                </p>
+                {#if kopfzeile}
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">{kopfzeile}</p>
+                {/if}
             </div>
             {#if plan.darf_bearbeiten}
                 <div class="flex flex-wrap items-center gap-2">
@@ -231,7 +237,8 @@
         {#if plan.lage}
             <section class="mb-5">
                 <VerlaufsplanZeitleiste abschnitte={bearbeiten ? abschnitte : plan.abschnitte} lage={plan.lage}
-                    kapitelReihenfolge={e.kapitelReihenfolge} kapitelVon={e.kapitelVon} planungsart={bearbeiten ? planungsart : plan.planungsart} />
+                    kapitelReihenfolge={e.kapitelReihenfolge} kapitelVon={e.kapitelVon} planungsart={bearbeiten ? planungsart : plan.planungsart}
+                    aktuell={plan.schuljahr === plan.aktuelles_schuljahr} bind:hervor onwahl={zumAbschnitt} />
                 <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
                     {plan.lage.belegt} von {plan.lage.unterrichtswochen} Unterrichtswochen verplant{#if plan.lage.frei}, {plan.lage.frei} frei{/if}
                 </p>
@@ -251,7 +258,7 @@
                     </select>
                 </label>
                 <VerlaufsplanEditor bind:abschnitte {planungsart} wochenstunden={plan.wochenstunden}
-                    lage={plan.lage} curricula={plan.curricula} onaenderung={geaendert} />
+                    lage={plan.lage} curricula={plan.curricula} onaenderung={geaendert} bind:hervor />
             </section>
         {:else}
             <section class="mb-6">
@@ -270,7 +277,10 @@
                                 {#each plan.abschnitte as a, i (a.id ?? i)}
                                     {@const l = plan.lage?.abschnitte?.[i]}
                                     {@const farbe = abschnittFarbe(a, e.kapitelReihenfolge, { planungsart: plan.planungsart, kapitelVon: e.kapitelVon })}
-                                    <tr class="border-b border-light-ui-2 dark:border-dark-ui-2 align-top text-light-tx dark:text-dark-tx">
+                                    <tr id="abschnitt-{i}"
+                                        class="border-b border-light-ui-2 dark:border-dark-ui-2 align-top text-light-tx dark:text-dark-tx scroll-mt-24 transition-colors
+                                               {hervor === i ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                                        onmouseenter={() => (hervor = i)} onmouseleave={() => (hervor = null)}>
                                         <td class="py-1 pr-2">
                                             <span class="inline-block w-2.5 h-2.5 rounded-full mr-1 {farbe ? '' : 'bg-light-ui-3 dark:bg-dark-ui-3'}"
                                                 style={farbe ? `background-color: ${farbe}` : ''} aria-hidden="true"></span>{i + 1}

@@ -13,7 +13,9 @@ Diese Datei rechnet daraus, was die Oberfläche und später der Assistent zeigen
 - für den Plan freie Wochen am Ende oder den Überhang über das Schuljahr hinaus;
 - die Stundenbilanz je Kapitel (Soll aus `std`, geplant aus Wochen × Wochenstunden);
 - die Abschnitte zwischen den Ferien — für den Knopf „bis zu den Ferien“ (BD F3) und die
-  Übersicht der Vorlage.
+  Übersicht der Vorlage;
+- für die Ablaufleiste (zweiter Durchgang): den Montag jeder Unterrichtswoche (Monatsachse,
+  „heute“), die Ferien als Lücken und die Woche, mit der das 2. Halbjahr beginnt.
 
 **Ganze Wochen.** Eine Woche mit zwei Unterrichtstagen zählt wie eine volle, auch in der
 Stundenbilanz (Wochen × Wochenstunden). Genauer ginge es nur mit dem Stundenplan der Gruppe —
@@ -114,6 +116,11 @@ class Planlage:
     kapitel_ohne_abschnitt: list[str]
     # Bei sequenzgenauer Planung: Sequenzen, die kein Abschnitt nennt
     sequenzen_ohne_abschnitt: list[str] = field(default_factory=list)
+    # Für die Ablaufleiste: die Unterrichtswochen, die Ferien zwischen ihnen und die erste Woche
+    # des 2. Halbjahrs (None, wenn es keine gibt)
+    wochen: list[Unterrichtswoche] = field(default_factory=list)
+    ferien: list[Ferienmarke] = field(default_factory=list)
+    halbjahr_ab_woche: Optional[int] = None
 
     @property
     def frei(self) -> int:
@@ -159,6 +166,13 @@ def ferienabschnitte(cfg: SchoolYearConfig, wochen: Optional[list[Unterrichtswoc
     if start <= len(wochen):
         aus.append(Ferienabschnitt(von_woche=start, bis_woche=len(wochen), endet_mit=SCHULJAHRESENDE))
     return aus
+
+
+def halbjahr_ab_woche(cfg: SchoolYearConfig, wochen: Optional[list[Unterrichtswoche]] = None) -> Optional[int]:
+    """Die Unterrichtswoche, in der das 2. Halbjahr beginnt — die erste, deren Freitag nicht vor
+    dem Wechsel liegt. Fällt der Wechsel in Ferien, die nächste Woche danach."""
+    wochen = wochen if wochen is not None else unterrichtswochen(cfg)
+    return next((w.index for w in wochen if w.montag + timedelta(days=4) >= cfg.halbjahreswechsel), None)
 
 
 def wochen_bis_zu_den_ferien(von_woche: int, cfg: SchoolYearConfig,
@@ -228,6 +242,10 @@ def lage(
         belegt=pos - 1,
         abschnitte=lagen,
         ferienabschnitte=ferienabschnitte(cfg, wochen),
+        wochen=wochen,
+        # Ferien nach der letzten Woche (Sommer) sind keine Lücke im Plan
+        ferien=[m for m in marken if m.nach_woche < n],
+        halbjahr_ab_woche=halbjahr_ab_woche(cfg, wochen),
         **(_sequenzbilanz(abschnitte, lagen, list(kapitel), wochenstunden) if planungsart == "sequenz"
            else _bilanz(abschnitte, lagen, list(kapitel), wochenstunden)),
     )

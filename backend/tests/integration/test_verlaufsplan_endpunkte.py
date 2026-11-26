@@ -123,6 +123,10 @@ async def test_fachschaft_legt_entwurf_an_mit_lage_und_bilanz(db, welt):
     assert [(a["von_woche"], a["bis_woche"]) for a in lage["abschnitte"]] == [(1, 4), (5, 10)]
     assert lage["abschnitte"][1]["ueber_ferien"] == ["Herbstferien"]
     assert (lage["belegt"], lage["frei"]) == (10, 27)
+    # Ablaufleiste: Wochen mit Montag, Ferienlücken, Halbjahr
+    assert len(lage["wochen"]) == 37 and lage["wochen"][0] == {"nr": 1, "montag": "2025-09-15"}
+    assert lage["ferien"][0]["name"] == "Herbstferien" and lage["ferien"][0]["nach_woche"] == 6
+    assert lage["halbjahr_ab_woche"] == 18
     bilanz = {k["titel"]: (k["soll"], k["geplant"]) for k in lage["kapitel"]}
     assert bilanz == {"Ähnlichkeit": (12, 16.0), "Pythagoras": (20, 24.0)}
     assert p["wochenstunden"] == 4
