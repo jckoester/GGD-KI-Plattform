@@ -411,3 +411,22 @@ async def test_puffer(db, welt):
         r = await c.post(f"/context/verlaufsplaene/{plan_id}/uebernehmen", json={"schuljahr": "2025/26"})
         assert r.status_code == 201, r.text
         assert [a["puffer"] for a in r.json()["abschnitte"]] == [False, True, True, False]
+
+
+async def test_export_pdf_und_docx(db, welt):
+    """BD Teil B, Schritt 7: lesen darf jede Lehrkraft, also auch exportieren."""
+    from app.export import pandoc
+
+    p = (await _anlegen(db, welt)).json()
+    async with _client(db, LK()) as c:
+        r = await c.get(f"/context/verlaufsplaene/{p['id']}/export?format=pdf")
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
+        assert f'jahresverlaufsplan_Mathe{TOKEN}_9_2025-26.pdf' in r.headers["content-disposition"]
+        if pandoc.pandoc_available():
+            r = await c.get(f"/context/verlaufsplaene/{p['id']}/export?format=docx")
+            assert r.status_code == 200 and r.content[:2] == b"PK"
+        assert (await c.get(f"/context/verlaufsplaene/{p['id']}/export?format=yaml")).status_code == 422
+        assert (await c.get(f"/context/verlaufsplaene/{uuid.uuid4()}/export")).status_code == 404
+    async with _client(db, _person("s-x", "student")) as c:
+        assert (await c.get(f"/context/verlaufsplaene/{p['id']}/export")).status_code == 403

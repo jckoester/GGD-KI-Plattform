@@ -7,9 +7,9 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { onDestroy } from 'svelte'
-    import { Check, CopyPlus, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
+    import { Check, CopyPlus, FileDown, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
     import {
-        beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
+        beschliesseVerlaufsplan, deleteVerlaufsplan, exportVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
     import {
         PLANUNGSARTEN, abschnittFarbe, bezugText, einheiten, entwurfHinweis, hinweise, uebernahmeZiele,
@@ -178,6 +178,38 @@
     const knopf = `${knopfForm} border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`
     const knopfRot = `${knopfForm} border border-light-ui-3 dark:border-dark-ui-3 text-light-re dark:text-dark-re hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`
     const knopfPrimaer = `${knopfForm} bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90`
+
+    // Export (BD Teil B, Schritt 7) — wie auf der Curriculum-Seite eine eigene Zeile unter dem Kopf
+    const WEITERBEARBEITEN = 'Zum Weiterbearbeiten in Word oder LibreOffice.'
+    const EXPORTE = [
+        { format: 'pdf', label: 'PDF' },
+        { format: 'docx', label: 'DOCX', titel: WEITERBEARBEITEN },
+        { format: 'odt', label: 'ODT', titel: WEITERBEARBEITEN },
+    ]
+    let exportiert = $state(false)
+    let exportFehler = $state(null)
+    async function exportieren(format) {
+        if (exportiert) return
+        exportiert = true
+        exportFehler = null
+        try {
+            // Beim Bearbeiten zuerst speichern, sonst fehlte der letzte Stand — und scheitert das,
+            // keine Datei mit dem alten Stand
+            if (bearbeiten) {
+                speicherFehler = null
+                await speichern()
+                if (speicherFehler) {
+                    exportFehler = 'Nicht gespeichert, deshalb nicht exportiert.'
+                    return
+                }
+            }
+            await exportVerlaufsplan(plan.id, format)
+        } catch (e) {
+            exportFehler = e.message || 'Export fehlgeschlagen.'
+        } finally {
+            exportiert = false
+        }
+    }
 </script>
 
 <svelte:head><title>{plan?.titel ?? 'Jahresverlaufsplan'}</title></svelte:head>
@@ -229,6 +261,19 @@
             {/if}
         </div>
 
+        <div class="flex flex-wrap items-center justify-end gap-2 -mt-3 mb-4">
+            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">Exportieren:</span>
+            {#each EXPORTE as e (e.format)}
+                <button type="button" onclick={() => exportieren(e.format)} disabled={exportiert} title={e.titel}
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx font-medium hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           disabled:opacity-50 disabled:cursor-not-allowed">
+                    <FileDown class="w-3.5 h-3.5" /> {e.label}
+                </button>
+            {/each}
+        </div>
+        {#if exportFehler}<div class="mb-3"><ErrorBanner message={exportFehler} /></div>{/if}
+
         {#if speicherFehler}<div class="mb-3"><ErrorBanner message={speicherFehler} /></div>{/if}
         {#if entfallen}
             <div class="mb-3"><WarningBanner message="Übernommen. {entfallen} {entfallen === 1 ? 'Kapitelbezug fand' : 'Kapitelbezüge fanden'} sich im heutigen Curriculum nicht wieder und {entfallen === 1 ? 'ist' : 'sind'} entfallen." /></div>
@@ -261,7 +306,7 @@
                 <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx mb-3">
                     Planung
                     <select value={planungsart} onchange={(ev) => { const neu = ev.currentTarget.value; ev.currentTarget.value = planungsart; artWechseln(neu) }}
-                        class="rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm">
+                        class="rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg pl-2 pr-8 py-1 text-sm">
                         {#each PLANUNGSARTEN as p (p.wert)}<option value={p.wert}>{p.text}</option>{/each}
                     </select>
                 </label>
@@ -329,7 +374,7 @@
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
                     <select bind:value={ziel} aria-label="Schuljahr"
-                        class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx px-2 py-1.5 text-sm">
+                        class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx pl-2 pr-8 py-1.5 text-sm">
                         {#each ziele as j (j)}<option value={j}>{j}</option>{/each}
                     </select>
                     <button type="button" class={knopf} onclick={inSchuljahrUebernehmen}>

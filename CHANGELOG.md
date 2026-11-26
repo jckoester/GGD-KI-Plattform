@@ -19,6 +19,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   die Einheiten an; danach lässt sich das Anlegen rückgängig machen.
 - Schnittstelle für KI-Abos (MCP): neue Werkzeuge `verlaufsplaene_finden` und `verlaufsplan_lesen` für die
   Jahresverlaufspläne der Fachschaften.
+- Jahresverlaufsplan als PDF, DOCX oder ODT exportieren (Querformat): Abschnitte mit Wochen, Zeitraum, Bezug,
+  Hinweisen und Notiz, dazu die Stunden je Kapitel.
 
 ### Behoben
 

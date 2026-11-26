@@ -37,7 +37,7 @@
     <select
         bind:value={fachWahl}
         aria-label="Fach wählen"
-        class="px-2 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
+        class="pl-2 pr-8 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
                text-light-tx dark:text-dark-tx"
     >
         <option value="">Fach wählen …</option>

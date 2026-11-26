@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ plan.titel }}</title>
+<!-- Jahresverlaufsplan (BD Teil B, Schritt 7) — Stil wie curriculum_pdf.html -->
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 18mm 12mm 12mm 12mm;
+    @top-left  { content: string(school-running); font-size: 8pt; color: #777; }
+    @top-right { content: "Seite " counter(page) " / " counter(pages); font-size: 8pt; color: #777; }
+  }
+  body { font-family: "Liberation Sans", Arial, sans-serif; font-size: 9pt; color: #1a1a1a; line-height: 1.35; }
+  .school-header {
+    string-set: school-running content();
+    font-size: 12pt; font-weight: bold; color: #1e3a5f;
+    border-bottom: 1pt solid #1e3a5f; padding-bottom: 1.5mm; margin-bottom: 3mm;
+  }
+  .doc-title { font-size: 14pt; font-weight: bold; margin-bottom: 2mm; }
+  .doc-stand { font-size: 10pt; font-weight: bold; margin-bottom: 1mm; }
+  .doc-stand.entwurf { color: #a15c00; }
+  .doc-meta { font-size: 8pt; color: #555; margin-bottom: 1mm; }
+  .doc-summe { font-size: 8pt; color: #555; margin-bottom: 5mm; }
+  h2.neue-seite { page-break-before: always; margin-top: 0; }
+  h2 { font-size: 10pt; font-weight: bold; color: #1e3a5f; border-bottom: 0.5pt solid #1e3a5f;
+       margin: 6mm 0 1.5mm 0; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { background: #d0dce8; border: 0.5pt solid #b0bec8; padding: 1.2mm 1.5mm; text-align: left;
+       font-size: 8pt; vertical-align: bottom; }
+  td { border: 0.5pt solid #c8d4dc; padding: 1.2mm 1.5mm; vertical-align: top; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  tr.puffer td { background: #f0f0f0; font-style: italic; }
+  .notiz { white-space: pre-line; }
+  .klein { color: #555; font-size: 8pt; }
+  td.zahl, th.zahl { text-align: right; }
+  col.nr { width: 4%; } col.thema { width: 17%; } col.wochen { width: 6%; } col.zeitraum { width: 12%; }
+  col.bezug { width: 27%; } col.hinweise { width: 14%; } col.notiz { width: 20%; }
+  table.bilanz { width: 70%; }
+  p.liste { margin: 2mm 0 0 0; }
+</style>
+</head>
+<body>
+{% if schule %}<div class="school-header">{{ schule }}</div>{% endif %}
+<div class="doc-title">{{ plan.titel }}</div>
+<div class="doc-stand{% if plan.entwurf %} entwurf{% endif %}">{{ plan.stand }}</div>
+<div class="doc-meta">{{ plan.meta }}</div>
+{% if plan.summe %}<div class="doc-summe">{{ plan.summe }}</div>{% endif %}
+{% if plan.hinweis %}<div class="doc-summe">{{ plan.hinweis }}</div>{% endif %}
+
+<table>
+  <colgroup><col class="nr"><col class="thema"><col class="wochen"><col class="zeitraum"><col class="bezug"><col class="hinweise"><col class="notiz"></colgroup>
+  <thead><tr><th>Nr.</th><th>Abschnitt</th><th class="zahl">Wochen</th><th>Zeitraum</th><th>Sequenzen/Kapitel</th><th>Hinweise</th><th>Notiz</th></tr></thead>
+  <tbody>
+  {% for z in plan.zeilen %}
+    <tr{% if z.puffer %} class="puffer"{% endif %}>
+      <td>{{ z.nr }}</td><td>{{ z.thema }}</td><td class="zahl">{{ z.wochen }}</td><td>{{ z.woche }}{% if z.tage %}<br><span class="klein">{{ z.tage }}</span>{% endif %}</td>
+      <td>{{ z.bezug }}</td><td class="klein">{{ z.hinweise }}</td><td class="notiz">{{ z.notiz }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if plan.bilanz %}
+<h2 class="neue-seite">Stunden je Kapitel</h2>
+{% for h in plan.bilanz_hinweise %}<p class="klein" style="margin: 0 0 1.5mm 0;">{{ h }}</p>{% endfor %}
+<table class="bilanz">
+  <thead><tr><th>Kapitel</th><th class="zahl">Soll (Std.)</th><th class="zahl">Geplant (Std.)</th><th class="zahl">Wochen</th></tr></thead>
+  <tbody>
+  {% for b in plan.bilanz %}
+    <tr><td>{{ b.titel }}{% if b.fremd %} <span class="klein">– nicht mehr im Curriculum</span>{% endif %}</td>
+        <td class="zahl">{{ b.soll }}</td><td class="zahl">{{ b.geplant }}</td><td class="zahl">{{ b.wochen }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if plan.kapitel_ohne_abschnitt %}<p class="liste"><strong>Kapitel ohne Abschnitt:</strong> {{ plan.kapitel_ohne_abschnitt | join(", ") }}</p>{% endif %}
+{% if plan.lernsequenzen_ohne_abschnitt %}<p class="liste"><strong>Lernsequenzen ohne Abschnitt:</strong> {{ plan.lernsequenzen_ohne_abschnitt | join(", ") }}</p>{% endif %}
+</body>
+</html>

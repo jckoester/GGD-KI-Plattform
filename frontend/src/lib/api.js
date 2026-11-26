@@ -2018,6 +2018,24 @@ export function getVerlaufsplan(id) {
   return _verlaufsplan(`/${id}`, {}, 'Jahresverlaufsplan konnte nicht geladen werden')
 }
 
+/**
+ * Plan als PDF, DOCX oder ODT herunterladen (BD Teil B, Schritt 7). Den Dateinamen setzt der Server.
+ */
+export async function exportVerlaufsplan(id, format) {
+  const res = await fetch(`${BASE}/context/verlaufsplaene/${id}/export?format=${format}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, typeof data.detail === 'string' ? data.detail : 'Export fehlgeschlagen')
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? `jahresverlaufsplan.${format}`
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /** Neuer Plan als Entwurf: `{subject_id, stufe, schuljahr, raster?, abschnitte?}`. */
 export function createVerlaufsplan(daten) {
   return _verlaufsplan('', { method: 'POST', body: daten }, 'Jahresverlaufsplan konnte nicht angelegt werden')

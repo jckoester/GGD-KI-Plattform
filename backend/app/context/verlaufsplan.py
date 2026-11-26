@@ -466,6 +466,8 @@ def kompakt(v: dict, *, titel_alt: dict[str, str] | None = None,
         "beschlossen_am": v.get("beschlossen_am"), "archiviert": v.get("archiviert", False),
         "planungsart": "sequenzgenau" if art == SEQUENZ else "kapitelgenau",
         "wochenstunden": v.get("wochenstunden"), "abschnitte": abschnitte,
+        # Ein Band-Curriculum (7/8): „Soll“ gilt fürs ganze Band (wie `VerlaufsplanBilanz`)
+        "band": any(c.get("band") for c in v.get("curricula") or []),
     }
     if lage is None:
         aus["hinweis"] = "Für dieses Schuljahr liegt der Kalender der Schule noch nicht vor; nur Wochen, keine Daten."

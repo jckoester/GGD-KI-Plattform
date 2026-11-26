@@ -159,6 +159,40 @@ async def verlaufsplan_lesen(
     return await vp.voll(db, plan, user)
 
 
+@router.get("/{plan_id}/export")
+async def verlaufsplan_export(
+    plan_id: UUID,
+    format: str = Query("pdf", pattern="^(pdf|docx|odt)$"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(lehrkraft),
+):
+    """Der Plan als PDF (Lesen, Akte) oder DOCX/ODT (Weiterbearbeiten), im Querformat (BD Teil B,
+    Schritt 7). Grundlage ist dieselbe kompakte Fassung wie für KI-Programme."""
+    from app.context import verlaufsplan_export as ex
+    from app.export import pandoc
+    from app.export import templates as export_templates
+    from app.export.document import EXPORT_MIME
+
+    plan = await vp.lade(db, plan_id)
+    if plan is None:
+        raise NICHT_GEFUNDEN
+    voll = await vp.voll(db, plan, user)
+    titel_alt, kapitel_alt = await vp.alte_titel(db, voll)
+    k = vp.kompakt(voll, titel_alt=titel_alt, kapitel_alt=kapitel_alt)
+    if format == "pdf":
+        daten, mime = await ex.render_pdf(k), "application/pdf"
+    else:
+        try:
+            daten = await ex.render_office(db, k, format, reference_doc=export_templates.vorlage(format))
+        except pandoc.PandocUnavailable:
+            raise HTTPException(status_code=503, detail="Office-Export ist auf diesem Server nicht verfügbar.") from None
+        except pandoc.PandocError as exc:
+            raise HTTPException(status_code=422, detail=f"Export fehlgeschlagen: {exc}") from None
+        mime = EXPORT_MIME[format]
+    return Response(content=daten, media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{ex.dateiname(k, format)}"'})
+
+
 async def _zum_schreiben(db: AsyncSession, plan_id: UUID, user) -> ContextNode:
     plan = await vp.lade(db, plan_id)
     if plan is None:

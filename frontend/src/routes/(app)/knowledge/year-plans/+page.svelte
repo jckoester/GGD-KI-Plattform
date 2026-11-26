@@ -87,7 +87,8 @@
         }
     }
 
-    const feld = 'rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm text-light-tx dark:text-dark-tx'
+    // Auswahllisten: rechts Platz für den Pfeil (pr-8), sonst steht er im Text (Jan 26.11.2026)
+    const feld = 'rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg pl-2 pr-8 py-1 text-sm text-light-tx dark:text-dark-tx'
 </script>
 
 <svelte:head><title>Jahresverlaufspläne</title></svelte:head>

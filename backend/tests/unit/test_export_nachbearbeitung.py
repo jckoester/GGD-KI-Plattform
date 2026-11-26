@@ -87,3 +87,15 @@ def test_werkstatt_tabelle_hat_linien(fmt):
 def test_werkstatt_bleibt_hochkant():
     data = pandoc.markdown_to_office_sync("Text", fmt="docx")
     assert 'w:orient="landscape"' not in zipfile.ZipFile(io.BytesIO(data)).read("word/document.xml").decode()
+
+
+def test_odt_seitenumbruch_nur_wenn_benutzt_und_einmal():
+    from app.export.nachbearbeitung import _odt_seitenumbruch
+
+    ohne = '<office:automatic-styles/><text:p>x</text:p>'
+    assert _odt_seitenumbruch(ohne) == ohne
+    mit = '<office:automatic-styles><style:style style:name="T1"/></office:automatic-styles><text:p text:style-name="Pagebreak"/>'
+    einmal = _odt_seitenumbruch(mit)
+    assert einmal.count('style:name="Pagebreak"') == 1 and _odt_seitenumbruch(einmal) == einmal
+    leer = '<office:automatic-styles/><text:p text:style-name="Pagebreak"/>'
+    assert '<office:automatic-styles><style:style style:name="Pagebreak"' in _odt_seitenumbruch(leer)

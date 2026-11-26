@@ -138,6 +138,24 @@ def _odt_quer(xml: str) -> str:
     return _SEITE_RE.sub(drehen, xml)
 
 
+# ── Seitenumbruch (ODT) ───────────────────────────────────────────────────────
+
+#: Absatzvorlage für einen Seitenumbruch im ODT (0.60). Ein Export schreibt dafür einen Roh-Block
+#: `<text:p text:style-name="Pagebreak"/>` (:data:`app.export.office.SEITENUMBRUCH`); Pandoc
+#: definiert die Vorlage aber nicht, und ohne Definition übergeht LibreOffice den Absatz.
+_ODT_PAGEBREAK = ('<style:style style:name="Pagebreak" style:family="paragraph">'
+                  '<style:paragraph-properties fo:break-after="page"/></style:style>')
+
+
+def _odt_seitenumbruch(xml: str) -> str:
+    if 'text:style-name="Pagebreak"' not in xml or 'style:name="Pagebreak"' in xml:
+        return xml
+    if "<office:automatic-styles/>" in xml:
+        return xml.replace("<office:automatic-styles/>",
+                           f"<office:automatic-styles>{_ODT_PAGEBREAK}</office:automatic-styles>", 1)
+    return xml.replace("</office:automatic-styles>", f"{_ODT_PAGEBREAK}</office:automatic-styles>", 1)
+
+
 # ── Einstieg ──────────────────────────────────────────────────────────────────
 
 
@@ -147,7 +165,7 @@ def nachbearbeiten(data: bytes, fmt: str, *, quer: bool = False) -> bytes:
         schritte = [_docx_linien, _docx_quer if quer else _docx_seitenformat]
         return zip_mit_ersetzung(data, {"word/document.xml": _nacheinander(schritte)})
     if fmt == "odt":
-        ersetzungen = {"content.xml": _odt_linien}
+        ersetzungen = {"content.xml": _nacheinander([_odt_linien, _odt_seitenumbruch])}
         if quer:
             ersetzungen["styles.xml"] = _odt_quer
         return zip_mit_ersetzung(data, ersetzungen)

@@ -114,6 +114,14 @@ def ueberschrift(ebene: int, inlines: list[Inline]) -> Block:
     return {"t": "Header", "c": [ebene, _KEIN_ATTR, inlines]}
 
 
+#: Seitenumbruch in DOCX und ODT (0.60) — je Format ein Roh-Block, Pandoc nimmt den passenden.
+#: Die ODT-Vorlage „Pagebreak“ ergänzt `nachbearbeitung._odt_seitenumbruch`.
+SEITENUMBRUCH: list[Block] = [
+    {"t": "RawBlock", "c": ["openxml", '<w:p><w:r><w:br w:type="page"/></w:r></w:p>']},
+    {"t": "RawBlock", "c": ["opendocument", '<text:p text:style-name="Pagebreak"/>']},
+]
+
+
 def aufzaehlung(punkte: Iterable[list[Block]]) -> Block:
     return {"t": "BulletList", "c": [list(p) for p in punkte]}
 
