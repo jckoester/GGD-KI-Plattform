@@ -144,7 +144,7 @@
             </div>
 
             <div class="mt-2 ml-14 flex flex-wrap gap-2 items-start">
-                <details class="text-sm">
+                <details class="text-sm" id="abschnitt-{i}-auswahl">
                     <summary class="cursor-pointer text-light-bl dark:text-dark-bl">
                         {#if a.puffer}Puffer{:else}{planungsart === 'sequenz' ? 'Sequenzen' : 'Kapitel'}{#if a[feldName]?.length}: {bezugText(a, planungsart, e.titel)}{:else} wählen{/if}{/if}
                     </summary>

@@ -19,7 +19,7 @@
      * Props: `abschnitte`, `lage`, `kapitelReihenfolge`, `kapitelVon`, `planungsart`, `aktuell`
      * (laufendes Schuljahr), `hervor`, `onwahl`.
      */
-    import { abschnittFarbe, hinweise, zeitraumText } from '$lib/verlaufsplan.js'
+    import { abschnittFarbe, hinweise, wochenText, zeitraumText } from '$lib/verlaufsplan.js'
     import { bloecke, freiStuecke, heuteSpalte, monate, raster } from '$lib/ablaufleiste.js'
 
     let {
@@ -43,7 +43,7 @@
     const ueberhang = $derived(lage?.ueberhang ? { von: r.spalteVon[n + 1], bis: r.spalten.length + 1 } : null)
 
     function tooltip(a, l) {
-        return [`${l.nr}. ${a.titel || 'ohne Thema'}`, zeitraumText(l), ...hinweise(l)].filter(Boolean).join(' · ')
+        return [`${l.nr}. ${a.titel || 'ohne Thema'}`, wochenText(l), zeitraumText(l), ...hinweise(l)].filter(Boolean).join(' · ')
     }
 
     // Einmal zu „heute“ springen, wenn die Leiste breiter ist als der Platz

@@ -163,6 +163,9 @@
     let hervor = $state(null)
     function zumAbschnitt(i) {
         document.getElementById(`abschnitt-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Im Editor öffnet der Klick die Auswahl der Sequenzen bzw. Kapitel (Plan, Schritt 3)
+        const auswahl = document.getElementById(`abschnitt-${i}-auswahl`)
+        if (auswahl) auswahl.open = true
     }
 
     onDestroy(() => {
@@ -234,8 +237,10 @@
             <div class="mb-3"><InfoBanner message="Für {plan.schuljahr} liegt der Kalender der Schule noch nicht vor. Der Plan zählt deshalb nur Wochen, ohne Daten und Ferien." /></div>
         {/if}
 
+        <!-- Aufteilung der Seite über Abstände (Jan 26.11.2026): Leiste und Bilanz mit mehr Luft
+             nach oben, keine weiteren Rahmen. -->
         {#if plan.lage}
-            <section class="mb-5">
+            <section class="mt-8 mb-8">
                 <VerlaufsplanZeitleiste abschnitte={bearbeiten ? abschnitte : plan.abschnitte} lage={plan.lage}
                     kapitelReihenfolge={e.kapitelReihenfolge} kapitelVon={e.kapitelVon} planungsart={bearbeiten ? planungsart : plan.planungsart}
                     aktuell={plan.schuljahr === plan.aktuelles_schuljahr} bind:hervor onwahl={zumAbschnitt} />
@@ -304,8 +309,10 @@
             </section>
         {/if}
 
-        <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band}
-            planungsart={plan.planungsart} />
+        <div class="mt-12">
+            <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band}
+                planungsart={plan.planungsart} />
+        </div>
 
         <!-- Übernehmen (Schritt 6) als eigener Rahmen am Seitenende (zweiter Durchgang): Es betrifft
              das nächste Schuljahr, nicht die Arbeit am Plan. -->
