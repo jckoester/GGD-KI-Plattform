@@ -14,7 +14,7 @@ gegenüber 1.x umbenannt (`FastMCP` → `MCPServer`); Beispiele im Netz sind oft
 |---|---|
 | `app/mcp/auth.py` | `ZugangstokenPruefer` (`TokenVerifier` des SDK) über `tokens.pruefe`, Scope Pflicht; `principal()` macht im Werkzeug ein `JwtPayload` daraus (ohne Vorschau) |
 | `app/mcp/server.py` | `aussteller`, `baue_server`, `transportschutz`, Drossel-Hülle `_Gedrosselt`, `einhaengen`, `lebenszyklus` |
-| `app/mcp/werkzeuge.py` | die neun Werkzeuge und ihre Lesefunktionen `lies_…(db, user, …)` |
+| `app/mcp/werkzeuge.py` | die elf Werkzeuge und ihre Lesefunktionen `lies_…(db, user, …)` |
 | `app/mcp/oauth.py` | `Provider` (Speicher des Autorisierungsservers, seit 0.55), `oauth_aufraeumen` |
 | `app/api/oauth.py` | Routen der Zustimmungsseite `/oauth/anfrage`, `/oauth/entscheidung` (seit 0.55) |
 
@@ -110,11 +110,17 @@ Kontolöschung nimmt Verbindungen (als Zugangstoken) und `oauth_codes` mit.
 | `bildungsplan_kompetenzen` | `lies_kompetenzen` | `kompetenzen_lesen`; ein ungespeicherter `ContextNode` trägt Fach, Fassung und Stufen; seit 0.58 mit `bereich` je Kompetenz `querverweise` |
 | `curriculum_yaml` (0.56) | `lies_curriculum_yaml` | `_lesbares_curriculum` + `build_curriculum_export_dict` — der YAML-Export |
 | `curriculum_yaml_pruefen` (0.56) | `lies_yaml_pruefung` | `curriculum_yaml.durchlauf(…, speichern=False)`: der Import als Entwurf im Savepoint, verworfen ([YAML-Import](curriculum-yaml-import.md)); ohne Fachschaft `ok: false` mit Meldung |
+| `verlaufsplaene_finden` (0.60) | `lies_verlaufsplaene` | Jahresverlaufspläne (Entwurf und beschlossen, alle Schuljahre); Fach erst genau (`_faecher`), dann als Teil; nur Lehrkräfte und Admins |
+| `verlaufsplan_lesen` (0.60) | `lies_verlaufsplan` | `vp.lade` + `vp.voll` + `vp.kompakt`; `vp.alte_titel` liefert Titel archivierter Bezüge (`nicht_mehr_im_curriculum`) |
 
 Alle mit `ToolAnnotations(read_only_hint=True, destructive_hint=False, …)` und
 `structured_output=False` (JSON als Text). Fehler als `ToolError` mit lesbarer Meldung.
 `_ohne_personen` entfernt bekannte Personenfelder rekursiv (F6) — heute enthält keine Antwort
 eines, der Filter ist das Netz für künftige Felder.
+
+Das Modul `app.context.verlaufsplan` holt `werkzeuge.py` ganz; der Wächter `test_mcp_nur_lesend`
+lässt davon nur die Namen in `MODUL_ATTRIBUTE` zu — unter jedem lokalen Namen und für jeden
+Zugriff, nicht nur für Aufrufe (seit 0.60).
 
 **Ein neues Werkzeug:** Lesefunktion `lies_…(db, user, …)`, Registrierung in `registrieren`
 mit `annotations=LESEND`, Beschreibung für das Modell (was es liefert, nicht wie). Jeder neue

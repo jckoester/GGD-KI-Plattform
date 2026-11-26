@@ -58,6 +58,8 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.context.service", "leitperspektive_code"): "reine Funktion",
     ("app.context.service", "normalize_lp_code"): "reine Funktion",
     ("app.context.router", "_lesbares_curriculum"): "Lesecheck der GET-Routen",
+    # BD Teil B (0.60): Jahresverlaufspläne — nur die Lesefunktionen, siehe MODUL_ATTRIBUTE["vp"]
+    ("app.context", "verlaufsplan"): "Modul; aufgerufen werden nur lade, voll, kurz, kompakt, aktuelles_schuljahr",
     ("app.context.curriculum_assistent", "entwurf_lesen"): "Lesefunktion des Assistenten (get_curriculum_draft)",
     ("app.context.curriculum_assistent", "abdeckung_kompakt"): "Lesefunktion (get_curriculum_coverage)",
     ("app.context.curriculum_assistent", "kompetenzen_lesen"): "Lesefunktion (get_bp_competences)",
@@ -71,8 +73,13 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.context.curriculum_yaml", "durchlauf"): "Import im Savepoint, immer verworfen (speichern=False)",
 }
 
-#: Für ganze Module: welche Attribute benutzt werden dürfen.
-MODUL_ATTRIBUTE = {"tokens": {"pruefe", "PRAEFIX"}}
+#: Für ganze Module (nach Modulpfad): welche Attribute benutzt werden dürfen — gleich unter
+#: welchem Namen das Modul gebunden ist (`import … as …`), und für jeden Zugriff, nicht nur Aufrufe.
+MODUL_ATTRIBUTE = {
+    "app.auth.tokens": {"pruefe", "PRAEFIX"},
+    "app.context.verlaufsplan": {"lade", "voll", "kurz", "kompakt", "alte_titel", "aktuelles_schuljahr",
+                                 "TYP", "LESBAR", "SEQUENZ"},
+}
 
 _SCHREIBENDE_METHODEN = {"commit", "add", "add_all", "flush", "delete", "merge", "bulk_save_objects",
                          "insert", "update", "execute_many"}
@@ -123,18 +130,51 @@ def _unerlaubte_importe(baeume):
     return sorted({f"{d}: from {m} import {n}" for d, m, n in _importe(baeume) if (m, n) not in ERLAUBT})
 
 
+def _modulnamen(baum) -> dict[str, str]:
+    """Lokaler Name → Modulpfad für die Module aus MODUL_ATTRIBUTE (`from app.auth import tokens`,
+    `from app.context import verlaufsplan as vp`, `import app.auth.tokens as t`)."""
+    namen = {}
+    for n in ast.walk(baum):
+        if isinstance(n, ast.ImportFrom) and n.module:
+            for a in n.names:
+                if f"{n.module}.{a.name}" in MODUL_ATTRIBUTE:
+                    namen[a.asname or a.name] = f"{n.module}.{a.name}"
+        elif isinstance(n, ast.Import):
+            for a in n.names:
+                if a.name in MODUL_ATTRIBUTE and a.asname:
+                    namen[a.asname] = a.name
+    return namen
+
+
+def _modulzugriffe(datei, baum):
+    """Zugriffe auf ein Modul aus MODUL_ATTRIBUTE außerhalb seiner Liste — auch ohne Aufruf
+    (`g = vp.bezugskanten_abgleichen`) und das Modul selbst als Wert (`h = vp`)."""
+    namen = _modulnamen(baum)
+    if not namen:
+        return set()
+    basis = {id(n.value) for n in ast.walk(baum) if isinstance(n, ast.Attribute)}
+    funde = set()
+    for n in ast.walk(baum):
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id in namen:
+            if n.attr not in MODUL_ATTRIBUTE[namen[n.value.id]]:
+                funde.add(f"{datei}:{n.lineno} {n.value.id}.{n.attr}")
+        elif isinstance(n, ast.Name) and n.id in namen and id(n) not in basis:
+            funde.add(f"{datei}:{n.lineno} {n.id} (Modul als Wert)")
+    return funde
+
+
 def _schreibende_aufrufe(baeume):
     funde = set()
     for datei, baum in baeume:
+        funde |= _modulzugriffe(datei, baum)
+        namen = _modulnamen(baum)
         for n in ast.walk(baum):
             if not isinstance(n, ast.Call):
                 continue
             f = n.func
             name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else ""
-            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id in MODUL_ATTRIBUTE:
-                if name not in MODUL_ATTRIBUTE[f.value.id]:
-                    funde.add(f"{datei}:{n.lineno} {f.value.id}.{name}")
-                continue
+            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id in namen:
+                continue   # geprüft in _modulzugriffe
             if (isinstance(f, ast.Attribute) and name in _SCHREIBENDE_METHODEN) or name in _SCHREIBENDE_NAMEN \
                     or name.startswith(_SCHREIBENDE_PRAEFIXE):
                 funde.add(f"{datei}:{n.lineno} {name}")
@@ -207,7 +247,11 @@ def test_gegenprobe_import(quelle):
     "async def f(db, n):\n    db.add(n)",
     "async def f(db):\n    await db.execute(sa.update(X))",
     "async def f(db):\n    await apply_curriculum_operations({}, None)",
-    "async def f(db):\n    await tokens.erzeuge(db)",
+    "from app.auth import tokens\nasync def f(db):\n    await tokens.erzeuge(db)",
+    # Module aus MODUL_ATTRIBUTE unter jedem Namen, auch ohne Aufruf (Review BD Teil B, 26.11.2026)
+    "from app.context import verlaufsplan\nasync def f(db, p):\n    await verlaufsplan.bezugskanten_abgleichen(db, p)",
+    "from app.context import verlaufsplan as vp\nasync def f(db, p):\n    g = vp.bezugskanten_abgleichen\n    await g(db, p)",
+    "from app.context import verlaufsplan as vp\nasync def f(db, p):\n    h = vp\n    await h.bezugskanten_abgleichen(db, p)",
 ])
 def test_gegenprobe_aufruf(quelle):
     assert _schreibende_aufrufe(_baeume([quelle]))

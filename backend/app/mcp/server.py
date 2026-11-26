@@ -42,7 +42,7 @@ PFAD = "/mcp"
 
 ANLEITUNG = (
     "Lesender Zugang zu einer Schulplattform: Curricula der Fachschaften (veröffentlicht und "
-    "Entwürfe), die Bildungspläne Baden-Württemberg 2016 mit Kompetenzen und Leitperspektiven, "
+    "Entwürfe), ihre Jahresverlaufspläne (Reihenfolge und Dauer der Kapitel im Schuljahr), die Bildungspläne Baden-Württemberg 2016 mit Kompetenzen und Leitperspektiven, "
     "und die Leitlinien der Schule. Schreiben ist über diese Schnittstelle nicht möglich. "
     "Für einen neuen oder geänderten Curriculum-Entwurf: Vorlage mit curriculum_yaml holen, YAML "
     "schreiben, mit curriculum_yaml_pruefen prüfen, bis es fehlerfrei ist, und es der Lehrkraft geben — "

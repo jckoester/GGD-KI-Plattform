@@ -26,7 +26,7 @@ HOST = "ki.schule.test"
 KOPF = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
 WERKZEUGE = {"leitlinien", "leitperspektiven", "leitlinie_uebersicht", "curricula_finden",
              "curriculum_lesen", "curriculum_abdeckung", "bildungsplan_kompetenzen",
-             "curriculum_yaml", "curriculum_yaml_pruefen"}
+             "curriculum_yaml", "curriculum_yaml_pruefen", "verlaufsplaene_finden", "verlaufsplan_lesen"}
 
 
 @pytest_asyncio.fixture
@@ -120,7 +120,7 @@ async def _ruf(rpc, name, **argumente):
     return (text if erg.get("isError") else json.loads(text)), bool(erg.get("isError"))
 
 
-async def test_neun_werkzeuge_alle_lesend(db, welt):
+async def test_elf_werkzeuge_alle_lesend(db, welt):
     async with _verbunden(db) as rpc:
         liste = (await rpc("tools/list"))["tools"]
     assert {w["name"] for w in liste} == WERKZEUGE
@@ -293,3 +293,64 @@ async def test_querverweise_in_curriculum_und_kompetenzen(db, welt):
         k1, k2 = [k for b in aus["bereiche"] for k in b["kompetenzen"]]
         assert [v["nr"] for v in k1["querverweise"]] == ["3.2.2(4)"]
         assert "querverweise" not in k2
+
+
+# ── Jahresverlaufspläne (0.60, BD Teil B Schritt 6) ───────────────────────────
+
+async def test_verlaufsplaene_finden_und_lesen(db, welt, monkeypatch):
+    from app.context import verlaufsplan as vp
+    from tests.unit.test_verlaufsplan_zeit import KALENDER_2025_26
+
+    monkeypatch.setattr(vp, "aktuelles_schuljahr", lambda: "2025/26")
+    monkeypatch.setattr(vp, "kalender_fuer", lambda sj: KALENDER_2025_26 if sj == "2025/26" else None)
+    kap = (await db.execute(sa.select(ContextNode).join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+                            .where(ContextEdge.to_node_id == welt["aktiv"].id, ContextNode.content_type == "kapitel"))).scalar_one()
+    plaene = []
+    for sj, status in (("2025/26", "active"), ("2024/25", "draft")):
+        p = _knoten("verlaufsplan", f"JVP Physik 7 {sj}", status, subject_id=welt["fach"].id, min_grade=7, max_grade=7,
+                    write_scope="school", metadata_={"schuljahr": sj, "planungsart": "kapitel", "beschlossen_am": "2025-10-01",
+                                                     "abschnitte": [{"id": "a1", "titel": "Licht", "wochen": 3,
+                                                                     "kapitel_ids": [str(kap.id)], "notiz": ""},
+                                                                    {"id": "a2", "titel": "Puffer", "wochen": 1, "puffer": True}]})
+        db.add(p)
+        plaene.append(p)
+    await db.flush()
+
+    async with _verbunden(db) as rpc:
+        aus, fehler = await _ruf(rpc, "verlaufsplaene_finden", fach=welt["fach"].name)
+        assert not fehler, aus
+        assert aus["laufendes_schuljahr"] == "2025/26"
+        assert [(p["schuljahr"], p["status"], p["archiviert"], p["wochen"]) for p in aus["verlaufsplaene"]] == [
+            ("2025/26", "beschlossen", False, 4), ("2024/25", "entwurf", True, 4)]
+        aus, _ = await _ruf(rpc, "verlaufsplaene_finden", fach=welt["fach"].name, schuljahr="2024/25", jahrgangsstufe="7")
+        assert [p["verlaufsplan_id"] for p in aus["verlaufsplaene"]] == [str(plaene[1].id)]
+        aus, _ = await _ruf(rpc, "verlaufsplaene_finden", fach=welt["fach"].name, jahrgangsstufe="8")
+        assert aus["verlaufsplaene"] == []
+
+        plan, fehler = await _ruf(rpc, "verlaufsplan_lesen", verlaufsplan_id=str(plaene[0].id))
+        assert not fehler, plan
+        assert plan["abschnitte"][0]["kapitel"] == [{"id": str(kap.id), "titel": kap.title}]
+        assert (plan["abschnitte"][0]["von_woche"], plan["abschnitte"][0]["beginn"]) == (1, "2025-09-15")
+        assert plan["abschnitte"][1]["puffer"] is True and plan["puffer_wochen"] == 1
+        assert plan["ferien"][0]["name"] == "Herbstferien"
+        assert "darf_bearbeiten" not in plan and "curricula" not in plan
+
+        # Früheres Schuljahr ohne Kalender: nur Wochen
+        alt, _ = await _ruf(rpc, "verlaufsplan_lesen", verlaufsplan_id=str(plaene[1].id))
+        assert alt["status"] == "entwurf" and "Kalender" in alt["hinweis"]
+
+        # Per Kürzel genau gefunden
+        aus, _ = await _ruf(rpc, "verlaufsplaene_finden", fach=welt["fach"].fach_code)
+        assert len(aus["verlaufsplaene"]) == 2
+
+        # Das Kapitel wird archiviert (neue Fassung): Titel bleibt, gekennzeichnet
+        kap.status = "archived"
+        await db.flush()
+        plan, _ = await _ruf(rpc, "verlaufsplan_lesen", verlaufsplan_id=str(plaene[0].id))
+        assert plan["abschnitte"][0]["kapitel"] == [{"id": str(kap.id), "titel": kap.title,
+                                                    "nicht_mehr_im_curriculum": True}]
+
+        text, fehler = await _ruf(rpc, "verlaufsplan_lesen", verlaufsplan_id=str(uuid.uuid4()))
+        assert fehler and "gibt es nicht" in text
+        text, fehler = await _ruf(rpc, "verlaufsplan_lesen", verlaufsplan_id="kein-uuid")
+        assert fehler and "Ungültige Kennung" in text

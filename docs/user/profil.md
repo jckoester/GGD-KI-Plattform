@@ -182,17 +182,17 @@ Behandle den Tokentext wie ein Passwort: nicht per Mail verschicken, nicht in ge
 
 ## KI-Programme verbinden
 
-Hat deine Schule ein KI-Abo, etwa für Claude, kann das Programm Curricula, Bildungspläne und Leitlinien direkt aus der Plattform lesen. Dann kannst du dort zum Beispiel fragen: „Wo kommt BNE in unseren Curricula der Klassen 7 und 8 vor, und wo fehlt es?“ oder „Vergleiche die Curricula Mathematik und Physik in Klasse 9.“
+Hat deine Schule ein KI-Abo, etwa für Claude, kann das Programm Curricula, Jahresverlaufspläne, Bildungspläne und Leitlinien direkt aus der Plattform lesen. Dann kannst du dort zum Beispiel fragen: „Wo kommt BNE in unseren Curricula der Klassen 7 und 8 vor, und wo fehlt es?“ oder „Vergleiche die Curricula Mathematik und Physik in Klasse 9.“
 
-Das geht nur, wenn die Schule es eingeschaltet hat. Die Adresse, die du im Programm einträgst, bekommst du von der Schule; sie steht auch beim Anlegen eines Zugangstokens unter der Berechtigung **„Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme“**.
+Das geht nur, wenn die Schule es eingeschaltet hat. Die Adresse, die du im Programm einträgst, bekommst du von der Schule; sie steht auch beim Anlegen eines Zugangstokens unter der Berechtigung **„Curricula, Jahresverlaufspläne, Bildungspläne und Leitlinien lesen — für KI-Programme“**.
 
-**Was das Programm sieht:** alle Curricula, die du auch im Browser lesen kannst, auch Entwürfe. Dazu die Bildungspläne mit Kompetenzen und Leitperspektiven, die Leitlinien der Schule und die Übersicht, wo eine Leitperspektive im Unterricht vorkommt.
+**Was das Programm sieht:** alle Curricula, die du auch im Browser lesen kannst, auch Entwürfe, und die Jahresverlaufspläne der Fachschaften samt Notizen, auch Entwürfe und frühere Schuljahre (seit 0.60, ohne neue Zustimmung für bestehende Verbindungen). Dazu die Bildungspläne mit Kompetenzen und Leitperspektiven, die Leitlinien der Schule und die Übersicht, wo eine Leitperspektive im Unterricht vorkommt.
 
-**Was es nicht sieht und nicht kann:** keine Chats, keine Unterrichtsplanung, keine Namen von Personen. Schreiben kann es nichts.
+**Was es nicht sieht und nicht kann:** keine Chats, nicht die Planung deiner Gruppen (Jahresplanung, Stunden), keine Namen von Personen. Schreiben kann es nichts.
 
 **Ein Curriculum entwerfen lassen:** Das Programm kann ein Curriculum als YAML schreiben — es holt sich dafür ein vorhandenes als Vorlage und prüft seinen Entwurf mit derselben Prüfung wie die Plattform, ohne zu speichern. Die fertige Datei importierst du selbst: in der Liste der Curricula des Fachs unter **Aus YAML importieren** (siehe [Schulcurriculum](curriculum.md#aus-einer-yaml-datei-importieren)). Du siehst vorher eine Vorschau, und es entsteht ein Entwurf, den deine Fachschaft veröffentlicht. Zum Beispiel: „Entwirf ein Curriculum Chemie Klasse 9 nach dem Muster von Klasse 8 und prüfe es.“
 
-**Wohin die Inhalte gehen:** Was das Programm liest, schickt es an seinen Anbieter, etwa Anthropic. Curricula enthalten in der Regel nichts Personenbezogenes; schreib deshalb auch keine Namen von Schüler:innen hinein. Verbinde nur ein Programm, das die Schule dafür vorsieht.
+**Wohin die Inhalte gehen:** Was das Programm liest, schickt es an seinen Anbieter, etwa Anthropic. Curricula und Jahresverlaufspläne enthalten in der Regel nichts Personenbezogenes; schreib deshalb auch in Notizen keine Namen von Schüler:innen oder Kolleg:innen hinein. Verbinde nur ein Programm, das die Schule dafür vorsieht.
 
 ### Mit Claude verbinden
 

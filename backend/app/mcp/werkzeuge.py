@@ -1,6 +1,6 @@
 """Die Werkzeuge des MCP-Servers — nur lesend (0.54, Päckchen AW Schritt 4, F2).
 
-Neun Werkzeuge über dieselben Lesefunktionen wie Oberfläche und Curriculum-Assistent;
+Elf Werkzeuge über dieselben Lesefunktionen wie Oberfläche und Curriculum-Assistent;
 gelesen wird mit den Rechten der Person hinter dem Token (`principal`), also wie im Browser:
 Entwürfe für Lehrkräfte sichtbar (seit 0.52), private Curricula nur die eigenen.
 
@@ -15,6 +15,10 @@ Export), `curriculum_yaml_pruefen` prüft einen Entwurf mit derselben Logik wie 
 Oberfläche — der echte Import in einem Savepoint, der **immer** verworfen wird
 (`curriculum_yaml.durchlauf(…, speichern=False)`; der Wächter `test_mcp_nur_lesend` hält das
 fest). Anlegen tut die Lehrkraft selbst, in der Plattform, nach der Vorschau.
+
+**Jahresverlaufspläne (0.60, BD Teil B Schritt 6):** `verlaufsplaene_finden` und
+`verlaufsplan_lesen` — die Pläne der Fachschaften, wie sie Lehrkräfte in der Bibliothek lesen
+(auch Entwürfe und frühere Schuljahre), kompakt über `verlaufsplan.kompakt`.
 """
 from __future__ import annotations
 
@@ -185,6 +189,70 @@ async def lies_abdeckung(db: AsyncSession, user, curriculum_id: str) -> dict:
     from app.context.curriculum_assistent import abdeckung_kompakt
 
     return await abdeckung_kompakt(db, await _curriculum_fuer_werkzeug(db, user, curriculum_id))
+
+
+async def lies_verlaufsplaene(db: AsyncSession, user, fach: str | None, jahrgangsstufe: str | None,
+                              schuljahr: str | None) -> dict:
+    from app.context import verlaufsplan as vp
+    from app.context.grades import parse_grade_band
+    from app.db.models import ContextNode, Subject
+
+    _nur_lehrkraefte(user)
+    abfrage = (sa.select(ContextNode, Subject).join(Subject, Subject.id == ContextNode.subject_id)
+               .where(ContextNode.content_type == vp.TYP, ContextNode.status.in_(vp.LESBAR))
+               .order_by(Subject.sort_order, Subject.name, ContextNode.min_grade,
+                         ContextNode.metadata_["schuljahr"].as_string().desc()))
+    if f := (fach or "").strip():
+        abfrage = abfrage.where(Subject.id.in_(await _faecher(db, f)))
+    if j := (jahrgangsstufe or "").strip():
+        lo, hi = parse_grade_band(j)
+        if lo is None:
+            raise ToolError(f"Unbekannte Jahrgangsstufe „{jahrgangsstufe}“ — etwa '7' oder '7/8'.")
+        abfrage = abfrage.where(ContextNode.min_grade >= lo, ContextNode.min_grade <= (hi or lo))
+    if sj := (schuljahr or "").strip():
+        abfrage = abfrage.where(ContextNode.metadata_["schuljahr"].as_string() == sj)
+    zeilen = (await db.execute(abfrage)).all()
+    return {"verlaufsplaene": [{
+        "verlaufsplan_id": str(p.id), "titel": k["titel"], "fach": k["fach"], "stufe": k["stufe"],
+        "schuljahr": k["schuljahr"], "status": "entwurf" if p.status == "draft" else "beschlossen",
+        "beschlossen_am": k["beschlossen_am"], "wochen": k["wochen"],
+        "planungsart": "sequenzgenau" if k["planungsart"] == vp.SEQUENZ else "kapitelgenau",
+        "archiviert": k["archiviert"],
+    } for p, fachzeile in zeilen for k in [vp.kurz(p, fachzeile)]],
+        "laufendes_schuljahr": vp.aktuelles_schuljahr()}
+
+
+async def _faecher(db: AsyncSession, f: str) -> list[int]:
+    """Fächer zu einer Angabe: erst genau (Name, Slug, Kürzel), nur ohne Treffer als Teil des Namens
+    oder Slugs — sonst träfe das Kürzel „M“ auch Musik und Chemie (wie `lies_kompetenzen`)."""
+    from app.db.models import Subject
+
+    genau = (await db.execute(sa.select(Subject.id).where(sa.or_(
+        Subject.name.ilike(f), Subject.slug.ilike(f), Subject.fach_code.ilike(f))))).scalars().all()
+    if genau:
+        return list(genau)
+    muster = f"%{f}%"
+    return list((await db.execute(sa.select(Subject.id).where(sa.or_(
+        Subject.name.ilike(muster), Subject.slug.ilike(muster))))).scalars().all())
+
+
+async def lies_verlaufsplan(db: AsyncSession, user, verlaufsplan_id: str) -> dict:
+    from app.context import verlaufsplan as vp
+
+    _nur_lehrkraefte(user)
+    plan = await vp.lade(db, _uuid(verlaufsplan_id, "den Jahresverlaufsplan"))
+    if plan is None:
+        raise ToolError("Diesen Jahresverlaufsplan gibt es nicht.")
+    voll = await vp.voll(db, plan, user)
+    titel_alt, kapitel_alt = await vp.alte_titel(db, voll)
+    return vp.kompakt(voll, titel_alt=titel_alt, kapitel_alt=kapitel_alt)
+
+
+def _nur_lehrkraefte(user) -> None:
+    """Pläne lesen Lehrkräfte und Admins (wie `/context/verlaufsplaene`). Zugangstoken gibt es nur
+    für sie (`tokens.ERLAUBTE_ROLLEN`); die Prüfung steht trotzdem hier, falls sich das ändert."""
+    if not {"teacher", "admin"} & set(user.roles or []):
+        raise ToolError("Jahresverlaufspläne lesen nur Lehrkräfte.")
 
 
 #: Das Format für `curriculum_yaml_pruefen` — kurz, das Programm hat die Vorlage aus `curriculum_yaml`.
@@ -364,6 +432,28 @@ def registrieren(server: MCPServer, sitzung: Callable[[], AsyncSession] | None =
                                                            "'vorhanden', das der Entwurf ersetzen soll.")] = None,
     ) -> dict:
         return await ausfuehren(lies_yaml_pruefung, yaml, ersetzen)
+
+    @server.tool(annotations=LESEND, structured_output=False, description=(
+        "Die Jahresverlaufspläne der Fachschaften: je Fach, Klassenstufe und Schuljahr höchstens einer, mit "
+        "Kennung, Status (beschlossen oder Entwurf), verplanten Wochen und Planungsart. Frühere Schuljahre "
+        "sind archiviert. laufendes_schuljahr nennt das aktuelle."))
+    async def verlaufsplaene_finden(
+        fach: Annotated[str | None, Field(description="Fachname oder Kürzel; ein Teil genügt.")] = None,
+        jahrgangsstufe: Annotated[str | None, Field(description="Klassenstufe oder Band, etwa '9' oder '7/8'.")] = None,
+        schuljahr: Annotated[str | None, Field(description="Etwa '2026/27'; leer = alle.")] = None,
+    ) -> dict:
+        return await ausfuehren(lies_verlaufsplaene, fach, jahrgangsstufe, schuljahr)
+
+    @server.tool(annotations=LESEND, structured_output=False, description=(
+        "Ein Jahresverlaufsplan: die Abschnitte in Reihenfolge mit Dauer in Unterrichtswochen, Woche von–bis, "
+        "erstem und letztem Schultag, Ferien darin, Thema, Notiz und den Kapiteln bzw. Lernsequenzen des "
+        "Curriculums (Titel mit Kennung; puffer = bewusst freie Wochen). Dazu die Ferien des Schuljahrs, "
+        "freie Wochen, die Stundenbilanz je Kapitel (Soll aus dem Curriculum, geplant = Wochen × "
+        "Wochenstunden) und Kapitel ohne Abschnitt."))
+    async def verlaufsplan_lesen(
+        verlaufsplan_id: Annotated[str, Field(description="Kennung aus verlaufsplaene_finden.")],
+    ) -> dict:
+        return await ausfuehren(lies_verlaufsplan, verlaufsplan_id)
 
     @server.tool(annotations=LESEND, structured_output=False, description=(
         "Kompetenzen des Bildungsplans für ein Fach und eine Jahrgangsstufe. Ohne bereich: Übersicht der "

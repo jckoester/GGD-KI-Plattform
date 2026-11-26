@@ -35,7 +35,8 @@ SCOPE_BESCHRIFTUNG: dict[str, str] = {
     "context:write": "Bausteine ändern",
     # 0.54, Päckchen AW: nur für den MCP-Server (`app/mcp/`). Öffnet keinen REST-Weg —
     # `app.auth.scopes` kennt ihn nicht, und dort gilt deny-by-default.
-    "curriculum:read": "Curricula, Bildungspläne und Leitlinien lesen — für KI-Programme",
+    # Seit 0.60 (BD Teil B) auch die Jahresverlaufspläne der Fachschaften — derselbe Scope.
+    "curriculum:read": "Curricula, Jahresverlaufspläne, Bildungspläne und Leitlinien lesen — für KI-Programme",
 }
 
 SCOPES = frozenset(SCOPE_BESCHRIFTUNG)
@@ -43,9 +44,9 @@ SCOPES = frozenset(SCOPE_BESCHRIFTUNG)
 # Erklärung unter der Beschriftung im Dialog, wo ein Scope mehr braucht als seinen Namen.
 SCOPE_HINWEIS: dict[str, str] = {
     "curriculum:read": (
-        "Für ein KI-Programm wie Claude, das du mit der Plattform verbindest. Es liest Curricula "
-        "(auch Entwürfe), Bildungspläne und Leitlinien und schreibt nichts. Was es liest, geht an "
-        "den Anbieter dieses Programms."),
+        "Für ein KI-Programm wie Claude, das du mit der Plattform verbindest. Es liest Curricula und "
+        "Jahresverlaufspläne (auch Entwürfe und frühere Schuljahre), Bildungspläne und Leitlinien und "
+        "schreibt nichts. Was es liest, geht an den Anbieter dieses Programms."),
 }
 
 # Obergrenze der Gültigkeit. Richtlinie der Anwendung, keine Invariante der Daten —

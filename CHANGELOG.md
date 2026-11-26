@@ -17,6 +17,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `POST …/verlaufsplan/rueckgaengig` nimmt einen Lauf zurück, solange seine Einheiten keine Stunden haben.
 - Planer: „Einheiten anlegen …“ in der Leiste des Jahresverlaufsplans öffnet eine Vorschau je Abschnitt und legt
   die Einheiten an; danach lässt sich das Anlegen rückgängig machen.
+- Schnittstelle für KI-Abos (MCP): neue Werkzeuge `verlaufsplaene_finden` und `verlaufsplan_lesen` für die
+  Jahresverlaufspläne der Fachschaften.
 
 ## [0.59.0] – 2026-11-26
 

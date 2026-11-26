@@ -54,6 +54,10 @@ musst du nicht eintragen: Der erste beginnt in der ersten Unterrichtswoche, jede
 danach. **Ferienwochen zählen nicht** — verschieben sich Ferien im Kalender der Schule, rückt
 der Plan von selbst mit.
 
+Die Notiz lesen alle Lehrkräfte und auch KI-Programme, die eine Lehrkraft mit der Plattform
+verbunden hat (siehe [KI-Programme verbinden](profil.md#ki-programme-verbinden)). Schreib deshalb
+keine Namen von Schüler:innen oder Kolleg:innen hinein.
+
 - **Bearbeiten** öffnet den Editor; gespeichert wird von selbst. **Fertig** schließt ihn.
 - Die **Reihenfolge** änderst du mit den Pfeilen oder durch Ziehen.
 - Wählst du für einen neuen Abschnitt die erste Sequenz (oder das erste Kapitel), schlägt der

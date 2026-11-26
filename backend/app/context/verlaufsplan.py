@@ -36,6 +36,8 @@ from app.planning.verlaufsplan_zeit import Planlage, lage
 
 TYP = "verlaufsplan"
 BESCHLOSSEN = "active"
+#: Pläne, die es gibt (Entwurf oder beschlossen) — gelöschte nicht.
+LESBAR = (ENTWURF, BESCHLOSSEN)
 #: Planungsart (Schritt 7, Jan 25.11.2026): Abschnitte nennen Lernsequenzen (Vorgabe) oder Kapitel.
 SEQUENZ, KAPITEL = "sequenz", "kapitel"
 PLANUNGSARTEN = (SEQUENZ, KAPITEL)
@@ -96,7 +98,7 @@ async def fachschaftsgruppe(db: AsyncSession, subject_id: int) -> Optional[int]:
 
 async def lade(db: AsyncSession, plan_id: UUID) -> Optional[ContextNode]:
     plan = await db.get(ContextNode, plan_id)
-    if plan is None or plan.content_type != TYP or plan.status not in (ENTWURF, BESCHLOSSEN):
+    if plan is None or plan.content_type != TYP or plan.status not in LESBAR:
         return None
     return plan
 
@@ -390,3 +392,125 @@ async def voll(db: AsyncSession, plan: ContextNode, user) -> dict:
 
 def heute() -> date:
     return date.today()
+
+
+# ── Für Programme: kompakt (BD Teil B, Schritt 6) ─────────────────────────────
+
+NICHT_MEHR_IM_CURRICULUM = "nicht mehr im Curriculum"
+
+
+def _iso(d) -> Optional[str]:
+    return d.isoformat() if isinstance(d, date) else d
+
+
+def kompakt(v: dict, *, titel_alt: dict[str, str] | None = None,
+            kapitel_alt: dict[str, str] | None = None) -> dict:
+    """Der Plan aus :func:`voll` für ein KI-Programm (MCP `verlaufsplan_lesen`, später der
+    Jahresplan-Assistent): Abschnitte mit Wochen, Daten, Ferien und Bezügen **als Titel mit
+    Kennung**, die Stundenbilanz je Kapitel und was noch fehlt. Ohne Rechte, Curricula-Baum,
+    Ablaufleiste und Personenangaben — rein, ohne Datenbank.
+
+    `titel_alt` (ID → Titel) und `kapitel_alt` (Sequenz → Titel ihres Kapitels) tragen die Titel
+    von Bezügen, die nicht mehr im veröffentlichten Curriculum stehen (frühere Fassung, Archiv) —
+    sonst sähe ein Programm bei einem Plan aus dem Vorjahr nur Kennungen. Solche Bezüge tragen
+    `nicht_mehr_im_curriculum: true` (:func:`alte_titel` holt beides)."""
+    titel_alt = titel_alt or {}
+    kapitel_alt = kapitel_alt or {}
+    titel: dict[str, str] = {}
+    kapitel_von: dict[str, str] = {}
+    for c in v.get("curricula") or []:
+        for k in c.get("kapitel") or []:
+            titel[str(k["id"])] = k["titel"]
+            for s in k.get("sequenzen") or []:
+                titel[str(s["id"])] = s["titel"]
+                kapitel_von[str(s["id"])] = str(k["id"])
+
+    def t(i) -> str:
+        return titel.get(str(i)) or titel_alt.get(str(i)) or NICHT_MEHR_IM_CURRICULUM
+
+    def bezug(i, **mehr) -> dict:
+        aus = {"id": str(i), "titel": t(i), **mehr}
+        if str(i) not in titel:
+            aus["nicht_mehr_im_curriculum"] = True
+        return aus
+
+    art = v.get("planungsart") or KAPITEL
+    lage = v.get("lage")
+    lagen = (lage or {}).get("abschnitte") or []
+    abschnitte = []
+    for i, a in enumerate(v.get("abschnitte") or []):
+        lg = lagen[i] if i < len(lagen) else {}
+        eintrag: dict = {"nr": i + 1, "titel": a.get("titel") or "", "wochen": a.get("wochen")}
+        if a.get("puffer"):
+            eintrag["puffer"] = True
+        elif art == SEQUENZ:
+            eintrag["lernsequenzen"] = [
+                bezug(s, kapitel=t(kapitel_von[str(s)]) if str(s) in kapitel_von
+                      else kapitel_alt.get(str(s), NICHT_MEHR_IM_CURRICULUM))
+                for s in a.get("sequenz_ids") or []]
+        else:
+            eintrag["kapitel"] = [bezug(k) for k in a.get("kapitel_ids") or []]
+        if lg:
+            eintrag.update({"von_woche": lg.get("von_woche"), "bis_woche": lg.get("bis_woche"),
+                            "beginn": _iso(lg.get("beginn")), "ende": _iso(lg.get("ende"))})
+            for feld in ("ueber_ferien", "vor_ferien", "halbjahreswechsel", "ausserhalb"):
+                if lg.get(feld):
+                    eintrag[feld] = lg[feld]
+        if (a.get("notiz") or "").strip():
+            eintrag["notiz"] = a["notiz"].strip()
+        abschnitte.append(eintrag)
+
+    aus = {
+        "verlaufsplan_id": str(v["id"]), "titel": v.get("titel"), "fach": v.get("fach"), "stufe": v.get("stufe"),
+        "schuljahr": v.get("schuljahr"), "status": "entwurf" if v.get("status") == ENTWURF else "beschlossen",
+        "beschlossen_am": v.get("beschlossen_am"), "archiviert": v.get("archiviert", False),
+        "planungsart": "sequenzgenau" if art == SEQUENZ else "kapitelgenau",
+        "wochenstunden": v.get("wochenstunden"), "abschnitte": abschnitte,
+    }
+    if lage is None:
+        aus["hinweis"] = "Für dieses Schuljahr liegt der Kalender der Schule noch nicht vor; nur Wochen, keine Daten."
+        return aus
+    aus.update({
+        "unterrichtswochen": lage.get("unterrichtswochen"), "verplant": lage.get("belegt"),
+        "frei": lage.get("frei"), "nach_schuljahresende": lage.get("ueberhang"),
+        "puffer_wochen": lage.get("puffer_wochen"),
+        "ferien": [{"name": f["name"], "von": _iso(f["von"]), "bis": _iso(f["bis"]), "nach_woche": f["nach_woche"]}
+                   for f in lage.get("ferien") or []],
+        "halbjahr_ab_woche": lage.get("halbjahr_ab_woche"),
+        "bilanz": [_bilanzzeile(k, art, titel, t) for k in lage.get("kapitel") or []],
+        "kapitel_ohne_abschnitt": [t(k) for k in lage.get("kapitel_ohne_abschnitt") or []],
+    })
+    if art == SEQUENZ:
+        aus["lernsequenzen_ohne_abschnitt"] = [t(s) for s in lage.get("sequenzen_ohne_abschnitt") or []]
+    return aus
+
+
+def _bilanzzeile(k: dict, art: str, titel: dict, t) -> dict:
+    """Eine Zeile der Bilanz. Bei sequenzgenauer Planung hängt `_sequenzbilanz` Sequenzen, die in
+    keinem Kapitel des Curriculums stehen, einzeln an (`kapitel_id` = Kennung der Sequenz) — für
+    ein Programm heißen sie dann auch so."""
+    kid = str(k["kapitel_id"])
+    werte = {"soll_stunden": k.get("soll"), "geplant_stunden": k.get("geplant"), "wochen": k.get("wochen")}
+    if art == SEQUENZ and not k.get("titel") and kid not in titel:
+        return {"lernsequenz": t(kid), "lernsequenz_id": kid, "nicht_mehr_im_curriculum": True, **werte}
+    zeile = {"kapitel": k.get("titel") or t(kid), "kapitel_id": kid, **werte}
+    if kid not in titel:
+        zeile["nicht_mehr_im_curriculum"] = True
+    return zeile
+
+
+async def alte_titel(db: AsyncSession, v: dict) -> tuple[dict[str, str], dict[str, str]]:
+    """Titel der Bezüge eines Plans, die nicht im veröffentlichten Curriculum stehen, für
+    :func:`kompakt`: (ID → Titel, Sequenz → Titel ihres Kapitels). Liest auch archivierte Knoten."""
+    bekannt = {str(k["id"]) for c in v.get("curricula") or [] for k in c.get("kapitel") or []} | {
+        str(s["id"]) for c in v.get("curricula") or [] for k in c.get("kapitel") or [] for s in k.get("sequenzen") or []}
+    art = v.get("planungsart") or KAPITEL
+    feld = BEZUGSFELD[art]
+    ids = {str(x) for a in v.get("abschnitte") or [] for x in a.get(feld) or []}
+    ids |= {str(k["kapitel_id"]) for k in ((v.get("lage") or {}).get("kapitel") or [])}
+    fremd = ids - bekannt
+    if not fremd:
+        return {}, {}
+    titel = {**await knotentitel(db, fremd, "kapitel"), **await knotentitel(db, fremd, "lernsequenz")}
+    kapitel = await kapiteltitel_der_sequenzen(db, fremd) if art == SEQUENZ else {}
+    return titel, kapitel

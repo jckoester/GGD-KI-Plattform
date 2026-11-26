@@ -15,7 +15,7 @@ Was das Programm liest, geht an dessen Anbieter.
 
 ## Was die Schnittstelle kann
 
-- **Nur lesen.** Neun Werkzeuge: Leitlinien, Leitperspektiven, die Übersicht einer Leitlinie
+- **Nur lesen.** Elf Werkzeuge: Leitlinien, Leitperspektiven, die Übersicht einer Leitlinie
   oder Leitperspektive, Curricula finden, ein Curriculum lesen, seine Abdeckung, die
   Kompetenzen des Bildungsplans; seit 0.56 ein Curriculum als YAML und die Prüfung eines
   YAML-Entwurfs. Seit 0.58 tragen ein Curriculum und die Kompetenzen des Bildungsplans die
@@ -72,8 +72,8 @@ Danach den Container des Backends neu erzeugen, damit er die geänderte `.env` l
 docker compose up -d --force-recreate backend
 ```
 
-Im Profil erscheint die Berechtigung „Curricula, Bildungspläne und Leitlinien lesen — für
-KI-Programme“ mit der Adresse erst, wenn die Schnittstelle eingeschaltet ist.
+Im Profil erscheint die Berechtigung „Curricula, Jahresverlaufspläne, Bildungspläne und
+Leitlinien lesen — für KI-Programme“ mit der Adresse erst, wenn die Schnittstelle eingeschaltet ist.
 
 ## Reverse Proxy
 
@@ -186,9 +186,10 @@ ein schon eingelöster Refresh-Token noch einmal, endet die Verbindung — er gi
 
 ## Datenschutz
 
-Die Schnittstelle liefert Curricula, Bildungspläne und Leitlinien, keine personenbezogenen
-Daten aus der Plattform. In den Freitexten eines Curriculums kann trotzdem etwas stehen, das
-nicht hinausgehen soll. Ob und mit welchem Anbieter die Schule das nutzt, entscheidet sie;
+Die Schnittstelle liefert Curricula, Jahresverlaufspläne (seit 0.60, mit demselben Scope —
+bestehende Verbindungen lesen sie ohne neue Zustimmung), Bildungspläne und Leitlinien, keine
+personenbezogenen Daten aus der Plattform. In den Freitexten eines Curriculums oder den Notizen
+eines Plans kann trotzdem etwas stehen, das nicht hinausgehen soll. Ob und mit welchem Anbieter die Schule das nutzt, entscheidet sie;
 dazu gehört ein Vertrag zur Auftragsverarbeitung mit dem Anbieter des Abos und ein Eintrag im
 Verarbeitungsverzeichnis.
 
