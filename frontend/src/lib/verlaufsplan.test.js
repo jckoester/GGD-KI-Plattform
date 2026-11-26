@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, abschnittFarbe, bezugText, entwurfHinweis, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
+    ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, PUFFER_TITEL, pufferUmschalten, abschnittFarbe, bezugText, entwurfHinweis, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
     umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern,
 } from './verlaufsplan.js'
 import { ueColorIndex } from './planner.js'
@@ -110,7 +110,7 @@ describe('Planungsart (Schritt 7)', () => {
 
 describe('Anlegen und Liste', () => {
     it('neuer Abschnitt: eine Woche, ohne Bezüge', () => {
-        expect(neuerAbschnitt()).toEqual({ id: null, titel: '', wochen: 1, kapitel_ids: [], sequenz_ids: [], notiz: '' })
+        expect(neuerAbschnitt()).toEqual({ id: null, titel: '', wochen: 1, kapitel_ids: [], sequenz_ids: [], notiz: '', puffer: false })
     })
     it('laufendes und nächstes Schuljahr', () => {
         expect(schuljahreZumAnlegen('2025/26')).toEqual(['2025/26', '2026/27'])
@@ -143,7 +143,7 @@ describe('Bilanz', () => {
 describe('Speichern', () => {
     it('nur die gespeicherten Felder', () => {
         const aus = zumSpeichern([{ id: 'x', titel: 'A', wochen: '3', kapitel_ids: ['k'], notiz: '', von_woche: 1 }], 'sequenz')
-        expect(aus).toEqual({ planungsart: 'sequenz', abschnitte: [{ id: 'x', titel: 'A', wochen: 3, kapitel_ids: ['k'], sequenz_ids: [], notiz: '' }] })
+        expect(aus).toEqual({ planungsart: 'sequenz', abschnitte: [{ id: 'x', titel: 'A', wochen: 3, kapitel_ids: ['k'], sequenz_ids: [], notiz: '', puffer: false }] })
     })
 })
 
@@ -224,5 +224,22 @@ describe('Entwurfshinweis', () => {
         expect(entwurfHinweis({ status: 'draft', darf_bearbeiten: false })).toBe(ENTWURF_NUR_LESEN)
         expect(entwurfHinweis({ status: 'active', darf_bearbeiten: true })).toBe('')
         expect(entwurfHinweis(null)).toBe('')
+    })
+})
+
+describe('Puffer', () => {
+    it('schließt Bezüge aus und setzt den Titel nur, wenn keiner da ist', () => {
+        const a = { titel: '', kapitel_ids: ['k'], sequenz_ids: ['s'], puffer: false }
+        const p = pufferUmschalten(a)
+        expect(p).toMatchObject({ puffer: true, kapitel_ids: [], sequenz_ids: [], titel: PUFFER_TITEL })
+        expect(pufferUmschalten({ ...a, titel: 'Reserve' }).titel).toBe('Reserve')
+        expect(pufferUmschalten(p)).toMatchObject({ puffer: false, titel: '' })
+        expect(pufferUmschalten({ ...p, titel: 'Reserve' }).titel).toBe('Reserve')
+    })
+
+    it('Bezugstext und Speichern', () => {
+        expect(bezugText({ puffer: true }, 'sequenz', {})).toBe('Puffer')
+        expect(zumSpeichern([{ wochen: 2, puffer: true }], 'kapitel').abschnitte[0].puffer).toBe(true)
+        expect(zumSpeichern([{ wochen: 2 }], 'kapitel').abschnitte[0].puffer).toBe(false)
     })
 })

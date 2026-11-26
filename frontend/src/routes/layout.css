@@ -292,6 +292,13 @@ html.dark {
        Fläche. */
     --planner-ausfall-stripe: rgba(0, 0, 0, 0.04);
 
+    /* Puffer im Jahresverlaufsplan (BD, zweiter Durchgang): neutral, gegenläufig zur Ferien-
+       Schraffur (45° statt 135°), damit beide nebeneinander unterscheidbar bleiben. Hell-
+       dunkelgraue Streifen (Jan 26.11.2026): Mit ui-2/ui-3 war der Puffer von den freien
+       Wochen kaum zu unterscheiden. Die Beschriftung liegt deshalb auf einem eigenen Grund. */
+    --verlaufsplan-puffer-bg:     var(--color-base-150);
+    --verlaufsplan-puffer-stripe: var(--color-base-500);
+
     /* ── Diagrammfarben — zur Laufzeit lesbar (chart.js) ─────────────────────────
        chart.js zeichnet auf eine Leinwand und braucht konkrete Farbwerte, die es über
        `getComputedStyle` liest (`lib/diagrammfarben.js`).
@@ -339,6 +346,9 @@ html.dark {
 
     --planner-ausfall-stripe: rgba(255, 255, 255, 0.06);
 
+    --verlaufsplan-puffer-bg:     var(--color-base-850);
+    --verlaufsplan-puffer-stripe: var(--color-base-600);
+
     /* Diagrammfarben, dunkel — eigens gewählt, keine Umkehrung (siehe :root). */
     --diagramm-verbrauch: var(--color-dark-bl);
     --diagramm-zusage: var(--color-dark-or);
@@ -384,6 +394,17 @@ html.dark {
         transparent               4px,
         var(--planner-ausfall-stripe) 4px,
         var(--planner-ausfall-stripe) 8px
+    );
+}
+
+.verlaufsplan-puffer {
+    background-color: var(--verlaufsplan-puffer-bg);
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent                        0px,
+        transparent                        4px,
+        var(--verlaufsplan-puffer-stripe)  4px,
+        var(--verlaufsplan-puffer-stripe)  7px
     );
 }
 

@@ -11,7 +11,8 @@ Diese Datei rechnet daraus, was die Oberfläche und später der Assistent zeigen
 - je Abschnitt die Unterrichtswochen von–bis, den ersten und letzten Schultag, die Ferien, über
   die er reicht, die Ferien direkt danach, ob der Halbjahreswechsel in ihm liegt, seine Stunden;
 - für den Plan freie Wochen am Ende oder den Überhang über das Schuljahr hinaus;
-- die Stundenbilanz je Kapitel (Soll aus `std`, geplant aus Wochen × Wochenstunden);
+- die Stundenbilanz je Kapitel (Soll aus `std`, geplant aus Wochen × Wochenstunden); Puffer
+  nennen nichts und zählen dort nicht, nur als eigene Summe (`puffer_wochen`);
 - die Abschnitte zwischen den Ferien — für den Knopf „bis zu den Ferien“ (BD F3) und die
   Übersicht der Vorlage;
 - für die Ablaufleiste (zweiter Durchgang): den Montag jeder Unterrichtswoche (Monatsachse,
@@ -77,6 +78,8 @@ class AbschnittLage:
     # Wochen, die über das Schuljahr hinausreichen
     ausserhalb: int = 0
     stunden: Optional[float] = None
+    # Puffer (zweiter Durchgang): bewusst freie Wochen ohne Bezug
+    puffer: bool = False
 
     @property
     def lang(self) -> bool:
@@ -121,6 +124,11 @@ class Planlage:
     wochen: list[Unterrichtswoche] = field(default_factory=list)
     ferien: list[Ferienmarke] = field(default_factory=list)
     halbjahr_ab_woche: Optional[int] = None
+
+    @property
+    def puffer_wochen(self) -> int:
+        """Wochen in Puffer-Abschnitten, auch hinter dem Schuljahresende."""
+        return sum(a.wochen for a in self.abschnitte if a.puffer)
 
     @property
     def frei(self) -> int:
@@ -198,7 +206,7 @@ def lage(
 ) -> Planlage:
     """Legt die Abschnitte auf den Kalender des Schuljahrs.
 
-    `abschnitte`: in Planreihenfolge, je `{id, titel, wochen, kapitel_ids, sequenz_ids, notiz}`;
+    `abschnitte`: in Planreihenfolge, je `{id, titel, wochen, kapitel_ids, sequenz_ids, notiz, puffer}`;
     gelesen werden `id`, `wochen` und das Bezugsfeld der Planungsart.
     `kapitel`: die Kapitel des Curriculums der Stufe, je `{id, titel, std, sequenzen}` — für die
     Bilanz und den Hinweis auf Kapitel (und Sequenzen) ohne Abschnitt.
@@ -228,6 +236,7 @@ def lage(
             id=a.get("id"), nr=nr, wochen=dauer, von_woche=von, bis_woche=bis,
             beginn=beginn, ende=ende, ausserhalb=max(0, bis - max(n, von - 1)),
             stunden=dauer * wochenstunden if wochenstunden else None,
+            puffer=bool(a.get("puffer")),
         )
         if von <= n:
             l.ueber_ferien = [m.name for m in marken if von <= m.nach_woche < innen_bis]

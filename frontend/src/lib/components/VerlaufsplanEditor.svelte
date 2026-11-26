@@ -20,7 +20,7 @@
     import { ArrowDown, ArrowUp, GripVertical, Trash2, Plus } from '@lucide/svelte'
     import {
         RICHTGROESSE, VORGABE_WOCHEN, bezugText, bezugsfeld, dauerVorschlag, einheiten, hinweise,
-        neuerAbschnitt, umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText,
+        neuerAbschnitt, pufferUmschalten, umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText,
     } from '$lib/verlaufsplan.js'
 
     let {
@@ -56,7 +56,8 @@
         if (!ids.length && neu.length === 1 && a.wochen === VORGABE_WOCHEN && !vonHand.has(a.id)) {
             wochen = dauerVorschlag(e.std[id], wochenstunden) ?? a.wochen
         }
-        setzen(abschnitte.map((x, k) => (k === i ? { ...x, [feldName]: neu, wochen } : x)))
+        // Eine Sequenz oder ein Kapitel macht aus einem Puffer wieder einen normalen Abschnitt
+        setzen(abschnitte.map((x, k) => (k === i ? { ...(x.puffer ? pufferUmschalten(x) : x), [feldName]: neu, wochen } : x)))
     }
 
     function dauerSetzen(i, wert) {
@@ -145,8 +146,15 @@
             <div class="mt-2 ml-14 flex flex-wrap gap-2 items-start">
                 <details class="text-sm">
                     <summary class="cursor-pointer text-light-bl dark:text-dark-bl">
-                        {planungsart === 'sequenz' ? 'Sequenzen' : 'Kapitel'}{#if a[feldName]?.length}: {bezugText(a, planungsart, e.titel)}{:else} wählen{/if}
+                        {#if a.puffer}Puffer{:else}{planungsart === 'sequenz' ? 'Sequenzen' : 'Kapitel'}{#if a[feldName]?.length}: {bezugText(a, planungsart, e.titel)}{:else} wählen{/if}{/if}
                     </summary>
+                    <!-- Puffer (zweiter Durchgang): derselbe Weg wie eine Sequenz, schließt sie aber aus -->
+                    <label class="mt-1 flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx">
+                        <input type="checkbox" checked={!!a.puffer}
+                            onchange={() => setzen(abschnitte.map((x, k) => (k === i ? pufferUmschalten(x) : x)))} />
+                        Puffer
+                        <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">(bewusst frei, ohne {planungsart === 'sequenz' ? 'Sequenz' : 'Kapitel'})</span>
+                    </label>
                     {#if curricula.length === 0}
                         <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">Für diese Stufe gibt es kein veröffentlichtes Curriculum.</p>
                     {/if}

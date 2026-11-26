@@ -8,6 +8,8 @@
      * eingetragen, teilweise (nur einige Sequenzen des Kapitels), fehlt — statt eines
      * Hinweisblocks darunter, der vom Plan ablenkte.
      *
+     * Darunter die Summe der Puffer-Wochen, die bei keinem Kapitel zählen.
+     *
      * Props: `lage`, `wochenstunden`, `band` (Curriculum über mehrere Stufen), `planungsart`.
      */
     import { ChevronDown, ChevronRight } from '@lucide/svelte'
@@ -102,5 +104,11 @@
                 </tbody>
             {/each}
         </table>
+        {#if lage.puffer_wochen}
+            <!-- Puffer zählen bei keinem Kapitel, nur hier als Summe (zweiter Durchgang) -->
+            <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                Puffer: {lage.puffer_wochen} {lage.puffer_wochen === 1 ? 'Woche' : 'Wochen'}
+            </p>
+        {/if}
     </section>
 {/if}

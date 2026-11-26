@@ -7,7 +7,8 @@
      *   `planner-ferien-band`); ein Abschnitt über Ferien zerfällt in Stücke links und rechts.
      * - Darüber Monatsachse, Linie „2. HJ“ und „heute“; darunter die Wochennummern.
      * - Ab drei Wochen trägt ein Block seinen Titel, darunter nur die Nummer.
-     * - Freie Wochen gestrichelt „frei“, Wochen nach Schuljahresende rot.
+     * - Freie Wochen gestrichelt „frei“, Wochen nach Schuljahresende rot, Puffer schraffiert
+     *   (gegenläufig zu den Ferien, `verlaufsplan-puffer`).
      * - Mindestbreite je Woche; ist die Leiste breiter als der Platz, scrollt sie waagerecht und
      *   springt im laufenden Schuljahr einmal zu „heute“.
      * - Maus über einem Block hebt ihn hier und in Tabelle/Editor hervor (`hervor`, bindable);
@@ -57,6 +58,8 @@
         gesprungen = true
     })
 
+    // Lesbarer Grund für die Beschriftung auf der kräftigen Puffer-Schraffur
+    const grundPuffer = 'rounded px-1 bg-light-ui-2 dark:bg-dark-ui-2'
     const klein = 'text-[10px] leading-none text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap'
 </script>
 
@@ -125,9 +128,9 @@
                             type="button"
                             class="relative h-10 rounded overflow-hidden px-1 text-xs leading-tight flex items-center
                                    justify-center text-center cursor-pointer transition-shadow
-                                   {farbe ? 'text-on-fill' : 'bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx dark:text-dark-tx'}
+                                   {a.puffer ? 'verlaufsplan-puffer text-light-tx dark:text-dark-tx' : farbe ? 'text-on-fill' : 'bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx dark:text-dark-tx'}
                                    {hervor === b.i ? 'ring-2 ring-offset-1 ring-light-tx dark:ring-dark-tx ring-offset-light-bg dark:ring-offset-dark-bg z-10' : ''}"
-                            style="grid-row: 3; grid-column: {st.von} / {st.bis};{farbe ? ` background-color: ${farbe};` : ''}"
+                            style="grid-row: 3; grid-column: {st.von} / {st.bis};{farbe && !a.puffer ? ` background-color: ${farbe};` : ''}"
                             title={text}
                             aria-label={st.beschriftung ? text : undefined}
                             aria-hidden={st.beschriftung ? undefined : 'true'}
@@ -140,9 +143,9 @@
                         >
                             {@render wochenlinien(st.wochen)}
                             {#if st.beschriftung === 'titel'}
-                                <span class="relative truncate">{a.titel || b.nr}</span>
+                                <span class="relative truncate {a.puffer ? grundPuffer : ''}">{a.titel || b.nr}</span>
                             {:else if st.beschriftung === 'nummer'}
-                                <span class="relative font-medium">{b.nr}</span>
+                                <span class="relative font-medium {a.puffer ? grundPuffer : ''}">{b.nr}</span>
                             {/if}
                         </button>
                     {/each}

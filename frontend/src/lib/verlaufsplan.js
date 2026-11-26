@@ -115,13 +115,25 @@ export function dauerVorschlag(stunden, wochenstunden) {
 
 /** Bezeichnung der Bezüge eines Abschnitts, für Tabelle und Auswahl. */
 export function bezugText(abschnitt, planungsart, titel) {
+    if (abschnitt?.puffer) return 'Puffer'
     return (abschnitt?.[bezugsfeld(planungsart)] ?? []).map((id) => titel[id] ?? 'nicht mehr im Curriculum').join(', ')
 }
 
 /** Eine neue, leere Zeile: eine Woche; wählt man Sequenzen oder Kapitel, schlägt der Editor die Dauer vor. */
 export const VORGABE_WOCHEN = 1
 export function neuerAbschnitt() {
-    return { id: null, titel: '', wochen: VORGABE_WOCHEN, kapitel_ids: [], sequenz_ids: [], notiz: '' }
+    return { id: null, titel: '', wochen: VORGABE_WOCHEN, kapitel_ids: [], sequenz_ids: [], notiz: '', puffer: false }
+}
+
+/**
+ * Puffer an- oder abwählen (zweiter Durchgang, Jan 25.11.2026) — derselbe Weg wie eine Sequenz
+ * oder ein Kapitel, aber ausschließend: Ein Puffer nennt nichts aus dem Curriculum und heißt ohne
+ * eigenen Titel „Puffer“. Beim Abwählen verschwindet nur dieser vorgegebene Titel.
+ */
+export const PUFFER_TITEL = 'Puffer'
+export function pufferUmschalten(a) {
+    if (a.puffer) return { ...a, puffer: false, titel: a.titel === PUFFER_TITEL ? '' : a.titel }
+    return { ...a, puffer: true, kapitel_ids: [], sequenz_ids: [], titel: a.titel?.trim() ? a.titel : PUFFER_TITEL }
 }
 
 /** Abschnitt `i` um `schritt` Plätze verschieben (−1 hoch, +1 runter); am Rand unverändert. */
@@ -257,6 +269,7 @@ export function zumSpeichern(abschnitte, planungsart) {
             kapitel_ids: [...(a.kapitel_ids ?? [])],
             sequenz_ids: [...(a.sequenz_ids ?? [])],
             notiz: a.notiz ?? '',
+            puffer: !!a.puffer,
         })),
     }
 }

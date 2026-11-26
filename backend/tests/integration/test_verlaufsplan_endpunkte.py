@@ -375,3 +375,39 @@ async def test_sequenzgenau_uebernehmen(db, welt):
     assert [a["sequenz_ids"] for a in p["abschnitte"]] == [[str(s[0].id), str(s[1].id)], []]
     assert p["kapitel_entfallen"] == 1
     assert await _kanten(db, p["id"]) == {s[0].id, s[1].id}
+
+
+async def test_puffer(db, welt):
+    """Puffer (zweiter Durchgang): ohne Bezug, mit Titel „Puffer“, nicht in der Bilanz, beim
+    Übernehmen dabei."""
+    plan_id = (await _anlegen(db, welt)).json()["id"]
+    kap = str(welt["kapitel"][0].id)
+    async with _client(db, FS()) as c:
+        r = await c.put(f"/context/verlaufsplaene/{plan_id}", json={"planungsart": "kapitel", "abschnitte": [
+            {"titel": "Ähnlichkeit", "wochen": 4, "kapitel_ids": [kap]},
+            {"titel": "", "wochen": 2, "puffer": True, "kapitel_ids": [kap]},   # Bezug fällt weg
+            {"titel": "Reserve vor den Ferien", "wochen": 1, "puffer": True},
+            {"titel": "offen", "wochen": 1},
+        ]})
+        assert r.status_code == 200, r.text
+        p = r.json()
+        assert [(a["titel"], a["puffer"], a["kapitel_ids"]) for a in p["abschnitte"]] == [
+            ("Ähnlichkeit", False, [kap]), ("Puffer", True, []), ("Reserve vor den Ferien", True, []),
+            ("offen", False, []),
+        ]
+        assert [a["puffer"] for a in p["lage"]["abschnitte"]] == [False, True, True, False]
+        assert p["lage"]["puffer_wochen"] == 3
+        bilanz = {k["kapitel_id"]: k["wochen"] for k in p["lage"]["kapitel"]}
+        assert bilanz[kap] == 4
+        # Nur das echte Kapitel bekommt eine Kante
+        kanten = (await db.execute(ContextEdge.__table__.select().where(
+            ContextEdge.from_node_id == uuid.UUID(plan_id)))).all()
+        assert len(kanten) == 1
+
+    plan = await db.get(ContextNode, uuid.UUID(plan_id))
+    plan.metadata_ = {**plan.metadata_, "schuljahr": "2024/25"}
+    await db.flush()
+    async with _client(db, FS()) as c:
+        r = await c.post(f"/context/verlaufsplaene/{plan_id}/uebernehmen", json={"schuljahr": "2025/26"})
+        assert r.status_code == 201, r.text
+        assert [a["puffer"] for a in r.json()["abschnitte"]] == [False, True, True, False]

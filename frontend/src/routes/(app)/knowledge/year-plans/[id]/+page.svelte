@@ -282,8 +282,8 @@
                                                {hervor === i ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                                         onmouseenter={() => (hervor = i)} onmouseleave={() => (hervor = null)}>
                                         <td class="py-1 pr-2">
-                                            <span class="inline-block w-2.5 h-2.5 rounded-full mr-1 {farbe ? '' : 'bg-light-ui-3 dark:bg-dark-ui-3'}"
-                                                style={farbe ? `background-color: ${farbe}` : ''} aria-hidden="true"></span>{i + 1}
+                                            <span class="inline-block w-2.5 h-2.5 rounded-full mr-1 {a.puffer ? 'verlaufsplan-puffer border border-light-ui-3 dark:border-dark-ui-3' : farbe ? '' : 'bg-light-ui-3 dark:bg-dark-ui-3'}"
+                                                style={farbe && !a.puffer ? `background-color: ${farbe}` : ''} aria-hidden="true"></span>{i + 1}
                                         </td>
                                         <td class="py-1 pr-2">{a.wochen}</td>
                                         <td class="py-1 pr-2 whitespace-nowrap">
@@ -293,7 +293,7 @@
                                             {a.titel || '–'}
                                             {#if l && hinweise(l).length}<div class="text-xs text-light-tx-2 dark:text-dark-tx-2">{hinweise(l).join(' · ')}</div>{/if}
                                         </td>
-                                        <td class="py-1 pr-2">{bezugText(a, plan.planungsart, e.titel)}</td>
+                                        <td class="py-1 pr-2 {a.puffer ? 'italic text-light-tx-2 dark:text-dark-tx-2' : ''}">{bezugText(a, plan.planungsart, e.titel)}</td>
                                         <td class="py-1 text-light-tx-2 dark:text-dark-tx-2">{a.notiz}</td>
                                     </tr>
                                 {/each}

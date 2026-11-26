@@ -260,3 +260,18 @@ class TestAblaufleiste:
         # Wechsel am Mittwoch der Faschingsferien → erste Woche danach (20)
         cfg = SchoolYearConfig.model_validate({**KALENDER_2025_26.model_dump(), "halbjahreswechsel": "2026-02-18"})
         assert halbjahr_ab_woche(cfg) == 20
+
+
+class TestPuffer:
+    def test_puffer_zaehlt_wochen_aber_nicht_in_der_bilanz(self):
+        abschnitte = [
+            {"id": "a", "wochen": 4, "kapitel_ids": ["k1"]},
+            {"id": "p", "wochen": 2, "puffer": True, "kapitel_ids": []},
+            {"id": "b", "wochen": 3, "kapitel_ids": []},          # ohne Bezug: kein Puffer
+        ]
+        p = _l(abschnitte, wochenstunden=4, kapitel=[{"id": "k1", "titel": "K1", "std": 16}])
+        assert [a.puffer for a in p.abschnitte] == [False, True, False]
+        assert p.puffer_wochen == 2
+        assert p.belegt == 9                                      # Puffer belegt Wochen
+        assert [(k.kapitel_id, k.wochen) for k in p.kapitel] == [("k1", 4)]
+        assert p.abschnitte[1].von_woche == 5

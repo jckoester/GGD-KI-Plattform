@@ -43,6 +43,9 @@ class Abschnitt(BaseModel):
     # Bei sequenzgenauer Planung (Schritt 7) — es gilt das Feld der Planungsart
     sequenz_ids: list[UUID] = Field(default_factory=list, max_length=40)
     notiz: str = Field(default="", max_length=2000)
+    # Puffer (zweiter Durchgang, Jan 25.11.2026): Wochen ohne Sequenz oder Kapitel, bewusst frei
+    # gehalten. Ein Abschnitt ohne Bezug ist dagegen ein normaler, noch nicht zugeordneter.
+    puffer: bool = False
 
 
 class PlanSpeichern(BaseModel):
@@ -81,6 +84,11 @@ def _metadata(alt: dict, daten: PlanSpeichern, abschnitte_roh: Optional[list[dic
         d["notiz"] = d["notiz"].strip()
         d["kapitel_ids"] = list(dict.fromkeys(d.get("kapitel_ids") or []))
         d["sequenz_ids"] = list(dict.fromkeys(d.get("sequenz_ids") or []))
+        d["puffer"] = bool(d.get("puffer"))
+        if d["puffer"]:
+            # Ein Puffer nennt nichts aus dem Curriculum und heißt ohne eigenen Titel „Puffer“
+            d["kapitel_ids"], d["sequenz_ids"] = [], []
+            d["titel"] = d["titel"] or "Puffer"
         abschnitte.append(d)
     meta = {k: v for k, v in alt.items() if k != "raster"}
     return {**meta, "abschnitte": abschnitte, "planungsart": daten.planungsart or vp.planungsart(alt)}
