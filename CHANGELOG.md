@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Planer einer Gruppe: `GET /planning/groups/{id}/verlaufsplan` liefert den Jahresverlaufsplan von Fach und Stufe im
+  laufenden Schuljahr mit der Zuordnung Woche → Abschnitt.
+
 ## [0.59.0] – 2026-11-26
 
 ### Neu

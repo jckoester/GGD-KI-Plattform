@@ -41,6 +41,7 @@ from app.einrichtung.router import router as einrichtung_router
 from app.upload.router import router as upload_router
 from app.context.router import router as context_router
 from app.planning.router import router as planning_router
+from app.planning.verlaufsplan_gruppe_router import router as verlaufsplan_gruppe_router
 from app.api.review import router as review_router
 from app.api.tokens import router as tokens_router
 from app.api.oauth import router as oauth_router
@@ -304,6 +305,7 @@ app.include_router(archiv_router)
 app.include_router(verlaufsplan_router)
 app.include_router(context_router)
 app.include_router(planning_router)
+app.include_router(verlaufsplan_gruppe_router)
 app.include_router(review_router)
 app.include_router(tokens_router)
 app.include_router(oauth_router)
