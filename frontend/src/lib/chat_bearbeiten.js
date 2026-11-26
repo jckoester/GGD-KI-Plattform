@@ -31,6 +31,9 @@ const WIRKUNGEN = {
   set_slot_category: PLAN,
   set_slot_topics: PLAN,
   undo_last_change: PLAN,
+  // 0.61: Einheiten aus dem Jahresverlaufsplan
+  verlaufsplan_einheiten_anlegen: "Einheiten aus dem Jahresverlaufsplan angelegt",
+  verlaufsplan_anlegen_zuruecknehmen: "Einheiten aus dem Jahresverlaufsplan wieder gelöscht",
   generate_image: "ein Bild erzeugt",
 };
 

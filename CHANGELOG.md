@@ -9,6 +9,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Anlegen aus dem Jahresverlaufsplan: einzelne Abschnitte auslassen und Titel ändern (für den Assistenten); die Antwort
   nennt die angelegten Einheiten.
+- Jahresplan-Assistent (Funktionen): `get_verlaufsplan` (Plan und Vorschau), `verlaufsplan_einheiten_anlegen` (mit
+  Auslassen und Umbenennen), `verlaufsplan_anlegen_zuruecknehmen`; `get_plan_balance` nennt den Plan der Fachschaft.
+  `undo_last_change` verweist nach einem Anlegen aus dem Plan auf die eigene Rücknahme.
 
 ## [0.60.0] – 2026-11-26
 

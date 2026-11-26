@@ -30,6 +30,10 @@ def test_planning_tools_registered():
         "assign_slots_to_unit",
         "set_slot_topics",
         "set_slot_category",
+        # 0.61: Jahresverlaufsplan der Fachschaft
+        "get_verlaufsplan",
+        "verlaufsplan_einheiten_anlegen",
+        "verlaufsplan_anlegen_zuruecknehmen",
     }
     registered = set(TOOL_REGISTRY.keys())
     assert expected.issubset(registered)
@@ -38,7 +42,8 @@ def test_planning_tools_registered():
 def test_write_tools_have_writes_flag():
     from app.chat.tools import TOOL_REGISTRY
 
-    write_tools = {"create_teaching_unit", "assign_slots_to_unit", "set_slot_topics", "set_slot_category"}
+    write_tools = {"create_teaching_unit", "assign_slots_to_unit", "set_slot_topics", "set_slot_category",
+                   "verlaufsplan_einheiten_anlegen", "verlaufsplan_anlegen_zuruecknehmen"}
     for name in write_tools:
         tool = TOOL_REGISTRY.get(name)
         if tool:
@@ -48,7 +53,7 @@ def test_write_tools_have_writes_flag():
 def test_read_tools_have_no_writes_flag():
     from app.chat.tools import TOOL_REGISTRY
 
-    read_tools = {"get_lesson_slots", "get_curriculum_chapters", "get_plan_balance"}
+    read_tools = {"get_lesson_slots", "get_curriculum_chapters", "get_plan_balance", "get_verlaufsplan"}
     for name in read_tools:
         tool = TOOL_REGISTRY.get(name)
         if tool:

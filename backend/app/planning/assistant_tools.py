@@ -238,7 +238,9 @@ async def _handle_get_plan_balance(args: dict, ctx: ToolContext) -> dict:
     group_id = ctx.group_id
     if group_id is None:
         return {"error": "Kein Gruppenkontext"}
-    return await _build_compact_balance(ctx.db, group_id)
+    bilanz = await _build_compact_balance(ctx.db, group_id)
+    # Ob die Fachschaft einen Jahresverlaufsplan hat (0.61, F4) — lesen nur bei Bedarf (get_verlaufsplan)
+    return {**bilanz, "verlaufsplan": await _verlaufsplan_kurz(ctx.db, group_id)}
 
 
 register_tool(ChatTool(
@@ -253,7 +255,8 @@ register_tool(ChatTool(
                 "Gibt die aktuelle Soll/Ist-Bilanz des Jahresplans zurück: "
                 "pro UE zugewiesene vs. geplante Stunden, Pufferstand, "
                 "Gesamtzahl Slots und unzugewiesene Slots. "
-                "Niemals selbst rechnen — immer dieses Tool für Bilanzzahlen nutzen."
+                "Niemals selbst rechnen — immer dieses Tool für Bilanzzahlen nutzen. "
+                "verlaufsplan nennt den Jahresverlaufsplan der Fachschaft (Titel, Status) oder null."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
@@ -1997,6 +2000,15 @@ async def _handle_undo_last_change(args: dict, ctx: ToolContext) -> dict:
     ).scalar_one_or_none()
     if snap is None:
         return {"ok": False, "error": "Kein Snapshot zum Rückgängigmachen vorhanden"}
+    # Nach dem Anlegen aus dem Jahresverlaufsplan (0.61, F3): Der Snapshot davor löschte die neuen
+    # Einheiten nicht — sie blieben leer stehen. Dafür gibt es die eigene Rücknahme.
+    from app.planning.verlaufsplan_gruppe import HERKUNFT, SNAPSHOT_LABEL, einheiten_des_schuljahrs
+    if snap.label == SNAPSHOT_LABEL:
+        for e in await einheiten_des_schuljahrs(ctx.db, ctx.group_id, None):
+            h = (e.metadata_ or {}).get(HERKUNFT)
+            if isinstance(h, dict) and h.get("snapshot_id") == str(snap.id):
+                return {"error": "Die letzte Änderung war das Anlegen aus dem Jahresverlaufsplan. Dafür "
+                                 "verlaufsplan_anlegen_zuruecknehmen verwenden.", "lauf_id": h.get("lauf_id")}
     label = snap.label
     await restore_snapshot(ctx.db, snap.id, ctx.user)
     return {"ok": True, "restored_label": label}
@@ -2018,4 +2030,226 @@ register_tool(ChatTool(
         },
     },
     handler=_handle_undo_last_change,
+))
+
+
+# ── Jahresverlaufsplan der Fachschaft (0.61) ──────────────────────────────────
+#
+# Derselbe Dienst wie der Knopf im Planer (`app/planning/verlaufsplan_gruppe.py`): Vorschau,
+# Anlegen (der Server rechnet neu, das Modell reicht keine Liste durch), Rücknahme. Nur die
+# Wünsche aus dem Chat — Abschnitte auslassen, Titel ändern — gibt das Modell mit (F1a).
+# Rückgängig ist hier **nicht** `undo_last_change`: Ein Snapshot löscht keine Einheiten.
+
+#: Was ein `grund` der Vorschau bedeutet — kurz, für die Beschreibung der Funktion.
+_VERLAUFSPLAN_GRUENDE = (
+    "puffer = bewusst freie Wochen; kapitel_vorhanden = das Kapitel hat schon eine Einheit der Gruppe; "
+    "schon_angelegt = schon aus dem Plan angelegt; vorbei = liegt in der Vergangenheit; "
+    "nach_schuljahresende; belegt = alle Stunden der Wochen schon belegt"
+)
+
+
+async def _verlaufsplan_kurz(db: AsyncSession, group_id: int) -> dict | None:
+    """Kopfangabe für `get_plan_balance` (F4): gibt es einen Plan, und welchen Status hat er?"""
+    from app.planning.verlaufsplan_gruppe import plan_der_gruppe
+
+    group = await db.get(Group, group_id)
+    if group is None:
+        return None
+    pg = await plan_der_gruppe(db, group)
+    if pg.plan is None:
+        return None
+    return {"titel": pg.plan.title, "status": "entwurf" if pg.plan.status == "draft" else "beschlossen"}
+
+
+async def _plan_fuer_werkzeug(ctx: ToolContext):
+    """(group, plan, voll) oder ein Fehler-Dict — wie `_plan_mit_lage` im Router, ohne HTTPException."""
+    from app.context import verlaufsplan as vp
+    from app.planning.verlaufsplan_gruppe import KEIN_FACH, KEINE_STUFE, plan_der_gruppe
+
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenkontext"}
+    group = await ctx.db.get(Group, ctx.group_id)
+    if group is None:
+        return {"error": "Gruppe nicht gefunden"}
+    pg = await plan_der_gruppe(ctx.db, group)
+    if pg.plan is None:
+        grund = {KEIN_FACH: "Die Gruppe hat kein Fach.",
+                 KEINE_STUFE: "Die Klassenstufe der Gruppe ist nicht bekannt (unter Unterricht festlegen)."}.get(
+            pg.grund, f"Die Fachschaft hat für diese Klassenstufe im Schuljahr {pg.schuljahr} keinen Jahresverlaufsplan.")
+        return {"error": grund, "verlaufsplan": None}
+    voll = await vp.voll(ctx.db, pg.plan, ctx.user)
+    return group, pg.plan, voll
+
+
+async def _handle_get_verlaufsplan(args: dict, ctx: ToolContext) -> dict:
+    from app.context import verlaufsplan as vp
+    from app.planning.verlaufsplan_gruppe import vorschlaege
+
+    erg = await _plan_fuer_werkzeug(ctx)
+    if isinstance(erg, dict):
+        return erg
+    group, plan, voll = erg
+    titel_alt, kapitel_alt = await vp.alte_titel(ctx.db, voll)
+    aus = {"verlaufsplan": vp.kompakt(voll, titel_alt=titel_alt, kapitel_alt=kapitel_alt)}
+    if voll["lage"] is None:
+        aus["vorschau"] = None
+        aus["hinweis"] = "Ohne Kalender des Schuljahrs lassen sich keine Einheiten aus dem Plan anlegen."
+        return aus
+    liste = await vorschlaege(ctx.db, group, plan, voll["lage"])
+    aus["vorschau"] = [{
+        "nr": v.nr, "titel": v.titel, "wochen": v.wochen, "kapitel": v.kapitel_titel,
+        "anlegen": v.anlegen, "grund": v.grund, "stunden": v.stunden,
+        **({"ohne_termine": True} if v.ohne_termine else {}),
+        **({"kapitel_nicht_mehr_im_curriculum": True} if v.kapitel_fehlt else {}),
+    } for v in liste]
+    aus["neu"] = sum(1 for v in liste if v.anlegen)
+    aus["stunden"] = sum(v.stunden for v in liste)
+    return aus
+
+
+register_tool(ChatTool(
+    name="get_verlaufsplan",
+    groups=frozenset({"planning"}),
+    writes=False,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "get_verlaufsplan",
+            "description": (
+                "Liest den Jahresverlaufsplan der Fachschaft für Fach und Klassenstufe dieser Gruppe "
+                "(Entwurf oder beschlossen): Abschnitte mit Wochen, Daten, Ferien, Kapiteln bzw. "
+                "Lernsequenzen und Notiz, dazu die Stundenbilanz. Unter vorschau steht je Abschnitt "
+                "(nr), ob verlaufsplan_einheiten_anlegen dafür eine Einheit anlegen würde (anlegen) "
+                "und wie viele freie Stunden sie bekäme; sonst der grund: " + _VERLAUFSPLAN_GRUENDE + "."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    handler=_handle_get_verlaufsplan,
+))
+
+
+def _ganzzahlen(werte) -> list[int] | None:
+    try:
+        return [int(w) for w in werte or []]
+    except (TypeError, ValueError):
+        return None
+
+
+async def _handle_verlaufsplan_einheiten_anlegen(args: dict, ctx: ToolContext) -> dict:
+    from app.planning import verlaufsplan_gruppe as vg
+
+    auslassen = _ganzzahlen(args.get("auslassen"))
+    if auslassen is None:
+        return {"error": "auslassen: eine Liste von Abschnittsnummern (nr aus get_verlaufsplan)"}
+    titel = {}
+    for eintrag in args.get("umbenennen") or []:
+        nr = _ganzzahlen([eintrag.get("nr")]) if isinstance(eintrag, dict) else None
+        if not nr or not str(eintrag.get("titel") or "").strip():
+            return {"error": "umbenennen: Einträge {nr, titel}"}
+        titel[nr[0]] = eintrag["titel"]
+    erg = await _plan_fuer_werkzeug(ctx)
+    if isinstance(erg, dict):
+        return erg
+    group, plan, voll = erg
+    if voll["lage"] is None:
+        return {"error": "Für dieses Schuljahr liegt der Kalender der Schule noch nicht vor."}
+    try:
+        lauf = await vg.anlegen(ctx.db, group, plan, voll, ctx.user, auslassen=auslassen, titel=titel)
+    except HTTPException as exc:
+        return {"error": exc.detail}
+    if not lauf["lauf_id"]:
+        return {"ok": True, "einheiten": 0, "hinweis": "Aus dem Plan war nichts (mehr) anzulegen."}
+    return {"ok": True, **lauf, "balance": await _build_compact_balance(ctx.db, group.id)}
+
+
+register_tool(ChatTool(
+    name="verlaufsplan_einheiten_anlegen",
+    groups=frozenset({"planning"}),
+    writes=True,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "verlaufsplan_einheiten_anlegen",
+            "description": (
+                "Legt die Einheiten aus dem Jahresverlaufsplan an — je Abschnitt mit anlegen=true aus "
+                "get_verlaufsplan eine Einheit mit Kapitel, belegt mit den freien Unterrichtsstunden "
+                "seiner Wochen. Vorhandenes bleibt unverändert. Nur nach Zustimmung der Lehrkraft zur "
+                "Vorschau. Gibt lauf_id zurück — damit nimmt verlaufsplan_anlegen_zuruecknehmen das "
+                "Anlegen zurück."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "auslassen": {
+                        "type": "array", "items": {"type": "integer"},
+                        "description": "Nummern (nr) der Abschnitte, die keine Einheit bekommen sollen",
+                    },
+                    "umbenennen": {
+                        "type": "array",
+                        "items": {"type": "object", "properties": {
+                            "nr": {"type": "integer"}, "titel": {"type": "string"}}, "required": ["nr", "titel"]},
+                        "description": "Eigener Titel der Einheit für einzelne Abschnitte",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    handler=_handle_verlaufsplan_einheiten_anlegen,
+))
+
+
+async def _juengster_lauf(db: AsyncSession, group_id: int) -> str | None:
+    from app.planning.verlaufsplan_gruppe import HERKUNFT, einheiten_des_schuljahrs
+
+    for e in reversed(await einheiten_des_schuljahrs(db, group_id, None)):
+        h = (e.metadata_ or {}).get(HERKUNFT)
+        if isinstance(h, dict) and h.get("lauf_id"):
+            return h["lauf_id"]
+    return None
+
+
+async def _handle_verlaufsplan_anlegen_zuruecknehmen(args: dict, ctx: ToolContext) -> dict:
+    from app.planning import verlaufsplan_gruppe as vg
+
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenkontext"}
+    group = await ctx.db.get(Group, ctx.group_id)
+    if group is None:
+        return {"error": "Gruppe nicht gefunden"}
+    lauf_id = str(args.get("lauf_id") or "").strip() or await _juengster_lauf(ctx.db, group.id)
+    if not lauf_id:
+        return {"error": "Es gibt keine Einheiten, die aus dem Jahresverlaufsplan angelegt wurden."}
+    try:
+        geloescht = await vg.rueckgaengig(ctx.db, group, lauf_id)
+    except vg.NichtMehrRueckgaengig:
+        return {"error": "Nicht mehr möglich: In mindestens einer dieser Einheiten gibt es schon Stunden. "
+                         "Einzelne Einheiten löscht die Lehrkraft in der Jahresübersicht."}
+    if not geloescht:
+        return {"error": "Die angelegten Einheiten gibt es nicht mehr."}
+    return {"ok": True, "einheiten_geloescht": geloescht, "balance": await _build_compact_balance(ctx.db, group.id)}
+
+
+register_tool(ChatTool(
+    name="verlaufsplan_anlegen_zuruecknehmen",
+    groups=frozenset({"planning"}),
+    writes=True,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "verlaufsplan_anlegen_zuruecknehmen",
+            "description": (
+                "Nimmt verlaufsplan_einheiten_anlegen zurück: löscht genau die dabei angelegten Einheiten, "
+                "ihre Stunden werden wieder frei. Geht nicht mehr, sobald eine davon eine Stunde hat. "
+                "Ohne lauf_id das jüngste Anlegen. Für diese Einheiten nicht undo_last_change verwenden."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"lauf_id": {"type": "string", "description": "lauf_id aus verlaufsplan_einheiten_anlegen"}},
+                "required": [],
+            },
+        },
+    },
+    handler=_handle_verlaufsplan_anlegen_zuruecknehmen,
 ))

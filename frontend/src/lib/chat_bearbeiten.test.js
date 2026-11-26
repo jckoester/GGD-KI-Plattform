@@ -28,6 +28,12 @@ describe("wirkungsHinweis", () => {
     expect(text).toContain("bleibt bestehen");
   });
 
+  it("kennt das Anlegen aus dem Jahresverlaufsplan (0.61)", () => {
+    const text = wirkungsHinweis(A("x", { werkzeuge_mit_wirkung: ["verlaufsplan_einheiten_anlegen"] }));
+    expect(text).toContain("Einheiten aus dem Jahresverlaufsplan angelegt");
+    expect(text).not.toContain("etwas geändert");
+  });
+
   it("schweigt ohne Wirkung", () => {
     expect(wirkungsHinweis(A("x"))).toBeNull();
     expect(wirkungsHinweis(null)).toBeNull();
