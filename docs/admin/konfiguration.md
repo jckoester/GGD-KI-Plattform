@@ -37,6 +37,15 @@ die alte Konfiguration bleibt in Kraft.
 Beide schreiben die YAML-Datei *und* verwerfen den Zwischenspeicher. Wer dieselben Dateien
 von Hand im Editor ändert, braucht trotzdem den Neustart.
 
+**Eine dritte Ausnahme: Kalender anderer Schuljahre** (seit 0.59). Neben `school_year.yaml`
+(dem laufenden Schuljahr) liest die Plattform Jahresdateien wie `school_year_2027-28.yaml`
+(Schrägstrich als Bindestrich) für die Jahresverlaufspläne der Fachschaften: die Datei des
+**kommenden** Schuljahrs, damit die Fachschaften ihren Plan schon mit echten Ferien schreiben,
+und die **vergangener** Jahre, damit archivierte Pläne ihre Daten behalten. Diese Dateien wirken
+**ohne Neustart**; eine geänderte Datei wird beim nächsten Aufruf neu gelesen. Fehlt die Datei
+eines Jahres, zählen dessen Pläne nur Wochen. Ablauf zum Schuljahreswechsel:
+[Runbook Schuljahreswechsel](../runbooks/schuljahreswechsel.md).
+
 ### `config/` muss für das Backend schreibbar sein
 
 Dafür muss das Backend in `config/` **schreiben** dürfen — in das Verzeichnis, nicht nur in

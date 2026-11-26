@@ -46,7 +46,7 @@ BEZUGSTYP = {SEQUENZ: "lernsequenz", KAPITEL: "kapitel"}
 EIGENE_WEGE = frozenset({TYP})
 
 
-EIGENER_WEG = "Jahresverlaufspläne bearbeitest du in ihrer eigenen Ansicht beim Fach."
+EIGENER_WEG = "Jahresverlaufspläne bearbeitest du in ihrer eigenen Ansicht in der Bibliothek."
 
 
 def pruefe_eigener_weg(content_type: str | None) -> None:

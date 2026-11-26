@@ -558,8 +558,10 @@ flowchart LR
   lernsequenz -->|references| lpa
   lernsequenz -->|references| lb
   lernsequenz -->|references| lba
-  %% Jahresverlaufsplan (BD, 0.59): Abschnitte nennen Kapitel; Erzeuger folgt mit den Endpunkten
-  verlaufsplan -.->|references| kapitel
+  %% Jahresverlaufsplan (BD, 0.59): je nach Planungsart auf Lernsequenzen oder Kapitel
+  %% (verlaufsplan.bezugskanten_abgleichen, docs/dev/jahresverlaufsplan.md)
+  verlaufsplan -->|references| lernsequenz
+  verlaufsplan -->|references| kapitel
 
   %% Unterrichtsplanung (planning/service.py, router.py, assistant_tools.py)
   ue -->|part_of| jahresplan

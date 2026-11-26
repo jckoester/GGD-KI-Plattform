@@ -14,13 +14,14 @@ eine Kachel je Bereich:
 
 - Meine Bausteine
 - Alle Bausteine
+- Jahresverlaufspläne (siehe [Jahresverlaufsplan](jahresverlaufsplan.md))
 - Curricula
 - Bildungspläne
 - Leitperspektiven
 - das Archiv
 - die Sammlungen
 
-Curricula, Bildungspläne und Leitperspektiven erscheinen erst ab der Darstellungsstufe, die sie
+Jahresverlaufspläne, Curricula, Bildungspläne und Leitperspektiven erscheinen erst ab der Darstellungsstufe, die sie
 zeigt. Aus den Bereichen führt „Zurück“ wieder auf die Übersicht.
 
 Unter **Leitperspektiven** stehen auch die **Leitlinien der Schule** — eigene Rahmenwerke wie

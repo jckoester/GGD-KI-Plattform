@@ -599,3 +599,17 @@
     kleine Marke mit dem Fach. Ein Klick zeigt, was gemeint ist und wo die andere Fachschaft es in
     ihrem Curriculum behandelt — ein guter Anlass für Absprachen. Auch im PDF und Word-Export.
   link: /help/curriculum#querverweise-in-andere-fächer
+
+- id: "0.59-jahresverlaufsplaene"
+  version: "0.59.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-26
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Jahresverlaufspläne der Fachschaften"
+  text: >-
+    In der Bibliothek gibt es jetzt Jahresverlaufspläne: Deine Fachschaft legt je Klassenstufe die
+    Sequenzen oder Kapitel ihres Curriculums in Unterrichtswochen auf das Schuljahr — die Ferien
+    rechnet die Plattform selbst ein. Mit Ablaufleiste, Puffer, Stundenbilanz je Kapitel und
+    Beschluss; im nächsten Schuljahr übernimmst du den Plan als Entwurf.
+  link: /help/jahresverlaufsplan

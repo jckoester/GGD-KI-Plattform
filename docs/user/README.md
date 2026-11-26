@@ -36,6 +36,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [Werkstatt](werkstatt.md) — Bilder, Diagramme und Dokumente aufbewahren, Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
 - [KI-Ergebnisse zitieren](zitieren.md) — Modell, Datum und Eingabe für GFS, Seminarkurs, Facharbeit
 - [Schulcurriculum](curriculum.md) — *(Lehrkräfte)* Kapitel & Lernsequenzen, Kompetenzen verknüpfen, Fassungswechsel, Export
+- [Jahresverlaufsplan](jahresverlaufsplan.md) — *(Lehrkräfte)* Abschnitte der Fachschaft auf dem Schuljahr, Puffer, Stundenbilanz, Übernehmen
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
 - [Bibliothek](bibliothek.md) — Bausteine suchen und gezielt in den Chat einbinden

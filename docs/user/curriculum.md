@@ -10,7 +10,8 @@ eines Fachs unterrichtet werden.
 > und lässt sich hier nicht ändern. Das **Curriculum** ist eure Fachschaftsarbeit darauf:
 > Kapitel, Lernsequenzen, Konkretisierungen, Material.
 
-Du erreichst Curricula über **Wissen → Curricula** oder direkt von der Fachseite aus.
+Du erreichst Curricula über **Bibliothek → Curricula** oder direkt von der Fachseite aus. Oben
+verlinkt ein Curriculum den [Jahresverlaufsplan](jahresverlaufsplan.md) seiner Stufe.
 
 ## Die Liste
 

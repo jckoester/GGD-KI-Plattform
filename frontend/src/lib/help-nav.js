@@ -37,6 +37,7 @@ export const helpNav = [
     { label: 'Bessere Antworten',   slug: 'bessere-antworten',   file: 'bessere-antworten', fuer: 'teacher' },
     { label: 'Als Schüler:in ansehen', slug: 'vorschau',         file: 'vorschau', fuer: 'teacher' },
     { label: 'Schulcurriculum',     slug: 'curriculum',          file: 'curriculum', fuer: 'teacher' },
+    { label: 'Jahresverlaufsplan',  slug: 'jahresverlaufsplan',  file: 'jahresverlaufsplan', fuer: 'teacher' },
     { label: 'Unterrichtsplanung',  slug: 'unterrichtsplanung',  file: 'unterrichtsplanung', fuer: 'teacher' },
     { label: 'Stundenplan übernehmen', slug: 'stundenplan',      file: 'stundenplan', fuer: 'teacher' },
     { label: 'Profil & Budget',     slug: 'profil',              file: 'profil' },

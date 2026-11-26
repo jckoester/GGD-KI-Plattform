@@ -541,6 +541,11 @@ auch mit Backup nicht möglich.
   Feiertage. **Danach die Zahl der Unterrichtswochen auf `/budget` prüfen:** Sie ist der
   Faktor der Jahreszusage, und ein vergessener Ferienzeitraum erzeugt zusätzliche Wochen
   und damit eine höhere Jahressumme als angezeigt.
+- Den bisherigen Kalender als `config/school_year_JJJJ-JJ.yaml` aufheben (etwa
+  `school_year_2025-26.yaml`) — sonst zeigen die archivierten Jahresverlaufspläne nur noch
+  Wochennummern. Liegt der Kalender des **folgenden** Jahres schon vor, als eigene Jahresdatei
+  ablegen; die Fachschaften planen dann mit echten Ferien. Einzelheiten im
+  [Runbook](../runbooks/schuljahreswechsel.md).
 - `config/budget_tiers.yaml`: Sollen sich die Wochenbeträge für bestimmte
   Jahrgänge ändern? Die Anpassung geht auch über `/budget`; dort steht die
   resultierende Jahressumme daneben.

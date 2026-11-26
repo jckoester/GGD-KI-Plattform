@@ -5,29 +5,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.59.0] – 2026-11-26
+
 ### Neu
 
-- Jahresverlaufspläne der Fachschaften (`/knowledge/year-plans`): je Fach, Klassenstufe und Schuljahr Abschnitte
-  in Unterrichtswochen auf dem Kalender der Schule, mit Zeitleiste, Stundenbilanz je Kapitel, Entwurf und Beschluss,
-  Archiv früherer Schuljahre. In der Bibliothek mit eigenem Eintrag und Kachel; das Curriculum verlinkt den Plan seiner
-  Stufe.
-- Jahresverlaufsplan aus einem früheren Schuljahr als Entwurf übernehmen; Kapitel werden auf das heutige
+- Jahresverlaufspläne der Fachschaften (`/knowledge/year-plans`, Bibliothek): je Fach, Klassenstufe und Schuljahr
+  Abschnitte in Unterrichtswochen auf dem Kalender der Schule, sequenz- oder kapitelgenau. Ablaufleiste mit Ferien,
+  Halbjahr und „heute“, Puffer, Stundenbilanz je Kapitel und Sequenz, Entwurf und Beschluss, Archiv früherer
+  Schuljahre. Das Curriculum verlinkt den Plan seiner Stufe.
+- Jahresverlaufsplan in ein anderes Schuljahr als Entwurf übernehmen; Sequenzen und Kapitel werden auf das heutige
   Curriculum abgebildet.
+- Kalender je Schuljahr: neben `config/school_year.yaml` gelten `config/school_year_JJJJ-JJ.yaml` für kommende
+  und vergangene Schuljahre, ohne Neustart.
+- Hilfe „Jahresverlaufsplan“.
 
 ### Intern
 
+- Knotentyp `verlaufsplan` mit eigenen Endpunkten `/context/verlaufsplaene`; die allgemeinen Schreibwege weisen
+  ihn ab. Migration 0114: Entwurf für Verlaufspläne, höchstens ein Plan je Fach, Klassenstufe und Schuljahr.
+- Zeitrechnung `app/planning/verlaufsplan_zeit.py`.
 - Symbolpaket `lucide-svelte` (1.0.1, nicht mehr gepflegt) durch den Nachfolger `@lucide/svelte` (1.80) ersetzt.
-
-- Knotentyp `verlaufsplan` (Jahresverlaufsplan der Fachschaft, noch ohne Oberfläche). Migration 0114:
-  Entwurf auch für Verlaufspläne, höchstens ein Plan je Fach, Jahrgangsstufe und Schuljahr.
-- Zeitrechnung des Verlaufsplans (`app/planning/verlaufsplan_zeit.py`): Abschnitte auf den Kalender des
-  Schuljahrs gelegt, mit Ferien, Halbjahr, Überhang und Stundenbilanz je Kapitel.
-- Endpunkte `/context/verlaufsplaene` (Liste, Anlegen, Lesen, Speichern, Beschließen, Löschen); die allgemeinen
-  Schreibwege weisen Verlaufspläne ab.
-- Jahresverlaufsplan: Planungsart sequenz- oder kapitelgenau (Abschnitte nennen Lernsequenzen oder Kapitel), Wechsel
-  mit Umrechnung; das Raster entfällt.
-- Kalender je Schuljahr: neben `config/school_year.yaml` gelten `config/school_year_JJJJ-JJ.yaml` für kommende
-  und vergangene Schuljahre.
 
 ## [0.58.1] – 2026-11-25
 
