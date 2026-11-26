@@ -132,9 +132,8 @@ async def lies_curricula(db: AsyncSession, user, fach: str | None, jahrgangsstuf
                       sa.and_(sa.literal(eigenes_zaehlt(user.sub)), ContextNode.owner_pseudonym == user.sub)))
         .order_by(Subject.sort_order, Subject.name, ContextNode.min_grade, ContextNode.title))
     if f := (fach or "").strip():
-        muster = f"%{f}%"
-        abfrage = abfrage.where(sa.or_(Subject.name.ilike(muster), Subject.slug.ilike(muster),
-                                       Subject.fach_code.ilike(f)))
+        # Erst genau, dann als Teil (0.60): „M“ traf sonst auch Musik, Chemie und Informatik
+        abfrage = abfrage.where(Subject.id.in_(await _faecher(db, f)))
     if j := (jahrgangsstufe or "").strip():
         lo, hi = parse_grade_band(j)
         if lo is None:

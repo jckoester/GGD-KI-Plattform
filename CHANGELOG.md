@@ -20,6 +20,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Schnittstelle für KI-Abos (MCP): neue Werkzeuge `verlaufsplaene_finden` und `verlaufsplan_lesen` für die
   Jahresverlaufspläne der Fachschaften.
 
+### Behoben
+
+- MCP `curricula_finden`: Ein Fachkürzel wie „M“ findet nur noch sein Fach, nicht jedes Fach, dessen Name es
+  enthält.
+
 ## [0.59.0] – 2026-11-26
 
 ### Neu

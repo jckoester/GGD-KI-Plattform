@@ -140,6 +140,23 @@ async def test_curricula_finden_wie_im_browser(db, welt):
         assert aus["curricula"] == []
 
 
+async def test_curricula_finden_kuerzel_genau(db, welt):
+    """Ein Kürzel trifft nur sein Fach, nicht jedes, dessen Name es enthält (0.60)."""
+    code = welt["fach"].fach_code
+    anderes = Subject(slug=f"mx-{TOKEN}", name=f"Musik{code.lower()}kunde", fach_code=f"MU{TOKEN[:3]}".upper())
+    db.add(anderes)
+    await db.flush()
+    db.add(_knoten("curriculum", f"Musik {TOKEN}", subject_id=anderes.id, min_grade=7, max_grade=8,
+                   metadata_={"jahrgangsstufe": "7/8"}))
+    await db.flush()
+    async with _verbunden(db) as rpc:
+        aus, _ = await _ruf(rpc, "curricula_finden", fach=code)
+        assert {c["fach"] for c in aus["curricula"]} == {welt["fach"].name}
+        # Ohne genauen Treffer weiter als Teil des Namens
+        aus, _ = await _ruf(rpc, "curricula_finden", fach=f"{code.lower()}kunde")
+        assert {c["fach"] for c in aus["curricula"]} == {anderes.name}
+
+
 async def test_curriculum_lesen_und_abdeckung(db, welt):
     async with _verbunden(db) as rpc:
         aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(welt["entwurf"].id))
