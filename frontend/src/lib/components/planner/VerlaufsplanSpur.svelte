@@ -34,7 +34,7 @@
 </script>
 
 {#if plan}
-    <section class="border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-4 py-2" aria-labelledby="verlaufsplan-spur-titel">
+    <section class="mt-2 border-y border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-4 py-2" aria-labelledby="verlaufsplan-spur-titel">
         <div class="flex items-center justify-between gap-3">
             <button type="button" onclick={umschalten} aria-expanded={!zu} aria-controls={zu ? undefined : 'verlaufsplan-spur-leiste'}
                 class="flex items-center gap-1.5 min-w-0 text-left text-xs text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx">
@@ -66,7 +66,7 @@
         {/if}
     </section>
 {:else if ohne}
-    <div class="border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-4 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center justify-between gap-3">
+    <div class="mt-2 border-y border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-4 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center justify-between gap-3">
         <span>{ohne}</span>
         {#if antwort?.grund === 'kein_plan'}
             <a href={listenPfad} class="flex-shrink-0 text-light-bl dark:text-dark-bl hover:underline">Jahresverlaufspläne des Fachs</a>
