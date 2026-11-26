@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-    abschnittFarbe, bezugText, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
+    ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, abschnittFarbe, bezugText, entwurfHinweis, bezugsfeld, bilanzStand, dauerVorschlag, einheiten, hinweise, neuerAbschnitt, schuljahreZumAnlegen, tagText, teilen,
     umsetzen, verschieben, wochenBisZuDenFerien, wochenText, zeitraumText, zumSpeichern,
 } from './verlaufsplan.js'
 import { ueColorIndex } from './planner.js'
@@ -215,5 +215,14 @@ describe('Verweise aus dem Curriculum (Schritt 7)', () => {
             .toEqual([{ href: '/knowledge/year-plans?fach=3', text: 'Jahresverlaufspläne' }])
         expect(planVerweise(undefined, { fachId: 4, stufen: [], aktuell: '2025/26' }))
             .toEqual([{ href: '/knowledge/year-plans?fach=4', text: 'Jahresverlaufspläne' }])
+    })
+})
+
+describe('Entwurfshinweis', () => {
+    it('unterscheidet Fachschaft und Lesende, beschlossen ohne Hinweis', () => {
+        expect(entwurfHinweis({ status: 'draft', darf_bearbeiten: true })).toBe(ENTWURF_HINWEIS)
+        expect(entwurfHinweis({ status: 'draft', darf_bearbeiten: false })).toBe(ENTWURF_NUR_LESEN)
+        expect(entwurfHinweis({ status: 'active', darf_bearbeiten: true })).toBe('')
+        expect(entwurfHinweis(null)).toBe('')
     })
 })

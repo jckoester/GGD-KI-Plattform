@@ -221,6 +221,21 @@ export function planVerweise(plaene, { fachId, stufen = [], aktuell }) {
     }))
 }
 
+/**
+ * Hinweis über einem Plan im Entwurf (zweiter Durchgang, Jan 25.11.2026) — wie beim Curriculum
+ * (`entwurfHinweis` in `$lib/curriculum.js`), je nachdem, ob man ihn bearbeiten darf. Leer, wenn
+ * der Plan beschlossen ist.
+ */
+export const ENTWURF_HINWEIS =
+    'Entwurf: Alle Lehrkräfte können ihn lesen, bearbeiten kann ihn die Fachschaft. Beschlossen ist er, sobald jemand aus der Fachschaft „Beschließen“ wählt.'
+export const ENTWURF_NUR_LESEN =
+    'Entwurf — nur lesen. Die Fachschaft des Fachs hat den Plan noch nicht beschlossen; er kann sich noch ändern.'
+
+export function entwurfHinweis(plan) {
+    if (plan?.status !== 'draft') return ''
+    return plan.darf_bearbeiten ? ENTWURF_HINWEIS : ENTWURF_NUR_LESEN
+}
+
 /** Bilanz eines Kapitels: „passt“, „zu wenig“, „zu viel“ oder `null` ohne Zahlen. Ein Spielraum
  *  von einer Wochenstunde gilt als passend. */
 export function bilanzStand(kapitel, wochenstunden) {

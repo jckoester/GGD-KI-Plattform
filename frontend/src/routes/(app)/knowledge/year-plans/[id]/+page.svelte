@@ -7,12 +7,12 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { onDestroy } from 'svelte'
-    import { Undo2 } from '@lucide/svelte'
+    import { Check, CopyPlus, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
     import {
         beschliesseVerlaufsplan, deleteVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
     import {
-        PLANUNGSARTEN, abschnittFarbe, bezugText, einheiten, hinweise, uebernahmeZiele,
+        PLANUNGSARTEN, abschnittFarbe, bezugText, einheiten, entwurfHinweis, hinweise, uebernahmeZiele,
         wochenText, zeitraumText, zumSpeichern,
     } from '$lib/verlaufsplan.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
@@ -157,7 +157,11 @@
         if (timer) speichern()
     })
 
-    const knopf = 'px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 disabled:opacity-40'
+    // Knöpfe wie auf der Curriculum-Seite: Bearbeiten gefüllt, alles andere mit Rahmen.
+    const knopfForm = 'inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+    const knopf = `${knopfForm} border border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`
+    const knopfRot = `${knopfForm} border border-light-ui-3 dark:border-dark-ui-3 text-light-re dark:text-dark-re hover:bg-light-ui-2 dark:hover:bg-dark-ui-2`
+    const knopfPrimaer = `${knopfForm} bg-primary dark:bg-primary-dark text-on-fill hover:opacity-90`
 </script>
 
 <svelte:head><title>{plan?.titel ?? 'Jahresverlaufsplan'}</title></svelte:head>
@@ -175,7 +179,7 @@
                 <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">{plan.titel}</h1>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                     {#if plan.status === 'draft'}
-                        <span class="font-medium text-light-or dark:text-dark-or">Entwurf</span>
+                        Entwurf
                     {:else}
                         beschlossen{#if plan.beschlossen_am} am {plan.beschlossen_am.split('-').reverse().join('.')}{/if}
                     {/if}
@@ -190,16 +194,25 @@
                             {speichert ? 'Speichert…' : 'Gespeichert'}
                         </span>
                         <button type="button" class={knopf} disabled={!verlauf.length || speichert} onclick={rueckgaengig}>
-                            <span class="inline-flex items-center gap-1"><Undo2 size={14} /> Rückgängig</span>
+                            <Undo2 class="w-4 h-4" /> Rückgängig
+                        </button>
+                        <!-- Fertig bewusst nicht blau (Jan 25.11.2026): gespeichert wird ohnehin laufend. -->
+                        <button type="button" class={knopf} onclick={async () => { await speichern(); bearbeiten = false }}>
+                            <Check class="w-4 h-4" /> Fertig
+                        </button>
+                    {:else}
+                        <button type="button" class={knopfPrimaer} onclick={() => (bearbeiten = true)}>
+                            <Pencil class="w-4 h-4" /> Bearbeiten
                         </button>
                     {/if}
-                    <button type="button" class={knopf} onclick={async () => { if (bearbeiten) await speichern(); bearbeiten = !bearbeiten }}>
-                        {bearbeiten ? 'Fertig' : 'Bearbeiten'}
-                    </button>
                     {#if plan.darf_beschliessen}
-                        <button type="button" class={knopf} onclick={beschliessen}>Beschließen</button>
+                        <button type="button" class={knopf} onclick={beschliessen}>
+                            <Stamp class="w-4 h-4" /> Beschließen
+                        </button>
                     {/if}
-                    <button type="button" class={knopf} onclick={loeschen}>Löschen</button>
+                    <button type="button" class={knopfRot} onclick={loeschen}>
+                        <Trash2 class="w-4 h-4" /> Löschen
+                    </button>
                 </div>
             {/if}
         </div>
@@ -208,15 +221,8 @@
         {#if entfallen}
             <div class="mb-3"><WarningBanner message="Übernommen. {entfallen} {entfallen === 1 ? 'Kapitelbezug fand' : 'Kapitelbezüge fanden'} sich im heutigen Curriculum nicht wieder und {entfallen === 1 ? 'ist' : 'sind'} entfallen." /></div>
         {/if}
-        {#if plan.darf_uebernehmen && ziele.length}
-            <div class="mb-4 flex flex-wrap items-center gap-2 text-sm text-light-tx dark:text-dark-tx" data-abschnitt="uebernehmen">
-                <span>{plan.archiviert ? 'Als Ausgangspunkt für ein neues Schuljahr:' : 'Für ein anderes Schuljahr:'}</span>
-                <select bind:value={ziel} aria-label="Schuljahr"
-                    class="rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg px-2 py-1 text-sm">
-                    {#each ziele as j (j)}<option value={j}>{j}</option>{/each}
-                </select>
-                <button type="button" class={knopf} onclick={inSchuljahrUebernehmen}>Als Entwurf übernehmen</button>
-            </div>
+        {#if plan.status === 'draft'}
+            <div class="mb-4"><InfoBanner message={entwurfHinweis(plan)} /></div>
         {/if}
         {#if plan.kalender_fehlt}
             <div class="mb-3"><InfoBanner message="Für {plan.schuljahr} liegt der Kalender der Schule noch nicht vor. Der Plan zählt deshalb nur Wochen, ohne Daten und Ferien." /></div>
@@ -290,5 +296,27 @@
 
         <VerlaufsplanBilanz lage={plan.lage} wochenstunden={plan.wochenstunden} {band}
             planungsart={plan.planungsart} />
+
+        <!-- Übernehmen (Schritt 6) als eigener Rahmen am Seitenende (zweiter Durchgang): Es betrifft
+             das nächste Schuljahr, nicht die Arbeit am Plan. -->
+        {#if plan.darf_uebernehmen && ziele.length}
+            <section class="mt-8 rounded-md border border-light-ui-3 dark:border-dark-ui-3 p-4" data-abschnitt="uebernehmen">
+                <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx">
+                    {plan.archiviert ? 'Als Ausgangspunkt für ein neues Schuljahr' : 'Für ein anderes Schuljahr übernehmen'}
+                </h2>
+                <p class="mt-1 mb-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    Legt eine Kopie mit denselben Abschnitten als Entwurf an; Daten und Ferien kommen aus dem Kalender des Zielschuljahrs. Dieser Plan bleibt unverändert.
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select bind:value={ziel} aria-label="Schuljahr"
+                        class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx px-2 py-1.5 text-sm">
+                        {#each ziele as j (j)}<option value={j}>{j}</option>{/each}
+                    </select>
+                    <button type="button" class={knopf} onclick={inSchuljahrUebernehmen}>
+                        <CopyPlus class="w-4 h-4" /> Als Entwurf übernehmen
+                    </button>
+                </div>
+            </section>
+        {/if}
     {/if}
 </PageBody>
