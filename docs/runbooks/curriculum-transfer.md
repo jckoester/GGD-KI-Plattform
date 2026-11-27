@@ -13,7 +13,7 @@ gibt es zwei Wege:
 | Weg | Wer | Ergebnis |
 |---|---|---|
 | **Aus YAML importieren** in der Oberfläche (seit 0.56) | Fachschaft, Admins | immer ein **Entwurf**, mit Vorschau; ändert kein vorhandenes Curriculum. Einzelne Curricula, Grenze 200 KB |
-| `scripts.import_curriculum` auf der Kommandozeile (dieses Runbook) | Administration | **veröffentlicht**; ein zweiter Import desselben Fachs und Jahrgangs **aktualisiert** das vorhandene Curriculum und archiviert Kapitel, die die Datei nicht mehr kennt. Ganze Verzeichnisse, ohne Grenzen, mit `--bp-version` |
+| `scripts.import_curriculum` auf der Kommandozeile (dieses Runbook) | Administration | **veröffentlicht**; ein zweiter Import desselben Fachs und Jahrgangs **aktualisiert** das vorhandene Curriculum und archiviert Kapitel, die die Datei nicht mehr kennt. Seit 0.64 bricht er ab, wenn es für Fach, Stufe und Fassung schon ein anderes veröffentlichtes Curriculum gibt (etwa im Editor angelegt) — dann die Datei als Entwurf einspielen und beim Veröffentlichen ersetzen lassen. Ganze Verzeichnisse, ohne Grenzen, mit `--bp-version` |
 
 Für ein einzelnes Curriculum ist der Weg über die Oberfläche der richtige. Die Kommandozeile
 bleibt für das Befüllen einer Testinstanz und für Überträge, die ein vorhandenes Curriculum

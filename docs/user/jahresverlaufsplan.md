@@ -63,6 +63,8 @@ keine Namen von Schüler:innen oder Kolleg:innen hinein.
 - Wählst du für einen neuen Abschnitt die erste Sequenz (oder das erste Kapitel), schlägt der
   Editor die Dauer aus den Stunden im Curriculum und den Wochenstunden vor. Hast du die Dauer
   selbst gesetzt, bleibt sie.
+- Das **Thema** übernimmt den Titel der ersten gewählten Sequenz oder des ersten Kapitels,
+  solange du kein eigenes schreibst.
 - **bis zu den Ferien** setzt die Dauer so, dass der Abschnitt vor den nächsten Ferien endet.
 - **6 Wochen** sind eine Richtgröße: Ein längerer Abschnitt ist erlaubt und wird nur
   gekennzeichnet.
@@ -78,6 +80,13 @@ und steht als eigene Zeile „Puffer: n Wochen“.
 
 Ein Abschnitt ohne Sequenz oder Kapitel, etwa ein Projekt oder eine Exkursion, ist dagegen ein
 normaler Abschnitt.
+
+### Absprachen mit anderen Fächern
+
+Hat die Fachschaft an einem Kapitel eine Absprache mit einem anderen Fach festgehalten (siehe
+[Curriculum](curriculum.md#absprachen-mit-anderen-fächern)), steht sie unter dem ersten Abschnitt,
+der das Kapitel nennt — bei sequenzgenauer Planung unter dem ersten mit einer seiner Sequenzen.
+Für Pläne des laufenden Schuljahrs steht dabei, ob sie zu den Plänen beider Fächer passt.
 
 ## Die Ablaufleiste
 

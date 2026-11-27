@@ -21,7 +21,8 @@ Was das Programm liest, geht an dessen Anbieter.
   YAML-Entwurfs. Seit 0.58 tragen ein Curriculum und die Kompetenzen des Bildungsplans die
   Querverweise in andere Fächer, samt Curriculum und Kapitel, in denen das andere Fach die
   Stelle behandelt; seit 0.63 auch die Absprachen der Fachschaften mit anderen Fächern, in beide
-  Richtungen und mit dem Leserecht der Person (Entwürfe nur für Lehrkräfte). Das YAML-Format
+  Richtungen und mit dem Leserecht der Person (Entwürfe nur für Lehrkräfte), seit 0.64 mit dem
+Ergebnis der Prüfung gegen die Jahresverlaufspläne. Das YAML-Format
   kennt Absprachen am Kapitel; die Formatbeschreibung nennt sie dem Programm. Schreiben ist nicht möglich; ein Test im Code hält das so.
 - **Entwürfe nur über die Lehrkraft.** Ein Programm kann ein Curriculum als YAML entwerfen und
   prüfen — die Prüfung ist der echte Import, der danach verworfen wird. Anlegen kann es nichts:

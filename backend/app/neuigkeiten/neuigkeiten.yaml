@@ -667,3 +667,16 @@
     „Bruchrechnung vor Dichte“. Die andere Fachschaft sieht die Absprache an ihrem Kapitel und kann
     sie als Gegenabsprache übernehmen. Im Editor steht an den Querverweisen „Absprache anlegen“.
   link: /help/curriculum#absprachen-mit-anderen-fächern
+
+- id: "0.64-absprachen-zeit"
+  version: "0.64.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-27
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Passen die Absprachen zu den Jahresverlaufsplänen?"
+  text: >-
+    Haben beide Fächer einen Jahresverlaufsplan, zeigt die Plattform an jeder zeitlichen Absprache,
+    ob die Pläne sie einhalten — mit den Kalenderwochen beider Kapitel. Du siehst das im Curriculum,
+    im Jahresverlaufsplan und an deinen Einheiten im Planer.
+  link: /help/curriculum#absprachen-mit-anderen-fächern

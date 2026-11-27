@@ -145,7 +145,9 @@ und **Einheiten** um. Die Plattform merkt sich deine Wahl — die Kachel auf der
 „Planung“ und die Gruppen im Menü öffnen dann gleich diese Ansicht.
 
 Unter **Einheiten** stehen die Einheiten der Gruppe als Liste oder Kacheln, mit der Zahl
-ihrer Stunden („5 Stunden · 1 ohne Termin“). Ein Klick auf eine Einheit zeigt ihre Stunden
+ihrer Stunden („5 Stunden · 1 ohne Termin“). Hat das Kapitel einer Einheit Absprachen mit
+anderen Fächern, steht „Absprachen mit Physik, …“ dabei — rot, wenn eine laut
+Jahresverlaufsplänen nicht eingehalten ist; über den Stunden der Einheit stehen sie ausführlich. Ein Klick auf eine Einheit zeigt ihre Stunden
 in ihrer Reihenfolge, jeweils mit Datum oder dem Vermerk **ohne Termin**. Ein Klick auf eine
 Stunde öffnet ihren Stundenentwurf.
 

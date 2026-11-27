@@ -145,6 +145,11 @@ Kompetenzen, fehlende Begriffe. Sie warnt nur; veröffentlichen kannst du trotzd
 alle das Curriculum, und es ist in der Jahresplanung wählbar. Darfst du nicht veröffentlichen,
 steht an der Stelle des Knopfs, wer es darf.
 
+**Je Fach, Klassenstufe und Bildungsplan-Fassung gilt ein Curriculum.** Gibt es schon ein
+veröffentlichtes, wählst du in der Übersicht, welches der Entwurf **ersetzt** — wie bei „Als
+Entwurf kopieren“: Das alte wird archiviert, Einheiten dieses Schuljahrs und Jahresverlaufspläne
+wandern an die Kapitel gleichen Titels. Ausgenommen sind verschiedene Bänder.
+
 Im Export steht bei einem Entwurf unter dem Titel „Entwurf, Stand …“.
 
 ### Ein veröffentlichtes Curriculum überarbeiten
@@ -291,6 +296,21 @@ Absprache erscheint nur noch einmal. Formuliert sie anders, steht ihr Text darun
 
 Ersetzt eine Fachschaft ihr Curriculum, bleiben die Absprachen am neuen Kapitel gleichen
 Titels. Entwürfe der anderen Fachschaft sind gekennzeichnet; Schüler:innen sehen keine.
+
+**Passt das zu den Jahresverlaufsplänen?** Haben beide Fächer für das laufende Schuljahr einen
+[Jahresverlaufsplan](jahresverlaufsplan.md), prüft die Plattform zeitliche Absprachen: Unter der
+Absprache steht „Passt zu den Jahresverlaufsplänen“ oder, rot, „Laut Jahresverlaufsplänen nicht
+eingehalten“ — jeweils mit Klassenstufe und Kalenderwochen beider Kapitel. Dabei gilt:
+
+- **vorher** ist eingehalten, wenn das andere Kapitel spätestens in der Woche endet, in der
+  dieses beginnt; **danach** umgekehrt;
+- **gleichzeitig** ist eingehalten, wenn sich die Wochen überschneiden;
+- liegen die Kapitel in verschiedenen Klassenstufen, entscheiden die Stufen („Kl. 7 vor Kl. 8“),
+  auch ohne Plan;
+- fehlt ein Plan und liegen beide in derselben Stufe, steht nichts dabei — es lässt sich nicht
+  sagen.
+
+Die Prüfung warnt nur. Stammt eine Woche aus einem Entwurf des Plans, steht „(Entwurf)“ dabei.
 
 ### Hinweise, Leitperspektiven und Leitlinien
 

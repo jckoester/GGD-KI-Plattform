@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.64.0] – 2026-11-27
+
 ### Neu
 
 - Zeitliche Absprachen werden gegen die Jahresverlaufspläne beider Fächer geprüft (eingehalten oder nicht, mit

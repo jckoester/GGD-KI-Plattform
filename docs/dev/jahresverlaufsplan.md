@@ -197,6 +197,14 @@ Datenbank, `--vergleich` für die Kosten je Zug, `--selbsttest`, `--trocken`. Er
 `Plaene/Messungen-Jahresplan/befund-lauf2.md`. Den Zuschlag für die Mess-Lehrkraft bucht
 `app.budget.zuschlag.buche_auf` mit `erstellt_von` `dev-messung-…`.
 
+## Absprachen (0.64, AY Teil 2)
+
+`voll()` liefert `absprachen` je Kapitel der Curricula der Stufe (`_absprachen_der_kapitel`, mit
+Zeitprüfung nur im laufenden Schuljahr); die Seite zeigt sie unter dem ersten Abschnitt, der das
+Kapitel nennt. Die Zeitprüfung liest die Pläne über `absprachen.zeitspannen` — siehe
+[Curriculum-Entwurf](curriculum-entwurf.md#absprachen-zwischen-fächern-seit-063). Das Thema
+eines Abschnitts folgt der ersten Wahl (`themaNachWahl` in `lib/verlaufsplan.js`).
+
 ## Tests
 
 - `tests/unit/test_verlaufsplan_zeit.py` — Zeitrechnung auf dem Kalender 2025/26, Ränder, Bilanz, Ablaufleiste, Puffer

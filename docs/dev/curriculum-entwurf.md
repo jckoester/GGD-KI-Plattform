@@ -334,6 +334,22 @@ mit `{kompetenz_ids, nur_veroeffentlicht}` (POST wegen der Listenlänge, in `vor
   `faecher_je_kompetenz` → „↔ PH, CH“ in PDF (`.ik-qv`) und DOCX/ODT. MCP: siehe
   [MCP](mcp.md).
 
+## Ein Curriculum je Fach, Stufe und Fassung (seit 0.64)
+
+`curriculum_veroeffentlichen.gleiche_stufe(db, tree)`: veröffentlichte Curricula gleichen Fachs,
+`metadata.jahrgangsstufe` und `metadata.bp_version`, ohne den Vorgänger (`kopie_von`);
+ausgenommen, wenn beide ein `band` tragen und es sich unterscheidet. `GET …/publish` liefert sie als
+`gleiche_stufe` (mit `?ersetzen=` die Übersicht als Ersatz); `POST …/publish` ohne passendes
+`?ersetzen=` → 409 `{grund: "gleiche_stufe", nachricht, curricula}`. Mit `ersetzen` setzt
+`_als_ersatz` `kopie_von` am Curriculum und an Kapiteln gleichen Titels (`_kapitel_nach_titel`),
+dann der bekannte Ersatzweg (Einheiten umhängen, Vorgänger archivieren). Ersetzt der Entwurf schon
+eines und es gibt ein weiteres → 409 ohne Wahl. `import_curriculum_from_draft` ohne Entwurf (Admin-
+Skript) bricht ab, wenn es den eigenen Schlüssel noch nicht gibt, aber ein anderes veröffentlichtes
+der Stufe. Tests: `tests/integration/test_curriculum_gleiche_stufe.py`.
+
+**Löschen** (`DELETE /context/nodes/{id}`, F7): Seit 0.64 zählen Verweise anderer nur von
+außerhalb des Teilbaums (`part_of`), dafür auf jeden Knoten darin — `test_loeschen_teilbaum.py`.
+
 ## Absprachen zwischen Fächern (seit 0.63)
 
 Päckchen AY Teil 2, `app/context/absprachen.py`. Gespeichert **am eigenen Kapitel** als
@@ -346,12 +362,22 @@ eigener Knotentyp, keine Migration; die Rechte folgen dem Curriculum.
 | `absprachen_des_curriculums` | `GET /context/curricula/{id}/absprachen`: je Kapitel `eigene` (Ziel über `nachfolger_der_kapitel` auf den aktiven Nachfolger) und `von_aussen` (Rückwärtssuche über alle Kapitel mit `absprachen`, auch auf **frühere Fassungen** der eigenen Kapitel, `art_hier` = `GEGENART`); `fach` = an das Fach ohne Kapitel, nur aus Curricula mit überschneidenden Stufen; `beidseitig` und `text_gegenseite`; Entwurf und veröffentlichtes Original mit derselben Absprache-Kennung erscheinen einmal |
 | `aus_yaml`, `aus_yaml_aufloesen`, `fuer_yaml` | YAML am Kapitel `absprachen: [{fach_code, kapitel, jahrgangsstufe, art, text}]`; der Import sucht das Kapitel über Fach und Titel (veröffentlicht vor Entwurf, dann Stufe), sonst bleibt der Titel ohne Kennung mit Warnung |
 | `export_zeilen` | PDF/DOCX: die **eigenen** kompakt unter der Kapitelüberschrift |
-| `kompakt` | MCP `curriculum_lesen` |
+| `kompakt` | MCP `curriculum_lesen` (mit `jahresverlaufsplaene`, ohne `offen`) |
+| `zeitspannen`, `pruefung_dict` (0.64) | Zeitprüfung: Spannen aus den Jahresverlaufsplänen des **laufenden** Schuljahrs der beteiligten Fächer (`absprachen_zeit.kapitel_spannen`, Kapitel ersetzter Curricula über `nachfolger_der_kapitel`, Entwurfs-Kapitel über ihr Original), sonst die Stufen des Curriculums; jede eigene und jede von außen trägt `pruefung = {ergebnis, grund, hier, dort}` |
+| `absprachen_der_kapitel` (0.64) | je Kapitel aus verschiedenen Curricula — `GET /planning/groups/{id}/absprachen` (je Einheit); `verlaufsplan.voll` liefert `absprachen` je Kapitel der Stufe (ohne Prüfung bei archivierten Plänen) |
+
+**Zeitprüfung** (`app/context/absprachen_zeit.py`, rein): `Spanne` = (Stufe, Unterrichtswoche)
+von–bis, ohne Plan nur Stufen. `vorher`: dort endet spätestens in der Anfangswoche von hier;
+`nachher` gespiegelt; `gleichzeitig`: Überschneidung (eine gemeinsame Woche genügt). Verschiedene
+Stufen entscheiden ohne Wochen; gleiche Stufe ohne Wochen → `offen` (`ohne_wochen`), fehlende
+Lage → `hier_ohne_lage`/`dort_ohne_lage`. Unterrichtswochen — Ferien verschieben nichts.
 
 Oberfläche: `lib/absprachen.js`, `AbsprachenEditor.svelte` (Formular, `FachWahl.svelte` als
 Combobox), `AbsprachenAnzeige.svelte`; in `CurriculumTable.svelte` eine Zeile unter der
 Kapiteleinleitung, „Absprache anlegen“ an den Fundstellen der Querverweise, `?gegen=<Kennung>`
-im Editor belegt die Gegenabsprache vor. **Nicht** im Curriculum-Assistenten (`entwurf_lesen`
+im Editor belegt die Gegenabsprache vor; `AbsprachenAnzeige` zeigt das Ergebnis der Zeitprüfung
+(`pruefungText`), der Planer die Kurzfassung (`einheitAbsprachen`), der Jahresverlaufsplan je
+Abschnitt (`absprachenJeAbschnitt`). **Nicht** im Curriculum-Assistenten (`entwurf_lesen`
 liest die Kapitel feldweise) — das kommt mit Teil C und eigener Messung.
 
 Tests: `tests/unit/test_absprachen.py`, `tests/integration/test_absprachen_ziele.py`,
