@@ -153,3 +153,49 @@ export function findeVonAussen(daten, id) {
   }
   return null
 }
+
+/**
+ * Ergebnis der Zeitprüfung mit den Jahresverlaufsplänen (0.64, Teil B) in einem Satz — leer, wenn
+ * es nichts zu sagen gibt (abgestimmt, oder ohne Plan nicht prüfbar).
+ */
+export function pruefungText(p) {
+  if (!p || p.ergebnis === 'offen') return ''
+  const lage = p.hier && p.dort ? ` (hier ${p.hier}, dort ${p.dort})` : ''
+  return p.ergebnis === 'eingehalten'
+    ? `Passt zu den Jahresverlaufsplänen${lage}.`
+    : `Laut Jahresverlaufsplänen nicht eingehalten${lage}.`
+}
+
+/**
+ * Absprachen je Abschnitt eines Jahresverlaufsplans (Teil B): die der Kapitel, die der Abschnitt
+ * nennt — jedes Kapitel nur am **ersten** Abschnitt, in dem es vorkommt (sequenzgenaue Pläne
+ * nennen ein Kapitel oft mehrmals). `daten` = `plan.absprachen` (je Kapitel `eigene`, `von_aussen`).
+ */
+export function absprachenJeAbschnitt(abschnitte, daten, { planungsart = 'kapitel', kapitelVon = {} } = {}) {
+  const gesehen = new Set()
+  return (abschnitte ?? []).map((a) => {
+    const ids = planungsart === 'sequenz'
+      ? (a.sequenz_ids ?? []).map((s) => kapitelVon[s]).filter(Boolean)
+      : (a.kapitel_ids ?? []).map(String)
+    const eigene = []
+    const vonAussen = []
+    for (const id of ids) {
+      if (gesehen.has(id) || !daten?.[id]) continue
+      gesehen.add(id)
+      eigene.push(...(daten[id].eigene ?? []))
+      vonAussen.push(...(daten[id].von_aussen ?? []))
+    }
+    return { eigene, vonAussen }
+  })
+}
+
+/**
+ * Kurzfassung an einer Einheit im Planer (Teil B): die Fächer, mit denen es Absprachen gibt, und
+ * ob eine laut Jahresverlaufsplänen nicht eingehalten ist. `null`, wenn es keine gibt.
+ */
+export function einheitAbsprachen(k) {
+  const alle = [...(k?.eigene ?? []), ...(k?.von_aussen ?? []).filter((a) => !a.beidseitig)]
+  if (!alle.length) return null
+  const faecher = [...new Set(alle.map((a) => a.fach ?? a.fach_code))]
+  return { text: `Absprachen mit ${faecher.join(', ')}`, verletzt: alle.some((a) => a.pruefung?.ergebnis === 'verletzt') }
+}

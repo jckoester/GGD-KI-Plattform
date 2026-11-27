@@ -299,6 +299,20 @@ async def absprachen_des_curriculums(db, curriculum, user) -> dict:
                         eintrag["text_gegenseite"] = g["text"]
             kapitel_aus[str(k.id)]["eigene"].append(eintrag)
 
+    # Zeitprüfung (Teil B): eigene gegen ihr Ziel, von außen gegen ihre Quelle — beide aus Sicht
+    # des eigenen Kapitels.
+    benoetigt = set(kapitel_aus)
+    for k in kapitel_aus.values():
+        benoetigt |= {a["ziel"]["kapitel_id"] for a in k["eigene"] if a.get("ziel")}
+        benoetigt |= {a["quelle"]["kapitel_id"] for a in k["von_aussen"]}
+    spannen = await zeitspannen(db, benoetigt)
+    for kid, k in kapitel_aus.items():
+        for a in k["eigene"]:
+            if a.get("ziel"):
+                a["pruefung"] = pruefung_dict(a["art"], spannen.get(kid), spannen.get(a["ziel"]["kapitel_id"]))
+        for a in k["von_aussen"]:
+            a["pruefung"] = pruefung_dict(a["art_hier"], spannen.get(kid), spannen.get(a["quelle"]["kapitel_id"]))
+
     def ordnung(e):
         q = e["quelle"]
         return (e.get("fach") or "", q["min_grade"] or 0, q["curriculum"], q["kapitel"])
@@ -480,16 +494,25 @@ def kompakt(daten: dict, kapitel_titel: dict[str, str]) -> dict:
         return {"kapitel": o["kapitel"], "curriculum": o["curriculum"], "curriculum_id": o["curriculum_id"],
                 **({"entwurf": True} if o.get("status") == "draft" else {})} if o else None
 
+    def zeit(a):
+        """Ergebnis der Zeitprüfung mit den Jahresverlaufsplänen, wenn es eines gibt."""
+        p = a.get("pruefung")
+        if not p or p["ergebnis"] == "offen":
+            return {}
+        return {"jahresverlaufsplaene": {"ergebnis": p["ergebnis"], "dieses_kapitel": p["hier"],
+                                         "anderes_kapitel": p["dort"]}}
+
     kapitel = []
     for kid, k in (daten.get("kapitel") or {}).items():
         eigene = [{"fach": a.get("fach"), "art": a["art"], "text": a.get("text") or "",
                    **({"ziel": ort(a["ziel"])} if a.get("ziel") else
                       {"ziel_kapitel": a.get("kapitel_titel") or "ganzes Fach"}),
                    **({"beidseitig": True} if a.get("beidseitig") else {}),
-                   **({"text_gegenseite": a["text_gegenseite"]} if a.get("text_gegenseite") else {})}
+                   **({"text_gegenseite": a["text_gegenseite"]} if a.get("text_gegenseite") else {}),
+                   **zeit(a)}
                   for a in k.get("eigene") or []]
         aussen = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
-                   "eingetragen_in": ort(a["quelle"])}
+                   "eingetragen_in": ort(a["quelle"]), **zeit(a)}
                   for a in k.get("von_aussen") or [] if not a.get("beidseitig")]
         if eigene or aussen:
             kapitel.append({"kapitel": kapitel_titel.get(kid, ""), **({"eigene": eigene} if eigene else {}),
@@ -497,3 +520,105 @@ def kompakt(daten: dict, kapitel_titel: dict[str, str]) -> dict:
     fach = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
              "eingetragen_in": ort(a["quelle"])} for a in daten.get("fach") or []]
     return {**({"kapitel": kapitel} if kapitel else {}), **({"an_das_fach": fach} if fach else {})}
+
+
+# ── Zeitprüfung mit den Jahresverlaufsplänen (Teil B, Schritt 8) ─────────────
+
+async def zeitspannen(db, kapitel_ids: set[str]) -> dict:
+    """Je Kapitel seine Spanne (`absprachen_zeit.Spanne`): aus den Jahresverlaufsplänen des
+    **laufenden** Schuljahrs seines Fachs, sonst die Stufen seines Curriculums.
+
+    Pläne nennen Kapitel, wie sie beim Planen waren — ein ersetztes Kapitel wird über `kopie_von`
+    auf seinen Nachfolger übertragen, ein Entwurfs-Kapitel nimmt die Spanne seines Originals.
+    """
+    import sqlalchemy as sa
+
+    from app.context import verlaufsplan as vp
+    from app.context.absprachen_zeit import Spanne, kapitel_spannen, vereinen
+    from app.db.models import ContextNode
+    from app.planning.calendar import kalender_fuer
+    from app.planning.verlaufsplan_gruppe import nachfolger_der_kapitel
+    from app.planning.verlaufsplan_zeit import lage
+
+    ids = {i for i in kapitel_ids if i}
+    if not ids:
+        return {}
+    knoten = {str(n.id): n for n in (await db.execute(sa.select(ContextNode).where(
+        ContextNode.id.in_([uuid.UUID(i) for i in ids])))).scalars()}
+    faecher = {n.subject_id for n in knoten.values() if n.subject_id is not None}
+    schuljahr = vp.aktuelles_schuljahr()
+    plaene = list((await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == vp.TYP, ContextNode.status.in_(vp.LESBAR),
+        ContextNode.subject_id.in_(faecher),
+        ContextNode.metadata_["schuljahr"].as_string() == schuljahr))).scalars()) if faecher else []
+    cfg = kalender_fuer(schuljahr)
+    gesammelt: dict[str, list] = {}
+    for plan in plaene if cfg else []:
+        meta = plan.metadata_ or {}
+        abschnitte = meta.get("abschnitte", [])
+        seq = None
+        if vp.planungsart(meta) == vp.SEQUENZ:
+            seq = await vp.kapitel_der_sequenzen(db, {str(s) for a in abschnitte for s in a.get("sequenz_ids") or []})
+        lage_ab = vp._lage_dict(lage(abschnitte, cfg, planungsart=vp.planungsart(meta)))["abschnitte"]
+        for kid, s in kapitel_spannen(abschnitte, lage_ab, plan.min_grade, kapitel_von_sequenz=seq,
+                                      entwurf=plan.status == vp.ENTWURF).items():
+            gesammelt.setdefault(kid, []).append(s)
+    nachfolger = await nachfolger_der_kapitel(db, set(gesammelt) - ids)
+    for alt, neu in nachfolger.items():
+        gesammelt.setdefault(neu, []).extend(gesammelt[alt])
+    curricula = await _curricula_der_kapitel(db, [n.id for n in knoten.values()])
+    aus = {}
+    for kid, n in knoten.items():
+        original = (n.metadata_ or {}).get("kopie_von") if n.status == vp.ENTWURF else None
+        spannen = gesammelt.get(kid) or gesammelt.get(original or "")
+        if spannen:
+            aus[kid] = vereinen(spannen)
+        elif (c := curricula.get(kid)) is not None and c.min_grade is not None:
+            aus[kid] = Spanne(c.min_grade, c.max_grade if c.max_grade is not None else c.min_grade)
+    return aus
+
+
+def pruefung_dict(art: str, hier, dort) -> dict | None:
+    from app.context.absprachen_zeit import beschreibung, pruefe
+
+    e = pruefe(art, hier, dort)
+    if e is None:
+        return None
+    return {"ergebnis": e.ergebnis, "grund": e.grund, "hier": beschreibung(hier), "dort": beschreibung(dort)}
+
+
+async def absprachen_der_kapitel(db, kapitel_ids: set[str], user) -> dict[str, dict]:
+    """Je Kapitel seine Absprachen (`eigene`, `von_aussen`, mit Zeitprüfung) — für Kapitel aus
+    verschiedenen Curricula, etwa die Einheiten einer Gruppe im Planer (Teil B). Ein archiviertes
+    Kapitel (ersetztes Curriculum) liefert die seines Nachfolgers. Nur, was die Person lesen darf;
+    Kapitel ohne Absprachen fehlen."""
+    import sqlalchemy as sa
+
+    from app.db.models import ContextNode
+    from app.planning.verlaufsplan_gruppe import nachfolger_der_kapitel
+
+    ids = {i for i in kapitel_ids if i}
+    if not ids:
+        return {}
+    knoten = {str(n.id): n for n in (await db.execute(sa.select(ContextNode).where(
+        ContextNode.id.in_([uuid.UUID(i) for i in ids])))).scalars()}
+    nachfolger = await nachfolger_der_kapitel(db, {i for i, n in knoten.items() if n.status == "archived"})
+    aktuell = {i: nachfolger.get(i, i) for i in knoten}
+    curricula = await _curricula_der_kapitel(db, list(set(aktuell.values())))
+    je_curriculum: dict = {}
+    for kid in set(aktuell.values()):
+        if (c := curricula.get(kid)) is not None:
+            je_curriculum.setdefault(c.id, c)
+    daten: dict[str, dict] = {}
+    from app.context.curriculum_entwurf import LESBARE_STATUS
+
+    for c in je_curriculum.values():
+        if c.status not in LESBARE_STATUS:
+            continue
+        daten.update((await absprachen_des_curriculums(db, c, user))["kapitel"])
+    aus = {}
+    for alt, neu in aktuell.items():
+        k = daten.get(neu)
+        if k and (k["eigene"] or k["von_aussen"]):
+            aus[alt] = k
+    return aus

@@ -387,7 +387,29 @@ async def voll(db: AsyncSession, plan: ContextNode, user) -> dict:
         # Übernehmen in ein späteres Schuljahr geht auch aus dem Archiv (F10, Schritt 6)
         "darf_uebernehmen": await darf_bearbeiten(db, plan, user),
         "aktuelles_schuljahr": aktuelles_schuljahr(),
+        "absprachen": await _absprachen_der_kapitel(db, curricula, user, mit_pruefung=not archiviert),
     }
+
+
+async def _absprachen_der_kapitel(db: AsyncSession, curricula: list[dict], user, *, mit_pruefung: bool) -> dict:
+    """Absprachen mit anderen Fächern je Kapitel der Curricula dieser Stufe (0.64, AY Teil 2, Teil B),
+    mit dem Ergebnis der Zeitprüfung — die rechnet mit den Plänen des **laufenden** Schuljahrs,
+    deshalb ohne Prüfung bei archivierten Plänen."""
+    from app.context.absprachen import absprachen_des_curriculums
+
+    aus: dict = {}
+    for c in curricula:
+        node = await db.get(ContextNode, UUID(c["id"]))
+        if node is None:
+            continue
+        for kid, k in (await absprachen_des_curriculums(db, node, user))["kapitel"].items():
+            if not (k["eigene"] or k["von_aussen"]):
+                continue
+            if not mit_pruefung:
+                for a in (*k["eigene"], *k["von_aussen"]):
+                    a.pop("pruefung", None)
+            aus[kid] = k
+    return aus
 
 
 def heute() -> date:

@@ -10,8 +10,13 @@
      * `termine`: Stunden ohne Termin kennzeichnen und je Einheit zählen — im Planer, wo man sie
      * noch einplanen will; im Archiv nicht. `onEinplanen(stunde, einheit)`: Knopf „Einplanen“ an
      * jeder Stunde ohne Termin (0.42.3, Schritt 3) — nur, wenn gesetzt. `onLoeschen(stunde)`:
-     * Knopf „Löschen“ an eigenen, nicht nachbereiteten Stunden (0.42.4).
+     * Knopf „Löschen“ an eigenen, nicht nachbereiteten Stunden (0.42.4). `absprachen`: je Einheit
+     * die Absprachen ihres Kapitels mit anderen Fächern (0.64, AY Teil 2) — Kurzfassung an der
+     * Einheit, ausführlich über ihren Stunden.
      */
+    import { TriangleAlert } from '@lucide/svelte'
+    import AbsprachenAnzeige from '$lib/components/AbsprachenAnzeige.svelte'
+    import { einheitAbsprachen } from '$lib/absprachen.js'
     import { loeschbar } from '$lib/stunde_loeschen.js'
     import { anzahl, datumKurz, einheitenMitOhne, gewaehlteEinheit, ohneTermin, stundenPfad } from '$lib/planung_archiv.js'
     import { ueColorIndex } from '$lib/planner.js'
@@ -27,6 +32,7 @@
         termine = false,
         onEinplanen = null,
         onLoeschen = null,
+        absprachen = null,
         leerText = 'In dieser Gruppe liegt keine Planung.',
         fehltText = 'Diese Einheit gibt es nicht.',
     } = $props()
@@ -69,9 +75,26 @@
     {/if}
 {/snippet}
 
+{#snippet absprachKurz(e)}
+    {@const k = einheitAbsprachen(absprachen?.[e.id])}
+    {#if k}
+        <span class="inline-flex items-center gap-1 text-xs {k.verletzt ? 'text-light-re dark:text-dark-re' : 'text-light-tx-2 dark:text-dark-tx-2'}"
+              title={k.verletzt ? 'Eine Absprache ist laut Jahresverlaufsplänen nicht eingehalten' : undefined}>
+            {#if k.verletzt}<TriangleAlert class="w-3.5 h-3.5" />{/if}{k.text}
+        </span>
+    {/if}
+{/snippet}
+
 {#if schluessel && !einheit}
     <InfoBanner message={fehltText} />
 {:else if einheit}
+    {#if absprachen?.[einheit.id]}
+        <div class="mb-4 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2">
+            <AbsprachenAnzeige eigene={absprachen[einheit.id].eigene ?? []}
+                vonAussen={absprachen[einheit.id].von_aussen ?? []}
+                titel="Absprachen mit anderen Fächern zum Kapitel dieser Einheit" />
+        </div>
+    {/if}
     <!-- Stunden einer Einheit -->
     {#if einheit.stunden.length === 0}
         <InfoBanner message="In dieser Einheit liegen keine Stunden." />
@@ -142,6 +165,7 @@
                         <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {farbe(e)}"></span>
                         <span class="flex-1 min-w-0 font-medium text-light-tx dark:text-dark-tx truncate
                                      {e.id ? '' : 'italic'}">{e.titel}</span>
+                        {#if e.id}{@render absprachKurz(e)}{/if}
                         <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">{einheitUnterzeile(e)}</span>
                     </a>
                     {#if e.id}
@@ -159,6 +183,7 @@
                        style={e.farbe != null ? `border-left: 4px solid ${farbe(e)}` : ''}>
                         <p class="font-medium text-light-tx dark:text-dark-tx {e.id ? '' : 'italic'}">{e.titel}</p>
                         <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2">{einheitUnterzeile(e)}</p>
+                        {#if e.id && absprachen?.[e.id]}<p class="mt-1">{@render absprachKurz(e)}</p>{/if}
                     </a>
                     {#if e.id}
                         <button type="button" class="{kopierKnopf} absolute top-2 right-2" onclick={() => onKopiereEinheit(e)}

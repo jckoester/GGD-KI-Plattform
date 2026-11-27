@@ -39,7 +39,7 @@
   import { getParkplatz, unparkEintrag } from '$lib/api.js'
   import { umhaengeErgebnis } from '$lib/jahresraster.js'
   // Einheitenansicht (0.42.3): Einheiten mit Stunden, auch ohne Termin — etwa Kopien.
-  import { getGruppenInhalt, getPreferences, patchPreferences } from '$lib/api.js'
+  import { getGruppenAbsprachen, getGruppenInhalt, getPreferences, patchPreferences } from '$lib/api.js'
   import {
     EINHEITEN, JAHR, PLANUNGS_ANSICHT_SCHLUESSEL, planerAnsichtPfad, planungsAnsichtAusAdresse,
     planungsAnsichtAusEinstellungen, stundenOhneTermin,
@@ -77,6 +77,9 @@
   const gruppeFuerPfad = $derived({ id: groupId, fach: { slug } })
   let darstellung = $state('kacheln')   // Liste oder Kacheln — gemerkt wie im Archiv
   let inhalt = $state(null)
+  // Absprachen mit anderen Fächern je Einheit (0.64, AY Teil 2) — Fehler beim Laden verschweigt der
+  // Planer: Die Absprachen sind ein Hinweis, die Einheiten gehen vor.
+  let absprachen = $state(null)
   let inhaltFehler = $state(null)
   // Auch in der Jahresübersicht geladen: für die Zeile „N Stunden ohne Termin“ (Schritt 4).
   const ohneTerminZahl = $derived(stundenOhneTermin(inhalt))
@@ -110,6 +113,7 @@
     inhaltFehler = null
     try {
       inhalt = await getGruppenInhalt(groupId)
+      getGruppenAbsprachen(groupId).then((a) => (absprachen = a)).catch(() => (absprachen = null))
     } catch (e) {
       inhaltFehler = e.message
     }
@@ -854,6 +858,7 @@
         {/if}
         <EinheitenAnsicht
           {inhalt}
+          {absprachen}
           ansicht={darstellung}
           schluessel={einheitSchluessel}
           einheitPfad={(k) => planerAnsichtPfad(gruppeFuerPfad, EINHEITEN, k)}

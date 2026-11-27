@@ -78,3 +78,38 @@ describe('Lesesicht (Schritt 4)', () => {
     expect(hatAbsprachen([], [{}])).toBe(true)
   })
 })
+
+describe('pruefungText (Teil B)', () => {
+  it('eingehalten, verletzt, offen', async () => {
+    const { pruefungText } = await import('./absprachen.js')
+    expect(pruefungText({ ergebnis: 'eingehalten', hier: 'Kl. 8, KW 44', dort: 'Kl. 8, KW 38–40' }))
+      .toBe('Passt zu den Jahresverlaufsplänen (hier Kl. 8, KW 44, dort Kl. 8, KW 38–40).')
+    expect(pruefungText({ ergebnis: 'verletzt', hier: 'Kl. 8', dort: 'Kl. 9' }))
+      .toBe('Laut Jahresverlaufsplänen nicht eingehalten (hier Kl. 8, dort Kl. 9).')
+    expect(pruefungText({ ergebnis: 'offen', grund: 'ohne_wochen' })).toBe('')
+    expect(pruefungText(null)).toBe('')
+  })
+})
+
+describe('absprachenJeAbschnitt (Teil B)', () => {
+  it('jedes Kapitel nur am ersten Abschnitt, auch sequenzgenau', async () => {
+    const { absprachenJeAbschnitt } = await import('./absprachen.js')
+    const daten = { k1: { eigene: [{ id: 'a' }], von_aussen: [{ id: 'b' }] }, k2: { eigene: [], von_aussen: [{ id: 'c' }] } }
+    const r = absprachenJeAbschnitt([{ kapitel_ids: ['k1'] }, { kapitel_ids: ['k1', 'k2'] }, { kapitel_ids: [] }], daten)
+    expect(r.map((x) => [x.eigene.map((a) => a.id), x.vonAussen.map((a) => a.id)])).toEqual([[['a'], ['b']], [[], ['c']], [[], []]])
+    const s = absprachenJeAbschnitt([{ sequenz_ids: ['s1', 's2'] }, { sequenz_ids: ['s3'] }], daten,
+      { planungsart: 'sequenz', kapitelVon: { s1: 'k1', s2: 'k1', s3: 'k2' } })
+    expect(s.map((x) => x.eigene.length + x.vonAussen.length)).toEqual([2, 1])
+  })
+})
+
+describe('einheitAbsprachen (Teil B)', () => {
+  it('Fächer und verletzt', async () => {
+    const { einheitAbsprachen } = await import('./absprachen.js')
+    expect(einheitAbsprachen(null)).toBeNull()
+    expect(einheitAbsprachen({ eigene: [], von_aussen: [] })).toBeNull()
+    const k = { eigene: [{ fach: 'Physik', pruefung: { ergebnis: 'eingehalten' } }],
+      von_aussen: [{ fach: 'Chemie', pruefung: { ergebnis: 'verletzt' } }, { fach: 'Physik', beidseitig: true }] }
+    expect(einheitAbsprachen(k)).toEqual({ text: 'Absprachen mit Physik, Chemie', verletzt: true })
+  })
+})

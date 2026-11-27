@@ -2591,6 +2591,13 @@ export async function getPlanungsArchivGruppe(groupId) {
 
 // Einheitenansicht des Planers (0.42.3): Einheiten mit Stunden, mit oder ohne Termin —
 // dieselbe Form wie das Archiv einer Gruppe.
+/** Absprachen mit anderen Fächern an den Kapiteln der Einheiten (0.64, AY Teil 2): je Einheit `{eigene, von_aussen}`. */
+export async function getGruppenAbsprachen(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/absprachen`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Die Absprachen konnten nicht geladen werden')
+    return res.json()
+}
+
 export async function getGruppenInhalt(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/inhalt`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, 'Die Einheiten konnten nicht geladen werden')

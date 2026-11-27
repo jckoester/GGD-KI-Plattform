@@ -2142,6 +2142,28 @@ async def get_gruppen_inhalt(
     return _inhalt_read(inhalt)
 
 
+@router.get("/groups/{group_id}/absprachen")
+async def get_gruppen_absprachen(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> dict:
+    """Absprachen mit anderen Fächern an den Kapiteln der Einheiten (0.64, AY Teil 2, Teil B):
+    je Einheit (`id`) das Kapitel und seine Absprachen samt Zeitprüfung. Nur lesend."""
+    from app.context.absprachen import absprachen_der_kapitel
+
+    gruppe = await require_group_teacher(group_id, user, db)
+    fach = await db.get(Subject, gruppe.subject_id) if gruppe.subject_id else None
+    inhalt = await archiv.archiv_inhalt(db, gruppe, fach, archiv.MITGLIED, user, stati=("active",))
+    kapitel_je_einheit = {}
+    for e in inhalt.einheiten:
+        kid, _ = await _kapitel_ref(db, e.id)
+        if kid is not None:
+            kapitel_je_einheit[str(e.id)] = str(kid)
+    daten = await absprachen_der_kapitel(db, set(kapitel_je_einheit.values()), user)
+    return {ue: daten[kid] for ue, kid in kapitel_je_einheit.items() if kid in daten}
+
+
 def _inhalt_read(inhalt: archiv.ArchivInhalt) -> ArchivInhaltRead:
     def stunde(s):
         return ArchivStundeRead(**s.__dict__)

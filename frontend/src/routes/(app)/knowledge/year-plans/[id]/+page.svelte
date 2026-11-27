@@ -5,6 +5,8 @@
      * Lage im Kalender zurück. Rückgängig nimmt den vorigen gespeicherten Stand und speichert ihn.
      */
     import { goto } from '$app/navigation'
+    import AbsprachenAnzeige from '$lib/components/AbsprachenAnzeige.svelte'
+    import { absprachenJeAbschnitt, hatAbsprachen } from '$lib/absprachen.js'
     import { page } from '$app/stores'
     import { onDestroy } from 'svelte'
     import { Check, CopyPlus, FileDown, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
@@ -70,6 +72,9 @@
         plan.archiviert && 'Archiv, nur lesbar',
         plan.wochenstunden && `${plan.wochenstunden} Wochenstunden`,
     ].filter(Boolean).join(' · ') : '')
+    // Absprachen mit anderen Fächern je Abschnitt (0.64, AY Teil 2, Teil B)
+    const abschnittAbsprachen = $derived(absprachenJeAbschnitt(plan?.abschnitte, plan?.absprachen,
+        { planungsart: plan?.planungsart, kapitelVon: einheiten(plan?.curricula).kapitelVon }))
     const e = $derived(einheiten(plan?.curricula))
     const band = $derived((plan?.curricula ?? []).some((c) => c.band))
 
@@ -349,6 +354,15 @@
                                         <td class="py-1 pr-2 {a.puffer ? 'italic text-light-tx-2 dark:text-dark-tx-2' : ''}">{bezugText(a, plan.planungsart, e.titel)}</td>
                                         <td class="py-1 text-light-tx-2 dark:text-dark-tx-2">{a.notiz}</td>
                                     </tr>
+                                    {#if hatAbsprachen(abschnittAbsprachen[i]?.eigene, abschnittAbsprachen[i]?.vonAussen)}
+                                        <tr class="border-b border-light-ui-2 dark:border-dark-ui-2">
+                                            <td></td>
+                                            <td colspan="5" class="pb-2 pr-2">
+                                                <AbsprachenAnzeige eigene={abschnittAbsprachen[i].eigene}
+                                                    vonAussen={abschnittAbsprachen[i].vonAussen} />
+                                            </td>
+                                        </tr>
+                                    {/if}
                                 {/each}
                             </tbody>
                         </table>

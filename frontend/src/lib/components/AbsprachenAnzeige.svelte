@@ -14,9 +14,9 @@
      * - ongegen(a): stattdessen ein Knopf (Editor)
      * - titel: Überschrift (wahlweise)
      */
-    import { ArrowLeftRight } from "@lucide/svelte";
+    import { ArrowLeftRight, CircleCheck, TriangleAlert } from "@lucide/svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
-    import { ART_SATZ, fachToenung, kapitelPfad, ortText } from "$lib/absprachen.js";
+    import { ART_SATZ, fachToenung, kapitelPfad, ortText, pruefungText } from "$lib/absprachen.js";
 
     let { eigene = [], vonAussen = [], gegenHref = null, ongegen = null, titel = "Absprachen mit anderen Fächern" } = $props();
 
@@ -34,6 +34,16 @@
         <SubjectIcon name={a.icon} size={11} color={a.color} />
         {a.fach ?? a.fach_code}
     </span>
+{/snippet}
+
+{#snippet zeit(p)}
+    {#if pruefungText(p)}
+        <span class="basis-full inline-flex items-center gap-1 text-xs
+                     {p.ergebnis === 'verletzt' ? 'text-light-re dark:text-dark-re' : 'text-light-tx-2 dark:text-dark-tx-2'}">
+            {#if p.ergebnis === "verletzt"}<TriangleAlert class="w-3.5 h-3.5 shrink-0" />{:else}<CircleCheck class="w-3.5 h-3.5 shrink-0" />{/if}
+            {pruefungText(p)}
+        </span>
+    {/if}
 {/snippet}
 
 {#snippet beidseitig()}
@@ -60,6 +70,7 @@
                 {#if a.text_gegenseite}
                     <span class="basis-full text-light-tx-2 dark:text-dark-tx-2">{a.fach}: {a.text_gegenseite}</span>
                 {/if}
+                {@render zeit(a.pruefung)}
             </li>
         {/each}
         {#each nurVonAussen as a (a.id)}
@@ -82,6 +93,7 @@
                     {/if}
                 {/if}
                 {#if a.text}<span class="basis-full text-light-tx-2 dark:text-dark-tx-2">{a.text}</span>{/if}
+                {@render zeit(a.pruefung)}
             </li>
         {/each}
     </ul>

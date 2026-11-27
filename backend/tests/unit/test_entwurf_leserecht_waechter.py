@@ -57,6 +57,10 @@ ERLAUBT = {
     "querverweise_lesen": ("POST, liest nur Querverweise und Fundstellen", None),
     "querverweise": ("liest nur (Bildungsplan, Fundstellen)", None),
     "_fundstellen_anhaengen": ("liest nur Fundstellen über `leitlinien_fundstellen`", None),
+    # AY Teil 2, Teil B (0.64): Absprachen zur Anzeige am Jahresverlaufsplan und an den Einheiten —
+    # liest nur; die Schreibwege des Plans rufen `voll` erst nach ihrer eigenen Rechteprüfung.
+    "_absprachen_der_kapitel": ("liest nur Absprachen für die Anzeige am Jahresverlaufsplan", None),
+    "absprachen_der_kapitel": ("liest nur Absprachen für den Planer", None),
     "create_edge": ("Kante in einen Entwurf braucht danach das Bearbeitungsrecht",
                     "pruefe_entwurf_bearbeiten"),
     "curriculum_veroeffentlichen": ("veröffentlichen erst nach dem Recht dazu", "darf_veroeffentlichen"),

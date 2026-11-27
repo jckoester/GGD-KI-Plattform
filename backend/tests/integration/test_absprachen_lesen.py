@@ -230,3 +230,77 @@ async def test_yaml_rundweg_aufloesen_und_warnungen(db_session, w):
     zeilen = await export_zeilen(db_session, tree)
     assert zeilen[str(w.dichte.id)] == ["Mathematik · Brüche — kommt vorher: Bruchrechnung zuerst",
                                         "Mathematik · ganzes Fach — abgestimmt: Einheiten gleich"]
+
+
+def _verlaufsplan(fach_id, abschnitte, status="active", stufe=8):
+    return ContextNode(id=uuid.uuid4(), category="knowledge", content_type="verlaufsplan", title=f"Plan {stufe}",
+                       status=status, subject_id=fach_id, min_grade=stufe, max_grade=stufe, read_scope="school",
+                       write_scope="private", owner_pseudonym="test",
+                       metadata_={"schuljahr": "2025/26", "planungsart": "kapitel", "abschnitte": abschnitte})
+
+
+async def test_zeitpruefung_mit_den_verlaufsplaenen(db_session, w, monkeypatch):
+    """Teil B (Schritt 8): Physik hält „Brüche vorher“ ein, solange Mathematik Brüche zuerst plant."""
+    from app.context import verlaufsplan as vp
+    from app.planning import calendar
+    from tests.unit.test_verlaufsplan_zeit import KALENDER_2025_26
+
+    monkeypatch.setattr(vp, "aktuelles_schuljahr", lambda: "2025/26")
+    monkeypatch.setattr(calendar, "kalender_fuer", lambda sj: KALENDER_2025_26 if sj == "2025/26" else None)
+    m_plan = _verlaufsplan(w.m, [{"id": "a", "wochen": 4, "kapitel_ids": [str(w.brueche.id)]}])
+    ph_plan = _verlaufsplan(w.ph, [{"id": "b", "wochen": 3, "kapitel_ids": []},
+                                   {"id": "c", "wochen": 3, "kapitel_ids": [str(w.dichte.id)]}], status="draft")
+    db_session.add_all([m_plan, ph_plan])
+    await db_session.flush()
+
+    r = await absprachen_des_curriculums(db_session, w.ph8, LEHRKRAFT)
+    vorher = r["kapitel"][str(w.dichte.id)]["eigene"][0]
+    assert vorher["art"] == "vorher"
+    p = vorher["pruefung"]
+    assert p["ergebnis"] == "eingehalten" and p["hier"].startswith("Kl. 8, KW") and p["hier"].endswith("(Entwurf)")
+    assert "pruefung" not in r["kapitel"][str(w.dichte.id)]["eigene"][1]   # abgestimmt ohne Kapitel
+
+    # Mathematik schiebt Brüche hinter Dichte → aus Sicht der Mathematik verletzt
+    m_plan.metadata_ = {**m_plan.metadata_, "abschnitte": [
+        {"id": "x", "wochen": 8, "kapitel_ids": []}, {"id": "a", "wochen": 4, "kapitel_ids": [str(w.brueche.id)]}]}
+    await db_session.flush()
+    r = await absprachen_des_curriculums(db_session, w.m8, LEHRKRAFT)
+    k = r["kapitel"][str(w.brueche.id)]
+    assert k["eigene"][0]["art"] == "nachher" and k["eigene"][0]["pruefung"]["ergebnis"] == "verletzt"
+    assert k["von_aussen"][0]["pruefung"]["ergebnis"] == "verletzt"
+
+    # Ohne Pläne: gleiche Stufe → offen
+    m_plan.status = ph_plan.status = "deleted"
+    await db_session.flush()
+    r = await absprachen_des_curriculums(db_session, w.m8, LEHRKRAFT)
+    assert r["kapitel"][str(w.brueche.id)]["eigene"][0]["pruefung"] == {
+        "ergebnis": "offen", "grund": "ohne_wochen", "hier": "Kl. 8", "dort": "Kl. 8"}
+
+
+async def test_absprachen_der_kapitel_auch_ueber_den_nachfolger(db_session, w):
+    """Planer (Teil B): Einheiten hängen auch an Kapiteln eines ersetzten Curriculums."""
+    from app.context.absprachen import absprachen_der_kapitel
+
+    r = await absprachen_der_kapitel(db_session, {str(w.dichte.id), str(uuid.uuid4())}, LEHRKRAFT)
+    assert list(r) == [str(w.dichte.id)] and r[str(w.dichte.id)]["eigene"][0]["art"] == "vorher"
+    ph8neu = await w.curriculum(w.ph, "Physik Kl. 8 neu", kopie_von=w.ph8.id)
+    await w.kapitel(ph8neu, "Dichte", [w.vorher], kopie_von=w.dichte.id)
+    w.ph8.status = w.dichte.status = "archived"
+    await db_session.flush()
+    r = await absprachen_der_kapitel(db_session, {str(w.dichte.id)}, LEHRKRAFT)
+    assert r[str(w.dichte.id)]["eigene"][0]["text"] == "Bruchrechnung zuerst"
+
+
+async def test_verlaufsplan_zeigt_absprachen_der_kapitel(db_session, w):
+    from app.context import verlaufsplan as vp
+
+    w.ph8.metadata_ = {"jahrgangsstufe": "8"}
+    plan = ContextNode(id=uuid.uuid4(), category="knowledge", content_type="verlaufsplan", title="Plan 8",
+                       status="draft", subject_id=w.ph, min_grade=8, max_grade=8, read_scope="school",
+                       write_scope="private", owner_pseudonym="test",
+                       metadata_={"schuljahr": vp.aktuelles_schuljahr(), "planungsart": "kapitel",
+                                  "abschnitte": [{"id": "a", "wochen": 2, "kapitel_ids": [str(w.dichte.id)]}]})
+    db_session.add(plan)
+    await db_session.flush()
+    v = await vp.voll(db_session, plan, LEHRKRAFT)
+    assert v["absprachen"][str(w.dichte.id)]["eigene"][0]["art"] == "vorher"
