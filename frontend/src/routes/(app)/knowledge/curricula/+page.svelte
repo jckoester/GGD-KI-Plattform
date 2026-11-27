@@ -13,6 +13,9 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import PageBody from '$lib/components/PageBody.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
+    import CurriculumYamlImportDialog from '$lib/components/CurriculumYamlImportDialog.svelte'
+    import CurriculumVorlagenDialog from '$lib/components/CurriculumVorlagenDialog.svelte'
+    import { FileUp, FolderUp } from '@lucide/svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -83,6 +86,24 @@
             return a.name.localeCompare(b.name, 'de')
         }))
 
+    // Import (0.62, BH): Admins dürfen in jedem Fach anlegen (bewusste Ausnahme, CLAUDE.md
+    // „Rollenmodell“) — bis 0.61 sahen sie die Knöpfe nur in Fächern mit eigener Gruppe.
+    const istAdmin = $derived(userHasAnyRole($user, ['admin']))
+    let importOffen = $state(false)
+    let vorlagenOffen = $state(false)
+    // Nach dem Einspielen laden die Listen der Fächer neu.
+    let stand = $state(0)
+
+    function vorlagenZu(angelegt) {
+        vorlagenOffen = false
+        if (angelegt) {
+            stand += 1
+            loadAllCurricula()
+        }
+    }
+
+    const knopf = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium border border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors'
+
     // Gesamtanzahl der Curricula
     const totalCurricula = $derived(Object.values(curriculaBySubject)
         .reduce((sum, curr) => sum + (curr?.length || 0), 0))
@@ -102,7 +123,25 @@
                     · <a href="/knowledge/year-plans" class="text-light-bl dark:text-dark-bl hover:underline">Jahresverlaufspläne</a>
                 </p>
             </div>
+            {#if istAdmin}
+                <!-- Nur Admins, die in jedem Fach importieren dürfen (Fach aus der Datei). Die
+                     Fachschaften importieren über den Knopf in ihrem Fach. -->
+                <div class="flex flex-wrap justify-end gap-2">
+                    <button type="button" onclick={() => (importOffen = true)} class={knopf}>
+                        <FileUp class="w-4 h-4" /> Aus YAML importieren
+                    </button>
+                    <button type="button" onclick={() => (vorlagenOffen = true)} class={knopf}>
+                        <FolderUp class="w-4 h-4" /> Vorlagen einspielen
+                    </button>
+                </div>
+            {/if}
         </div>
+        {#if importOffen}
+            <CurriculumYamlImportDialog onClose={() => (importOffen = false)} />
+        {/if}
+        {#if vorlagenOffen}
+            <CurriculumVorlagenDialog onClose={vorlagenZu} />
+        {/if}
 
         <!-- Lade-Indikator -->
         {#if loading}
@@ -123,6 +162,7 @@
                     {filterWert === 'eigene' ? 'Du bist in keinem Fach Mitglied der Fachschaft oder einer Unterrichtsgruppe.' : 'Keine Curricula verfügbar.'}
                 </p>
             {/if}
+            {#key stand}
             <div class="space-y-3">
                 {#each sichtbareFaecher as subject (subject.id)}
                     <!-- Je Fach einklappbar; eigene und ein gezielt gewähltes Fach zu Beginn offen. -->
@@ -141,11 +181,12 @@
                             <CurriculumList
                                 subjectId={subject.id}
                                 subjectFachCode={subject.fach_code}
-                                showNewButton={mySubjectIds.includes(subject.id)}
+                                showNewButton={istAdmin || mySubjectIds.includes(subject.id)}
                             />
                         </div>
                     </details>
                 {/each}
             </div>
+            {/key}
         {/if}
 </PageBody>

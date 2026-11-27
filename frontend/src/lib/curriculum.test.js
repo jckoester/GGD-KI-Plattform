@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen, entwurfHinweis, ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, vorlageHinweis, quelleText } from './curriculum.js'
+import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen, entwurfHinweis, ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, vorlageHinweis, quelleText, darfCurriculaAnlegen, darfCurriculaImportieren } from './curriculum.js'
 
 describe('lernsequenzStd', () => {
     it('liest eine Zahl', () => {
@@ -102,5 +102,32 @@ describe('vorlageHinweis und quelleText (0.62, BH)', () => {
   it('Quelle aus den Metadaten', () => {
     expect(quelleText({ metadata: { quelle: ' Beispielcurriculum ZSL ' } })).toBe('Beispielcurriculum ZSL')
     expect(quelleText({ metadata: {} })).toBe('')
+  })
+})
+
+describe('darfCurriculaAnlegen (0.62, BH)', () => {
+  it('Admins in jedem Fach, auch ohne Gruppe', () => {
+    expect(darfCurriculaAnlegen({ roles: ['admin', 'teacher'] }, 7)).toBe(true)
+  })
+  it('Lehrkräfte nur mit Unterrichtsgruppe oder Fachschaft im Fach', () => {
+    const l = { roles: ['teacher'] }
+    expect(darfCurriculaAnlegen(l, 7)).toBe(false)
+    expect(darfCurriculaAnlegen(l, 7, { unterricht: [{ subject_id: 7 }] })).toBe(true)
+    expect(darfCurriculaAnlegen(l, 7, { gruppen: [{ type: 'subject_department', subject_id: 7 }] })).toBe(true)
+    expect(darfCurriculaAnlegen(l, 7, { gruppen: [{ type: 'class', subject_id: 7 }] })).toBe(false)
+  })
+  it('Schüler:innen und ohne Fach nie', () => {
+    expect(darfCurriculaAnlegen({ roles: ['student'] }, 7, { unterricht: [{ subject_id: 7 }] })).toBe(false)
+    expect(darfCurriculaAnlegen({ roles: ['admin'] }, null)).toBe(false)
+  })
+})
+
+describe('darfCurriculaImportieren (0.62, BH)', () => {
+  it('Admins in jedem Fach, Lehrkräfte nur in der Fachschaft — eine Unterrichtsgruppe genügt nicht', () => {
+    expect(darfCurriculaImportieren({ roles: ['admin'] }, 7)).toBe(true)
+    const l = { roles: ['teacher'] }
+    expect(darfCurriculaImportieren(l, 7, { gruppen: [{ type: 'teaching_group', subject_id: 7 }] })).toBe(false)
+    expect(darfCurriculaImportieren(l, 7, { gruppen: [{ type: 'subject_department', subject_id: 8 }] })).toBe(false)
+    expect(darfCurriculaImportieren(l, 7, { gruppen: [{ type: 'subject_department', subject_id: 7 }] })).toBe(true)
   })
 })

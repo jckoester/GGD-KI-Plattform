@@ -2458,6 +2458,35 @@ function _yamlFehlertext(status, data) {
   return 'Prüfen fehlgeschlagen'
 }
 
+/**
+ * Curriculum-Vorlagen gesammelt prüfen (0.62, BH, nur Admins): `dateien` = [{name, yaml}].
+ * Antwort: `dateien` (je Datei die Vorschau plus `datei`, `art`, `ersetzt_titel`) und `zahlen`.
+ */
+export async function pruefeCurriculumVorlagen(dateien) {
+  return _curriculumStapel('/context/curricula/import/stapel/pruefen', dateien)
+}
+
+/** Dasselbe, und aus jeder fehlerfreien Datei entsteht ein Entwurf (mit `id`). */
+export async function importiereCurriculumVorlagen(dateien) {
+  return _curriculumStapel('/context/curricula/import/stapel', dateien)
+}
+
+async function _curriculumStapel(pfad, dateien) {
+  const res = await fetch(`${BASE}${pfad}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ dateien }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (res.ok) return data
+  let text = 'Prüfen fehlgeschlagen'
+  if (res.status === 413) text = 'Die Dateien sind zusammen zu groß für den Server — bitte in mehreren Durchgängen.'
+  else if (typeof data.detail === 'string') text = data.detail
+  else if (Array.isArray(data.detail) && data.detail[0]?.msg) text = data.detail[0].msg.replace(/^Value error, /, '')
+  throw new ApiError(res.status, text)
+}
+
 // `createCurriculumFromDraft` stand hier und rief `POST /context/curricula` auf. Beides
 // am 2026-08-08 entfernt: Der Endpunkt committete nicht, wurde von keiner Seite benutzt
 // und doppelte den Admin-Weg über `scripts/import_curriculum.py`. Curricula entstehen in

@@ -23,7 +23,7 @@
     import { subjects } from "$lib/stores/subjects.js";
     import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
     import { assistants } from "$lib/stores/assistants.js";
-    import { myTeachingGroups, myGroupsGeladen } from "$lib/stores/myGroups.js";
+    import { myGroups, myTeachingGroups, myGroupsGeladen } from "$lib/stores/myGroups.js";
     import { conversationCountsByGroup, refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
     import { getConversations, getFormerGroups } from "$lib/api.js";
@@ -33,8 +33,10 @@
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
     import CurriculumList from "$lib/components/CurriculumList.svelte";
+    import CurriculumYamlImportDialog from "$lib/components/CurriculumYamlImportDialog.svelte";
+    import { darfCurriculaImportieren } from "$lib/curriculum.js";
     import BildungsplanTree from "$lib/components/BildungsplanTree.svelte";
-    import { Search } from "@lucide/svelte";
+    import { FileUp, Plus, Search } from "@lucide/svelte";
 
     const subject = $derived(
         $subjects.find((s) => s.slug === $page.params.slug) ?? null,
@@ -62,6 +64,10 @@
     const activeTab = $derived(
         $page.url.searchParams.get("tab") ?? "uebersicht",
     );
+
+    // Curriculum aus YAML (0.62, BH): Fachschaft des Fachs, Admins in jedem Fach — wie im Backend.
+    const darfImportieren = $derived(darfCurriculaImportieren($user, subject?.id, { gruppen: $myGroups }));
+    let importOffen = $state(false);
 
     const myGroupsForSubject = $derived(
         isTeacher ? gruppenImFach($myTeachingGroups, subject?.id) : [],
@@ -402,16 +408,34 @@
                 </h2>
                 <!-- fach_code (Bildungsplan-Kürzel, z. B. 'M'), NICHT der Slug.
                      Fächer ohne fach_code → Link ohne Vorbelegung (frei wählbar). -->
+                <div class="flex flex-wrap justify-end gap-2">
+                {#if darfImportieren}
+                    <!-- 0.62 (BH): Import auch hier; Admins in jedem Fach. -->
+                    <button
+                        type="button"
+                        onclick={() => (importOffen = true)}
+                        class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                    >
+                        <FileUp class="w-4 h-4" />
+                        Aus YAML importieren
+                    </button>
+                {/if}
                 <a
                     href={subject?.fach_code
                         ? `/knowledge/curriculum/new?fach_code=${encodeURIComponent(subject.fach_code)}`
                         : "/knowledge/curriculum/new"}
-                    class="text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
+                    class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
                  text-on-fill font-medium hover:opacity-90 transition-opacity"
                 >
-                    + Neues Curriculum
+                    <Plus class="w-4 h-4" />
+                    Neues Curriculum
                 </a>
+                </div>
             </div>
+            {#if importOffen}
+                <CurriculumYamlImportDialog onClose={() => (importOffen = false)} />
+            {/if}
             <CurriculumList
                 subjectId={subject?.id}
                 subjectSlug={subject?.slug}

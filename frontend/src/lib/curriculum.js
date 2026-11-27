@@ -29,6 +29,31 @@ export function entwurfHinweis(curriculum) {
 }
 
 /**
+ * Ob jemand in einem Fach Curricula anlegen und importieren darf (Oberfläche; das Backend prüft
+ * selbst): Admins in jedem Fach (bewusste Ausnahme, CLAUDE.md „Rollenmodell“), Lehrkräfte mit
+ * einer Unterrichtsgruppe oder in der Fachschaft des Fachs.
+ */
+export function darfCurriculaAnlegen(nutzer, subjectId, { unterricht = [], gruppen = [] } = {}) {
+  if (!subjectId || !nutzer) return false
+  if (nutzer.roles?.includes('admin')) return true
+  if (!nutzer.roles?.includes('teacher')) return false
+  return unterricht.some((g) => g.subject_id === subjectId)
+    || gruppen.some((g) => g.type === 'subject_department' && g.subject_id === subjectId)
+}
+
+/**
+ * Ob jemand in einem Fach aus YAML importieren darf — strenger als das Anlegen, wie im Backend
+ * (`darf_entwurf_bearbeiten`): Admins, oder Lehrkräfte in der **Fachschaft** des Fachs. Eine
+ * Unterrichtsgruppe genügt nicht.
+ */
+export function darfCurriculaImportieren(nutzer, subjectId, { gruppen = [] } = {}) {
+  if (!subjectId || !nutzer) return false
+  if (nutzer.roles?.includes('admin')) return true
+  if (!nutzer.roles?.includes('teacher')) return false
+  return gruppen.some((g) => g.type === 'subject_department' && g.subject_id === subjectId)
+}
+
+/**
  * Hinweis an einem Entwurf, der als Vorlage eingespielt wurde (0.62, BH, F4): Die Fachschaft prüft
  * ihn, bevor er gilt. Leer bei veröffentlichten Curricula und Entwürfen ohne `metadata.vorlage`.
  */

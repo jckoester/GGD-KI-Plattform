@@ -21,6 +21,8 @@
     import CurriculumYamlImportDialog from '$lib/components/CurriculumYamlImportDialog.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import ListenZeile from '$lib/components/ListenZeile.svelte'
+    import { darfCurriculaAnlegen, darfCurriculaImportieren } from '$lib/curriculum.js'
+    import { FileUp, Plus } from '@lucide/svelte'
 
     let { subjectId = null, subjectFachCode = null, showNewButton = true } = $props()
 
@@ -29,16 +31,10 @@
     let loading = $state(true)
     let error = $state(null)
 
-    // Mitglied der Fachschaft (oder Admin): darf Curricula anlegen.
-    const canEditSubject = $derived.by(() => {
-        if (!subjectId || !$user) return false
-        if ($user.roles?.includes('admin')) return true
-        if ($user.roles?.includes('teacher')) {
-            return $myTeachingGroups.some(g => g.subject_id === subjectId)
-                || $myGroups.some(g => g.type === 'subject_department' && g.subject_id === subjectId)
-        }
-        return false
-    })
+    // Fachschaft, Unterrichtsgruppe im Fach oder Admin: darf Curricula anlegen.
+    const canEditSubject = $derived(darfCurriculaAnlegen($user, subjectId, { unterricht: $myTeachingGroups, gruppen: $myGroups }))
+    // Import nur Fachschaft und Admins, wie im Backend (0.62)
+    const darfImport = $derived(darfCurriculaImportieren($user, subjectId, { gruppen: $myGroups }))
     const lehrkraft = $derived(!!$user?.roles?.includes('teacher'))
 
     $effect(() => {
@@ -172,9 +168,11 @@
                        text-light-tx-2 dark:text-dark-tx-2
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
-                + Neues Curriculum
+                <Plus class="w-4 h-4" />
+                Neues Curriculum
             </a>
             <!-- 0.56 (BA): legt immer einen Entwurf an; Rechte prüft das Backend (Fachschaft). -->
+            {#if darfImport}
             <button
                 type="button"
                 onclick={() => (importOffen = true)}
@@ -183,8 +181,10 @@
                        text-light-tx-2 dark:text-dark-tx-2
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
+                <FileUp class="w-4 h-4" />
                 Aus YAML importieren
             </button>
+            {/if}
         </div>
     {/if}
     {#if importOffen}
