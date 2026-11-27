@@ -640,3 +640,17 @@
     an wie der Knopf im Planer, auf Wunsch ohne einzelne Abschnitte oder mit eigenen Titeln, und nimmt
     das Anlegen zurück, wenn du es willst. Fragst du nach dem Plan der Fachschaft, liest er ihn dir vor.
   link: /help/unterrichtsplanung#mit-dem-jahresplan-assistenten-planen
+
+- id: "0.62-curriculum-vorlagen"
+  version: "0.62.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-27
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Curricula aus Vorlagen"
+  text: >-
+    Die Administration kann Vorlagen für viele Fächer auf einmal einspielen, etwa aus den
+    Beispielcurricula des Landes. In deinem Fach erscheinen sie als Entwürfe mit dem Hinweis, dass
+    die Fachschaft sie prüft — bearbeiten, veröffentlichen oder löschen könnt ihr sie wie jeden
+    Entwurf. Woraus ein Curriculum entstand, steht jetzt unter seinem Titel.
+  link: /help/curriculum#entwürfe-aus-vorlagen

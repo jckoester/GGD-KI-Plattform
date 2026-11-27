@@ -90,8 +90,9 @@ Assistenten erscheint die kommende Fassung erst, wenn sie gilt.
 
 Ein Curriculum, das als YAML vorliegt — aus dem Export einer anderen Plattform oder von einem
 KI-Programm entworfen (siehe [KI-Programme verbinden](profil.md#ki-programme-verbinden)) —,
-holst du über **Aus YAML importieren** in der Liste der Curricula eines Fachs herein. Den Knopf
-sieht, wer in der Fachschaft ist, und Admins.
+holst du über **Aus YAML importieren** herein — in der Liste der Curricula eines Fachs oder auf
+der Fachseite im Reiter Curricula. Den Knopf sieht, wer in der Fachschaft des Fachs ist, und
+Admins (in jedem Fach, dazu oben auf der Seite der Curricula; das Fach steht in der Datei).
 
 1. Datei wählen oder den Text einfügen.
 2. **Prüfen.** Die Vorschau zeigt Titel, Klasse, Fassung, die Kapitel mit Stunden und Umfang —
@@ -112,6 +113,21 @@ alle wird der Entwurf erst, wenn ihr ihn veröffentlicht. Änderst du nach dem P
 oder die Wahl, prüfst du neu.
 
 Verweise auf Bausteine, die du nicht lesen darfst, bleiben als Text ohne Link stehen.
+
+Steht in der Datei eine **Quelle** (Feld `quelle`, etwa „Beispielcurriculum Physik Gymnasium
+Klassen 7–8 (ZSL, Fassung V3.0)“), zeigt die Vorschau sie, und das Curriculum trägt sie unter
+seinem Titel — auch nach dem Veröffentlichen, im Export und in einer Kopie. Ein KI-Programm, das
+einen Entwurf aus einem Beispielcurriculum schreibt, füllt das Feld von sich aus.
+
+### Entwürfe aus Vorlagen
+
+Die Administration kann Vorlagen für viele Fächer auf einmal einspielen, etwa aus den
+Beispielcurricula des Landes. Daraus entstehen **Entwürfe** in deinem Fach, oben mit dem Hinweis
+„Aus einer Vorlage importiert … — die Fachschaft prüft und passt an, bevor sie veröffentlicht.“
+Ein solcher Entwurf ist ein Angebot: Ihr bearbeitet ihn wie jeden anderen, veröffentlicht ihn
+oder löscht ihn. Gab es zur Stufe schon ein veröffentlichtes Curriculum, ersetzt der Entwurf es
+erst, wenn ihr ihn veröffentlicht. Gab es schon einen Entwurf, steht beim neuen das Importdatum
+im Titel, damit ihr beide auseinanderhaltet.
 
 ---
 

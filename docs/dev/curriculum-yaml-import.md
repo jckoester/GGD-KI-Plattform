@@ -13,6 +13,8 @@ dieselbe Prüfung aufrufen, nie das Anlegen ([MCP-Server](mcp.md)).
 | `app/context/router.py` | `POST /context/curricula/import/pruefen`, `POST /context/curricula/import` |
 | `frontend/src/lib/components/CurriculumYamlImportDialog.svelte` | Dialog; Regeln in `lib/curriculum_yaml_import.js` |
 | `backend/scripts/import_curriculum.py` | Admin-Skript; nutzt `zu_entwurf(…, grenzen=None)`, sonst unverändert |
+| `app/context/curriculum_stapel.py` | Sammelimport (0.62, BH): `art_bestimmen` (rein), `stapel` — je Datei `durchlauf` |
+| `frontend/src/lib/components/CurriculumVorlagenDialog.svelte` | „Vorlagen einspielen“ (Admins); Regeln in `lib/curriculum_vorlagen.js` |
 
 ## Format
 
@@ -27,6 +29,7 @@ jahrgangsstufe: "8"   # Pflicht; "7/8" für ein Band
 bp_version: "2016"    # Pflicht; Fassung des Bildungsplans
 bp_id: BP2016BW_ALLG_GYM_CH   # findet den Fachplan in einer anderen Instanz
 vorwort: …
+quelle: Beispielcurriculum Chemie Gymnasium Klasse 8 (ZSL, Fassung V3.0)   # optional, ≤ 300 Zeichen (0.62)
 rahmen: {wochenstunden: {"8": 2}, …}
 kapitel:
   - titel: Stoffe     # Pflicht
@@ -109,6 +112,38 @@ Verlauf beim Anlegen — den ersten hält der Editor beim ersten Speichern fest.
 Dialog gleich ein zweites Mal mit `ersetzen`, damit die Vorschau zur Vorauswahl passt (F2).
 Ändern sich Text oder Wahl, ist *Anlegen* gesperrt, bis neu geprüft ist.
 
+## Sammelimport (seit 0.62)
+
+Päckchen BH, nur Admins: `POST /context/curricula/import/stapel/pruefen` und
+`POST /context/curricula/import/stapel` mit `{dateien: [{name, yaml}]}` — höchstens 60, zusammen
+12 MB (`MAX_DATEIEN`, `MAX_BYTES_GESAMT`; Pydantic). Beide immer 200; Eimer `curriculum_stapel`
+(10 / 10 min).
+
+`stapel(db, dateien, user, tag=, speichern=)` je Datei:
+
+1. `_lage`: einlesen, Fach, veröffentlichte Curricula gleicher Stufe und Fassung, Zahl der
+   Entwürfe (freie Entwürfe der Stufe ∪ offene Entwürfe der veröffentlichten).
+2. `art_bestimmen(vorhanden, entwuerfe, schon_im_stapel)`: `neu`; `ersetzt` bei genau einem
+   veröffentlichten ohne Entwurf (dann `ersetzen=`); sonst `zusaetzlich` — auch bei mehreren
+   veröffentlichten (Bänder) und wenn eine frühere Datei des Laufs dieselbe Stufe trifft. Damit
+   stimmt die Vorschau mit dem Anlegen überein, obwohl die Vorschau jede Datei zurückrollt.
+3. `durchlauf(…, titel_zusatz="Import TT.MM.JJJJ" bei zusaetzlich, vorlage={datei, importiert_am})`
+   in einem eigenen Savepoint; unerwartete Ausnahmen werden geloggt und als Fehler der Datei
+   gemeldet. Beim Anlegen Commit nach jeder Datei.
+
+Antwort: `dateien` (die Antwort von `durchlauf` plus `datei`, `art`, `ersetzt_titel`), `zahlen`
+(`ok`, `fehler`).
+
+**Metadaten:** `metadata.quelle` kommt aus der Datei (jeder Import; Export und Kopie behalten es),
+`metadata.vorlage` nur aus dem Sammelimport — `duplicate_curriculum` lässt es weg, nach dem
+Veröffentlichen bleibt es stehen. Die Oberfläche zeigt `vorlageHinweis` nur an Entwürfen
+(`lib/curriculum.js`). Sichtbarkeit der Import-Knöpfe: `darfCurriculaImportieren` — Admin oder
+Fachschaft, wie `darf_entwurf_bearbeiten` (eine Unterrichtsgruppe genügt nicht).
+
+**MCP:** `YAML_FORMAT` (Beschreibung von `curriculum_yaml_pruefen`) und `ANLEITUNG` nennen
+`quelle` — die Vorlagen entstehen in einem KI-Programm. Wächter
+`test_curriculum_stapel.py::test_mcp_kennt_quelle`.
+
 ## Tests
 
 - `tests/unit/test_curriculum_yaml.py` — bösartige Eingaben, Meldungen mit Stelle, Grenzen.
@@ -117,5 +152,8 @@ Dialog gleich ein zweites Mal mit `ersetzen`, damit die Vorschau zur Vorauswahl 
 - `tests/integration/test_curriculum_yaml_http.py` — Routen, Rechte, Drossel; die Vorschau
   hinterlässt nichts.
 - `frontend/src/lib/curriculum_yaml_import.test.js` — Vorauswahl, Anlegen, Summen.
+- `tests/unit/test_curriculum_stapel.py`, `tests/integration/test_curriculum_stapel_http.py` —
+  Sammelimport: Art je Datei, Datum im Titel, Fehler je Datei, Rechte, Grenzen, Drossel,
+  `quelle`/`vorlage` in Export und Kopie; `frontend/src/lib/curriculum_vorlagen.test.js`.
 - MCP: `test_mcp_werkzeuge.py::test_curriculum_yaml_und_pruefen`, Wächter
   `test_mcp_nur_lesend.py::test_durchlauf_nur_ohne_speichern`.

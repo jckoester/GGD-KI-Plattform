@@ -24,7 +24,9 @@ Was das Programm liest, geht an dessen Anbieter.
 - **Entwürfe nur über die Lehrkraft.** Ein Programm kann ein Curriculum als YAML entwerfen und
   prüfen — die Prüfung ist der echte Import, der danach verworfen wird. Anlegen kann es nichts:
   Die Lehrkraft lädt die Datei in der Plattform hoch (**Aus YAML importieren**), sieht eine
-  Vorschau, und es entsteht ein Entwurf, den die Fachschaft veröffentlicht.
+  Vorschau, und es entsteht ein Entwurf, den die Fachschaft veröffentlicht. Viele Dateien auf
+  einmal spielen Admins über **Vorlagen einspielen** ein ([Curriculum-Vorlagen](curriculum-vorlagen.md));
+  das Format kennt dafür seit 0.62 das Feld `quelle`, das die Schnittstelle dem Programm nennt.
 - **Mit den Rechten der Lehrkraft.** Gelesen wird, was die Person auch im Browser sieht —
   veröffentlichte Curricula und Entwürfe, eigene private, keine fremden privaten.
 - **Ohne Personen.** Die Antworten enthalten keine Pseudonyme und keine Namen. Chats,
