@@ -159,3 +159,32 @@ async def test_route(db_session, w):
         assert r.status_code == 200, r.text
         assert r.json()["kapitel"][str(w.brueche.id)]["eigene"][0]["fach_code"] == "PHAY"
         assert (await c.get(f"/context/curricula/{uuid.uuid4()}/absprachen")).status_code == 404
+
+
+async def test_speichern_ueber_den_knoten(db_session, w, monkeypatch):
+    from app.context.router import router
+
+    async def _flush():
+        await db_session.flush()
+
+    monkeypatch.setattr(db_session, "commit", _flush)
+
+    admin = JwtPayload(sub="ay2-admin", roles=["admin", "teacher"], grade=None, jti="j", iat=0, exp=9999999999)
+    app = FastAPI()
+    app.include_router(router)
+
+    async def _db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = lambda: admin
+    meta = {**w.brueche.metadata_, "absprachen": [
+        {"fach_code": "phay", "kapitel_id": str(w.dichte.id), "art": "gleichzeitig", "text": " zusammen "}]}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.patch(f"/context/nodes/{w.brueche.id}", json={"metadata": meta})
+        assert r.status_code == 200, r.text
+        [a] = r.json()["metadata"]["absprachen"]
+        assert (a["fach_code"], a["text"], a["kapitel_titel"]) == ("PHAY", "zusammen", "Dichte")
+        meta["absprachen"] = [{"fach_code": "PHAY", "art": "vorher"}]
+        r = await c.patch(f"/context/nodes/{w.brueche.id}", json={"metadata": meta})
+        assert r.status_code == 422 and "braucht ein Kapitel" in r.json()["detail"]

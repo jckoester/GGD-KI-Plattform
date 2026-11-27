@@ -7,6 +7,8 @@
      * Tabellen, in denen sie steht, sind schon dicht (F8, Jan 25.11.2026).
      *
      * liste: Einträge aus `POST /context/querverweise` für genau eine Kompetenz.
+     * onabsprache(fundstelle, eintrag): im Editor — „Absprache anlegen“ an einer Fundstelle
+     *   (0.63, AY Teil 2); ohne die Funktion kein Knopf.
      */
     import { page } from "$app/stores";
     import { bausteinPfad } from "$lib/rueckweg.js";
@@ -15,7 +17,7 @@
     } from "$lib/querverweise.js";
     import SubjectIcon from "./SubjectIcon.svelte";
 
-    let { liste = [] } = $props();
+    let { liste = [], onabsprache = null } = $props();
 
     let offen = $state(false);
     const listenId = `qv-${Math.random().toString(36).slice(2, 9)}`;
@@ -82,6 +84,12 @@
                                     behandelt in
                                     <a href={fundstellePfad(f)} class="underline hover:text-primary dark:hover:text-primary-dark"
                                         >{fundstelleText(f)}</a>
+                                    {#if onabsprache}
+                                        <button type="button" onclick={() => onabsprache(f, e)}
+                                                class="ml-1 underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark">
+                                            Absprache anlegen
+                                        </button>
+                                    {/if}
                                 </li>
                             {/each}
                         </ul>

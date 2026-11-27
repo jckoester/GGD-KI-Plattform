@@ -23,6 +23,8 @@
     import { page } from "$app/stores";
     import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl, getQuerverweise } from "$lib/api.js";
     import Querverweise from "./Querverweise.svelte";
+    import AbsprachenEditor from "./AbsprachenEditor.svelte";
+    import { tick } from "svelte";
     import { fehlendeIds, kompetenzIdsImCurriculum, uebernehmen } from "$lib/querverweise.js";
     import { myFachschaften } from "$lib/stores/myGroups.js";
     import {
@@ -56,6 +58,25 @@
         bpVersion = null,
         onchange = () => {},
     } = $props();
+
+    // ── Absprachen mit anderen Fächern (0.63, AY Teil 2) ─────────────────────
+    // „Absprache anlegen“ an einer Fundstelle der Querverweise öffnet das Formular am Kapitel,
+    // in dem die Kompetenz steht — vorbelegt mit Fach und Kapitel des anderen Fachs.
+    let vorbelegungen = $state({});
+    async function absprachVorbelegen(kapId, fundstelle, verweis) {
+        vorbelegungen = { ...vorbelegungen, [kapId]: {
+            fach_code: verweis.fach_code, curriculum_id: fundstelle.curriculum_id,
+            kapitel_id: fundstelle.kapitel_id, kapitel_titel: fundstelle.kapitel,
+        } };
+        if (collapsedChapters.has(kapId)) toggleChapter(kapId);
+        await tick();
+        document.getElementById(`absprachen-${kapId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    function absprachenSetzen(kap, liste) {
+        kap.metadata = { ...kap.metadata, absprachen: liste };
+        curriculum.kapitel = [...curriculum.kapitel];
+        onchange();
+    }
 
     // ── Begriffe und Fachmethoden am Eintrag (0.44, AQ) ──────────────────────
     // Die Auflösung kommt mit dem Curriculum (`curriculum.begriffe`) und wird für neu
@@ -799,6 +820,22 @@
                     </tr>
                 {/if}
 
+                <!-- Absprachen mit anderen Fächern (0.63, AY Teil 2) -->
+                {#if editMode}
+                    <tr class="bg-light-bg-2 dark:bg-dark-bg-2">
+                        <td id="absprachen-{kap.id}" colspan="5"
+                            class="px-3 py-2 border-b border-light-ui-3 dark:border-dark-ui-3 scroll-mt-24">
+                            <AbsprachenEditor
+                                absprachen={kap.metadata?.absprachen ?? []}
+                                eigenesFachId={fachId}
+                                stufe={grade}
+                                vorbelegung={vorbelegungen[kap.id] ?? null}
+                                onchange={(liste) => absprachenSetzen(kap, liste)}
+                            />
+                        </td>
+                    </tr>
+                {/if}
+
                 <!-- Lernsequenzen -->
                 {#each kap.lernsequenzen || [] as ls, lsIndex (ls.id)}
                     <!-- Lernsequenz-Titel -->
@@ -1015,7 +1052,8 @@
                                     {#each normalizeIk(eintrag.ik).filter((ik) => qvVon(ik.node_id).length) as ik (ik.node_id)}
                                         <div class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
                                             {ik.nr}
-                                            <Querverweise liste={qvVon(ik.node_id)} />
+                                            <Querverweise liste={qvVon(ik.node_id)}
+                                                onabsprache={(f, e) => absprachVorbelegen(kap.id, f, e)} />
                                         </div>
                                     {/each}
                                 {:else}

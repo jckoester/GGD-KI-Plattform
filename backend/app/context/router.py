@@ -845,6 +845,15 @@ async def create_node(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
+    # Absprachen mit anderen Fächern am Kapitel (0.63, AY Teil 2).
+    if payload.content_type == "kapitel":
+        from app.context.absprachen import pruefe_absprachen
+
+        try:
+            payload.metadata_ = await pruefe_absprachen(db, "kapitel", payload.metadata_, payload.subject_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
     # Scope und Trägergruppe müssen zusammenpassen — Pflicht **und** Art. Die Regel
     # steht in `scope_gruppen.py`, weil sie hier und beim Ändern gilt; bis 09/2026
     # stand nur die Pflichtprüfung hier und fehlte beim Ändern ganz.
@@ -1062,6 +1071,16 @@ async def update_node(
                     vorher=node.metadata_ if node.content_type == typ_danach else None)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail=str(exc))
+
+    # Absprachen mit anderen Fächern am Kapitel (0.63, AY Teil 2), geprüft im Stand danach.
+    if typ_danach == "kapitel" and "metadata_" in update_data:
+        from app.context.absprachen import pruefe_absprachen
+
+        try:
+            update_data["metadata_"] = await pruefe_absprachen(
+                db, "kapitel", update_data["metadata_"], update_data.get("subject_id", node.subject_id))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     # Scope und Trägergruppe müssen auch nach einer Teiländerung zusammenpassen.
     # Maßgeblich ist der Stand **danach**: Wer nur den Scope schickt, behält die

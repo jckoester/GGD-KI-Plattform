@@ -302,3 +302,24 @@ async def absprachen_des_curriculums(db, curriculum, user) -> dict:
         v["von_aussen"].sort(key=ordnung)
     fach_aus.sort(key=ordnung)
     return {"kapitel": kapitel_aus, "fach": fach_aus}
+
+
+# ── Speichern (Schritt 3) ────────────────────────────────────────────────────
+
+async def pruefe_absprachen(db, content_type: str | None, metadata: dict | None, subject_id: int | None) -> dict | None:
+    """Beim Anlegen und Ändern eines Knotens: Absprachen eines Kapitels prüfen und bereinigt
+    zurückgeben (Kopie). Wirft `ValueError`. Andere Typen und Kapitel ohne `absprachen` bleiben
+    unberührt; eine leere Liste fällt weg."""
+    import sqlalchemy as sa
+
+    from app.db.models import Subject
+
+    if content_type != "kapitel" or not metadata or "absprachen" not in metadata:
+        return metadata
+    eigen = (await db.execute(sa.select(Subject.fach_code).where(Subject.id == subject_id))).scalar_one_or_none() \
+        if subject_id is not None else None
+    liste = await ziele_pruefen(db, normalisieren(metadata.get("absprachen"), eigen))
+    meta = {k: v for k, v in metadata.items() if k != "absprachen"}
+    if liste:
+        meta["absprachen"] = liste
+    return meta
