@@ -115,3 +115,41 @@ export function zielText(a, faecherJeCode = {}) {
   const fach = faecherJeCode[a.fach_code]?.name ?? a.fach ?? a.fach_code
   return `${fach} · ${a.ziel?.kapitel ?? a.kapitel_titel ?? 'ganzes Fach'}`
 }
+
+/** Die Art als Satzteil hinter dem anderen Kapitel: „Physik · Dichte — kommt vorher“. */
+export const ART_SATZ = {
+  vorher: 'kommt vorher',
+  gleichzeitig: 'läuft gleichzeitig',
+  nachher: 'kommt danach',
+  abgestimmt: 'abgestimmt',
+}
+
+/** Sprungziel auf ein Kapitel eines Curriculums. */
+export function kapitelPfad(ort) {
+  return ort?.curriculum_id && ort?.kapitel_id ? `/knowledge/curriculum/${ort.curriculum_id}#kapitel-${ort.kapitel_id}` : null
+}
+
+/** „Dichte · Physik Kl. 8 (Entwurf)“ — das Kapitel eines Ziels oder einer Quelle. */
+export function ortText(ort, kapitelTitel = null) {
+  if (!ort) return kapitelTitel ?? 'ganzes Fach'
+  return `${ort.kapitel} · ${ort.curriculum}${ort.status === 'draft' ? ' (Entwurf)' : ''}`
+}
+
+/** Ob es an einem Kapitel etwas zu zeigen gibt. */
+export function hatAbsprachen(eigene, vonAussen) {
+  return !!(eigene?.length || vonAussen?.length)
+}
+
+/** Link in den Editor, der dort die Gegenabsprache vorbelegt (Lesesicht, Schritt 4). */
+export function gegenabspracheHref(curriculumId, absprache) {
+  return `/knowledge/curriculum/${curriculumId}/edit?gegen=${encodeURIComponent(absprache.id)}`
+}
+
+/** Die Absprache von außen mit dieser Kennung samt eigenem Kapitel — für `?gegen=` im Editor. */
+export function findeVonAussen(daten, id) {
+  for (const [kapId, k] of Object.entries(daten?.kapitel ?? {})) {
+    const a = (k.von_aussen ?? []).find((x) => x.id === id)
+    if (a) return { kapId, absprache: a }
+  }
+  return null
+}

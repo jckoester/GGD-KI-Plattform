@@ -13,6 +13,7 @@
      * - vorbelegung: öffnet das Formular vorbelegt (aus einer Fundstelle der Querverweise)
      * - onchange(liste): neue Liste
      */
+    import { untrack } from "svelte";
     import { Pencil, Plus, Trash2 } from "@lucide/svelte";
     import { getCurriculaBySubject, getCurriculum } from "$lib/api.js";
     import { subjects } from "$lib/stores/subjects.js";
@@ -36,9 +37,12 @@
     const fehler = $derived(form ? formularFehler(form, { vorhandene: absprachen ?? [], eigenesFach }) : "");
     const formId = `abspr-${Math.random().toString(36).slice(2, 9)}`;
 
-    // Vorbelegung von außen öffnet das Formular (und lädt Curricula und Kapitel dazu).
+    // Vorbelegung von außen öffnet das Formular (und lädt Curricula und Kapitel dazu). Nur die
+    // Vorbelegung zählt: Ohne `untrack` hinge der Effekt auch am Formular, das `oeffnen` liest,
+    // und öffnete es nach jeder Änderung neu — „Übernehmen“ und die Auswahl liefen ins Leere.
     $effect(() => {
-        if (vorbelegung) oeffnen(formular(vorbelegung));
+        const v = vorbelegung;
+        if (v) untrack(() => oeffnen(formular(v)));
     });
 
     async function oeffnen(f) {

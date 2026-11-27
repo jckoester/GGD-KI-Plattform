@@ -2292,6 +2292,16 @@ export async function relinkCurriculum(curriculumId, apply = false) {
   return res.json()
 }
 
+/** Absprachen mit anderen Fächern (0.63, AY Teil 2): je Kapitel `eigene` und `von_aussen`, dazu `fach`. */
+export async function getCurriculumAbsprachen(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/absprachen`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Absprachen konnten nicht geladen werden')
+  }
+  return res.json()
+}
+
 export async function getCurriculaBySubject(subjectId) {
   const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}`, {
     credentials: 'include'

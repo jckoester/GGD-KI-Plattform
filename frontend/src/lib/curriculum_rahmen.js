@@ -13,7 +13,13 @@ export const RAHMEN_TEXTFELDER = [
     },
     { feld: "beschluesse", label: "Beschlüsse der Fachschaft", platzhalter: "z. B. Lektüren, Pflichtversuche, Exkursionen" },
     { feld: "schwerpunkte", label: "Schwerpunkte", platzhalter: "Wofür die Fachschaft die freie Zeit nutzt" },
-    { feld: "absprachen", label: "Absprachen", platzhalter: "z. B. Leistungsnachweise, Methoden- und Medienkonzept" },
+    {
+        feld: "absprachen",
+        label: "Absprachen in der Fachschaft",
+        platzhalter: "z. B. Leistungsnachweise, Methoden- und Medienkonzept",
+        // Seit 0.63 (AY Teil 2, F8) — der Name verwechselte sich mit Absprachen zwischen Fächern.
+        hinweis: "Absprachen mit anderen Fächern trägst du am Kapitel ein.",
+    },
 ];
 
 /** Klassenstufen eines Bands: „7/8" → [7, 8], „8-10" → [8, 9, 10], „9" → [9]. */

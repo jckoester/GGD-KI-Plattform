@@ -65,7 +65,7 @@ def test_wochenstunden_text():
 
 def test_abschnitte_in_fester_reihenfolge():
     abschnitte = rahmen_abschnitte({"absprachen": "A", "lehrwerk": "L", "wochenstunden": {"9": 2}}, "9")
-    assert [label for label, _ in abschnitte] == ["Wochenstunden", "Lehrwerk", "Absprachen"]
+    assert [label for label, _ in abschnitte] == ["Wochenstunden", "Lehrwerk", "Absprachen in der Fachschaft"]
     assert rahmen_abschnitte(None, "9") == []
 
 

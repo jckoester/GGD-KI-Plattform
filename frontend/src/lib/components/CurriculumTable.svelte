@@ -24,6 +24,9 @@
     import { aufloesenCurriculumBegriffe, fehlendeBegriffeUrl, getQuerverweise } from "$lib/api.js";
     import Querverweise from "./Querverweise.svelte";
     import AbsprachenEditor from "./AbsprachenEditor.svelte";
+    import AbsprachenAnzeige from "./AbsprachenAnzeige.svelte";
+    import { getCurriculumAbsprachen } from "$lib/api.js";
+    import { findeVonAussen, gegenabsprache, gegenabspracheHref, hatAbsprachen } from "$lib/absprachen.js";
     import { tick } from "svelte";
     import { fehlendeIds, kompetenzIdsImCurriculum, uebernehmen } from "$lib/querverweise.js";
     import { myFachschaften } from "$lib/stores/myGroups.js";
@@ -72,7 +75,40 @@
         await tick();
         document.getElementById(`absprachen-${kapId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
+    // Absprachen beider Richtungen vom Backend (Ziele aufgelöst, von außen, an das Fach).
+    let absprachenDaten = $state(null);
+    let gegenErledigt = false;
+    $effect(() => {
+        const id = curriculum?.id;
+        if (!id) return;
+        let abgebrochen = false;
+        getCurriculumAbsprachen(id)
+            .then((d) => { if (!abgebrochen) absprachenDaten = d; })
+            .catch(() => { if (!abgebrochen) absprachenDaten = null; });
+        return () => { abgebrochen = true; };
+    });
+    // `?gegen=<Kennung>` aus der Lesesicht: Gegenabsprache am passenden Kapitel vorbelegen.
+    $effect(() => {
+        const gegen = $page.url.searchParams.get("gegen");
+        if (!editMode || !gegen || !absprachenDaten || gegenErledigt) return;
+        gegenErledigt = true;
+        const treffer = findeVonAussen(absprachenDaten, gegen);
+        if (treffer) gegenVorbelegen(treffer.kapId, treffer.absprache);
+    });
+    async function gegenVorbelegen(kapId, a) {
+        vorbelegungen = { ...vorbelegungen, [kapId]: gegenabsprache(a) };
+        if (collapsedChapters.has(kapId)) toggleChapter(kapId);
+        await tick();
+        document.getElementById(`absprachen-${kapId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    const absprachenVon = (kapId) => absprachenDaten?.kapitel?.[kapId] ?? { eigene: [], von_aussen: [] };
+
     function absprachenSetzen(kap, liste) {
+        // Die Vorbelegung ist verbraucht — sonst öffnete ein neu aufgebauter Editor sie wieder.
+        if (vorbelegungen[kap.id]) {
+            const { [kap.id]: _, ...rest } = vorbelegungen;
+            vorbelegungen = rest;
+        }
         kap.metadata = { ...kap.metadata, absprachen: liste };
         curriculum.kapitel = [...curriculum.kapitel];
         onchange();
@@ -667,6 +703,13 @@
     </details>
 {/if}
 
+{#if absprachenDaten?.fach?.length}
+    <!-- Absprachen anderer Fächer mit dem ganzen Fach, ohne Kapitel (0.63, AY Teil 2) -->
+    <div class="mt-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2" data-uebersicht="absprachen">
+        <AbsprachenAnzeige vonAussen={absprachenDaten.fach} titel="Absprachen anderer Fächer mit dem ganzen Fach" />
+    </div>
+{/if}
+
 <div class="overflow-x-auto" role="presentation" onclick={hideMenu}>
     <table class="kapitel-tabelle w-full text-left border-collapse text-sm">
         <thead>
@@ -844,6 +887,26 @@
                                 stufe={grade}
                                 vorbelegung={vorbelegungen[kap.id] ?? null}
                                 onchange={(liste) => absprachenSetzen(kap, liste)}
+                            />
+                            {#if absprachenVon(kap.id).von_aussen.length}
+                                <div class="mt-3">
+                                    <AbsprachenAnzeige
+                                        vonAussen={absprachenVon(kap.id).von_aussen}
+                                        titel="Von anderen Fächern eingetragen"
+                                        ongegen={(a) => gegenVorbelegen(kap.id, a)}
+                                    />
+                                </div>
+                            {/if}
+                        </td>
+                    </tr>
+                {:else if hatAbsprachen(absprachenVon(kap.id).eigene, absprachenVon(kap.id).von_aussen)}
+                    <tr class="bg-light-bg-2 dark:bg-dark-bg-2">
+                        <td id="absprachen-{kap.id}" colspan="4"
+                            class="px-3 py-2 border-b border-light-ui-3 dark:border-dark-ui-3 scroll-mt-24">
+                            <AbsprachenAnzeige
+                                eigene={absprachenVon(kap.id).eigene}
+                                vonAussen={absprachenVon(kap.id).von_aussen}
+                                gegenHref={curriculum?.can_edit ? (a) => gegenabspracheHref(curriculum.id, a) : null}
                             />
                         </td>
                     </tr>
@@ -1383,11 +1446,16 @@
                     </td>
                 </tr>
             {:else if editMode}
-                <tr class="bg-light-bg-2 dark:bg-dark-bg-2">
-                    <td colspan="5" class="px-3 py-2">
+                <!-- Außerhalb der Kapitel-Kästen: ohne Rand links und rechts, Rand oben schließt das
+                     letzte Kapitel ab (0.63). -->
+                <tr class="abstand">
+                    <td colspan="5" class="px-0 pt-3 pb-1 border-t border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2">
                         <button
+                            type="button"
                             onclick={addKapitel}
-                            class="inline-flex items-center gap-1 text-sm text-light-bl dark:text-dark-bl hover:underline"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
+                                   border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
+                                   text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                         >
                             <Plus class="w-4 h-4" /> Kapitel hinzufügen
                         </button>
@@ -1406,6 +1474,13 @@
     }
     .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):last-child {
         border-right: 1px solid var(--color-light-ui-3);
+    }
+    /* In der Lesesicht schließt die letzte Zeile das letzte Kapitel ab. */
+    .kapitel-tabelle > tbody > tr:not(.abstand):last-child > td {
+        border-bottom: 1px solid var(--color-light-ui-3);
+    }
+    :global(.dark) .kapitel-tabelle > tbody > tr:not(.abstand):last-child > td {
+        border-bottom-color: var(--color-dark-ui-3);
     }
     :global(.dark) .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):first-child {
         border-left-color: var(--color-dark-ui-3);

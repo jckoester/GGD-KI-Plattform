@@ -26,7 +26,8 @@ TEXTFELDER: tuple[tuple[str, str], ...] = (
     ("lehrwerk", "Lehrwerk"),
     ("beschluesse", "Beschlüsse der Fachschaft"),
     ("schwerpunkte", "Schwerpunkte"),
-    ("absprachen", "Absprachen"),
+    # Seit 0.63 „in der Fachschaft“: Absprachen mit anderen Fächern stehen am Kapitel (AY Teil 2, F8).
+    ("absprachen", "Absprachen in der Fachschaft"),
 )
 
 

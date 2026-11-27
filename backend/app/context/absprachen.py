@@ -323,3 +323,117 @@ async def pruefe_absprachen(db, content_type: str | None, metadata: dict | None,
     if liste:
         meta["absprachen"] = liste
     return meta
+
+
+# ── YAML (Schritt 5) ─────────────────────────────────────────────────────────
+#
+# Im YAML steht ein Ziel über **Fach und Kapiteltitel**, nicht über Kennungen — die Datei soll in
+# einer anderen Instanz und aus einem KI-Programm heraus funktionieren:
+#
+#     absprachen:
+#       - {fach_code: PH, kapitel: Dichte, jahrgangsstufe: "7/8", art: vorher, text: …}
+#
+# `kapitel` und `jahrgangsstufe` sind freiwillig; `jahrgangsstufe` hilft nur beim Auflösen, wenn
+# derselbe Kapiteltitel in mehreren Curricula des Fachs vorkommt.
+
+YAML_FELDER = frozenset({"fach_code", "kapitel", "jahrgangsstufe", "art", "text"})
+
+
+def aus_yaml(liste: Any, eigenes_fach: str | None = None) -> tuple[list[dict], list[str]]:
+    """Absprachen eines Kapitels aus dem YAML prüfen (rein). Rückgabe: Einträge
+    `{fach_code, kapitel_titel, jahrgangsstufe, art, text}` und Warnungen (unbekannte Felder).
+    `ValueError` mit Stelle wie bei `normalisieren`."""
+    if liste is None:
+        return [], []
+    if not isinstance(liste, list):
+        raise ValueError("Die Absprachen müssen eine Liste sein.")
+    warnungen, roh = [], []
+    for i, a in enumerate(liste, 1):
+        if not isinstance(a, dict):
+            raise ValueError(f"Absprache {i}: muss ein Objekt sein.")
+        if fremd := sorted(set(map(str, a)) - YAML_FELDER):
+            warnungen.append(f"Absprache {i}: unbekannte Felder ({', '.join(fremd)}) übergangen.")
+        stufe = a.get("jahrgangsstufe")
+        if stufe is not None and not isinstance(stufe, (str, int)):
+            raise ValueError(f"Absprache {i}: jahrgangsstufe muss Text sein.")
+        roh.append({"fach_code": a.get("fach_code"), "kapitel_titel": a.get("kapitel"), "art": a.get("art"),
+                    "text": a.get("text"), "_stufe": str(stufe).strip() if stufe not in (None, "") else None})
+    geprueft = normalisieren([{k: v for k, v in r.items() if k != "_stufe"} for r in roh], eigenes_fach)
+    for g, r in zip(geprueft, roh):
+        g.pop("id", None)
+        g.pop("kapitel_id", None)
+        g["jahrgangsstufe"] = r["_stufe"]
+    return geprueft, warnungen
+
+
+async def aus_yaml_aufloesen(db, liste: list[dict], eigene_stufe: str | None = None) -> tuple[list[dict], list[str]]:
+    """Ziele aus dem YAML über Fach und Kapiteltitel auf Kapitel abbilden. Eindeutig → Kennung;
+    sonst bleibt die Absprache mit dem Titel stehen (Warnung). Ein unbekanntes Fach fällt weg
+    (Warnung). Bevorzugt veröffentlichte Kapitel, dann die angegebene oder die eigene Stufe."""
+    import sqlalchemy as sa
+
+    from app.context.curriculum_entwurf import LESBARE_STATUS
+    from app.db.models import ContextNode, Subject
+
+    if not liste:
+        return [], []
+    codes = {a["fach_code"] for a in liste}
+    faecher = dict((await db.execute(sa.select(Subject.fach_code, Subject.id).where(Subject.fach_code.in_(codes)))).all())
+    aus, warnungen = [], []
+    for i, a in enumerate(liste, 1):
+        wo = f"Absprache {i}"
+        if a["fach_code"] not in faecher:
+            warnungen.append(f"{wo}: Ein Fach „{a['fach_code']}“ gibt es hier nicht — übergangen.")
+            continue
+        eintrag = {k: a[k] for k in ("fach_code", "kapitel_titel", "art", "text")}
+        eintrag["kapitel_id"] = None
+        if a.get("kapitel_titel"):
+            treffer = list((await db.execute(sa.select(ContextNode).where(
+                ContextNode.content_type == "kapitel", ContextNode.status.in_(LESBARE_STATUS),
+                ContextNode.subject_id == faecher[a["fach_code"]],
+                sa.func.lower(sa.func.trim(ContextNode.title)) == a["kapitel_titel"].strip().lower()))).scalars())
+            if len(treffer) > 1:
+                cur = await _curricula_der_kapitel(db, [k.id for k in treffer])
+                stufe = a.get("jahrgangsstufe") or eigene_stufe
+
+                def stufe_von(k, cur=cur):
+                    c = cur.get(str(k.id))
+                    return (c.metadata_ or {}).get("jahrgangsstufe") if c is not None else None
+
+                for passt in (lambda k: k.status == "active", lambda k: stufe is not None and stufe_von(k) == stufe):
+                    enger = [k for k in treffer if passt(k)]
+                    if enger:
+                        treffer = enger
+                    if len(treffer) == 1:
+                        break
+            if len(treffer) == 1:
+                eintrag["kapitel_id"] = str(treffer[0].id)
+                eintrag["kapitel_titel"] = treffer[0].title
+            else:
+                warnungen.append(f"{wo}: Kapitel „{a['kapitel_titel']}“ in {a['fach_code']} "
+                                 f"{'nicht eindeutig' if treffer else 'nicht gefunden'} — die Absprache bleibt ohne Verknüpfung.")
+        aus.append(eintrag)
+    return normalisieren(aus), warnungen
+
+
+async def fuer_yaml(db, liste: list[dict] | None) -> list[dict]:
+    """Absprachen eines Kapitels für den YAML-Export: Fach, aktueller Kapiteltitel und Stufe des
+    Ziels (sonst der gespeicherte Titel), Art, Text — ohne Kennungen."""
+    import sqlalchemy as sa
+
+    from app.db.models import ContextNode
+
+    if not liste:
+        return []
+    ids = [uuid.UUID(a["kapitel_id"]) for a in liste if a.get("kapitel_id")]
+    knoten = {str(n.id): n for n in (await db.execute(sa.select(ContextNode).where(ContextNode.id.in_(ids)))).scalars()} if ids else {}
+    cur = await _curricula_der_kapitel(db, list(knoten)) if knoten else {}
+    aus = []
+    for a in liste:
+        k = knoten.get(a.get("kapitel_id") or "")
+        titel = k.title if k is not None else a.get("kapitel_titel")
+        stufe = (cur[str(k.id)].metadata_ or {}).get("jahrgangsstufe") if k is not None and str(k.id) in cur else None
+        aus.append({"fach_code": a["fach_code"], **({"kapitel": titel} if titel else {}),
+                    **({"jahrgangsstufe": stufe} if stufe else {}), "art": a["art"],
+                    **({"text": a["text"]} if a.get("text") else {})})
+    return aus

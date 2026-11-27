@@ -60,3 +60,21 @@ describe('Auswahl und Anzeige', () => {
     expect(zielText({ fach_code: 'XX', fach: 'Chemie', ziel: { kapitel: 'Stoffe' } })).toBe('Chemie · Stoffe')
   })
 })
+
+describe('Lesesicht (Schritt 4)', () => {
+  it('Pfade und Texte', async () => {
+    const { kapitelPfad, ortText, gegenabspracheHref, findeVonAussen, hatAbsprachen } = await import('./absprachen.js')
+    const ort = { curriculum_id: 'c', kapitel_id: 'k', kapitel: 'Dichte', curriculum: 'Physik Kl. 8', status: 'draft' }
+    expect(kapitelPfad(ort)).toBe('/knowledge/curriculum/c#kapitel-k')
+    expect(kapitelPfad(null)).toBeNull()
+    expect(ortText(ort)).toBe('Dichte · Physik Kl. 8 (Entwurf)')
+    expect(ortText(null, 'Dichte')).toBe('Dichte')
+    expect(ortText(null)).toBe('ganzes Fach')
+    expect(gegenabspracheHref('c1', { id: 'a b' })).toBe('/knowledge/curriculum/c1/edit?gegen=a%20b')
+    const daten = { kapitel: { k1: { eigene: [], von_aussen: [{ id: 'x' }] } } }
+    expect(findeVonAussen(daten, 'x')).toEqual({ kapId: 'k1', absprache: { id: 'x' } })
+    expect(findeVonAussen(daten, 'y')).toBeNull()
+    expect(hatAbsprachen([], [])).toBe(false)
+    expect(hatAbsprachen([], [{}])).toBe(true)
+  })
+})

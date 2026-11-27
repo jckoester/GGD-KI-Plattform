@@ -56,7 +56,7 @@
                 </span>
             {:else if editMode}
                 <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                    · Wochenstunden, Lehrwerk, Beschlüsse, Schwerpunkte, Absprachen
+                    · Wochenstunden, Lehrwerk, Beschlüsse, Schwerpunkte, Absprachen in der Fachschaft
                 </span>
             {/if}
         </button>
