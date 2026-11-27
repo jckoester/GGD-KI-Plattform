@@ -30,7 +30,9 @@ DIREKT = {"_check_read_permission", "_curriculum_lesen", "_lesbare_curricula",
           # Übersicht der Leitlinien (0.53, AU): zählt Entwürfe mit, liest nur.
           "leitlinien_fundstellen", "leitlinien_uebersicht",
           # MCP-Server für KI-Abos (0.54, AW): Liste der Curricula, liest nur.
-          "lies_curricula"}
+          "lies_curricula",
+          # Absprachen zwischen Fächern (0.63, AY Teil 2): Entwürfe anderer Fächer gekennzeichnet, liest nur.
+          "absprachen_des_curriculums"}
 
 #: Lesende Hilfsfunktionen ohne eigene Route.
 LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
@@ -39,7 +41,9 @@ LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
           # das Paket von schreibenden Funktionen fern.
           "_curriculum_fuer_werkzeug", "lies_abdeckung", "lies_curricula", "lies_curriculum", "lies_uebersicht",
           # 0.56 (BA): das Curriculum als YAML, wie der Export.
-          "lies_curriculum_yaml"}
+          "lies_curriculum_yaml",
+          # 0.63 (AY Teil 2): Absprachen in beide Richtungen.
+          "absprachen_des_curriculums"}
 
 #: Nicht lesende Stellen, die die Leseregel benutzen: Grund und die Prüfung, die sie danach
 #: aufrufen müssen (``None``: ändert nichts an einem Entwurf).

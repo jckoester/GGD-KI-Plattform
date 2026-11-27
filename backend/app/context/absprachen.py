@@ -123,3 +123,182 @@ async def ziele_pruefen(db, absprachen: list[dict]) -> list[dict]:
             a["kapitel_titel"] = (k.title or "")[:MAX_TITEL] or a.get("kapitel_titel")
         aus.append(a)
     return aus
+
+
+# ── Lesen in beide Richtungen (Schritt 2) ────────────────────────────────────
+
+_OFFEN = ("global", "school", "subject")
+
+
+def _fach(s) -> dict:
+    return {"fach_code": s.fach_code, "fach": s.name, "fach_slug": s.slug, "icon": s.icon, "color": s.color}
+
+
+def _stufen(cur) -> dict:
+    return {"min_grade": cur.min_grade, "max_grade": cur.max_grade}
+
+
+def _ueberschneiden(a, b) -> bool:
+    if None in (a.min_grade, a.max_grade, b.min_grade, b.max_grade):
+        return True
+    return a.min_grade <= b.max_grade and b.min_grade <= a.max_grade
+
+
+async def _kapitel_des_curriculums(db, curriculum) -> list:
+    import sqlalchemy as sa
+
+    from app.db.models import ContextEdge, ContextNode
+
+    return list((await db.execute(
+        sa.select(ContextNode).join(ContextEdge, sa.and_(ContextEdge.from_node_id == ContextNode.id,
+                                                         ContextEdge.relation == "part_of"))
+        .where(ContextEdge.to_node_id == curriculum.id, ContextNode.content_type == "kapitel",
+               ContextNode.status == curriculum.status)
+        .order_by(ContextNode.metadata_["reihenfolge"].as_integer(), ContextNode.title))).scalars())
+
+
+async def _curricula_der_kapitel(db, kapitel_ids) -> dict:
+    """Kapitel-Kennung → Curriculum-Knoten (über `part_of`)."""
+    import sqlalchemy as sa
+
+    from app.db.models import ContextEdge, ContextNode
+
+    if not kapitel_ids:
+        return {}
+    zeilen = (await db.execute(
+        sa.select(ContextEdge.from_node_id, ContextNode)
+        .join(ContextNode, ContextNode.id == ContextEdge.to_node_id)
+        .where(ContextEdge.from_node_id.in_(list(kapitel_ids)), ContextEdge.relation == "part_of",
+               ContextNode.content_type == "curriculum"))).all()
+    return {str(k): c for k, c in zeilen}
+
+
+async def _vorgaenger(db, kapitel) -> dict[str, str]:
+    """Kennungen früherer Fassungen der eigenen Kapitel (über `kopie_von`, rückwärts) → eigenes
+    Kapitel. Eine Absprache, die auf ein Kapitel vor dem Ersatz zeigt, gilt dem Nachfolger."""
+    import sqlalchemy as sa
+
+    from app.db.models import ContextNode
+
+    aus = {str(k.id): str(k.id) for k in kapitel}
+    offen = {(k.metadata_ or {}).get("kopie_von"): str(k.id) for k in kapitel if (k.metadata_ or {}).get("kopie_von")}
+    for _ in range(5):
+        offen = {alt: eigen for alt, eigen in offen.items() if alt and alt not in aus}
+        if not offen:
+            break
+        aus.update(offen)
+        try:
+            ids = [uuid.UUID(a) for a in offen]
+        except ValueError:
+            break
+        zeilen = (await db.execute(sa.select(ContextNode.id, ContextNode.metadata_["kopie_von"].astext)
+                                   .where(ContextNode.id.in_(ids)))).all()
+        offen = {weiter: offen[str(kid)] for kid, weiter in zeilen if weiter}
+    return aus
+
+
+async def absprachen_des_curriculums(db, curriculum, user) -> dict:
+    """Die Absprachen eines Curriculums in beide Richtungen (F4, F6). Das Lesen des Curriculums
+    selbst prüft der Aufrufer.
+
+    Antwort: `kapitel` — je eigenes Kapitel `eigene` (am Kapitel gespeichert, das Ziel auf den
+    aktuellen Nachfolger aufgelöst) und `von_aussen` (Absprachen anderer Fächer, die auf dieses
+    Kapitel oder eine frühere Fassung zeigen) — und `fach`: Absprachen anderer Fächer an das Fach
+    ohne Kapitel, aus Curricula mit überschneidenden Stufen. Je Absprache `beidseitig`, wenn die
+    Gegenseite die passende Gegenabsprache hat. Entwürfe zählen nur für Lehrkräfte (`status`).
+    """
+    import sqlalchemy as sa
+
+    from app.auth.vorschau import eigenes_zaehlt
+    from app.context.curriculum_entwurf import ENTWURF, darf_entwurf_lesen
+    from app.db.models import ContextNode, Subject
+    from app.planning.verlaufsplan_gruppe import nachfolger_der_kapitel
+
+    status_lesbar = ("active", ENTWURF) if darf_entwurf_lesen(user) else ("active",)
+
+    def lesbar(cur) -> bool:
+        return (cur is not None and cur.status in status_lesbar
+                and (cur.read_scope in _OFFEN or (eigenes_zaehlt(user.sub) and cur.owner_pseudonym == user.sub)))
+
+    faecher = {s.id: s for s in (await db.execute(sa.select(Subject))).scalars()}
+    je_code = {s.fach_code: s for s in faecher.values() if s.fach_code}
+    eigenes_fach = faecher.get(curriculum.subject_id)
+    eigene_kapitel = await _kapitel_des_curriculums(db, curriculum)
+    alias = await _vorgaenger(db, eigene_kapitel)
+
+    # Eigene: Ziele auflösen
+    ziel_ids = {a["kapitel_id"] for k in eigene_kapitel for a in (k.metadata_ or {}).get("absprachen") or []
+                if a.get("kapitel_id")}
+    ziele = {str(n.id): n for n in (await db.execute(sa.select(ContextNode).where(
+        ContextNode.id.in_([uuid.UUID(i) for i in ziel_ids])))).scalars()} if ziel_ids else {}
+    nachfolger = await nachfolger_der_kapitel(db, {i for i, n in ziele.items() if n.status == "archived"})
+    if nachfolger:
+        ziele.update({str(n.id): n for n in (await db.execute(sa.select(ContextNode).where(
+            ContextNode.id.in_([uuid.UUID(i) for i in nachfolger.values()])))).scalars()})
+    ziel_cur = await _curricula_der_kapitel(db, [ziele[i].id for i in ziele])
+
+    # Von außen: Kapitel anderer Fächer mit Absprachen
+    kandidaten = list((await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == "kapitel", ContextNode.status.in_(status_lesbar),
+        ContextNode.subject_id != curriculum.subject_id,
+        ContextNode.metadata_.has_key("absprachen")))).scalars())
+    quell_cur = await _curricula_der_kapitel(db, [k.id for k in kandidaten])
+
+    kapitel_aus = {str(k.id): {"eigene": [], "von_aussen": []} for k in eigene_kapitel}
+    fach_aus: list[dict] = []
+    gesehen: dict[str, tuple] = {}   # Absprache-Kennung → (Rang, Eintrag); veröffentlicht vor Entwurf
+    for k in kandidaten:
+        cur = quell_cur.get(str(k.id))
+        if not lesbar(cur) or cur.status != k.status:
+            continue
+        quelle_fach = faecher.get(k.subject_id)
+        for a in (k.metadata_ or {}).get("absprachen") or []:
+            eigen = alias.get(a.get("kapitel_id") or "")
+            an_fach = (not a.get("kapitel_id") and eigenes_fach is not None
+                       and a.get("fach_code") == eigenes_fach.fach_code and _ueberschneiden(cur, curriculum))
+            if not eigen and not an_fach:
+                continue
+            eintrag = {
+                "id": a.get("id"), "art": a.get("art"), "art_hier": GEGENART.get(a.get("art"), a.get("art")),
+                "text": a.get("text") or "", **(_fach(quelle_fach) if quelle_fach else {}),
+                "quelle": {"kapitel_id": str(k.id), "kapitel": k.title, "curriculum_id": str(cur.id),
+                           "curriculum": cur.title, "status": cur.status, **_stufen(cur)},
+                "beidseitig": False, "_eigen": eigen,
+            }
+            rang = 0 if cur.status == "active" else 1
+            if a.get("id") in gesehen and gesehen[a["id"]][0] <= rang:
+                continue
+            gesehen[a.get("id") or str(uuid.uuid4())] = (rang, eintrag)
+    for _, eintrag in gesehen.values():
+        eigen = eintrag.pop("_eigen")
+        (kapitel_aus[eigen]["von_aussen"] if eigen else fach_aus).append(eintrag)
+
+    for k in eigene_kapitel:
+        for a in (k.metadata_ or {}).get("absprachen") or []:
+            kid = a.get("kapitel_id")
+            ziel = ziele.get(nachfolger.get(kid, kid)) if kid else None
+            zcur = ziel_cur.get(str(ziel.id)) if ziel is not None else None
+            zfach = je_code.get(a.get("fach_code"))
+            eintrag = {
+                "id": a.get("id"), "art": a.get("art"), "text": a.get("text") or "",
+                **(_fach(zfach) if zfach else {"fach_code": a.get("fach_code"), "fach": a.get("fach_code")}),
+                "kapitel_titel": a.get("kapitel_titel"),
+                "ziel": ({"kapitel_id": str(ziel.id), "kapitel": ziel.title, "curriculum_id": str(zcur.id),
+                          "curriculum": zcur.title, "status": zcur.status, **_stufen(zcur)}
+                         if ziel is not None and ziel.status in status_lesbar and lesbar(zcur) else None),
+                "beidseitig": False,
+            }
+            # Beidseitig: Die Gegenseite hat am Ziel eine Absprache mit der Gegenart auf dieses Kapitel.
+            for g in kapitel_aus[str(k.id)]["von_aussen"]:
+                if (eintrag["ziel"] and g["quelle"]["kapitel_id"] == eintrag["ziel"]["kapitel_id"]
+                        and g["art_hier"] == a.get("art")):
+                    eintrag["beidseitig"] = g["beidseitig"] = True
+            kapitel_aus[str(k.id)]["eigene"].append(eintrag)
+
+    def ordnung(e):
+        q = e["quelle"]
+        return (e.get("fach") or "", q["min_grade"] or 0, q["curriculum"], q["kapitel"])
+    for v in kapitel_aus.values():
+        v["von_aussen"].sort(key=ordnung)
+    fach_aus.sort(key=ordnung)
+    return {"kapitel": kapitel_aus, "fach": fach_aus}

@@ -75,6 +75,9 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         # immer ein Entwurf. Aufrufer: „Vorlagen einspielen“ auf `/knowledge/curricula`.
         ("POST", "/context/curricula/import/stapel/pruefen"),
         ("POST", "/context/curricula/import/stapel"),
+        # 0.63 (AY Teil 2): Absprachen mit anderen Fächern, lesend, beide Richtungen; Aufrufer
+        # Ansicht und Editor des Curriculums.
+        ("GET", "/context/curricula/{curriculum_id}/absprachen"),
         # 0.46 (AP Teil B): Rückgängig — Verlauf lesen, Stand sichern (Editor vor dem Speichern),
         # zurücknehmen; Aufrufer der Curriculum-Editor.
         ("GET", "/context/curricula/{curriculum_id}/history"),

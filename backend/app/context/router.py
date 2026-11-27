@@ -2234,6 +2234,20 @@ async def get_curriculum(
     }
 
 
+@router.get("/curricula/{curriculum_id}/absprachen")
+async def get_curriculum_absprachen(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+) -> dict:
+    """Absprachen mit anderen Fächern (0.63, AY Teil 2): je Kapitel die eigenen und die anderer
+    Fächer, die hierher zeigen, dazu die an das Fach ohne Kapitel. Lesen wie das Curriculum."""
+    from app.context.absprachen import absprachen_des_curriculums
+
+    node = await _lesbares_curriculum(db, curriculum_id, user)
+    return await absprachen_des_curriculums(db, node, user)
+
+
 @router.patch("/curricula/{curriculum_id}", response_model=CurriculumRead)
 async def update_curriculum_meta(
     curriculum_id: UUID,
