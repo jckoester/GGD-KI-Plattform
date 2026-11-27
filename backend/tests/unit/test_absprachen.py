@@ -66,3 +66,34 @@ def test_grenzen_und_doppelte():
     erst = normalisieren([_a()])[0]
     zwei = normalisieren([erst, {**erst, "art": "nachher"}])
     assert zwei[0]["id"] != zwei[1]["id"]
+
+
+def test_aus_yaml():
+    from app.context.absprachen import aus_yaml
+
+    liste, warnungen = aus_yaml([{"fach_code": "ph", "kapitel": "Dichte", "jahrgangsstufe": 8, "art": "vorher",
+                                  "text": "zuerst", "farbe": "rot"}], "M")
+    assert liste == [{"fach_code": "PH", "kapitel_titel": "Dichte", "art": "vorher", "text": "zuerst",
+                      "jahrgangsstufe": "8"}]
+    assert warnungen == ["Absprache 1: unbekannte Felder (farbe) übergangen."]
+    assert aus_yaml(None) == ([], [])
+    with pytest.raises(ValueError, match="Absprache 1: „vorher“ braucht ein Kapitel"):
+        aus_yaml([{"fach_code": "PH", "art": "vorher"}])
+    with pytest.raises(ValueError, match="Liste"):
+        aus_yaml({"fach_code": "PH"})
+
+
+def test_einlesen_mit_absprachen_und_stelle():
+    import yaml
+
+    from app.context.curriculum_yaml import einlesen
+
+    grund = {"schule": "", "fach_code": "M", "schulart": "G", "jahrgangsstufe": "8", "bp_version": "2016",
+             "kapitel": [{"titel": "Brüche", "reihenfolge": 1, "lernsequenzen": [],
+                          "absprachen": [{"fach_code": "PH", "kapitel": "Dichte", "art": "vorher"}]}]}
+    p = einlesen(yaml.safe_dump(grund, allow_unicode=True))
+    assert p.ok, p.fehler
+    assert p.entwurf.kapitel[0].absprachen[0]["kapitel_titel"] == "Dichte"
+    grund["kapitel"][0]["absprachen"] = [{"fach_code": "M", "art": "abgestimmt", "text": "x"}]
+    p = einlesen(yaml.safe_dump(grund, allow_unicode=True))
+    assert not p.ok and "absprachen: Absprache 1: Eine Absprache gilt einem anderen Fach" in p.fehler[0]

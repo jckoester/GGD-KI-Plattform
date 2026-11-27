@@ -20,6 +20,10 @@
 
     let { eigene = [], vonAussen = [], gegenHref = null, ongegen = null, titel = "Absprachen mit anderen Fächern" } = $props();
 
+    // Eine beidseitige Absprache steht nur einmal da — als eigene, mit „beidseitig“ und, wenn
+    // drüben anders formuliert, dem Text der anderen Fachschaft.
+    const nurVonAussen = $derived(vonAussen.filter((a) => !a.beidseitig));
+
     const link = "underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark";
 </script>
 
@@ -53,9 +57,12 @@
                 <span class="text-light-tx-2 dark:text-dark-tx-2">— {ART_SATZ[a.art] ?? a.art}</span>
                 {#if a.beidseitig}{@render beidseitig()}{/if}
                 {#if a.text}<span class="basis-full text-light-tx-2 dark:text-dark-tx-2">{a.text}</span>{/if}
+                {#if a.text_gegenseite}
+                    <span class="basis-full text-light-tx-2 dark:text-dark-tx-2">{a.fach}: {a.text_gegenseite}</span>
+                {/if}
             </li>
         {/each}
-        {#each vonAussen as a (a.id)}
+        {#each nurVonAussen as a (a.id)}
             <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-light-tx dark:text-dark-tx">
                 {@render marke(a)}
                 {#if kapitelPfad(a.quelle)}

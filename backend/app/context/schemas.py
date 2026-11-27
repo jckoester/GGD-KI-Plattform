@@ -443,8 +443,13 @@ class CurriculumDraftKapitel(BaseModel):
     hinweis: str | None = None
     konkretisierung: list[str] = Field(default_factory=list)
     lernsequenzen: list[CurriculumDraftLernsequenz] = Field(default_factory=list)
+    #: Absprachen mit anderen Fächern (0.63, AY Teil 2), Ziel über Fach und Kapiteltitel —
+    #: `absprachen.aus_yaml`, aufgelöst beim Import.
+    absprachen: list[dict] = Field(default_factory=list)
     confidence: float = Field(default=1.0)
     warnings: list[str] = Field(default_factory=list)
+
+
 class CurriculumDraftConfirmed(BaseModel):
     """Bestätigtes Zwischenformat für die Speicherung (Stufe 2)."""
     schule: str

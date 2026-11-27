@@ -8,6 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.absprachen import export_zeilen, fuer_yaml
 from app.context.curriculum_begriffe import FELDER, namen_fuer_export, namen_fuer_yaml
 from app.context.curriculum_rahmen import rahmen_abschnitte
 from app.context.editions import BP_STATUS_CURRICULUM
@@ -240,6 +241,8 @@ async def build_curriculum_export_dict(db: AsyncSession, tree: dict) -> dict:
             "std": kap_meta.get("std"),
             "hinweis": kap_meta.get("einleitung") or "",
             "konkretisierung": kap_konkretisierung,
+            # Absprachen mit anderen Fächern (0.63, AY Teil 2): Fach und Kapiteltitel, keine Kennungen.
+            **({"absprachen": a} if (a := await fuer_yaml(db, kap_meta.get("absprachen"))) else {}),
             "lernsequenzen": lernsequenzen_out,
         })
 
@@ -344,7 +347,8 @@ async def _formeln_in_teilen(teile: list[dict]) -> list[dict]:
     return teile
 
 
-async def _build_pdf_kapitel(tree: dict, querverweise: dict[str, str] | None = None) -> list[dict]:
+async def _build_pdf_kapitel(tree: dict, querverweise: dict[str, str] | None = None,
+                             absprachen: dict[str, list[str]] | None = None) -> list[dict]:
     """Reichert die Curriculum-Struktur fürs PDF-Template an.
 
     - IK/PK als Volltext (Knoten-Titel aus ik_refs/pk_refs), Fallback nr/pk_id
@@ -414,6 +418,7 @@ async def _build_pdf_kapitel(tree: dict, querverweise: dict[str, str] | None = N
         kapitel_out.append({
             "titel": kap.get("title"),
             "std": kap_meta.get("std"),
+            "absprachen": (absprachen or {}).get(str(kap.get("id")), []),
             "lernsequenzen": ls_out,
         })
     return kapitel_out
@@ -469,7 +474,7 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
         meta=meta,
         entwurf=entwurf_vermerk(tree),
         rahmen=await _build_pdf_rahmen(meta),
-        kapitel=await _build_pdf_kapitel(tree, await faecher_je_kompetenz(db, tree)),
+        kapitel=await _build_pdf_kapitel(tree, await faecher_je_kompetenz(db, tree), await export_zeilen(db, tree)),
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
     return pdf_bytes
@@ -560,6 +565,7 @@ async def render_curriculum_office(
     from app.export import office as o
 
     qv_faecher = await faecher_je_kompetenz(db, tree)  # AY Teil 1 (F7)
+    abspr_zeilen = await export_zeilen(db, tree)  # AY Teil 2 (F7)
     teile: dict[str, str] = {}
     gerueste = []  # (kapitel, [(ls, [eintrag-Schlüssel])])
     for k, kap in enumerate(tree.get("kapitel", [])):
@@ -619,6 +625,8 @@ async def render_curriculum_office(
     for kap, lss in gerueste:
         std = (kap.get("metadata") or {}).get("std")
         dok.append(o.ueberschrift(2, o.text(f"{kap.get('title') or ''}" + (f" ({std} Std.)" if std else ""))))
+        for zeile in abspr_zeilen.get(str(kap.get("id")), []):
+            dok.append(o.absatz([o.fett(o.text("Absprache:")), {"t": "Space"}, *o.text(zeile)]))
         for ls, schluessel in lss:
             std = (ls.get("metadata") or {}).get("std")
             dok.append(o.ueberschrift(3, o.text(f"{ls.get('title') or '–'}" + (f" ({std} Std.)" if std else ""))))

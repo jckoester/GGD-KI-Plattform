@@ -163,3 +163,19 @@ def test_ik_texte_mit_querverweisen():
     ls = {"ik_refs": [{"node_id": "a", "title": "3.1.1 Zahlen"}]}
     iks, _ = _ik_pk_texte(e, ls, {"a": "↔ PH"})
     assert iks == ["3.1.1 Zahlen (T) ↔ PH", "3.1.2"]
+
+
+async def test_absprachen_unter_dem_kapitel(monkeypatch):
+    """AY Teil 2 (F7): die eigenen Absprachen kompakt unter der Kapitelüberschrift."""
+    from app.context import curriculum_export
+
+    baum = _baum()
+    baum["kapitel"][0]["id"] = "k1"
+
+    async def _zeilen(db, tree):
+        return {"k1": ["Physik · Dichte — kommt vorher: Bruchrechnung zuerst"]}
+
+    monkeypatch.setattr(curriculum_export, "export_zeilen", _zeilen)
+    text = _klartext(await _docx(baum))
+    assert "Absprache: Physik · Dichte — kommt vorher: Bruchrechnung zuerst" in text
+    assert text.index("Rationale Zahlen") < text.index("Absprache:") < text.index("Brüche vergleichen")

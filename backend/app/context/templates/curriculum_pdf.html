@@ -114,6 +114,9 @@
   ul.komp-list li { margin-bottom: 1mm; }
   li.ik-partiell::after { content: " (T)"; font-size: 7pt; color: #888; }
   .ik-qv { font-size: 7pt; color: #666; white-space: nowrap; }
+  /* Absprachen mit anderen Fächern unter dem Kapitel (0.63, AY Teil 2) */
+  .kapitel-absprachen { margin: 0 0 2mm 0; padding: 0; list-style: none; font-size: 8pt; color: #444; }
+  .kapitel-absprachen li { margin: 0 0 0.5mm 0; }
 
   /* ── Konkretisierung (gerendertes Markdown) ─────────────────────────────── */
   .konk p { margin: 0 0 1mm 0; }
@@ -180,6 +183,11 @@
   {{ kap.titel }}
   {% if kap.std %}<span class="kapitel-std">({{ kap.std }} Std.)</span>{% endif %}
 </div>
+{% if kap.absprachen %}
+<ul class="kapitel-absprachen">
+  {% for z in kap.absprachen %}<li><strong>Absprache:</strong> {{ z }}</li>{% endfor %}
+</ul>
+{% endif %}
 
 {% for ls in kap.lernsequenzen %}
 <div class="ls-heading">

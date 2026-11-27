@@ -888,7 +888,7 @@
                                 vorbelegung={vorbelegungen[kap.id] ?? null}
                                 onchange={(liste) => absprachenSetzen(kap, liste)}
                             />
-                            {#if absprachenVon(kap.id).von_aussen.length}
+                            {#if absprachenVon(kap.id).von_aussen.some((a) => !a.beidseitig)}
                                 <div class="mt-3">
                                     <AbsprachenAnzeige
                                         vonAussen={absprachenVon(kap.id).von_aussen}

@@ -293,6 +293,10 @@ async def absprachen_des_curriculums(db, curriculum, user) -> dict:
                 if (eintrag["ziel"] and g["quelle"]["kapitel_id"] == eintrag["ziel"]["kapitel_id"]
                         and g["art_hier"] == a.get("art")):
                     eintrag["beidseitig"] = g["beidseitig"] = True
+                    # Steht drüben ein anderer Text, liest man ihn an der eigenen Absprache mit —
+                    # die Anzeige zeigt eine beidseitige Absprache nur einmal.
+                    if (g.get("text") or "") and g["text"] != eintrag["text"]:
+                        eintrag["text_gegenseite"] = g["text"]
             kapitel_aus[str(k.id)]["eigene"].append(eintrag)
 
     def ordnung(e):
@@ -436,4 +440,34 @@ async def fuer_yaml(db, liste: list[dict] | None) -> list[dict]:
         aus.append({"fach_code": a["fach_code"], **({"kapitel": titel} if titel else {}),
                     **({"jahrgangsstufe": stufe} if stufe else {}), "art": a["art"],
                     **({"text": a["text"]} if a.get("text") else {})})
+    return aus
+
+
+#: Die Art als Satzteil, wie in der Oberfläche (`lib/absprachen.js`, `ART_SATZ`).
+ART_SATZ = {"vorher": "kommt vorher", "gleichzeitig": "läuft gleichzeitig", "nachher": "kommt danach",
+            "abgestimmt": "abgestimmt"}
+
+
+async def export_zeilen(db, tree: dict) -> dict[str, list[str]]:
+    """Je Kapitel die eigenen Absprachen als Zeilen für PDF und DOCX (kompakt, F7):
+    „Physik · Dichte — kommt vorher: Bruchrechnung zuerst“. Absprachen von außen stehen nicht im
+    Export — sie gehören der anderen Fachschaft und hängen am Leserecht."""
+    import sqlalchemy as sa
+
+    from app.db.models import Subject
+
+    alle = [a for kap in tree.get("kapitel", []) for a in (kap.get("metadata") or {}).get("absprachen") or []]
+    if not alle:
+        return {}
+    namen = dict((await db.execute(sa.select(Subject.fach_code, Subject.name).where(
+        Subject.fach_code.in_({a["fach_code"] for a in alle})))).all())
+    aus = {}
+    for kap in tree.get("kapitel", []):
+        zeilen = []
+        for a in (kap.get("metadata") or {}).get("absprachen") or []:
+            ziel = a.get("kapitel_titel") or "ganzes Fach"
+            zeile = f"{namen.get(a['fach_code'], a['fach_code'])} · {ziel} — {ART_SATZ.get(a['art'], a['art'])}"
+            zeilen.append(f"{zeile}: {a['text']}" if a.get("text") else zeile)
+        if zeilen:
+            aus[str(kap["id"])] = zeilen
     return aus

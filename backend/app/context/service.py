@@ -1651,6 +1651,10 @@ async def import_curriculum_from_draft(
         
         # Kapitel-Knoten
         konkretisierung_text = " ".join(kap.konkretisierung) if kap.konkretisierung else None
+        # Absprachen (0.63, AY Teil 2): Ziel über Fach und Kapiteltitel auflösen.
+        from app.context.absprachen import aus_yaml_aufloesen
+        absprachen, abspr_warnungen = await aus_yaml_aufloesen(db, kap.absprachen, jahrgangsstufe)
+        stats.warnings.extend(f"Kapitel „{kap.titel}“: {w}" for w in abspr_warnungen)
         kapitel_data = {
             "category": "knowledge",
             "content_type": "kapitel",
@@ -1670,6 +1674,7 @@ async def import_curriculum_from_draft(
                 "einleitung": kap.hinweis or "",
                 "breadcrumb": f"{schulart} | {fach_name} | Kl. {jahrgangsstufe}: {kap.titel}",
                 "import_key": kapitel_import_key,
+                **({"absprachen": absprachen} if absprachen else {}),
                 **({"kopie_von": str(vorbild)}
                    if (vorbild := _vorbild_nehmen(kapitel_vorbild, kap.titel)) is not None else {}),
             }

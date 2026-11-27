@@ -87,6 +87,7 @@ async def test_beide_richtungen_beidseitig_und_fach(db_session, w):
     assert (aussen["fach_code"], aussen["art"], aussen["art_hier"], aussen["text"]) == (
         "PHAY", "vorher", "nachher", "Bruchrechnung zuerst")
     assert aussen["quelle"]["kapitel"] == "Dichte" and eigen["beidseitig"] and aussen["beidseitig"]
+    assert eigen["text_gegenseite"] == "Bruchrechnung zuerst"
     [an_fach] = r["fach"]
     assert (an_fach["art"], an_fach["text"], an_fach["quelle"]["curriculum"]) == ("abgestimmt", "Einheiten gleich",
                                                                                   "Physik Kl. 8")
@@ -188,3 +189,44 @@ async def test_speichern_ueber_den_knoten(db_session, w, monkeypatch):
         meta["absprachen"] = [{"fach_code": "PHAY", "art": "vorher"}]
         r = await c.patch(f"/context/nodes/{w.brueche.id}", json={"metadata": meta})
         assert r.status_code == 422 and "braucht ein Kapitel" in r.json()["detail"]
+
+
+async def test_yaml_rundweg_aufloesen_und_warnungen(db_session, w):
+    """Export schreibt Fach und Kapiteltitel; der Import löst sie wieder auf (Schritt 5)."""
+    from app.context.absprachen import aus_yaml_aufloesen, export_zeilen, fuer_yaml
+    from app.context.service import load_curriculum_tree
+
+    w.m8.metadata_ = {"jahrgangsstufe": "8"}
+    w.ph8.metadata_ = {"jahrgangsstufe": "8"}
+    await db_session.flush()
+    raus = await fuer_yaml(db_session, w.brueche.metadata_["absprachen"])
+    assert raus == [{"fach_code": "PHAY", "kapitel": "Dichte", "jahrgangsstufe": "8", "art": "nachher"}]
+
+    rein, warnungen = await aus_yaml_aufloesen(db_session, [
+        {"fach_code": "PHAY", "kapitel_titel": "dichte ", "jahrgangsstufe": "8", "art": "nachher", "text": ""},
+        {"fach_code": "PHAY", "kapitel_titel": "Gibt es nicht", "jahrgangsstufe": None, "art": "vorher", "text": ""},
+        {"fach_code": "XXAY", "kapitel_titel": None, "jahrgangsstufe": None, "art": "abgestimmt", "text": "t"},
+    ], "8")
+    assert rein[0]["kapitel_id"] == str(w.dichte.id) and rein[0]["kapitel_titel"] == "Dichte"
+    assert rein[1]["kapitel_id"] is None and rein[1]["kapitel_titel"] == "Gibt es nicht"
+    assert len(rein) == 2
+    assert any("nicht gefunden" in x for x in warnungen) and any("„XXAY“" in x for x in warnungen)
+
+    # Gleicher Titel in zwei Curricula: die Stufe entscheidet, sonst Warnung
+    ph9 = await w.curriculum(w.ph, "Physik Kl. 9", (9, 9))
+    ph9.metadata_ = {"jahrgangsstufe": "9"}
+    dichte9 = await w.kapitel(ph9, "Dichte")
+    await db_session.flush()
+    rein, warnungen = await aus_yaml_aufloesen(db_session, [
+        {"fach_code": "PHAY", "kapitel_titel": "Dichte", "jahrgangsstufe": "9", "art": "vorher", "text": ""}])
+    assert rein[0]["kapitel_id"] == str(dichte9.id) and warnungen == []
+    rein, warnungen = await aus_yaml_aufloesen(db_session, [
+        {"fach_code": "PHAY", "kapitel_titel": "Dichte", "jahrgangsstufe": None, "art": "vorher", "text": ""}])
+    assert rein[0]["kapitel_id"] is None and "nicht eindeutig" in warnungen[0]
+
+    # PDF/DOCX: kompakte Zeilen der eigenen Absprachen
+    tree = await load_curriculum_tree(db_session, w.ph8.id)
+    assert tree
+    zeilen = await export_zeilen(db_session, tree)
+    assert zeilen[str(w.dichte.id)] == ["Mathematik · Brüche — kommt vorher: Bruchrechnung zuerst",
+                                        "Mathematik · ganzes Fach — abgestimmt: Einheiten gleich"]

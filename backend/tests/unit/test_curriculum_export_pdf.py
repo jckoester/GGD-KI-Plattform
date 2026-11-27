@@ -60,6 +60,26 @@ class TestBuildPdfKapitel:
                                  {"html": "3.1.2", "partiell": False}]
 
     @pytest.mark.asyncio
+    async def test_absprachen_unter_dem_kapitel(self):
+        """AY Teil 2 (F7): die eigenen Absprachen kompakt unter der Kapitelüberschrift."""
+        import os
+
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        tree = _tree_with_entry(entry={"ik": [], "pk": []})
+        tree["kapitel"][0]["id"] = "k1"
+        kap = await _build_pdf_kapitel(tree, None, {"k1": ["Physik · Dichte — kommt vorher: <zuerst>"]})
+        assert kap[0]["absprachen"] == ["Physik · Dichte — kommt vorher: <zuerst>"]
+        assert (await _build_pdf_kapitel(tree))[0]["absprachen"] == []
+        from app.context import curriculum_export
+        vorlagen = os.path.join(os.path.dirname(curriculum_export.__file__), "templates")
+        env = Environment(loader=FileSystemLoader(vorlagen), autoescape=select_autoescape(["html"]))
+        html = env.get_template("curriculum_pdf.html").render(title="T", school_name="", meta={}, entwurf=None,
+                                                               rahmen=[], kapitel=kap)
+        assert '<ul class="kapitel-absprachen">' in html
+        assert "Physik · Dichte — kommt vorher: &lt;zuerst&gt;" in html
+
+    @pytest.mark.asyncio
     async def test_fallback_to_nr_and_pk_id(self):
         """Ohne passenden Ref-Titel fällt der Text auf nr bzw. pk_id zurück."""
         tree = _tree_with_entry(

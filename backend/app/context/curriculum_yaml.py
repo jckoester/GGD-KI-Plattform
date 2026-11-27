@@ -62,7 +62,8 @@ QUELLE_ZEICHEN = 300
 
 PFLICHT = ("schule", "fach_code", "schulart", "jahrgangsstufe", "bp_version")
 FELDER_OBEN = frozenset(PFLICHT + ("fach", "fachplan_id", "bp_id", "vorwort", "quelle", "rahmen", "kapitel"))
-FELDER_KAPITEL = frozenset(("titel", "reihenfolge", "std", "hinweis", "konkretisierung", "lernsequenzen"))
+FELDER_KAPITEL = frozenset(("titel", "reihenfolge", "std", "hinweis", "konkretisierung", "lernsequenzen",
+                            "absprachen"))
 FELDER_LS = frozenset(("bp_titel", "bp_leitidee", "reihenfolge", "std", "eintraege"))
 FELDER_EINTRAG = frozenset(("ik", "ik_partiell", "pk", "konkretisierung", "hinweise", "lp", "material",
                             "begriffe", "fachmethoden"))
@@ -326,10 +327,19 @@ def zu_entwurf(daten: dict, bp_version_override: str | None = None, *,
         titel = (text(roh_titel, f"{kwo}, titel", pflicht=True) or "").strip()
         if not titel and isinstance(roh_titel, str) and roh_titel:
             p.fehler.append(f"{kwo}, titel: fehlt.")
+        # Absprachen mit anderen Fächern (0.63, AY Teil 2): Ziel über Fach und Kapiteltitel;
+        # aufgelöst wird beim Import (`absprachen.aus_yaml_aufloesen`).
+        from app.context.absprachen import aus_yaml
+        try:
+            absprachen, w = aus_yaml(kap.get("absprachen"), werte["fach_code"])
+            p.warnungen.extend(f"{kwo}, absprachen: {x}" for x in w)
+        except ValueError as e:
+            p.fehler.append(f"{kwo}, absprachen: {e}")
+            absprachen = []
         kapitel.append(CurriculumDraftKapitel(
             titel=titel, reihenfolge=reihenfolge if reihenfolge is not None else ki,
             std=stunden(kap.get("std"), f"{kwo}, std"), hinweis=text(kap.get("hinweis"), f"{kwo}, hinweis"),
-            konkretisierung=konkretisierung, lernsequenzen=lernsequenzen,
+            konkretisierung=konkretisierung, lernsequenzen=lernsequenzen, absprachen=absprachen,
         ))
 
     # Die Reihenfolge ist Teil des Schlüssels jedes Kapitels und jeder Lernsequenz: Zwei gleiche
