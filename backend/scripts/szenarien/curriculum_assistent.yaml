@@ -50,6 +50,18 @@ curriculum:
   jahrgangsstufe: "7/8"
   bp_version: "2016.V3"
 
+# Zweites Fach (0.65, Absprachen): je Lauf ein veröffentlichtes Curriculum Mathematik 7/8 mit
+# `messung`, danach gelöscht. `verknuepft` setzt Fundstellen für die Querverweise der Kinematik
+# (Physik 3.1.5(2) → M 3.2.4(1), 3.1.5(4) → M 3.2.1(11)).
+  partner:
+    fach: Mathematik
+    jahrgangsstufe: "7/8"
+    bp_version: "2016.V3"
+    kapitel:
+      - {titel: Proportionale Zuordnungen, verknuepft: ["3.2.4(1)"]}
+      - {titel: Terme und Formeln, verknuepft: ["3.2.1(11)"]}
+      - {titel: Winkel und Dreiecke}
+
 assistent:
   name: Curriculum-Entwurf (Messung)
   prompt: config/prompts/curriculum_assistent.md
@@ -89,6 +101,24 @@ vorlagen:
   veroeffentlicht:
     <<: *bestehend
     status: active
+
+  # 0.65: eine eigene Absprache (Kinematik ↔ M „Proportionale Zuordnungen“, vorher) und eine,
+  # die die Mathematik bei uns eingetragen hat (an „Terme und Formeln“ → „Messgeräte entwickeln“).
+  mit_absprachen:
+    <<: *bestehend
+    extra_operationen:
+      - {op: absprache_anlegen, kapitel_id: k4, fach: M, art: vorher, ziel_kapitel: Proportionale Zuordnungen,
+         text: Proportionalität zuerst in Mathematik}
+    partner_absprachen:
+      - {kapitel: Terme und Formeln, ziel: Messgeräte entwickeln, art: abgestimmt,
+         text: Formeln mit Einheiten schreiben beide Fächer gleich}
+
+  # 0.65: eine Absprache nur als Freitext in den Hinweisen (wie im Physik-Curriculum auf Dev)
+  mit_freitext:
+    <<: *bestehend
+    extra_operationen:
+      - {op: eintrag_anlegen, lernsequenz_id: l33, ik: ["3.1.7(6)"],
+         hinweise: "In Absprache mit der Fachschaft Mathematik: Winkel messen lernen die Schüler:innen dort vorher im Kapitel Winkel und Dreiecke."}
 
   bestehend_editor:
     <<: *bestehend
@@ -387,3 +417,98 @@ faelle:
       Legt nach „leg das Gerüst an“ genau das Gerüst an, nennt verplant und rest und fragt, mit
       welchem Kapitel es weitergeht. Kein Kapitel gefüllt, auch kein Vorschlag mit Einträgen in
       derselben Antwort.
+
+  # ── Absprachen mit anderen Fächern (0.65, Päckchen AY Teil 2 C) ────────────────────────────
+  - id: absprache-auf-bitte
+    vorlage: bestehend
+    zuege:
+      - text: >-
+          Leg für das Kapitel Mechanik: Kinematik eine Absprache mit Mathematik an: Proportionale
+          Zuordnungen behandelt die Mathematik vorher.
+        muss: [get_subject_chapters, preview_curriculum_operations]
+      - text: Ja, passt.
+        muss_eine: [apply_curriculum_operations, get_curriculum_draft]
+    ende:
+      absprachen_anzahl: 1
+      absprache_mit: [{kapitel: "Mechanik: Kinematik", fach: M, art: vorher, ziel: Proportionale Zuordnungen}]
+    erwartung: >-
+      Holt die Kapitel der Mathematik, schlägt die Absprache mit Fach, Kapitel „Proportionale
+      Zuordnungen“, Art vorher und Text vor (mit Vorschau), schreibt nach „ja“ (oder gleich, weil die
+      Bitte vollständig ist) und nennt keine Funktionsnamen.
+
+  - id: gegenabsprache
+    vorlage: mit_absprachen
+    zuege:
+      - text: >-
+          Die Fachschaft Mathematik hat bei uns eine Absprache eingetragen. Übernimm sie bitte auch
+          bei uns.
+        muss: [preview_curriculum_operations]
+        antwort: ["(Terme|Formeln|Messgeräte)"]
+      - text: Ja, bitte.
+    ende:
+      absprachen_anzahl: 2
+      absprache_mit: [{kapitel: Messgeräte entwickeln, fach: M, art: abgestimmt, ziel: Terme und Formeln}]
+    erwartung: >-
+      Findet die Absprache der Mathematik an „Messgeräte entwickeln“, schlägt die Gegenabsprache
+      (abgestimmt, Ziel „Terme und Formeln“) vor und legt sie an. Die eigene Absprache der Kinematik
+      bleibt.
+
+  - id: absprache-nennen
+    vorlage: mit_absprachen
+    zuege:
+      - text: >-
+          Ergänz im Kapitel Mechanik: Kinematik eine Lernsequenz „Geschwindigkeit messen“ mit 4
+          Stunden.
+        muss: [preview_curriculum_operations]
+        antwort: ["Mathematik"]
+      - text: Ja, übernehmen.
+        muss: [apply_curriculum_operations]
+    ende:
+      absprachen_anzahl: 1
+    erwartung: >-
+      Schlägt die Lernsequenz vor und nennt dabei in einem Satz die Absprache mit der Mathematik
+      (Proportionale Zuordnungen vorher). Legt keine neue Absprache an und ändert die vorhandene nicht.
+
+  - id: aus-hinweisen
+    vorlage: mit_freitext
+    zuege:
+      - text: In unseren Hinweisen stehen Absprachen mit anderen Fächern. Mach daraus richtige Absprachen.
+        muss: [preview_curriculum_operations]
+        antwort: ["Mathematik"]
+      - text: Ja, so übernehmen.
+    ende:
+      absprache_mit: [{kapitel: Optik, fach: M}]
+      hinweise_enthaelt: ["In Absprache mit der Fachschaft Mathematik"]
+    erwartung: >-
+      Findet die Stelle in der Lernsequenz Reflexion, schlägt eine Absprache am Kapitel Optik mit
+      Mathematik vor (vorher, Ziel „Winkel und Dreiecke“), schreibt nach Zustimmung und lässt den
+      Hinweistext stehen.
+
+  - id: wo-sinnvoll
+    vorlage: bestehend
+    zuege:
+      - text: Mit welchen Fächern sollten wir uns absprechen? Schreib noch nichts.
+        muss: [get_cross_subject_references]
+        nicht: [apply_curriculum_operations]
+        inhalt: gleich
+        antwort: ["Mathematik"]
+    ende:
+      absprachen_anzahl: 0
+    erwartung: >-
+      Liest die Querverweise und nennt je Kapitel die Bezüge, darunter die Kinematik mit Mathematik
+      (Proportionale Zuordnungen, Terme und Formeln als Fundstellen). Schlägt höchstens vor, schreibt
+      nichts.
+
+  - id: keine-erfinden
+    vorlage: bestehend
+    zuege:
+      - text: Welche Absprachen haben wir mit der Biologie?
+        nicht: [apply_curriculum_operations, preview_curriculum_operations]
+        inhalt: gleich
+        antwort: ["(keine|nicht|noch nicht)"]
+    ende:
+      absprachen_anzahl: 0
+    erwartung: >-
+      Sagt, dass es keine Absprachen mit der Biologie gibt, erfindet keine und legt keine an. Darf
+      anbieten, eine anzulegen.
+

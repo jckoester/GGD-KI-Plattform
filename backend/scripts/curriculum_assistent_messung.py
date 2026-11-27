@@ -72,6 +72,8 @@ FUNKTIONEN = (
     "get_curriculum_draft", "get_bp_competences", "get_curriculum_coverage", "get_hour_frame",
     "preview_curriculum_operations", "apply_curriculum_operations", "set_curriculum_frame",
     "undo_last_curriculum_change", "finde_curriculum", "waehle_curriculum", "lege_curriculum_an",
+    # 0.65 (AY Teil 2 C): Absprachen mit anderen Fächern
+    "get_subject_chapters", "get_cross_subject_references",
 )
 LESEN = {"get_curriculum_draft", "waehle_curriculum", "lege_curriculum_an"}
 BEWERTUNGEN = ("brauchbar", "teilweise", "unbrauchbar")
@@ -150,7 +152,11 @@ def baum(conn, cid: str) -> dict:
                 JOIN context_edges e ON e.from_node_id = l.id AND e.relation = 'part_of'
                 WHERE e.to_node_id = %s AND l.content_type = 'lernsequenz'
                 ORDER BY (l.metadata->>'reihenfolge')::int NULLS LAST, l.title""", kid)]
-        kapitel.append({"titel": titel, "einleitung": (km or {}).get("einleitung") or "", "lernsequenzen": lss})
+        kapitel.append({"titel": titel, "einleitung": (km or {}).get("einleitung") or "", "lernsequenzen": lss,
+                        # 0.65: Absprachen mit anderen Fächern — Fach, Ziel-Kapitel, Art, Text
+                        "absprachen": [{"fach": a.get("fach_code"), "ziel": a.get("kapitel_titel"),
+                                        "art": a.get("art"), "text": a.get("text") or ""}
+                                       for a in (km or {}).get("absprachen") or []]})
     return {"rahmen": meta.get("rahmen") or {}, "kapitel": kapitel}
 
 
@@ -201,8 +207,13 @@ def curricula_loeschen(conn, ids: list[str]) -> None:
                 OR (id::text = ANY(%s) AND content_type = 'curriculum')""", (ids, ids))
 
 
-def mess_assistent(conn, cfg: dict, modell: str) -> tuple[int, str]:
+def mess_assistent(conn, cfg: dict, modell: str, prompt_rev: str | None = None) -> tuple[int, str]:
     prompt = (REPO / cfg["prompt"]).read_text(encoding="utf-8").strip()
+    if prompt_rev:  # Arm A (0.65): der Prompt aus einer früheren Revision
+        import subprocess
+
+        prompt = subprocess.run(["git", "-C", str(REPO), "show", f"{prompt_rev}:{cfg['prompt']}"],
+                                capture_output=True, text=True, check=True).stdout.strip()
     vorlage = _alle(conn, "SELECT description, tool_groups::text, produces::text FROM assistants WHERE name = %s",
                     cfg["vorlage"])
     if not vorlage:
@@ -281,14 +292,22 @@ async def _aufbauen(cfg: dict, vorlage: dict, pseudonym: str) -> str:
             if cur is None:
                 raise SystemExit(f"Mess-Curriculum nicht angelegt: {antwort}")
             cur.metadata_ = {**(cur.metadata_ or {}), "messung": True}
+            partner = await _partner_aufbauen(db, cfg.get("partner"), pseudonym) if cfg.get("partner") else {}
             if vorlage.get("rahmen"):
                 r = await ca.rahmen_setzen(db, user, cur, vorlage["rahmen"])
                 if not r.get("ok"):
                     raise SystemExit(f"Vorlage, Rahmen: {r}")
-            if vorlage.get("operationen"):
-                r = await ca.operationen_anwenden(db, user, cur, vorlage["operationen"])
+            ops = [*(vorlage.get("operationen") or []), *(vorlage.get("extra_operationen") or [])]
+            # Absprachen der Vorlage nennen ihr Ziel über den Titel im Partnerfach (0.65)
+            ops = [{**{k: v for k, v in o.items() if k != "ziel_kapitel"},
+                    **({"ziel_kapitel_id": partner[o["ziel_kapitel"]]} if o.get("ziel_kapitel") else {})}
+                   for o in ops]
+            if ops:
+                r = await ca.operationen_anwenden(db, user, cur, ops)
                 if not r.get("ok"):
                     raise SystemExit(f"Vorlage, Operationen: {r.get('fehler')}")
+            if vorlage.get("partner_absprachen"):
+                await _partner_absprachen(db, cfg["partner"], partner, cur, vorlage["partner_absprachen"])
             await db.execute(sa.delete(CurriculumSnapshot).where(CurriculumSnapshot.curriculum_id == cur.id))
             if vorlage.get("status"):
                 await db.execute(sa.update(ContextNode).where(ContextNode.id.in_(await baum_ids(db, cur.id)))
@@ -302,6 +321,73 @@ async def _aufbauen(cfg: dict, vorlage: dict, pseudonym: str) -> str:
             return str(cur.id)
     finally:
         await engine.dispose()
+
+
+async def _partner_aufbauen(db, p: dict, pseudonym: str) -> dict[str, str]:
+    """Ein Curriculum eines zweiten Fachs (0.65): veröffentlicht, `messung`, Kapitel mit je einer
+    Lernsequenz; `verknuepft` verknüpft sie mit Kompetenzen des Fachs, auf die der Bildungsplan aus
+    dem Messfach verweist — so haben die Querverweise eine Fundstelle. Rückgabe: Titel → Kennung."""
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.db.models import ContextEdge, ContextNode, Subject
+
+    fach = (await db.execute(sa.select(Subject).where(sa.or_(Subject.name == p["fach"], Subject.slug == p["fach"])))).scalar_one()
+    lo, hi = (int(x) for x in re.findall(r"\d+", p["jahrgangsstufe"])[:2]) if "/" in p["jahrgangsstufe"] else \
+        (int(p["jahrgangsstufe"]),) * 2
+
+    def knoten(typ, titel, meta):
+        return ContextNode(id=_uuid.uuid4(), category="knowledge", content_type=typ, title=titel, status="active",
+                           owner_pseudonym=pseudonym, read_scope="school", write_scope="school",
+                           subject_id=fach.id, min_grade=lo, max_grade=hi, metadata_=meta)
+    cur = knoten("curriculum", f"{p['fach']} {p['jahrgangsstufe']} (Messung)",
+                 {"messung": True, "jahrgangsstufe": p["jahrgangsstufe"], "bp_version": p.get("bp_version"),
+                  "fach": fach.name, "fach_code": fach.fach_code})
+    db.add(cur)
+    await db.flush()
+    aus = {}
+    for i, k in enumerate(p["kapitel"], 1):
+        kap = knoten("kapitel", k["titel"], {"reihenfolge": i})
+        ls = knoten("lernsequenz", f"{k['titel']} (Sequenz)", {"reihenfolge": 1, "std": 6, "eintraege": []})
+        db.add_all([kap, ls])
+        await db.flush()
+        db.add_all([ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of", metadata_={}),
+                    ContextEdge(from_node_id=ls.id, to_node_id=kap.id, relation="part_of", metadata_={})])
+        for nr in k.get("verknuepft") or []:
+            ziel = (await db.execute(sa.select(ContextNode.id).where(
+                ContextNode.subject_id == fach.id, ContextNode.content_type == "ik_kompetenz",
+                ContextNode.status == "active", ContextNode.metadata_["kompetenz_nr"].astext == nr)
+                .order_by(ContextNode.bp_version.desc()).limit(1))).scalar_one_or_none()
+            if ziel is None:
+                raise SystemExit(f"Partnerfach: Kompetenz {nr} in {p['fach']} gibt es nicht")
+            db.add(ContextEdge(from_node_id=ls.id, to_node_id=ziel, relation="references",
+                               metadata_={"partiell": "false"}))
+        aus[k["titel"]] = str(kap.id)
+    await db.flush()
+    return aus
+
+
+async def _partner_absprachen(db, p: dict, partner: dict[str, str], cur, liste: list[dict]) -> None:
+    """Absprachen, die das Partnerfach eingetragen hat (von außen): am Partnerkapitel, Ziel ein
+    Kapitel des Mess-Curriculums über den Titel."""
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.db.models import ContextEdge, ContextNode, Subject
+
+    titel_id = {t: i for i, t in (await db.execute(
+        sa.select(ContextNode.id, ContextNode.title).join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(ContextEdge.to_node_id == cur.id, ContextNode.content_type == "kapitel"))).all()}
+    fach_code = await db.scalar(sa.select(Subject.fach_code).where(Subject.id == cur.subject_id))
+    for a in liste:
+        kap = await db.get(ContextNode, _uuid.UUID(partner[a["kapitel"]]))
+        ziel = titel_id[a["ziel"]]
+        kap.metadata_ = {**(kap.metadata_ or {}), "absprachen": [*(kap.metadata_ or {}).get("absprachen", []), {
+            "id": str(_uuid.uuid4()), "fach_code": fach_code, "kapitel_id": str(ziel), "kapitel_titel": a["ziel"],
+            "art": a["art"], "text": a.get("text") or ""}]}
+    await db.flush()
 
 
 def aufbauen(cfg: dict, vorlage: dict, pseudonym: str) -> str:
@@ -530,6 +616,14 @@ def ende_pruefen(fall: dict, zuege: list[dict], ende: dict) -> dict[str, bool]:
         muster, grenze = anteil["muster"], anteil["anteil"]
         mit = sum(1 for h in hinweise if re.search(muster, h))
         k[f"Ende höchstens {grenze:.0%} der Einträge mit {muster}"] = bool(hinweise) and mit / len(hinweise) <= grenze
+    # Absprachen mit anderen Fächern (0.65): eigene des Mess-Curriculums
+    eigene = [(kap["titel"], a) for kap in stand["kapitel"] for a in kap.get("absprachen") or []]
+    if "absprachen_anzahl" in e:
+        k[f"Ende {e['absprachen_anzahl']} Absprachen"] = len(eigene) == e["absprachen_anzahl"]
+    for soll in e.get("absprache_mit") or []:
+        k[f"Ende Absprache {soll['kapitel']} ↔ {soll['fach']}" + (f" ({soll['art']})" if soll.get("art") else "")] = any(
+            t == soll["kapitel"] and a["fach"] == soll["fach"] and (not soll.get("art") or a["art"] == soll["art"])
+            and (not soll.get("ziel") or a["ziel"] == soll["ziel"]) for t, a in eigene)
     if "bezug" in e:
         k["Ende Bezug"] = ende["bezug"] == ende["cid"]
     if "kopie" in e:
@@ -584,6 +678,9 @@ def _gliederung(b: dict) -> list[str]:
     for i, k in enumerate(b["kapitel"], 1):
         std = sum(ls.get("std") or 0 for ls in k["lernsequenzen"])
         zeilen.append(f"{i}. **{k['titel']}** ({std} Std.)")
+        for a in k.get("absprachen") or []:
+            zeilen.append(f"    - ↔ Absprache {a['fach']} · {a['ziel'] or 'ganzes Fach'} ({a['art']})"
+                          + (f": {a['text']}" if a.get("text") else ""))
         for ls in k["lernsequenzen"]:
             nrn = sorted({(r.get("nr") if isinstance(r, dict) else r) or "" for e in ls["eintraege"]
                           for r in (e.get("ik") or [])} - {""})
@@ -656,6 +753,13 @@ def selbsttest(daten: dict, conn) -> bool:
     pruefe(_beruehrt_bestehendes([{"op": "x", "kapitel_id": "2ee4dad2-fcc9-4b5a-b83d-364318fd3953"}])
            and not _beruehrt_bestehendes([{"op": "kapitel_anlegen", "ref": "k1"}]), "Bestehendes berührt")
 
+    stand = {"rahmen": {}, "kapitel": [{"titel": "Optik", "lernsequenzen": [],
+                                        "absprachen": [{"fach": "M", "ziel": "Winkel", "art": "vorher", "text": ""}]}]}
+    k = ende_pruefen({"ende": {"absprachen_anzahl": 1, "absprache_mit": [
+        {"kapitel": "Optik", "fach": "M", "art": "vorher"}, {"kapitel": "Optik", "fach": "BIO"}]}},
+        [{"stand": stand, "vorher": stand, "aufrufe": []}], {})
+    pruefe(list(k.values()) == [True, True, False], "Absprachen am Ende (0.65)")
+
     print("Szenariodatei:")
     cfg = daten["curriculum"]
     fach = fach_id(conn, cfg)
@@ -667,6 +771,20 @@ def selbsttest(daten: dict, conn) -> bool:
     pruefe(bool(_eins(conn, "SELECT 1 FROM assistants WHERE name = %s", daten["assistent"]["vorlage"])),
            f"Vorlage „{daten['assistent']['vorlage']}“ (geseedet)")
     pruefe((REPO / daten["assistent"]["prompt"]).exists(), "Promptdatei")
+    if p := cfg.get("partner"):
+        pf = _eins(conn, "SELECT id FROM subjects WHERE name = %s OR slug = %s", p["fach"], p["fach"])
+        pruefe(pf is not None, f"Partnerfach {p['fach']}")
+        for kap in p["kapitel"]:
+            for nr in kap.get("verknuepft") or []:
+                pruefe(bool(_eins(conn, "SELECT 1 FROM context_nodes WHERE subject_id = %s AND content_type = "
+                                        "'ik_kompetenz' AND status = 'active' AND metadata->>'kompetenz_nr' = %s",
+                                  pf, nr)), f"Partner: Kompetenz {nr}")
+        titel = {k["titel"] for k in p["kapitel"]}
+        for name, v in (daten.get("vorlagen") or {}).items():
+            ziele = {o["ziel_kapitel"] for o in v.get("extra_operationen") or [] if o.get("ziel_kapitel")}
+            ziele |= {a["kapitel"] for a in v.get("partner_absprachen") or []}
+            if ziele:
+                pruefe(ziele <= titel, f"Vorlage {name}: Ziele im Partnerfach")
     pruefe(bool(_eins(conn, "SELECT 1 FROM group_memberships WHERE group_id = %s AND role_in_group = 'teacher'",
                       daten["lehrkraft_der_gruppe"])), "Mess-Lehrkraft")
     vorhanden = [t for (t,) in _alle(
@@ -676,7 +794,8 @@ def selbsttest(daten: dict, conn) -> bool:
               "AND COALESCE(metadata->>'messung', '') <> 'true'", fach, cfg["bp_version"], cfg["jahrgangsstufe"])]
     pruefe(not vorhanden, "kein anderes Curriculum für Band und Fassung" + (f" ({vorhanden})" if vorhanden else ""))
     for name, v in (daten.get("vorlagen") or {}).items():
-        nrn = {_norm(n) for o in v.get("operationen") or [] for f in ("ik", "ik_teilweise", "pk")
+        nrn = {_norm(n) for o in [*(v.get("operationen") or []), *(v.get("extra_operationen") or [])]
+               for f in ("ik", "ik_teilweise", "pk")
                for n in o.get(f) or []}
         pruefe(nrn <= band, f"Vorlage {name}: Nummern im Band" + (f" — fremd: {sorted(nrn - band)}" if nrn - band else ""))
     for fall in daten["faelle"]:
@@ -725,6 +844,8 @@ def main() -> None:
     p.add_argument("--json", type=Path, default=None)
     p.add_argument("--selbsttest", action="store_true", help="nur Instrument und Szenariodatei prüfen")
     p.add_argument("--bewertung", type=Path, default=None, help="Kästchen eines Verlaufs auszählen")
+    p.add_argument("--prompt-rev", default=None,
+                   help="Arm A: den Prompt aus dieser Git-Revision nehmen (etwa HEAD vor einer Änderung)")
     p.add_argument("--trocken", action="store_true",
                    help="jede Vorlage einmal aufbauen, zeigen und wieder löschen — ohne Modellaufrufe")
     args = p.parse_args()
@@ -762,18 +883,26 @@ def main() -> None:
                 status = _eins(conn, "SELECT status FROM context_nodes WHERE id = %s", cid)
                 print(f"\n## {name} — Status {status}, Stände {[r for (r,) in staende]}")
                 print("\n".join(_gliederung(baum(conn, cid))))
-                curricula_loeschen(conn, [cid])
+                if cfg.get("partner"):
+                    for kap_titel, absprachen in _alle(conn, """
+                            SELECT k.title, k.metadata->'absprachen' FROM context_nodes k
+                            JOIN context_edges e ON e.from_node_id = k.id AND e.relation = 'part_of'
+                            JOIN context_nodes c ON c.id = e.to_node_id
+                            WHERE c.metadata->>'messung' = 'true' AND c.subject_id <> %s""", fach):
+                        print(f"   Partner: {kap_titel}" + (f" — Absprachen {absprachen}" if absprachen else ""))
+                curricula_loeschen(conn, mess_curricula(conn, fach, pseudonym))
                 print(f"   gelöscht: {_eins(conn, 'SELECT count(*) FROM context_nodes WHERE id = %s', cid) == 0}")
         finally:
             curricula_loeschen(conn, mess_curricula(conn, fach, pseudonym))
             mitglied_entfernen(conn, gruppe, pseudonym)
             conn.close()
         return
-    assistent, _ = mess_assistent(conn, daten["assistent"], args.modell)
+    assistent, _ = mess_assistent(conn, daten["assistent"], args.modell, args.prompt_rev)
     beginn = _eins(conn, "SELECT now()")
     kopf = {"datei": args.datei.name, "beginn": datetime.now().strftime("%d.%m.%Y, %H:%M"),
             "assistent": assistent, "assistent_name": daten["assistent"]["name"], "modell": args.modell,
-            "prompt": prompt_stand(REPO / daten["assistent"]["prompt"])}
+            "prompt": (f"Revision {args.prompt_rev}" if args.prompt_rev
+                       else prompt_stand(REPO / daten["assistent"]["prompt"]))}
     token, _ = get_jwt_service().issue(pseudonym=pseudonym, roles=["teacher"], grade=None)
     laeufe, ergebnisse = [], []
     try:
@@ -791,7 +920,9 @@ def main() -> None:
                         zuege = []
                     ende = {"cid": cid, "bezug": _eins(conn, "SELECT curriculum_node_id::text FROM conversations "
                                                              "WHERE id = %s", konversation) if konversation else None,
-                            "kopien": [i for i in mess_curricula(conn, fach, pseudonym, lauf_beginn) if i != cid]}
+                            # Nur Curricula des Messfachs — das Partnerfach (0.65) ist keine Kopie
+                            "kopien": [i for i in mess_curricula(conn, fach, pseudonym, lauf_beginn) if i != cid
+                                       and _eins(conn, "SELECT subject_id FROM context_nodes WHERE id = %s", i) == fach]}
                     if zuege:
                         kriterien, berichtet = bewerte(fall, zuege, band=band, ende=ende)
                     else:
@@ -814,7 +945,8 @@ def main() -> None:
                     }
                     laeufe.append(eintrag)
                     ergebnisse.append(eintrag)
-                    curricula_loeschen(conn, [cid, *ende["kopien"]])
+                    # Auch das Partner-Curriculum (`messung`), sonst stünden im nächsten Lauf zwei da
+                    curricula_loeschen(conn, sorted({cid, *ende["kopien"], *mess_curricula(conn, fach, pseudonym)}))
                     if args.verlauf:
                         args.verlauf.write_text(verlauf_als_markdown(kopf, laeufe), encoding="utf-8")
     finally:
