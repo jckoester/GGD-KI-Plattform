@@ -680,3 +680,16 @@
     ob die Pläne sie einhalten — mit den Kalenderwochen beider Kapitel. Du siehst das im Curriculum,
     im Jahresverlaufsplan und an deinen Einheiten im Planer.
   link: /help/curriculum#absprachen-mit-anderen-fächern
+
+- id: "0.65-absprachen-assistent"
+  version: "0.65.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-27
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Der Curriculum-Assistent kennt die Absprachen"
+  text: >-
+    Arbeitet der Assistent an einem Kapitel mit Absprachen, nennt er sie. Auf deine Bitte legt er
+    Absprachen an, übernimmt eine Gegenabsprache oder macht aus Hinweisen wie „in Absprache mit der
+    Fachschaft Chemie …“ eine Absprache. Frag ihn auch: „Wo wären Absprachen sinnvoll?“
+  link: /help/curriculum#mit-dem-assistenten-arbeiten

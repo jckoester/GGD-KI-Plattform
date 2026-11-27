@@ -243,6 +243,8 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
 | `finde_curriculum` | liest | Curricula der eigenen Fachschaften (Admin: alle), gefiltert nach Fach und Band, mit `offener_entwurf_id`; je Fach die Fassungen zum Anlegen |
 | `waehle_curriculum` | Bezug | setzt das Bezugscurriculum; veröffentlicht mit offenem Entwurf → der Entwurf; ohne → nur lesen, mit `als_entwurf_kopieren` eine Kopie |
 | `lege_curriculum_an` | schreibt | leerer Entwurf am Fachplan (`curriculum_anlegen`, dieselbe Funktion wie `POST /curricula/new`); nicht, wenn es für Band und Fassung schon eins gibt |
+| `get_subject_chapters` (0.65) | liest | `absprachen.kapitel_eines_fachs`: Kapitel der Curricula eines anderen Fachs (Name oder Kürzel) mit `kapitel_id`, Curricula der eigenen Stufen vorn, `entwurf` für Unveröffentlichtes — Ziele für `absprache_anlegen` |
+| `get_cross_subject_references` (0.65) | liest | `absprachen.querverweise_je_kapitel`: je Kapitel die Querverweise des Bildungsplans an den verknüpften Kompetenzen (Kompetenz oder Bereich) und `behandelt_in` (Kapitel im Curriculum des anderen Fachs, mit `kapitel_id`) |
 
 - **Zugang:** `zugang()` ruft `_require_curriculum_write` (die Regel des Editors) — auch zum Lesen.
   Schreiben zusätzlich nur bei `status == draft` (E17), sonst `NUR_ENTWUERFE`. Bezug:
@@ -288,6 +290,16 @@ ohne Gruppenbezug, wie die Stundenplanung. Marke „erstellt Curricula“ (`prod
   (1,39 $), `chat-standard` 7/30 (löscht ohne Zustimmung, bleibt stehen), `mistral-large` 26/30
   (0,48 $). Seed: `chat-komplex`. Die Umbenennung der Vorschau (vorher
   `check_curriculum_operations`) änderte an `chat-komplex` nichts messbar.
+- **Absprachen (0.65, AY Teil 2 C):** `entwurf_lesen` liefert je Kapitel `absprachen`
+  (`absprachen.kapitel_kompakt`: `eigene` mit `nr`, `von_anderen_faechern` ohne beidseitige, je
+  mit Zeitprüfung) und oben `absprachen_an_das_fach`. Der Stapel kennt `absprache_anlegen`,
+  `absprache_aendern`, `absprache_loeschen` (`_Plan.absprache`, `absprache` = `nr`, nur eigene);
+  `_planen` prüft danach mit `normalisieren` und `ziele_pruefen` wie der Editor (Ziel aktives oder
+  Entwurfs-Kapitel des genannten Fachs). Die Antwort trägt `absprachen` für die Kapitel, deren
+  Absprachen sich ändern. Absprachen anderer Fächer und Jahresverlaufspläne ändert der
+  Assistent nicht. Messung 27.11.2026 (`Plaene/Messungen-Curriculum/befund-absprachen.md`): sechs
+  neue Fälle je 3/3 nach zwei Prompt-Korrekturen; Gegenprobe der bisherigen Fälle mit altem und
+  neuem Prompt gleich oder besser, Kosten +2 %.
 - **Bereich einer Kompetenz** (`bereich_von` in `curriculum_abdeckung.py`): `thematische_gruppe`,
   sonst die letzte Überschrift im `breadcrumb` („3.1.7 Optik“) — `thematische_gruppe` ist in den
   meisten Fächern leer. Gilt für die Abdeckung und `get_bp_competences`.
@@ -377,8 +389,8 @@ Combobox), `AbsprachenAnzeige.svelte`; in `CurriculumTable.svelte` eine Zeile un
 Kapiteleinleitung, „Absprache anlegen“ an den Fundstellen der Querverweise, `?gegen=<Kennung>`
 im Editor belegt die Gegenabsprache vor; `AbsprachenAnzeige` zeigt das Ergebnis der Zeitprüfung
 (`pruefungText`), der Planer die Kurzfassung (`einheitAbsprachen`), der Jahresverlaufsplan je
-Abschnitt (`absprachenJeAbschnitt`). **Nicht** im Curriculum-Assistenten (`entwurf_lesen`
-liest die Kapitel feldweise) — das kommt mit Teil C und eigener Messung.
+Abschnitt (`absprachenJeAbschnitt`). Im Curriculum-Assistenten seit 0.65 (siehe
+[Funktionen des Curriculum-Assistenten](#funktionen-des-curriculum-assistenten-seit-046)).
 
 Tests: `tests/unit/test_absprachen.py`, `tests/integration/test_absprachen_ziele.py`,
 `tests/integration/test_absprachen_lesen.py`, `test_mcp_werkzeuge.py::test_absprachen_in_curriculum_lesen`,

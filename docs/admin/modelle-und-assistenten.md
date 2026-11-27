@@ -642,6 +642,15 @@ Entwurfs (Knopf **Assistent**) oder aus der Assistentenliste.
   bricht solche Antworten ab.
 - **Kosten:** Ein Gespräch, das ein Gerüst und ein Kapitel schreibt, kostete in der Messung mit
   `chat-komplex` etwa 0,05–0,10 $.
+- **Absprachen (seit 0.65):** Der Assistent liest die Absprachen mit anderen Fächern, legt sie
+  auf Bitte an, ändert und löscht eigene und nennt Bezüge zu anderen Fächern. Dafür hat die
+  Fähigkeit zwei neue lesende Funktionen; einrichten müssen Sie nichts.
+
+⚠️ **Nach dem Update auf 0.65: Prompt im Editor ersetzen.** Der Seed überschreibt einen
+vorhandenen Curriculum-Assistenten nicht. Übernehmen Sie den Inhalt von
+`config/prompts/curriculum_assistent.md` in den System-Prompt des Assistenten
+(**Assistenten verwalten** → Curriculum-Entwurf). Mit dem alten Prompt kennt der Assistent die
+Funktionen zwar, nennt Absprachen aber nicht verlässlich und schlägt sie womöglich ungefragt vor.
 
 ## Assistenten freigeben (`/settings/assistants`)
 

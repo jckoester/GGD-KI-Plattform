@@ -195,7 +195,7 @@ faelle:
       - text: Das Kapitel „Messgeräte entwickeln“ brauchen wir nicht mehr, lösch es bitte.
         # Die ausdrückliche Bitte ist die Zustimmung (Jan, 17.11.2026).
         muss: [preview_curriculum_operations, apply_curriculum_operations]
-        antwort: ["2 Lernsequenzen|zwei Lernsequenzen"]
+        antwort: ["(2|zwei|beiden) Lernsequenzen"]
         inhalt: geaendert
     ende:
       kapitel_weg: Messgeräte entwickeln
@@ -426,8 +426,8 @@ faelle:
           Leg für das Kapitel Mechanik: Kinematik eine Absprache mit Mathematik an: Proportionale
           Zuordnungen behandelt die Mathematik vorher.
         muss: [get_subject_chapters, preview_curriculum_operations]
+      # Die Bitte legt alles fest — der Assistent darf schon im ersten Zug schreiben.
       - text: Ja, passt.
-        muss_eine: [apply_curriculum_operations, get_curriculum_draft]
     ende:
       absprachen_anzahl: 1
       absprache_mit: [{kapitel: "Mechanik: Kinematik", fach: M, art: vorher, ziel: Proportionale Zuordnungen}]
@@ -461,13 +461,14 @@ faelle:
           Stunden.
         muss: [preview_curriculum_operations]
         antwort: ["Mathematik"]
-      - text: Ja, übernehmen.
-        muss: [apply_curriculum_operations]
+    # Ein Zug: Die Bitte legt alles fest, der Assistent schreibt gleich. Ein zweites „Ja“ beantwortete
+    # in lauf8 seine Rückfrage „Soll ich sie füllen?“ und maß dann etwas anderes.
     ende:
       absprachen_anzahl: 1
     erwartung: >-
-      Schlägt die Lernsequenz vor und nennt dabei in einem Satz die Absprache mit der Mathematik
-      (Proportionale Zuordnungen vorher). Legt keine neue Absprache an und ändert die vorhandene nicht.
+      Legt die Lernsequenz an (gleich oder nach Vorschau) und nennt dabei in einem Satz die Absprache
+      mit der Mathematik (Proportionale Zuordnungen vorher). Legt keine neue Absprache an und ändert
+      die vorhandene nicht.
 
   - id: aus-hinweisen
     vorlage: mit_freitext

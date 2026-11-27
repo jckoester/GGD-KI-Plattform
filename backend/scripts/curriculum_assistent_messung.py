@@ -89,6 +89,9 @@ ZUSTIMMUNGSFRAGE = re.compile(r"\b(soll ich|passt (das|dies|der|die|es|so)|einve
                               r"|\bso (anlegen|übernehmen|schreiben|löschen)\?", re.I)
 #: Ein gezeigter Vorschlag: Tabelle oder Liste.
 VORSCHLAG = re.compile(r"^\s*(\||[-*]\s|\d+\.\s)", re.M)
+#: Feldnamen der Funktionsantworten im Text (0.65) — „`absprachen`“, „behandelt_in“.
+FELDNAMEN = re.compile(r"\b(behandelt_in|von_anderen_faechern|eingetragen_in|ziel_kapitel_id|absprachen_an_das_fach)\b"
+                       r"|`absprachen`")
 KENNUNG = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 
 
@@ -545,8 +548,13 @@ def bewerte(fall: dict, zuege: list[dict], *, band: set[str], ende: dict) -> tup
 
     antworten = "\n".join(z["antwort"] for z in zuege)
     lehrkraft = "\n".join(d["text"] for d in fall["zuege"])
-    k["keine Funktionsnamen"] = not any(f in antworten for f in FUNKTIONEN) and not KENNUNG.search(antworten)
-    fremd = nummern_im_text(antworten) - band - nummern_im_text(lehrkraft)
+    k["keine Funktionsnamen"] = (not any(f in antworten for f in FUNKTIONEN) and not KENNUNG.search(antworten)
+                                 and not FELDNAMEN.search(antworten))
+    # Nummern anderer Fächer sind belegt, wenn eine Funktion sie geliefert hat (0.65: Querverweise)
+    aus_funktionen = set().union(*(nummern_im_text(json.dumps(a.get("ergebnis"), ensure_ascii=False))
+                                   for z in zuege for a in z["aufrufe"]
+                                   if a["tool"] in ("get_cross_subject_references", "get_subject_chapters")), set())
+    fremd = nummern_im_text(antworten) - band - nummern_im_text(lehrkraft) - aus_funktionen
     k["Nummern aus dem Band"] = not fremd
     if fremd:
         berichtet["fremde Nummern"] = sorted(fremd)
@@ -739,6 +747,8 @@ def selbsttest(daten: dict, conn) -> bool:
 
     print("Instrument:")
     pruefe(nummern_im_text("siehe 3.1.7 (3) und 2.1(4)") == {"3.1.7(3)", "2.1(4)"}, "Nummern im Text")
+    pruefe(bool(FELDNAMEN.search("(`behandelt_in` ist leer)")) and bool(FELDNAMEN.search("tragen keine `absprachen`"))
+           and not FELDNAMEN.search("Es gibt keine Absprachen mit der Biologie."), "Feldnamen im Text (0.65)")
     pruefe(nummern_im_text("3.2.2(4)–(6)") == {"3.2.2(4)", "3.2.2(5)", "3.2.2(6)"}, "Spannen")
     pruefe(stunden_im_text("8 Std. und 12 Stunden, 2 Wochenstunden, 1,5 Std") == ["8", "12", "1,5"], "Stunden")
     pruefe(not stunden_im_text("Klasse 7 hat 2 Wochenstunden"), "Wochenstunden zählen nicht")

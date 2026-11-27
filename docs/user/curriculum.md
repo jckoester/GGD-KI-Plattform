@@ -419,6 +419,15 @@ das die Zustimmung; er sagt danach, was mit verschwunden ist.
 - Hat die Schule Leitlinien hinterlegt, fragt er zu Beginn, ob das Curriculum sie
   berücksichtigen soll. Aspekte der Leitperspektiven und der Leitlinien schlägt er dort vor, wo
   sie fachlich passen, und trägt sie in die Hinweise ein.
+- **Absprachen mit anderen Fächern** ([oben](#absprachen-mit-anderen-fächern)) kennt er: Arbeitet
+  er an einem Kapitel mit Absprachen, nennt er sie — und sagt, wenn die Jahresverlaufspläne eine
+  nicht einhalten. Eine Absprache legt er nur an, wenn du ihn darum bittest, etwa „Leg eine
+  Absprache mit Mathematik an: Proportionale Zuordnungen vorher“. Er übernimmt auch eine
+  Absprache, die eine andere Fachschaft eingetragen hat, als Gegenabsprache, oder macht aus
+  Hinweisen wie „in Absprache mit der Fachschaft Chemie …“ Absprachen. Fragst du „Wo wären
+  Absprachen sinnvoll?“, nennt er je Kapitel die Bezüge des Bildungsplans zu anderen Fächern und
+  wo die andere Fachschaft sie behandelt. Absprachen anderer Fächer und Jahresverlaufspläne
+  ändert er nicht.
 - Bei großen Vorschlägen dauert eine Antwort manchmal eine Minute.
 
 Veröffentlichen kann er nicht — das geschieht wie immer in der Ansicht.

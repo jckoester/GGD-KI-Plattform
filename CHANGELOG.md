@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.65.0] – 2026-11-27
+
+### Neu
+
+- Der Curriculum-Assistent liest die Absprachen mit anderen Fächern und nennt sie am Kapitel, an dem er arbeitet,
+  samt Ergebnis der Zeitprüfung. Auf Bitte legt er Absprachen an, ändert oder löscht eigene, übernimmt
+  Gegenabsprachen und macht aus Hinweisen Absprachen — mit Vorschau und nach Zustimmung.
+- Auf die Frage, wo Absprachen sinnvoll wären, nennt er je Kapitel die Querverweise des Bildungsplans und wo das
+  andere Fach die Stelle behandelt.
+
+### Nach dem Update
+
+- Den Prompt des „Curriculum-Entwurf“ im Editor durch `config/prompts/curriculum_assistent.md` ersetzen — der Seed
+  überschreibt einen vorhandenen Assistenten nicht.
+
 ## [0.64.0] – 2026-11-27
 
 ### Neu
