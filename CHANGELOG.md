@@ -18,6 +18,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Jahresverlaufsplan: „Kapitel wählen“ und „Sequenzen wählen“ ohne Leerzeichen.
 - Das Admin-Skript `import_curriculum.py` legte ein zweites veröffentlichtes Curriculum derselben Stufe an.
+- Löschen: Die eigenen Kapitel und Lernsequenzen eines Curriculums zählten als „Verweise anderer“ und sperrten
+  das Löschen; jetzt zählen nur Verweise von außen, auch auf Kapitel und Lernsequenzen.
 
 ## [0.63.0] – 2026-11-27
 

@@ -380,10 +380,11 @@ def _referenz(titel="Fremdes Curriculum", owner="jemand-anders", relation="refer
 
 
 def _delete_db(node, *, referenzen=(), kinder=()):
-    """DB-Attrappe für den Löschpfad: erst die Referenzabfrage, dann die Kinder.
+    """DB-Attrappe für den Löschpfad: erst die Kinder, dann die Referenzabfrage.
 
-    Der Pfad fragt zuerst nach eingehenden Kanten aktiver Knoten (F7), danach je Ebene
-    nach `part_of`-Kindern. Beides geht über `db.execute`, deshalb die Reihenfolge.
+    Der Pfad sammelt zuerst je Ebene die `part_of`-Kinder (seit 0.64: Verweise zählen nur von
+    außerhalb des Teilbaums), danach die eingehenden Kanten aktiver Knoten (F7). Beides geht
+    über `db.execute`, deshalb die Reihenfolge.
     """
     db = AsyncMock()
     db.get = AsyncMock(return_value=node)
@@ -392,10 +393,13 @@ def _delete_db(node, *, referenzen=(), kinder=()):
 
     ref_result = MagicMock()
     ref_result.all.return_value = list(referenzen)
-    kind_result = MagicMock()
-    kind_result.__iter__ = lambda self: iter(kinder)
+    def _kinder(liste):
+        m = MagicMock()
+        m.__iter__ = lambda self: iter(liste)
+        return m
 
-    db.execute = AsyncMock(side_effect=[ref_result] + [kind_result] * 8)
+    # Wurzel → ihre Kinder, je Kind eine leere Ebene, dann die Referenzen
+    db.execute = AsyncMock(side_effect=[_kinder(kinder)] + [_kinder(())] * len(kinder) + [ref_result])
     return db
 
 
@@ -512,9 +516,9 @@ class TestF7ArchivierenVorLoeschen:
             m.__iter__ = lambda self: iter([(i,) for i in ids])
             return m
 
-        # Referenzabfrage, dann je Ebene die Kinder: Eltern → Kind → Enkel → nichts
+        # Je Ebene die Kinder (Eltern → Kind → Enkel → nichts), dann die Referenzabfrage
         db.execute = AsyncMock(side_effect=[
-            keine_referenzen, _kinder(kind.id), _kinder(enkel.id), _kinder(),
+            _kinder(kind.id), _kinder(enkel.id), _kinder(), keine_referenzen,
         ])
 
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")

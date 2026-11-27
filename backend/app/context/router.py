@@ -1374,6 +1374,26 @@ async def delete_node(
             detail="Planung löschst du im Planer: Stunden im Stundenentwurf oder unter „Einheiten“.",
         )
 
+    # Rekursiv alle untergeordneten Knoten einsammeln: Kinder zeigen per
+    # 'part_of'-Kante (from_node = Kind, to_node = Elternteil) auf ihr Elternteil.
+    # So wird z. B. ein ganzes Curriculum (Curriculum → Kapitel → Lernsequenz)
+    # in einem Rutsch gelöscht, statt verwaiste Knoten zu hinterlassen. Die
+    # Kanten selbst verschwinden über ON DELETE CASCADE der FK-Constraints.
+    to_delete: set[UUID] = {node_id}
+    frontier: list[UUID] = [node_id]
+    while frontier:
+        current = frontier.pop()
+        child_rows = await db.execute(
+            sa.select(ContextEdge.from_node_id).where(
+                ContextEdge.to_node_id == current,
+                ContextEdge.relation == "part_of",
+            )
+        )
+        for (child_id,) in child_rows:
+            if child_id not in to_delete:
+                to_delete.add(child_id)
+                frontier.append(child_id)
+
     # ── F7: Archivieren vor Löschen (ADR-019) ────────────────────────────────
     # Zeigen **aktive Knoten anderer Eigentümer** auf diesen, ist Löschen die falsche
     # Aktion: Es reißt in fremde Planungen ein Loch, das dort niemand erklären kann.
@@ -1384,18 +1404,21 @@ async def delete_node(
     # Blatt löscht, weiß, was er tut. Admins können mit `force=true` durchgreifen — dann
     # gilt wieder die Kaskade unten.
     if not force:
+        # Verweise von außen auf den ganzen Teilbaum — nicht die eigenen Teile: Kapitel und
+        # Lernsequenzen hängen per `part_of` am Curriculum und gehören oft einem anderen Eigentümer
+        # (Import). Bis 0.63 zählten sie als „fremde Verweise“ und sperrten das Löschen (Jan, 27.11.2026).
         referenzen = (await db.execute(
             sa.select(ContextNode.id, ContextNode.title, ContextNode.content_type,
                       ContextEdge.relation, ContextNode.owner_pseudonym)
             .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
             .where(
-                ContextEdge.to_node_id == node_id,
+                ContextEdge.to_node_id.in_(list(to_delete)),
                 ContextNode.status == "active",
-                ContextNode.id != node_id,
+                ContextNode.id.notin_(list(to_delete)),
             )
-            .limit(50)
+            .limit(200)
         )).all()
-        fremde = [r for r in referenzen if r.owner_pseudonym != user.sub]
+        fremde = list({r.id: r for r in referenzen if r.owner_pseudonym != user.sub}.values())
         if fremde:
             raise HTTPException(
                 status_code=409,
@@ -1419,26 +1442,6 @@ async def delete_node(
             status_code=403,
             detail="`force` ist Admins vorbehalten — sonst archivieren.",
         )
-
-    # Rekursiv alle untergeordneten Knoten einsammeln: Kinder zeigen per
-    # 'part_of'-Kante (from_node = Kind, to_node = Elternteil) auf ihr Elternteil.
-    # So wird z. B. ein ganzes Curriculum (Curriculum → Kapitel → Lernsequenz)
-    # in einem Rutsch gelöscht, statt verwaiste Knoten zu hinterlassen. Die
-    # Kanten selbst verschwinden über ON DELETE CASCADE der FK-Constraints.
-    to_delete: set[UUID] = {node_id}
-    frontier: list[UUID] = [node_id]
-    while frontier:
-        current = frontier.pop()
-        child_rows = await db.execute(
-            sa.select(ContextEdge.from_node_id).where(
-                ContextEdge.to_node_id == current,
-                ContextEdge.relation == "part_of",
-            )
-        )
-        for (child_id,) in child_rows:
-            if child_id not in to_delete:
-                to_delete.add(child_id)
-                frontier.append(child_id)
 
     for nid in to_delete:
         n = await db.get(ContextNode, nid)
