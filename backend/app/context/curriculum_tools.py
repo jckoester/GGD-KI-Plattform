@@ -195,14 +195,23 @@ OPERATIONEN = {
         "leitlinien als Listen von Kürzeln\n"
         "- eintrag_aendern{lernsequenz_id, eintrag, …}: eintrag = Nummer ab 1; genannte Felder "
         "ersetzen die bisherigen, andere bleiben\n"
-        "- eintrag_loeschen{lernsequenz_id, eintrag}")},
+        "- eintrag_loeschen{lernsequenz_id, eintrag}\n"
+        "- absprache_anlegen{kapitel_id, fach, art, ziel_kapitel_id?, text?}: Absprache dieses Kapitels mit "
+        "einem anderen Fach; fach = Kürzel (fach_code), ziel_kapitel_id aus get_subject_chapters oder "
+        "get_cross_subject_references (ohne: das ganze Fach); art vorher = das andere Kapitel kommt zuerst, "
+        "gleichzeitig, nachher, abgestimmt = inhaltlich ohne Zeitpunkt; vorher/gleichzeitig/nachher "
+        "brauchen ziel_kapitel_id, abgestimmt braucht text\n"
+        "- absprache_aendern{kapitel_id, absprache, fach?, art?, ziel_kapitel_id?, text?}: absprache = nr "
+        "aus get_curriculum_draft (nur eigene)\n"
+        "- absprache_loeschen{kapitel_id, absprache}")},
 }
 
 _ANTWORT = (
     "Antwort: gliederung (Kapitel mit Lernsequenzen und Stunden; die Stunden eines Kapitels sind "
     "die Summe seiner Lernsequenzen), verplant, verplanbar, rest (null, solange Wochenstunden "
     "fehlen — dann fehlende_stufen) und geloescht (Kapitel, Lernsequenzen, Einträge, die der "
-    "Stapel entfernt; fehlt, wenn nichts gelöscht wird).")
+    "Stapel entfernt; fehlt, wenn nichts gelöscht wird); absprachen: die Absprachen der Kapitel, "
+    "deren Absprachen der Stapel ändert.")
 
 
 async def _konversation(ctx: ToolContext):

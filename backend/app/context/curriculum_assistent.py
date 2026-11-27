@@ -330,6 +330,8 @@ class _Kap:
     lss: list[_Ls] = field(default_factory=list)
     neu: bool = False
     geaendert: bool = False
+    #: Absprachen mit anderen Fächern geändert (0.65) — Ziele prüft `_planen` danach gegen die DB
+    absprachen_geaendert: bool = False
 
 
 class _Fehler(Exception):
@@ -358,8 +360,9 @@ def _std(wert) -> int | None:
 
 class _Plan:
     def __init__(self, tree: dict, iks: list[ContextNode], pks: list[ContextNode],
-                 ziele: Verweisziele | None = None):
+                 ziele: Verweisziele | None = None, fach_code: str | None = None):
         self.ziele = ziele
+        self.fach_code = fach_code
         self.kapitel = [
             _Kap(id=UUID(str(k["id"])), titel=k.get("title") or "", meta=dict(k.get("metadata") or {}),
                  lss=[_Ls(id=UUID(str(ls["id"])), titel=ls.get("title") or "", meta=dict(ls.get("metadata") or {}))
@@ -527,8 +530,45 @@ class _Plan:
                         self.alt_eintraege.add(id(eintraege[i]))
             ls.meta["eintraege"] = eintraege
             ls.geaendert = True
+        elif art in ("absprache_anlegen", "absprache_aendern", "absprache_loeschen"):
+            self.absprache(art, op)
         else:
             raise _Fehler(f"unbekannte Operation „{art}“")
+
+    # Absprachen mit anderen Fächern (0.65, AY Teil 2 C)
+    def absprache(self, art: str, op: dict) -> None:
+        """Ändert `metadata.absprachen` des Kapitels im Speicher und prüft die Form (wie im Editor).
+        Ob das Ziel-Kapitel zum genannten Fach gehört, prüft `_planen` danach gegen die Datenbank."""
+        from app.context.absprachen import normalisieren
+
+        k = self.kap(op.get("kapitel_id"))
+        liste = [dict(a) for a in k.meta.get("absprachen") or []]
+        if art == "absprache_anlegen":
+            liste.append({"fach_code": op.get("fach"), "kapitel_id": op.get("ziel_kapitel_id"),
+                          "art": op.get("art"), "text": op.get("text") or ""})
+        else:
+            try:
+                i = int(op.get("absprache")) - 1
+            except (TypeError, ValueError):
+                raise _Fehler("absprache (Nummer ab 1) fehlt") from None
+            if not 0 <= i < len(liste):
+                raise _Fehler(f"Absprache {op.get('absprache')} gibt es an diesem Kapitel nicht")
+            if art == "absprache_loeschen":
+                liste.pop(i)
+            else:
+                a = liste[i]
+                if "fach" in op:
+                    a["fach_code"] = op["fach"]
+                if "ziel_kapitel_id" in op:
+                    a["kapitel_id"], a["kapitel_titel"] = op["ziel_kapitel_id"], None
+                for f in ("art", "text"):
+                    if f in op:
+                        a[f] = op[f]
+        try:
+            k.meta["absprachen"] = normalisieren(liste, self.fach_code)
+        except ValueError as e:
+            raise _Fehler(str(e)) from None
+        k.geaendert = k.absprachen_geaendert = True
 
     # Ergebnis
     def geloescht(self) -> dict[str, int]:
@@ -549,6 +589,14 @@ class _Plan:
                                     "std": als_stundenzahl(ls.meta.get("std")),
                                     "eintraege": len(ls.meta.get("eintraege") or [])} for ls in k.lss]}
                 for k in self.kapitel]
+
+    def absprachen(self) -> list[dict]:
+        """Die Absprachen der Kapitel, die der Stapel ändert — für Vorschau und Antwort."""
+        return [{"kapitel": k.titel, "absprachen": [
+            {"nr": i, "fach_code": a["fach_code"], "ziel_kapitel": a.get("kapitel_titel") or "ganzes Fach",
+             "art": a["art"], **({"text": a["text"]} if a.get("text") else {})}
+            for i, a in enumerate(k.meta.get("absprachen") or [], 1)]}
+            for k in self.kapitel if k.absprachen_geaendert]
 
 
 # ── Schreiben: Kanten wie im Editor ──────────────────────────────────────────
@@ -612,7 +660,9 @@ async def _planen(db: AsyncSession, cur: ContextNode, ops) -> _Plan | list[str]:
         return ["operations ist leer"]
     tree = await load_curriculum_tree(db, cur.id)
     iks, pks = await kompetenzen_des_bands(db, cur)
-    plan = _Plan(tree, iks, pks, await verweisziele(db))
+    fach_code = await db.scalar(sa.select(Subject.fach_code).where(Subject.id == cur.subject_id)) \
+        if cur.subject_id else None
+    plan = _Plan(tree, iks, pks, await verweisziele(db), fach_code)
     fehler = []
     for i, op in enumerate(ops, 1):
         if not isinstance(op, dict):
@@ -622,6 +672,20 @@ async def _planen(db: AsyncSession, cur: ContextNode, ops) -> _Plan | list[str]:
             plan.anwenden(op)
         except _Fehler as e:
             fehler.append(f"Operation {i} ({op.get('op')}): {e}")
+    if not fehler:
+        # Absprachen (0.65): Ziel-Kapitel gegen die Datenbank, Titel aus der Datenbank
+        from app.context.absprachen import ziele_pruefen
+
+        for k in plan.kapitel:
+            if not k.absprachen_geaendert:
+                continue
+            try:
+                k.meta["absprachen"] = await ziele_pruefen(db, k.meta.get("absprachen") or [])
+            except ValueError as e:
+                fehler.append(f"Absprachen am Kapitel „{k.titel}“: {e}")
+                continue
+            if not k.meta["absprachen"]:
+                k.meta.pop("absprachen", None)
     return fehler or plan
 
 
@@ -635,6 +699,8 @@ def _ergebnis(cur: ContextNode, plan: _Plan, ops: list, *, geschrieben: bool) ->
         aus["geloescht"] = geloescht
     if leer := [k["titel"] for k in gliederung if not k["lernsequenzen"]]:
         aus["hinweis"] = f"Kapitel ohne Lernsequenz: {', '.join(leer)}"
+    if abspr := plan.absprachen():
+        aus["absprachen"] = abspr
     return aus
 
 

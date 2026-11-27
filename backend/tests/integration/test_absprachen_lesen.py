@@ -373,3 +373,52 @@ async def test_querverweise_je_kapitel_fuer_den_assistenten(db_session, w):
     [v] = k["verweise"]
     assert (v["ik"], v["fach_code"], v["nr"]) == ("3.2.1(1)", "PHAY", "3.2.1(3)")
     assert v["behandelt_in"] == [{"curriculum": "Physik Kl. 8", "kapitel": "Dichte", "kapitel_id": str(w.dichte.id)}]
+
+
+async def test_assistent_absprachen_anlegen_aendern_loeschen_rueckgaengig(db_session, w):
+    """Teil C (F2): Absprachen über den Stapel des Curriculum-Assistenten — Vorschau, Schreiben,
+    Prüfung wie im Editor, Rückgängig."""
+    from app.context.curriculum_assistent import operationen_anwenden, operationen_pruefen
+    from app.context.curriculum_verlauf import zuruecknehmen
+
+    w.m8.status = w.brueche.status = "draft"
+    await db_session.flush()
+    kap = str(w.brueche.id)
+    anlegen = [{"op": "absprache_anlegen", "kapitel_id": kap, "fach": "phay", "art": "gleichzeitig",
+                "ziel_kapitel_id": str(w.dichte.id), "text": "Messen zusammen"}]
+    v = await operationen_pruefen(db_session, w.m8, anlegen)
+    assert v["ok"] and not v["geschrieben"]
+    assert v["absprachen"] == [{"kapitel": "Brüche", "absprachen": [
+        {"nr": 1, "fach_code": "PHAY", "ziel_kapitel": "Dichte", "art": "nachher"},
+        {"nr": 2, "fach_code": "PHAY", "ziel_kapitel": "Dichte", "art": "gleichzeitig", "text": "Messen zusammen"}]}]
+    assert len((await db_session.get(ContextNode, w.brueche.id)).metadata_["absprachen"]) == 1   # nichts geschrieben
+
+    r = await operationen_anwenden(db_session, LEHRKRAFT, w.m8, anlegen)
+    assert r["ok"] and r["geschrieben"]
+    await db_session.refresh(w.brueche)
+    assert [a["art"] for a in w.brueche.metadata_["absprachen"]] == ["nachher", "gleichzeitig"]
+    assert w.brueche.metadata_["absprachen"][1]["kapitel_titel"] == "Dichte"
+
+    r = await operationen_anwenden(db_session, LEHRKRAFT, w.m8, [
+        {"op": "absprache_aendern", "kapitel_id": kap, "absprache": 2, "art": "abgestimmt"},
+        {"op": "absprache_loeschen", "kapitel_id": kap, "absprache": 1}])
+    assert r["ok"], r
+    await db_session.refresh(w.brueche)
+    assert [(a["art"], a["text"]) for a in w.brueche.metadata_["absprachen"]] == [("abgestimmt", "Messen zusammen")]
+
+    # Fehler wie im Editor: das eigene Fach, Kapitel eines anderen Fachs, fehlende Nummer
+    for ops, muster in (
+        ([{"op": "absprache_anlegen", "kapitel_id": kap, "fach": "MAY", "art": "abgestimmt", "text": "t"}], "nicht dem eigenen"),
+        ([{"op": "absprache_anlegen", "kapitel_id": kap, "fach": "PHAY", "art": "vorher",
+           "ziel_kapitel_id": kap}], "gehört nicht zu einem Curriculum von „PHAY“"),
+        ([{"op": "absprache_loeschen", "kapitel_id": kap, "absprache": 5}], "gibt es an diesem Kapitel nicht"),
+        ([{"op": "absprache_anlegen", "kapitel_id": kap, "fach": "PHAY", "art": "vorher"}], "braucht ein Kapitel"),
+    ):
+        v = await operationen_pruefen(db_session, w.m8, ops)
+        assert not v["ok"] and muster in " ".join(v["fehler"]), (muster, v)
+
+    # Rückgängig: der Stand vor dem letzten Schreiben
+    await zuruecknehmen(db_session, w.m8)
+    await db_session.flush()
+    await db_session.refresh(w.brueche)
+    assert [a["art"] for a in w.brueche.metadata_["absprachen"]] == ["nachher", "gleichzeitig"]
