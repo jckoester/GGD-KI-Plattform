@@ -37,6 +37,8 @@ kapitel:
     std: 10
     hinweis: …
     konkretisierung: [ … ]
+    absprachen:       # 0.63: mit anderen Fächern; Ziel über Fach und Kapiteltitel
+      - {fach_code: PH, kapitel: Dichte, jahrgangsstufe: "7/8", art: vorher, text: …}
     lernsequenzen:
       - bp_titel: …
         reihenfolge: 1

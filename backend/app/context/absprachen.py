@@ -471,3 +471,29 @@ async def export_zeilen(db, tree: dict) -> dict[str, list[str]]:
         if zeilen:
             aus[str(kap["id"])] = zeilen
     return aus
+
+
+def kompakt(daten: dict, kapitel_titel: dict[str, str]) -> dict:
+    """Absprachen für Programme (MCP, 0.63): je Kapitel mit Titel statt Kennung, beidseitige nur
+    einmal (als eigene), die Art immer aus Sicht dieses Curriculums. Leere Teile fallen weg."""
+    def ort(o):
+        return {"kapitel": o["kapitel"], "curriculum": o["curriculum"], "curriculum_id": o["curriculum_id"],
+                **({"entwurf": True} if o.get("status") == "draft" else {})} if o else None
+
+    kapitel = []
+    for kid, k in (daten.get("kapitel") or {}).items():
+        eigene = [{"fach": a.get("fach"), "art": a["art"], "text": a.get("text") or "",
+                   **({"ziel": ort(a["ziel"])} if a.get("ziel") else
+                      {"ziel_kapitel": a.get("kapitel_titel") or "ganzes Fach"}),
+                   **({"beidseitig": True} if a.get("beidseitig") else {}),
+                   **({"text_gegenseite": a["text_gegenseite"]} if a.get("text_gegenseite") else {})}
+                  for a in k.get("eigene") or []]
+        aussen = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
+                   "eingetragen_in": ort(a["quelle"])}
+                  for a in k.get("von_aussen") or [] if not a.get("beidseitig")]
+        if eigene or aussen:
+            kapitel.append({"kapitel": kapitel_titel.get(kid, ""), **({"eigene": eigene} if eigene else {}),
+                            **({"von_anderen_faechern": aussen} if aussen else {})})
+    fach = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
+             "eingetragen_in": ort(a["quelle"])} for a in daten.get("fach") or []]
+    return {**({"kapitel": kapitel} if kapitel else {}), **({"an_das_fach": fach} if fach else {})}

@@ -654,3 +654,16 @@
     die Fachschaft sie prüft — bearbeiten, veröffentlichen oder löschen könnt ihr sie wie jeden
     Entwurf. Woraus ein Curriculum entstand, steht jetzt unter seinem Titel.
   link: /help/curriculum#entwürfe-aus-vorlagen
+
+- id: "0.63-absprachen"
+  version: "0.63.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-27
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Absprachen mit anderen Fächern"
+  text: >-
+    Halte am Kapitel fest, was deine Fachschaft mit einer anderen vereinbart hat — etwa
+    „Bruchrechnung vor Dichte“. Die andere Fachschaft sieht die Absprache an ihrem Kapitel und kann
+    sie als Gegenabsprache übernehmen. Im Editor steht an den Querverweisen „Absprache anlegen“.
+  link: /help/curriculum#absprachen-mit-anderen-fächern

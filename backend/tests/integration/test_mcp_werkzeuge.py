@@ -312,6 +312,39 @@ async def test_querverweise_in_curriculum_und_kompetenzen(db, welt):
         assert "querverweise" not in k2
 
 
+async def test_absprachen_in_curriculum_lesen(db, welt):
+    """AY Teil 2 (0.63): Absprachen beider Richtungen in `curriculum_lesen`, Art aus Sicht des Curriculums."""
+    chemie = Subject(slug=f"mwa-{TOKEN}", name=f"Chemie A {TOKEN}", fach_code=f"A{TOKEN[:4]}".upper())
+    db.add(chemie)
+    await db.flush()
+    ph_kap = (await db.execute(sa.select(ContextNode).join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+                               .where(ContextEdge.to_node_id == welt["aktiv"].id, ContextNode.content_type == "kapitel")
+                               )).scalars().first()
+    cur = _knoten("curriculum", f"Chemie A 7/8 {TOKEN}", "active", subject_id=chemie.id, min_grade=7, max_grade=8,
+                  metadata_={"jahrgangsstufe": "7/8", "bp_version": BP, "fach": chemie.name})
+    kap = _knoten("kapitel", f"Licht {TOKEN}", "active", subject_id=chemie.id, metadata_={
+        "reihenfolge": 1, "absprachen": [{"id": str(uuid.uuid4()), "fach_code": welt["fach"].fach_code,
+                                          "kapitel_id": str(ph_kap.id), "kapitel_titel": ph_kap.title,
+                                          "art": "vorher", "text": "Optik zuerst"}]})
+    db.add_all([cur, kap])
+    await db.flush()
+    db.add(ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"))
+    await db.flush()
+
+    async with _verbunden(db) as rpc:
+        aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(cur.id))
+        assert not fehler
+        [k] = aus["absprachen"]["kapitel"]
+        assert k["kapitel"] == kap.title
+        assert k["eigene"][0]["art"] == "vorher" and k["eigene"][0]["ziel"]["kapitel"] == ph_kap.title
+        aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(welt["aktiv"].id))
+        assert not fehler
+        [k] = aus["absprachen"]["kapitel"]
+        [a] = k["von_anderen_faechern"]
+        assert (a["fach"], a["art"], a["text"]) == (chemie.name, "nachher", "Optik zuerst")
+        assert a["eingetragen_in"]["curriculum"] == cur.title
+
+
 # ── Jahresverlaufspläne (0.60, BD Teil B Schritt 6) ───────────────────────────
 
 async def test_verlaufsplaene_finden_und_lesen(db, welt, monkeypatch):

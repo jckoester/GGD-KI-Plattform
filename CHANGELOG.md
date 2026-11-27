@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.63.0] – 2026-11-27
+
+### Neu
+
+- Absprachen mit anderen Fächern am Kapitel eines Curriculums: Fach, wahlweise ein Kapitel des anderen Fachs,
+  Art (vorher, gleichzeitig, danach, abgestimmt) und Text. Die andere Fachschaft sieht sie an ihrem Kapitel und
+  kann eine Gegenabsprache anlegen; stehen beide da, gilt die Absprache als beidseitig. „Absprache anlegen“ an
+  den Fundstellen der Querverweise.
+- Absprachen im YAML (Fach und Kapiteltitel, beim Import wieder aufgelöst), kompakt in PDF und DOCX/ODT und über
+  den MCP-Server in `curriculum_lesen`.
+
+### Geändert
+
+- Die Rahmenangabe „Absprachen“ heißt „Absprachen in der Fachschaft“.
+- Curriculum-Tabelle: Kapitel als abgesetzte Kästen, längeres Feld für die Kapiteleinleitung, „Kapitel
+  hinzufügen“ als Knopf.
+
 ## [0.62.0] – 2026-11-27
 
 ### Neu

@@ -334,6 +334,30 @@ mit `{kompetenz_ids, nur_veroeffentlicht}` (POST wegen der Listenlänge, in `vor
   `faecher_je_kompetenz` → „↔ PH, CH“ in PDF (`.ik-qv`) und DOCX/ODT. MCP: siehe
   [MCP](mcp.md).
 
+## Absprachen zwischen Fächern (seit 0.63)
+
+Päckchen AY Teil 2, `app/context/absprachen.py`. Gespeichert **am eigenen Kapitel** als
+`metadata.absprachen = [{id, fach_code, kapitel_id?, kapitel_titel?, art, text}]` (F1) — kein
+eigener Knotentyp, keine Migration; die Rechte folgen dem Curriculum.
+
+| Teil | Was |
+|---|---|
+| `normalisieren`, `ziele_pruefen`, `pruefe_absprachen` | Prüfen beim Speichern (`POST/PATCH /context/nodes` für Kapitel, 422): Fach Pflicht und nicht das eigene, `art` ∈ `vorher`/`gleichzeitig`/`nachher`/`abgestimmt`, zeitlich braucht Kapitel (Kennung **oder** Titel), `abgestimmt` braucht Text, ≤ 20 je Kapitel, Text ≤ 1.000; das Ziel ist ein aktives oder Entwurfs-Kapitel des genannten Fachs (`subject_id`), `kapitel_titel` kommt aus der Datenbank |
+| `absprachen_des_curriculums` | `GET /context/curricula/{id}/absprachen`: je Kapitel `eigene` (Ziel über `nachfolger_der_kapitel` auf den aktiven Nachfolger) und `von_aussen` (Rückwärtssuche über alle Kapitel mit `absprachen`, auch auf **frühere Fassungen** der eigenen Kapitel, `art_hier` = `GEGENART`); `fach` = an das Fach ohne Kapitel, nur aus Curricula mit überschneidenden Stufen; `beidseitig` und `text_gegenseite`; Entwurf und veröffentlichtes Original mit derselben Absprache-Kennung erscheinen einmal |
+| `aus_yaml`, `aus_yaml_aufloesen`, `fuer_yaml` | YAML am Kapitel `absprachen: [{fach_code, kapitel, jahrgangsstufe, art, text}]`; der Import sucht das Kapitel über Fach und Titel (veröffentlicht vor Entwurf, dann Stufe), sonst bleibt der Titel ohne Kennung mit Warnung |
+| `export_zeilen` | PDF/DOCX: die **eigenen** kompakt unter der Kapitelüberschrift |
+| `kompakt` | MCP `curriculum_lesen` |
+
+Oberfläche: `lib/absprachen.js`, `AbsprachenEditor.svelte` (Formular, `FachWahl.svelte` als
+Combobox), `AbsprachenAnzeige.svelte`; in `CurriculumTable.svelte` eine Zeile unter der
+Kapiteleinleitung, „Absprache anlegen“ an den Fundstellen der Querverweise, `?gegen=<Kennung>`
+im Editor belegt die Gegenabsprache vor. **Nicht** im Curriculum-Assistenten (`entwurf_lesen`
+liest die Kapitel feldweise) — das kommt mit Teil C und eigener Messung.
+
+Tests: `tests/unit/test_absprachen.py`, `tests/integration/test_absprachen_ziele.py`,
+`tests/integration/test_absprachen_lesen.py`, `test_mcp_werkzeuge.py::test_absprachen_in_curriculum_lesen`,
+Export in `test_curriculum_export_pdf.py`/`_office.py`, `frontend/src/lib/absprachen.test.js`.
+
 ## Bekannte Grenzen
 
 - Tote Verweise in Hinweisen (Baustein gelöscht) speichert der Editor ohne Kante und nennt sie

@@ -36,6 +36,9 @@ ERLAUBT: dict[tuple[str, str], str] = {
     ("app.db.models", "ContextNode"): "Abfragen; ein ungespeicherter Knoten trägt das Band",
     ("app.db.models", "Subject"): "Abfragen",
     ("app.version", "plattformversion"): "Versionsangabe",
+    # AY Teil 2 (0.63): Absprachen mit anderen Fächern — nur SELECT, Leserecht wie das Curriculum
+    ("app.context.absprachen", "absprachen_des_curriculums"): "liest Kapitel, Curricula und Fächer",
+    ("app.context.absprachen", "kompakt"): "formt nur um",
     # AY Teil 1 (25.11.2026): Querverweise des Bildungsplans — nur SELECT
     ("app.context.querverweise", "querverweise"): "liest Kanten, Knoten, Fächer und Fundstellen",
     ("app.context.querverweise", "ik_ids_im_baum"): "rechnet nur",

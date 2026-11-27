@@ -210,7 +210,9 @@ ganze Curriculum gilt:
 - **Lehrwerk**
 - **Beschlüsse der Fachschaft**, etwa Lektüren, Pflichtversuche, Exkursionen
 - **Schwerpunkte**, für die die Fachschaft die freie Zeit nutzt
-- **Absprachen**, etwa zu Leistungsnachweisen oder zum Methoden- und Medienkonzept
+- **Absprachen in der Fachschaft**, etwa zu Leistungsnachweisen oder zum Methoden- und
+  Medienkonzept — Absprachen mit anderen Fächern stehen am Kapitel (siehe
+  [Absprachen mit anderen Fächern](#absprachen-mit-anderen-fächern))
 
 Die Textfelder verstehen Markdown, also auch Aufzählungen.
 
@@ -261,7 +263,34 @@ anderen Fachs erst später, steht „ab Schuljahr …“ dabei. Dieselben Marken
 Bibliothek unter **Bildungspläne** und — beim Bearbeiten — unter den gewählten Kompetenzen.
 
 Eigene Bezüge, die der Bildungsplan nicht nennt, trägst du weiter in den **Hinweisen** ein
-(nächster Abschnitt).
+(übernächster Abschnitt). Was ihr mit der anderen Fachschaft vereinbart habt, hältst du als
+**Absprache** am Kapitel fest — im Editor steht dafür an jeder Fundstelle **Absprache anlegen**.
+
+### Absprachen mit anderen Fächern
+
+Am Kapitel hältst du fest, was deine Fachschaft mit einer anderen vereinbart hat, etwa
+„Bruchrechnung in Mathematik vor Dichte in Physik“. Im Editor steht unter der Einleitung jedes
+Kapitels **Absprachen mit anderen Fächern** → **Absprache hinzufügen**:
+
+1. **Fach** — tipp die ersten Buchstaben oder das Kürzel.
+2. Wahlweise **Curriculum** und **Kapitel** des anderen Fachs. Curricula deiner Stufe stehen
+   oben, die Fassung steht in Klammern. Ohne Kapitel gilt die Absprache dem ganzen Fach.
+3. **Art**:
+   - **vorher** — das Kapitel des anderen Fachs kommt zuerst;
+   - **gleichzeitig** — etwa in denselben Wochen;
+   - **danach** — das andere Kapitel kommt später;
+   - **abgestimmt** — inhaltlich abgestimmt, ohne Zeitpunkt, etwa „Begriffe einheitlich“.
+   Die ersten drei brauchen ein Kapitel, „abgestimmt“ braucht einen Text.
+4. **Was vereinbart ist** — ein, zwei Sätze. **Übernehmen**, dann das Curriculum speichern.
+
+Die andere Fachschaft sieht die Absprache an ihrem Kapitel, mit „eingetragen von der
+Fachschaft …“ und der Art aus ihrer Sicht: Dein „vorher“ steht bei ihr als „kommt danach“.
+Zustimmen muss sie nicht. Will sie die Absprache auch selbst festhalten, legt sie mit
+**Gegenabsprache anlegen** die passende an — danach steht bei beiden **beidseitig**, und die
+Absprache erscheint nur noch einmal. Formuliert sie anders, steht ihr Text darunter.
+
+Ersetzt eine Fachschaft ihr Curriculum, bleiben die Absprachen am neuen Kapitel gleichen
+Titels. Entwürfe der anderen Fachschaft sind gekennzeichnet; Schüler:innen sehen keine.
 
 ### Hinweise, Leitperspektiven und Leitlinien
 
@@ -487,11 +516,14 @@ anlegen](#ein-curriculum-anlegen)).
 
 - **PDF** — zum Ausdrucken, für Konferenzen und die Fachschaftsakte; Begriffe und
   Fachmethoden stehen als eigene Zeilen unter der Konkretisierung; der Rahmen steht vor dem ersten Kapitel;
-  hinter einer Kompetenz stehen die Fächer ihrer Querverweise, etwa „↔ PH, CH“
+  hinter einer Kompetenz stehen die Fächer ihrer Querverweise, etwa „↔ PH, CH“; unter der
+  Kapitelüberschrift stehen die eigenen Absprachen mit anderen Fächern
 - **DOCX** (Word) oder **ODT** (LibreOffice) — zum Weiterbearbeiten außerhalb der Plattform,
   im Querformat und mit Formeln als bearbeitbare Formeln; Querverweise wie im PDF
 - **YAML** — die maschinenlesbare Fassung; Begriffe und Fachmethoden gehen als Namen mit
-  und werden in einer anderen Plattform gegen deren Bibliothek abgeglichen
+  und werden in einer anderen Plattform gegen deren Bibliothek abgeglichen; Absprachen mit
+  Fach und Kapiteltitel — der Import sucht das Kapitel wieder und warnt, wenn er es nicht
+  eindeutig findet
 
 Das YAML ist die einzige Form, die sich wieder einlesen lässt — über **Aus YAML importieren**
 (siehe [Aus einer YAML-Datei importieren](#aus-einer-yaml-datei-importieren)), als Entwurf.
