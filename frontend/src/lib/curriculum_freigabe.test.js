@@ -36,3 +36,13 @@ describe("Leitlinien der Schule (0.50)", () => {
     expect(z).toContainEqual({ text: "Nachhaltigkeitsziele: 3 von 17 Aspekten kommen vor", warnung: false })
   })
 })
+
+describe('gleicheStufe (0.64)', () => {
+  it('Wahl, Vorauswahl, gesperrt', async () => {
+    const { gleicheStufe } = await import('./curriculum_freigabe.js')
+    expect(gleicheStufe({ gleiche_stufe: [] })).toEqual({ wahl: [], gesperrt: false, vorauswahl: null })
+    expect(gleicheStufe({ gleiche_stufe: [{ id: 'a', title: 'A' }], vorgaenger: null }).vorauswahl).toBe('a')
+    expect(gleicheStufe({ gleiche_stufe: [{ id: 'a' }, { id: 'b' }], vorgaenger: null }).vorauswahl).toBeNull()
+    expect(gleicheStufe({ gleiche_stufe: [{ id: 'a' }], vorgaenger: { id: 'v' } }).gesperrt).toBe(true)
+  })
+})

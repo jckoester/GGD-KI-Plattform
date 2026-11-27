@@ -2020,14 +2020,16 @@ async def _entwurfsbaum(db: AsyncSession, curriculum_id: UUID, user: JwtPayload,
 @router.get("/curricula/{curriculum_id}/publish")
 async def veroeffentlichen_uebersicht(
     curriculum_id: UUID,
+    ersetzen: UUID | None = Query(default=None, description="Curriculum derselben Stufe, das der Entwurf ersetzen soll (0.64)."),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    """Übersicht vor dem Veröffentlichen eines Entwurfs (0.45, Punkt 7) — warnt, sperrt nicht."""
+    """Übersicht vor dem Veröffentlichen eines Entwurfs (0.45, Punkt 7) — warnt, sperrt nicht.
+    `gleiche_stufe` nennt veröffentlichte Curricula derselben Stufe und Fassung (0.64)."""
     from app.context.curriculum_veroeffentlichen import uebersicht
 
     tree = await _entwurfsbaum(db, curriculum_id, user, ENTWURF)
-    return {**await uebersicht(db, tree, user),
+    return {**await uebersicht(db, tree, user, ersetzen),
             "darf_veroeffentlichen": await darf_veroeffentlichen(db, tree["subject_id"], user),
             "wer_veroeffentlicht": wer_veroeffentlicht()}
 
@@ -2035,19 +2037,27 @@ async def veroeffentlichen_uebersicht(
 @router.post("/curricula/{curriculum_id}/publish")
 async def curriculum_veroeffentlichen(
     curriculum_id: UUID,
+    ersetzen: UUID | None = Query(default=None, description="Curriculum derselben Stufe, das der Entwurf ersetzt (0.64)."),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
     """Veröffentlicht einen Entwurf (E9); eine Kopie ersetzt ihren Vorgänger (E15).
 
-    Der einzige Weg aus dem Status `draft` — die allgemeinen PATCH-Wege weisen ihn ab.
+    Der einzige Weg aus dem Status `draft` — die allgemeinen PATCH-Wege weisen ihn ab. Je Fach,
+    Stufe und Fassung gilt ein Curriculum (0.64): Gibt es schon eines, ersetzt der Entwurf es
+    (`ersetzen`), sonst `409` mit den Curricula im `detail`.
     """
-    from app.context.curriculum_veroeffentlichen import veroeffentlichen
+    from app.context.curriculum_veroeffentlichen import GleicheStufe, veroeffentlichen
 
     tree = await _entwurfsbaum(db, curriculum_id, user, ENTWURF)
     if not await darf_veroeffentlichen(db, tree["subject_id"], user):
         raise HTTPException(status_code=403, detail=f"Veröffentlichen dürfen: {wer_veroeffentlicht()}.")
-    ergebnis = await veroeffentlichen(db, tree, user)
+    try:
+        ergebnis = await veroeffentlichen(db, tree, user, ersetzen)
+    except GleicheStufe as e:
+        raise HTTPException(status_code=409, detail={
+            "grund": "gleiche_stufe", "nachricht": str(e),
+            "curricula": [{"id": str(c.id), "title": c.title} for c in e.curricula]}) from None
     await db.commit()
     return ergebnis
 

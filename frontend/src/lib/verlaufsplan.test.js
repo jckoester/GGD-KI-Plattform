@@ -309,3 +309,16 @@ describe('Einheiten aus dem Plan (Teil B, Schritt 5)', () => {
         }
     })
 })
+
+describe('themaNachWahl (0.64)', () => {
+  it('folgt der ersten Wahl, solange niemand selbst schreibt', async () => {
+    const { themaNachWahl } = await import('./verlaufsplan.js')
+    const t = { k1: 'Dichte', k2: 'Auftrieb' }
+    expect(themaNachWahl('', [], ['k1'], t)).toBe('Dichte')
+    expect(themaNachWahl('Dichte', ['k1'], ['k2'], t)).toBe('Auftrieb')
+    expect(themaNachWahl('Dichte', ['k1'], ['k1', 'k2'], t)).toBe('Dichte')
+    expect(themaNachWahl('Dichte', ['k1'], [], t)).toBe('')
+    expect(themaNachWahl('Eigenes Thema', ['k1'], ['k2'], t)).toBe('Eigenes Thema')
+    expect(themaNachWahl(null, [], [], t)).toBe('')
+  })
+})

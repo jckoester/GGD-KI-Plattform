@@ -18,7 +18,7 @@
         kopiereCurriculumAlsEntwurf,
         veroeffentlicheCurriculum,
     } from "$lib/api.js";
-    import { uebersichtZeilen } from "$lib/curriculum_freigabe.js";
+    import { gleicheStufe, uebersichtZeilen } from "$lib/curriculum_freigabe.js";
 
     /** `gesperrt`: ungespeicherte Änderungen im Editor — erst speichern. */
     /** `onveroeffentlicht`: nach dem Schließen des Ergebnisses — die Seite lädt neu. */
@@ -26,6 +26,9 @@
 
     let offen = $state(false);
     let uebersicht = $state(null);
+    // Ein Curriculum je Stufe und Fassung (0.64): welches der Entwurf ersetzt
+    let ersetzen = $state(null);
+    let gleich = $state({ wahl: [], gesperrt: false, vorauswahl: null });
     let fehler = $state(null);
     let laeuft = $state(false);
     let ergebnis = $state(null);
@@ -40,8 +43,21 @@
         uebersicht = null;
         fehler = null;
         ergebnis = null;
+        ersetzen = null;
         try {
             uebersicht = await getVeroeffentlichenUebersicht(curriculum.id);
+            gleich = gleicheStufe(uebersicht);
+            if (gleich.vorauswahl) await ersatzWaehlen(gleich.vorauswahl);
+        } catch (e) {
+            fehler = e.message;
+        }
+    }
+
+    /** Die Übersicht noch einmal, so als ersetzte der Entwurf dieses Curriculum. */
+    async function ersatzWaehlen(id) {
+        ersetzen = id;
+        try {
+            uebersicht = await getVeroeffentlichenUebersicht(curriculum.id, id);
         } catch (e) {
             fehler = e.message;
         }
@@ -51,7 +67,7 @@
         laeuft = true;
         fehler = null;
         try {
-            ergebnis = await veroeffentlicheCurriculum(curriculum.id);
+            ergebnis = await veroeffentlicheCurriculum(curriculum.id, ersetzen);
         } catch (e) {
             fehler = e.message;
         } finally {
@@ -152,6 +168,24 @@
                     Danach sehen alle das Curriculum, auch in Suche, Chat und Jahresplanung. Die Übersicht
                     zeigt, was auffällt — veröffentlichen kannst du trotzdem.
                 </p>
+                {#if gleich.gesperrt}
+                    <ErrorBanner message={`Außer dem Curriculum, das dieser Entwurf ersetzt, gibt es für diese Stufe und Fassung noch ${uebersicht.gleiche_stufe.map((c) => `„${c.title}“`).join(", ")}. Je Stufe und Fassung gilt nur ein Curriculum — archiviere es zuerst.`} />
+                {:else if gleich.wahl.length}
+                    <fieldset class="rounded border border-light-ui-3 dark:border-dark-ui-3 p-3 space-y-1" data-uebersicht="gleiche-stufe">
+                        <legend class="px-1 text-light-tx dark:text-dark-tx font-medium">Je Stufe und Fassung gilt ein Curriculum</legend>
+                        <p class="text-light-tx-2 dark:text-dark-tx-2">
+                            Für diese Stufe und Fassung ist schon eines veröffentlicht. Dieser Entwurf ersetzt es — Einheiten
+                            dieses Schuljahrs und Jahresverlaufspläne wandern an die Kapitel gleichen Titels.
+                        </p>
+                        {#each gleich.wahl as c (c.id)}
+                            <label class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
+                                <input type="radio" name="ersetzen" value={c.id} checked={ersetzen === c.id}
+                                       onchange={() => ersatzWaehlen(c.id)} />
+                                ersetzt „{c.title}“
+                            </label>
+                        {/each}
+                    </fieldset>
+                {/if}
                 <ul class="space-y-1" data-uebersicht="veroeffentlichen">
                     {#each zeilen as z, i (i)}
                         <li
@@ -168,7 +202,7 @@
                     <button
                         type="button"
                         onclick={veroeffentlichen}
-                        disabled={laeuft || !uebersicht.darf_veroeffentlichen}
+                        disabled={laeuft || !uebersicht.darf_veroeffentlichen || gleich.gesperrt || (gleich.wahl.length > 0 && !ersetzen)}
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
                                text-on-fill font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                     >

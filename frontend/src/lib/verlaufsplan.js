@@ -90,6 +90,18 @@ export function einheiten(curricula) {
     return { kapitelReihenfolge, kapitelVon, titel, std }
 }
 
+/**
+ * Thema eines Abschnitts nach der Wahl von Kapiteln oder Sequenzen (0.64, Jan 27.11.2026): Ist das
+ * Thema leer oder noch der Titel der bisher ersten Wahl, folgt es der ersten Wahl. Ein selbst
+ * geschriebenes Thema bleibt.
+ */
+export function themaNachWahl(thema, alteIds, neueIds, titelJeId = {}) {
+    const bisher = (thema ?? '').trim()
+    const automatisch = !bisher || (alteIds?.length && bisher === (titelJeId[alteIds[0]] ?? '').trim())
+    if (!automatisch) return thema
+    return neueIds?.length ? (titelJeId[neueIds[0]] ?? '') : ''
+}
+
 /** Das erste Kapitel eines Abschnitts — bei Sequenzen das Kapitel der ersten Sequenz. */
 export function erstesKapitel(abschnitt, planungsart, kapitelVon = {}) {
     const erste = abschnitt?.[bezugsfeld(planungsart)]?.[0]

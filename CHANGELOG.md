@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Zeitliche Absprachen werden gegen die Jahresverlaufspläne beider Fächer geprüft (eingehalten oder nicht, mit
+  Kalenderwochen); das Ergebnis steht an der Absprache im Curriculum, am Abschnitt im Jahresverlaufsplan und an
+  der Einheit im Planer.
+- Je Fach, Jahrgangsstufe und Bildungsplan-Fassung gilt ein veröffentlichtes Curriculum: Wer einen Entwurf neben
+  einem vorhandenen veröffentlicht, wählt, welches er ersetzt. Verschiedene Bänder sind ausgenommen.
+- Jahresverlaufsplan: Das Thema eines Abschnitts übernimmt den Titel des gewählten Kapitels oder der Sequenz.
+
+### Behoben
+
+- Jahresverlaufsplan: „Kapitel wählen“ und „Sequenzen wählen“ ohne Leerzeichen.
+- Das Admin-Skript `import_curriculum.py` legte ein zweites veröffentlichtes Curriculum derselben Stufe an.
+
 ## [0.63.0] – 2026-11-27
 
 ### Neu

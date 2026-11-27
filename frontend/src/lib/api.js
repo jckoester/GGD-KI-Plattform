@@ -2106,8 +2106,9 @@ export async function getCurriculumFachmethoden(curriculumId, q = '') {
 }
 
 /** Übersicht vor dem Veröffentlichen eines Entwurfs (0.45). */
-export async function getVeroeffentlichenUebersicht(curriculumId) {
-  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish`, { credentials: 'include' })
+export async function getVeroeffentlichenUebersicht(curriculumId, ersetzen = null) {
+  const q = ersetzen ? `?ersetzen=${encodeURIComponent(ersetzen)}` : ''
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish${q}`, { credentials: 'include' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Übersicht konnte nicht geladen werden')
@@ -2115,15 +2116,20 @@ export async function getVeroeffentlichenUebersicht(curriculumId) {
   return res.json()
 }
 
-/** Veröffentlicht einen Entwurf; eine Kopie ersetzt ihren Vorgänger (0.45). */
-export async function veroeffentlicheCurriculum(curriculumId) {
-  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish`, {
+/**
+ * Veröffentlicht einen Entwurf; eine Kopie ersetzt ihren Vorgänger (0.45). `ersetzen`: ein
+ * veröffentlichtes Curriculum derselben Stufe und Fassung, das der Entwurf ersetzt (0.64).
+ */
+export async function veroeffentlicheCurriculum(curriculumId, ersetzen = null) {
+  const q = ersetzen ? `?ersetzen=${encodeURIComponent(ersetzen)}` : ''
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}/publish${q}`, {
     method: 'POST',
     credentials: 'include',
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.detail ?? 'Veröffentlichen fehlgeschlagen')
+    const text = typeof data.detail === 'string' ? data.detail : data.detail?.nachricht
+    throw new ApiError(res.status, text ?? 'Veröffentlichen fehlgeschlagen')
   }
   return res.json()
 }

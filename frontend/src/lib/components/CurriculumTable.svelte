@@ -638,11 +638,14 @@
 <!-- Ein Klick in die Tabelle schließt das Kontextmenü (Maus). -->
 <svelte:document onvisibilitychange={beiRueckkehr} />
 
+<!-- Kästen über der Tabelle (Abdeckung, Begriffe, Absprachen an das Fach) auf der Farbe der
+     Abstandszeilen — so steht hinter ihren runden Ecken und zwischen ihnen kein Weiß (0.64). -->
+<div class="rounded-t-lg bg-light-bg-2 dark:bg-dark-bg-2 space-y-3">
 <CurriculumAbdeckung curriculumId={curriculum?.id} stand={curriculum} {editMode} {fachId} />
 
 {#if fehlListe.fehlend.length || fehlListe.mehrdeutig.length}
     <details
-        class="mt-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
+        class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-white dark:bg-dark-bg px-3 py-2 text-sm"
         data-uebersicht="begriffe"
     >
         <summary class="cursor-pointer text-light-tx dark:text-dark-tx">
@@ -705,10 +708,11 @@
 
 {#if absprachenDaten?.fach?.length}
     <!-- Absprachen anderer Fächer mit dem ganzen Fach, ohne Kapitel (0.63, AY Teil 2) -->
-    <div class="mt-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2" data-uebersicht="absprachen">
+    <div class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 bg-white dark:bg-dark-bg px-3 py-2" data-uebersicht="absprachen">
         <AbsprachenAnzeige vonAussen={absprachenDaten.fach} titel="Absprachen anderer Fächer mit dem ganzen Fach" />
     </div>
 {/if}
+</div>
 
 <div class="overflow-x-auto" role="presentation" onclick={hideMenu}>
     <table class="kapitel-tabelle w-full text-left border-collapse text-sm">

@@ -41,3 +41,15 @@ export function uebersichtZeilen(u) {
   }
   return zeilen
 }
+
+/**
+ * Ein gültiges Curriculum je Stufe und Fassung (0.64): Was die Übersicht dazu sagt.
+ * `wahl` — der Entwurf muss eines ersetzen (bei genau einem vorausgewählt); `gesperrt` — er
+ * ersetzt schon eines, und es gibt noch ein weiteres.
+ */
+export function gleicheStufe(u) {
+  const andere = u?.gleiche_stufe ?? []
+  if (!andere.length) return { wahl: [], gesperrt: false, vorauswahl: null }
+  if (u.vorgaenger) return { wahl: [], gesperrt: true, vorauswahl: null }
+  return { wahl: andere, gesperrt: false, vorauswahl: andere.length === 1 ? andere[0].id : null }
+}

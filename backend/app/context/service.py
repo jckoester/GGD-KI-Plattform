@@ -1629,6 +1629,22 @@ async def import_curriculum_from_draft(
                else {}),
         }
     }
+    # Ein gültiges Curriculum je Fach, Stufe und Fassung (0.64): Das Admin-Skript aktualisiert ein
+    # Curriculum mit demselben Schlüssel, legt aber kein zweites neben ein vorhandenes.
+    if not als_entwurf:
+        schon = (await db.execute(sa.select(ContextNode.id).where(
+            ContextNode.content_type == "curriculum",
+            ContextNode.metadata_["import_key"].astext == curriculum_import_key).limit(1))).scalar_one_or_none()
+        anderes = None if schon is not None else (await db.execute(sa.select(ContextNode.title).where(
+            ContextNode.content_type == "curriculum", ContextNode.status == "active",
+            ContextNode.subject_id == subject_id,
+            ContextNode.metadata_["jahrgangsstufe"].astext == payload.jahrgangsstufe,
+            ContextNode.metadata_["bp_version"].astext == payload.bp_version).limit(1))).scalar_one_or_none()
+        if anderes is not None:
+            raise ValueError(
+                f"Für {payload.fach or payload.fach_code} Kl. {payload.jahrgangsstufe} ({payload.bp_version}) gibt es "
+                f"schon das veröffentlichte Curriculum „{anderes}“. Je Stufe und Fassung gilt nur eines — spiel die "
+                f"Datei in der Oberfläche als Entwurf ein (Aus YAML importieren) und ersetze es beim Veröffentlichen.")
     curriculum_id, created = await get_or_create_node(
         db, "knowledge", "curriculum", curriculum_import_key, curriculum_data
     )
