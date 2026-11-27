@@ -56,8 +56,12 @@ class Grenzen:
 
 GRENZEN = Grenzen()
 
+#: `quelle` (0.62, BH): woraus der Entwurf entstand, eine Zeile — etwa „Beispielcurriculum Physik
+#: Gymnasium Klassen 7–8 (ZSL, Fassung V3.0 vom 08.04.2026)“.
+QUELLE_ZEICHEN = 300
+
 PFLICHT = ("schule", "fach_code", "schulart", "jahrgangsstufe", "bp_version")
-FELDER_OBEN = frozenset(PFLICHT + ("fach", "fachplan_id", "bp_id", "vorwort", "rahmen", "kapitel"))
+FELDER_OBEN = frozenset(PFLICHT + ("fach", "fachplan_id", "bp_id", "vorwort", "quelle", "rahmen", "kapitel"))
 FELDER_KAPITEL = frozenset(("titel", "reihenfolge", "std", "hinweis", "konkretisierung", "lernsequenzen"))
 FELDER_LS = frozenset(("bp_titel", "bp_leitidee", "reihenfolge", "std", "eintraege"))
 FELDER_EINTRAG = frozenset(("ik", "ik_partiell", "pk", "konkretisierung", "hinweise", "lp", "material",
@@ -237,7 +241,10 @@ def zu_entwurf(daten: dict, bp_version_override: str | None = None, *,
             werte[k] = ""
         else:
             werte[k] = text(oben[k], k, pflicht=k not in ("schule", "schulart")) or ""
-    kopf = {k: text(oben.get(k), k) for k in ("fach", "fachplan_id", "bp_id", "vorwort")}
+    kopf = {k: text(oben.get(k), k) for k in ("fach", "fachplan_id", "bp_id", "vorwort", "quelle")}
+    if kopf["quelle"] and len(kopf["quelle"]) > QUELLE_ZEICHEN:
+        p.fehler.append(f"quelle: zu lang ({len(kopf['quelle'])} Zeichen, höchstens {QUELLE_ZEICHEN}) — "
+                        f"nur die Angabe, woraus der Entwurf entstand; Erläuterungen gehören ins vorwort.")
 
     from app.context.curriculum_rahmen import rahmen_normalisieren
     rahmen = oben.get("rahmen")
@@ -351,7 +358,8 @@ def zu_entwurf(daten: dict, bp_version_override: str | None = None, *,
         fachplan_id=kopf["fachplan_id"] or None,
         bp_id=None if bp_version_override else (kopf["bp_id"] or None),
         bp_version=bp_version_override or werte["bp_version"],
-        vorwort=kopf["vorwort"], rahmen=rahmen, kapitel=kapitel,
+        vorwort=kopf["vorwort"], quelle=(kopf["quelle"] or "").strip() or None, rahmen=rahmen,
+        kapitel=kapitel,
     )
     return p
 
@@ -423,7 +431,7 @@ class KeinRecht(Exception):
 
 
 async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, titel_zusatz: str | None = None,
-                    speichern: bool = False) -> dict:
+                    vorlage: dict | None = None, speichern: bool = False) -> dict:
     """Einlesen, bereinigen, als Entwurf importieren — und ohne `speichern` zurückrollen (F4 a).
 
     Die Vorschau ist also der echte Import: dieselbe Auflösung von Fach, Fachplan und
@@ -435,7 +443,8 @@ async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, titel_zusatz: 
     Originals ersetzt), `summen`, `vorhanden` (veröffentlichte Curricula gleichen Fachs,
     Jahrgangs und Edition, je mit offenem Entwurf, F2), `ersetzen`; nach dem Speichern `id`.
     `titel_zusatz` hängt der Sammelimport an den Titel, wenn es schon einen Entwurf gibt
-    („Chemie Kl. 8 (Import 27.11.2026)“, 0.62, BH).
+    („Chemie Kl. 8 (Import 27.11.2026)“, 0.62, BH), `vorlage` (`{datei, importiert_am}`) kennzeichnet
+    den Entwurf als eingespielte Vorlage (`metadata.vorlage`).
     `KeinRecht`, wenn die Person in dem Fach keine Entwürfe anlegen darf (F1).
     """
     import sqlalchemy as sa
@@ -493,9 +502,12 @@ async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, titel_zusatz: 
         await sicherung.rollback()
         p.fehler.append(str(fehler))
         return aus
-    if titel_zusatz:
+    if titel_zusatz or vorlage:
         knoten = await db.get(ContextNode, cid)
-        knoten.title = f"{knoten.title} ({titel_zusatz})"
+        if titel_zusatz:
+            knoten.title = f"{knoten.title} ({titel_zusatz})"
+        if vorlage:
+            knoten.metadata_ = {**(knoten.metadata_ or {}), "vorlage": vorlage}
         await db.flush()
     for w in stats.warnings:
         if w not in p.warnungen:
@@ -515,7 +527,7 @@ async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, titel_zusatz: 
         summen["stunden"] += std or 0
     aus.update(ok=True, kapitel=kapitel, summen=summen, curriculum={
         "titel": tree.get("title"), "fach_code": e.fach_code, "fach": e.fach,
-        "jahrgangsstufe": e.jahrgangsstufe, "bp_version": e.bp_version})
+        "jahrgangsstufe": e.jahrgangsstufe, "bp_version": e.bp_version, "quelle": e.quelle})
     if speichern:
         await sicherung.commit()
         aus["id"] = str(cid)

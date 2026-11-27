@@ -46,7 +46,8 @@ ANLEITUNG = (
     "und die Leitlinien der Schule. Schreiben ist über diese Schnittstelle nicht möglich. "
     "Für einen neuen oder geänderten Curriculum-Entwurf: Vorlage mit curriculum_yaml holen, YAML "
     "schreiben, mit curriculum_yaml_pruefen prüfen, bis es fehlerfrei ist, und es der Lehrkraft geben — "
-    "sie importiert es in der Plattform als Entwurf."
+    "sie importiert es in der Plattform als Entwurf. Beruht der Entwurf auf einer Vorlage (etwa einem "
+    "Beispielcurriculum), nenne sie im Feld quelle."
 )
 
 

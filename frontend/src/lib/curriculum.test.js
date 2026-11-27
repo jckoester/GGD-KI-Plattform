@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen, entwurfHinweis, ENTWURF_HINWEIS, ENTWURF_NUR_LESEN } from './curriculum.js'
+import { lernsequenzStd, kapitelStd, curriculumStd, ersetztHinweis, toteVerweiseBeschriftungen, entwurfHinweis, ENTWURF_HINWEIS, ENTWURF_NUR_LESEN, vorlageHinweis, quelleText } from './curriculum.js'
 
 describe('lernsequenzStd', () => {
     it('liest eine Zahl', () => {
@@ -85,5 +85,22 @@ describe('entwurfHinweis (0.52, AZ)', () => {
   it('veröffentlicht oder ohne Curriculum: kein Hinweis', () => {
     expect(entwurfHinweis({ status: 'active', can_edit: false })).toBe('')
     expect(entwurfHinweis(null)).toBe('')
+  })
+})
+
+describe('vorlageHinweis und quelleText (0.62, BH)', () => {
+  const vorlage = { datei: 'ph78.yaml', importiert_am: '2026-11-27' }
+  it('Entwurf aus einer Vorlage: Datum, Datei und dass die Fachschaft prüft', () => {
+    expect(vorlageHinweis({ status: 'draft', metadata: { vorlage } })).toBe(
+      'Aus einer Vorlage importiert am 27.11.2026 (ph78.yaml) — die Fachschaft prüft und passt an, bevor sie veröffentlicht.')
+  })
+  it('veröffentlicht oder ohne Vorlage: kein Hinweis', () => {
+    expect(vorlageHinweis({ status: 'active', metadata: { vorlage } })).toBe('')
+    expect(vorlageHinweis({ status: 'draft', metadata: {} })).toBe('')
+    expect(vorlageHinweis(null)).toBe('')
+  })
+  it('Quelle aus den Metadaten', () => {
+    expect(quelleText({ metadata: { quelle: ' Beispielcurriculum ZSL ' } })).toBe('Beispielcurriculum ZSL')
+    expect(quelleText({ metadata: {} })).toBe('')
   })
 })

@@ -29,6 +29,24 @@ export function entwurfHinweis(curriculum) {
 }
 
 /**
+ * Hinweis an einem Entwurf, der als Vorlage eingespielt wurde (0.62, BH, F4): Die Fachschaft prüft
+ * ihn, bevor er gilt. Leer bei veröffentlichten Curricula und Entwürfen ohne `metadata.vorlage`.
+ */
+export function vorlageHinweis(curriculum) {
+  const v = curriculum?.metadata?.vorlage
+  if (curriculum?.status !== 'draft' || !v) return ''
+  const am = /^\d{4}-\d{2}-\d{2}$/.test(v.importiert_am ?? '')
+    ? ` am ${v.importiert_am.slice(8, 10)}.${v.importiert_am.slice(5, 7)}.${v.importiert_am.slice(0, 4)}`
+    : ''
+  return `Aus einer Vorlage importiert${am}${v.datei ? ` (${v.datei})` : ''} — die Fachschaft prüft und passt an, bevor sie veröffentlicht.`
+}
+
+/** Woraus das Curriculum entstand (0.62, BH, F7), etwa ein Beispielcurriculum; sonst leer. */
+export function quelleText(curriculum) {
+  return (curriculum?.metadata?.quelle ?? '').trim()
+}
+
+/**
  * Banner in der Planung (0.45, E15): Einheiten, deren Curriculum-Kapitel zu einem ersetzten
  * (archivierten) Curriculum gehört. `titel`: die Titel der eigenen Einheiten.
  */

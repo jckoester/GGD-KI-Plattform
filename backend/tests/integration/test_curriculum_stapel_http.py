@@ -116,6 +116,8 @@ async def test_vorschau_hinterlaesst_nichts_anlegen_je_datei_ein_entwurf(db):
     assert len(entwuerfe) == 3 and {e.owner_pseudonym for e in entwuerfe} == {ADMIN.sub}
     ersatz = next(e for e in entwuerfe if e.id == uuid.UUID(ids[1]))
     assert ersatz.metadata_["kopie_von"] == str(original_id) and ersatz.title == "Chemie Kl. 9"
+    assert ersatz.metadata_["vorlage"] == {"datei": "ch9.yaml", "importiert_am": ersatz.metadata_["vorlage"]["importiert_am"]}
+    assert len(ersatz.metadata_["vorlage"]["importiert_am"]) == 10
     zweiter = next(e for e in entwuerfe if e.id == uuid.UUID(ids[3]))
     assert "kopie_von" not in zweiter.metadata_ and zweiter.title.startswith("Chemie Kl. 7 (Import ")
     assert (await db.get(ContextNode, original_id)).status == "active"
@@ -168,3 +170,23 @@ async def test_gedrosselt(db, monkeypatch):
         # Der Einzelimport hat seinen eigenen Eimer
         einzel = await c.post("/context/curricula/import/pruefen", json={"yaml": "x: 1"})
     assert codes == [200, 429] and einzel.status_code == 200
+
+
+async def test_quelle_bleibt_im_export_kopie_ohne_vorlage(db):
+    """`quelle` wandert mit Export und Kopie; die Kennzeichnung als Vorlage gilt nur dem Import."""
+    from app.context.curriculum_export import build_curriculum_export_dict
+    from app.context.relink import duplicate_curriculum
+    from app.context.service import load_curriculum_tree
+
+    quelle = "Beispielcurriculum Chemie (ZSL, Fassung V3.0)"
+    async with _client(db, ADMIN) as c:
+        v = (await c.post(STAPEL, json={"dateien": [{"name": "q.yaml", "yaml": _text(_datei("8", quelle=quelle))}]})).json()
+    d = v["dateien"][0]
+    assert d["ok"] and d["curriculum"]["quelle"] == quelle
+    entwurf = await db.get(ContextNode, uuid.UUID(d["id"]))
+    assert entwurf.metadata_["quelle"] == quelle and entwurf.metadata_["vorlage"]["datei"] == "q.yaml"
+    export = await build_curriculum_export_dict(db, await load_curriculum_tree(db, entwurf.id))
+    assert export["quelle"] == quelle
+    kopie_id, _ = await duplicate_curriculum(db, entwurf.id, owner=ADMIN.sub, titel="Kopie")
+    kopie = await db.get(ContextNode, kopie_id)
+    assert kopie.metadata_["quelle"] == quelle and "vorlage" not in kopie.metadata_

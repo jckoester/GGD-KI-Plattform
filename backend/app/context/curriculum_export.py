@@ -257,6 +257,8 @@ async def build_curriculum_export_dict(db: AsyncSession, tree: dict) -> dict:
         "bp_id": await _fachplan_bp_id(db, tree),
         "bp_version": meta.get("bp_version", ""),
         "vorwort": tree.get("content") or "",
+        # Woraus der Entwurf entstand (0.62, BH) — nur, wenn angegeben.
+        **({"quelle": meta["quelle"]} if meta.get("quelle") else {}),
         # Rahmenangaben (0.46, E20) — nur, wenn welche da sind.
         **({"rahmen": meta["rahmen"]} if meta.get("rahmen") else {}),
         "kapitel": kapitel_out,

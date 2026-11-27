@@ -11,6 +11,9 @@ entsteht, folgt aus dem, was es zu Fach, Jahrgang und Edition schon gibt:
   veröffentlichte → ein zusätzlicher Entwurf, der nichts ersetzt, mit dem Importdatum im
   Titel (`zusaetzlich`).
 
+Jeder Entwurf trägt `metadata.vorlage = {datei, importiert_am}` (F4); die Oberfläche zeigt
+daran den Hinweis, dass die Fachschaft ihn prüft. `quelle` kommt aus der Datei (F7).
+
 Jede Datei läuft für sich durch `curriculum_yaml.durchlauf`, in einem eigenen Savepoint: Eine
 fehlerhafte Datei hält die übrigen nicht auf. Beim Anlegen wird nach jeder Datei committet.
 """
@@ -112,6 +115,7 @@ async def stapel(db, dateien: list[tuple[str, str]], user, *, tag: date, speiche
         sicherung = await db.begin_nested()
         try:
             r = await durchlauf(db, text, user, ersetzen=ersetzen, speichern=speichern,
+                                vorlage={"datei": name, "importiert_am": tag.isoformat()},
                                 titel_zusatz=titel_zusatz(tag) if art == ZUSAETZLICH else None)
         except KeinRecht as fehler:
             await sicherung.rollback()

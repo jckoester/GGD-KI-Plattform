@@ -257,7 +257,9 @@ def _nur_lehrkraefte(user) -> None:
 #: Das Format für `curriculum_yaml_pruefen` — kurz, das Programm hat die Vorlage aus `curriculum_yaml`.
 YAML_FORMAT = (
     "Oben: schule, fach_code (Kürzel, etwa 'M'), fach, schulart, jahrgangsstufe (etwa '7/8'), bp_version, "
-    "bp_id, vorwort, rahmen, kapitel. Kapitel: titel, reihenfolge, std, hinweis, konkretisierung (Liste), "
+    "bp_id, vorwort, quelle, rahmen, kapitel. quelle: eine Zeile, woraus der Entwurf entstand, wenn er auf "
+    "einer Vorlage beruht (etwa 'Beispielcurriculum Physik Gymnasium Klassen 7–8 (ZSL, Fassung V3.0 vom "
+    "08.04.2026)'), höchstens 300 Zeichen; Erläuterungen gehören ins vorwort. Kapitel: titel, reihenfolge, std, hinweis, konkretisierung (Liste), "
     "lernsequenzen. Lernsequenz: bp_titel, bp_leitidee, reihenfolge, std, eintraege. Eintrag: ik (Liste "
     "von {nr, partiell}), pk (Liste von {id}), konkretisierung, hinweise, material, begriffe, fachmethoden. "
     "Verweise in hinweise: @[Text](lp:BNE), @[Text](lb:<Kürzel der Leitlinie>), @[Text](lba:<Kürzel des "

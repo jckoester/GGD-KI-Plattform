@@ -15,7 +15,7 @@
         nimmCurriculumZurueck,
     } from "$lib/api.js";
     import { kannZuruecknehmen, rueckgaengigTitel, zurueckgenommenMeldung } from "$lib/curriculum_verlauf.js";
-    import { kapitelStd, curriculumStd, ENTWURF_HINWEIS, toteVerweiseBeschriftungen } from "$lib/curriculum.js";
+    import { kapitelStd, curriculumStd, ENTWURF_HINWEIS, toteVerweiseBeschriftungen, vorlageHinweis } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
@@ -670,6 +670,9 @@
 
             {#if draft?.status === "draft"}
                 <div class="mb-4"><InfoBanner message={ENTWURF_HINWEIS} /></div>
+                {#if vorlageHinweis(curriculum)}
+                    <div class="mb-4"><InfoBanner message={vorlageHinweis(curriculum)} /></div>
+                {/if}
             {/if}
 
             <!-- Fehler/Erfolg -->

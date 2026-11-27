@@ -30,3 +30,12 @@ def test_mehrere_veroeffentlichte_ersetzen_keines():
 
 def test_titel_zusatz():
     assert titel_zusatz(date(2026, 11, 27)) == "Import 27.11.2026"
+
+
+def test_mcp_kennt_quelle():
+    """Die Entwürfe entstehen in einem KI-Programm über den MCP-Server — es muss `quelle` kennen."""
+    from app.mcp.server import ANLEITUNG
+    from app.mcp.werkzeuge import YAML_FORMAT
+
+    assert "quelle" in YAML_FORMAT and "300 Zeichen" in YAML_FORMAT
+    assert "quelle" in ANLEITUNG

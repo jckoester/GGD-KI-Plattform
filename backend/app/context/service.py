@@ -1623,6 +1623,7 @@ async def import_curriculum_from_draft(
             "jahrgangsstufe": payload.jahrgangsstufe,
             "import_key": curriculum_import_key,
             **({"rahmen": rahmen} if (rahmen := rahmen_normalisieren(payload.rahmen)) else {}),
+            **({"quelle": payload.quelle} if payload.quelle else {}),
             **({"kopie_von": str(original.id)} if original is not None else {}),
             **({"band": band} if original is not None and (band := (original.metadata_ or {}).get("band"))
                else {}),

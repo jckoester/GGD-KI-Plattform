@@ -127,6 +127,9 @@
                         </span>
                     </p>
                     <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">{summenText(vorschau.summen)}</p>
+                    {#if vorschau.curriculum.quelle}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">Quelle: {vorschau.curriculum.quelle}</p>
+                    {/if}
                     <ol class="text-sm space-y-0.5 list-decimal pl-5 text-light-tx dark:text-dark-tx">
                         {#each vorschau.kapitel as k, i (i)}
                             <li>

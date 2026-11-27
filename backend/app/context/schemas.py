@@ -462,6 +462,8 @@ class CurriculumDraftConfirmed(BaseModel):
     bp_id: str | None = None
     bp_version: str
     vorwort: str | None = None
+    #: Woraus der Entwurf entstand (0.62, BH), etwa ein Beispielcurriculum — `metadata.quelle`.
+    quelle: str | None = None
     #: Rahmenangaben (0.46, E20): Wochenstunden je Stufe, Lehrwerk, Beschlüsse, Schwerpunkte,
     #: Absprachen — siehe `app/context/curriculum_rahmen.py`.
     rahmen: dict | None = None

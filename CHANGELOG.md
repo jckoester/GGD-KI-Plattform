@@ -9,6 +9,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Curriculum-Vorlagen gesammelt einspielen (Admins, Backend): bis zu 60 YAML-Dateien je Lauf, mit Vorschau; aus jeder
   Datei wird ein Entwurf. Gibt es zur Stufe schon einen Entwurf, trägt der neue das Importdatum im Titel.
+- Curriculum-YAML: neues Feld `quelle` (woraus der Entwurf entstand, etwa ein Beispielcurriculum); steht in der
+  Ansicht, im Export und in der Formatbeschreibung des MCP-Servers. Eingespielte Vorlagen tragen am Entwurf den
+  Hinweis, dass die Fachschaft sie prüft.
 
 ## [0.61.0] – 2026-11-27
 

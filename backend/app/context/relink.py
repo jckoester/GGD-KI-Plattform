@@ -345,7 +345,10 @@ async def duplicate_curriculum(
     # „Als Entwurf kopieren“ behält den Titel (die Kopie ersetzt das Original); der
     # Relink-Weg legt eine zweite, eigenständige Fassung an und heißt „(Kopie)“.
     new_cur = kopie(cur, title=titel if titel is not None else f"{cur.title or ''} (Kopie)")
-    new_cur.metadata_ = {**(new_cur.metadata_ or {}), "kopie_von": str(cur.id)}
+    # Die Kennzeichnung als eingespielte Vorlage (0.62, BH) gilt dem Import, nicht der Kopie;
+    # `quelle` (woraus der Inhalt stammt) wandert mit.
+    new_cur.metadata_ = {**{k: v for k, v in (new_cur.metadata_ or {}).items() if k != "vorlage"},
+                         "kopie_von": str(cur.id)}
     db.add(new_cur)
     await db.flush()
 

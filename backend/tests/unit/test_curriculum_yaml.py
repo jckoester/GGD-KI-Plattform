@@ -149,3 +149,14 @@ def test_rahmen_wird_geprueft():
 def test_titel_nur_leerraum_fehlt():
     p = zu_entwurf({**GRUND, "kapitel": [{**GRUND["kapitel"][0], "titel": "   "}]})
     assert "Kapitel 1, titel: fehlt." in p.fehler
+
+
+def test_quelle_optional_und_kurz():
+    """`quelle` (0.62, BH, F7): woraus der Entwurf entstand — eine Zeile, Erläuterungen ins Vorwort."""
+    assert einlesen(_yaml()).entwurf.quelle is None
+    p = einlesen(_yaml(quelle="  Beispielcurriculum Physik Gymnasium Klassen 7–8 (ZSL, Fassung V3.0)  "))
+    assert p.ok and p.warnungen == []
+    assert p.entwurf.quelle == "Beispielcurriculum Physik Gymnasium Klassen 7–8 (ZSL, Fassung V3.0)"
+    p = einlesen(_yaml(quelle="x" * 301))
+    assert not p.ok and p.fehler[0].startswith("quelle: zu lang (301 Zeichen, höchstens 300)")
+    assert not einlesen(_yaml(quelle=["a"])).ok

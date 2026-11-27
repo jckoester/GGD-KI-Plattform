@@ -9,7 +9,7 @@
         exportCurriculum,
         relinkCurriculum,
     } from "$lib/api.js";
-    import { curriculumStd, entwurfHinweis } from "$lib/curriculum.js";
+    import { curriculumStd, entwurfHinweis, quelleText, vorlageHinweis } from "$lib/curriculum.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import CurriculumRahmen from "$lib/components/CurriculumRahmen.svelte";
     import CurriculumBandWahl from "$lib/components/CurriculumBandWahl.svelte";
@@ -224,6 +224,9 @@
                             · <a href={l.href} class="text-light-bl dark:text-dark-bl hover:underline">{l.text}</a>
                         {/each}
                     </p>
+                    {#if quelleText(curriculum)}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">Quelle: {quelleText(curriculum)}</p>
+                    {/if}
                 </div>
                 <div bind:this={topActionsEl} class="flex flex-wrap justify-end gap-2">
                     <CurriculumFreigabe
@@ -291,6 +294,9 @@
 
             {#if curriculum.status === "draft"}
                 <div class="mb-4"><InfoBanner message={entwurfHinweis(curriculum)} /></div>
+                {#if vorlageHinweis(curriculum)}
+                    <div class="mb-4"><InfoBanner message={vorlageHinweis(curriculum)} /></div>
+                {/if}
                 {#if curriculum.kopie_von}
                     <p class="-mt-2 mb-4 text-xs text-light-tx-2 dark:text-dark-tx-2">
                         Beim Veröffentlichen ersetzt dieser Entwurf
