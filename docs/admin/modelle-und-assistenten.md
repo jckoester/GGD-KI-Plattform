@@ -411,11 +411,11 @@ angelegt ist, archivieren Sie ihn (CHANGELOG 0.26.0, „Nach dem Update“).
 Der Jahresplan-Assistent ermöglicht es Lehrkräften, ihren Jahresplan per
 Konversation zu erstellen. Er liest Lehrplan und Slot-Angebot, schlägt eine
 UE-Verteilung vor und schreibt den Plan nach Bestätigung direkt in die
-Plattform.
+Plattform. Seit 0.61 liest er auch den **Jahresverlaufsplan der Fachschaft** und legt die
+Einheiten danach an — über denselben Weg wie der Knopf im Planer, mit Rücknahme.
 
-**Voraussetzung:** UP-Phase-1 und UP-Phase-2 müssen aktiv sein (Datenmodell
-und Planer-UI), der Bildungsplan muss für die betreffenden Fächer importiert
-sein.
+**Voraussetzung:** Die Gruppe hat Termine (Wochenmuster oder Stundenplan), und für ihr Fach ist
+ein Curriculum veröffentlicht.
 
 **Einmalige Einrichtung (Seed-Skript):**
 
@@ -475,8 +475,9 @@ Im Editor (Abschnitt „Vorschlag im Chat“):
   die im Vorschlag unter diesem stehen, höchstens 3. Die drei ausgelieferten Schüler-Assistenten
   bringen das mit (beide Chemie-Assistenten → naturwissenschaftliche Aufgaben).
 
-Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodell
-(`CHAT_DEFAULT_MODEL`). Nur wenn er an ein **bestimmtes** Modell gebunden sein soll:
+Danach ist der Assistent einsatzbereit — er nutzt `PLANUNG_MODEL` (empfohlen `chat-komplex`), ohne
+diese Einstellung das schulweite Standardmodell (`CHAT_DEFAULT_MODEL`). Nur wenn er an ein
+**bestimmtes** Modell gebunden sein soll:
 
 1. `/assistants/manage` aufrufen.
 2. „Jahresplanung" in der Liste anklicken.
@@ -488,6 +489,10 @@ Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodel
 > Assistent einem späteren Modellwechsel automatisch. Ein fest gewähltes Modell bindet
 > ihn daran — er funktioniert nicht mehr, sobald dieses Modell aus der LiteLLM-Config
 > fällt. Für die meisten Assistenten ist der Standard die wartungsärmere Wahl.
+
+⚠️ **Nach einem Update mit Änderung am Prompt (zuletzt 0.61: Jahresverlaufsplan) den Prompt im
+Editor nachziehen.** Der Seed überschreibt einen vorhandenen Assistenten nicht. Übernehmen Sie den
+Inhalt von `config/prompts/jahresplan_assistent.md` in den System-Prompt der „Jahresplanung“.
 
 **Verhalten in der UI:** Jeder Einstieg wählt seinen Assistenten über die **Fähigkeit**:
 
@@ -526,7 +531,7 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten* — mit einer 
 
 | Fähigkeit | Funktionen | Freischaltung |
 |---|---|---|
-| `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien, Ausfall (mit Nachrücken) sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
+| `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien, Ausfall (mit Nachrücken) sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`); seit 0.61 der **Jahresverlaufsplan** der Fachschaft (`get_verlaufsplan`, `verlaufsplan_einheiten_anlegen`, `verlaufsplan_anlegen_zuruecknehmen`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
 | `lesson_planning` | **Stundenplanung:** Stundenentwurf lesen — samt passender Fachbegriffe des Fachs und seiner Bezugsfächer (`begriffe`) — und Phasen, Stundenziel, Kompetenzen und Fachbegriffe schreiben (`get_lesson_detail`, `update_lesson_phases`; Begriffe über Titel oder Alias, fehlende meldet `nicht_eingetragen`); eine Stunde aus Angaben im Chat finden und als Bezug setzen (`finde_stunde`, `waehle_stunde`); Einheit samt Kapitel lesen (`get_unit_detail`, auch in `planning`) | **Lehrkräfte**, auch **ohne Gruppenbezug** — den Zugang zur einzelnen Stunde prüft jede Funktion selbst |
 | `curriculum_planning` | **Curriculum-Entwurf** (seit 0.46): Curriculum finden, wählen, anlegen, als Entwurf kopieren; lesen samt Stundenbilanz, Abdeckung und Kompetenzen des Bands; Rahmen festhalten; Änderungen als Vorschau prüfen und nach Zustimmung schreiben; letzte Speicherung zurücknehmen. Geschrieben wird nur in Entwürfe. | nur **Admins** vergeben sie, nur an Assistenten mit Zielgruppe **Lehrkräfte**; den Zugang zum Curriculum prüft jede Funktion wie im Editor |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |

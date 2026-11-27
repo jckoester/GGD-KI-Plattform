@@ -140,9 +140,9 @@ faelle:
     erwartung: >-
       Die Gruppe hat schon Einheiten, die Frage hat mit dem Plan nichts zu tun: trägt die Prüfung
       ein, ohne den Jahresverlaufsplan zu lesen.
+    # Ein Zug: Der Auftrag wird sofort ausgeführt (Jan). Ein zweites „Ja.“ wäre mehrdeutig — auf
+    # das angebotene Zurücknehmen hin nahm es der Assistent in Lauf 2 als Auftrag zur Rücknahme.
     zuege:
       - text: "Trag am {termin:6} bitte eine Klassenarbeit ein."
-        nicht: [get_verlaufsplan]
-      - text: "Ja."
         nicht: [get_verlaufsplan, verlaufsplan_einheiten_anlegen]
     ende: {aus_plan: 0, vorhandene_unveraendert: true, kategorie: {termin: 6, wert: pruefung}}

@@ -627,3 +627,16 @@
     und belegst ihre freien Stunden — mit Vorschau und Rückgängig. Den Plan selbst kannst du als PDF,
     DOCX oder ODT exportieren.
   link: /help/unterrichtsplanung#der-jahresverlaufsplan-der-fachschaft
+
+- id: "0.61-jahresplan-assistent-verlaufsplan"
+  version: "0.61.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-27
+  rollen: [teacher]
+  eintrag: planner
+  titel: "Der Jahresplan-Assistent kennt den Plan der Fachschaft"
+  text: >-
+    Sag dem Jahresplan-Assistenten „Leg die Einheiten nach dem Jahresverlaufsplan an“ — er legt sie
+    an wie der Knopf im Planer, auf Wunsch ohne einzelne Abschnitte oder mit eigenen Titeln, und nimmt
+    das Anlegen zurück, wenn du es willst. Fragst du nach dem Plan der Fachschaft, liest er ihn dir vor.
+  link: /help/unterrichtsplanung#mit-dem-jahresplan-assistenten-planen

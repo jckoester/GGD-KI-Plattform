@@ -32,6 +32,8 @@ describe("wirkungsHinweis", () => {
     const text = wirkungsHinweis(A("x", { werkzeuge_mit_wirkung: ["verlaufsplan_einheiten_anlegen"] }));
     expect(text).toContain("Einheiten aus dem Jahresverlaufsplan angelegt");
     expect(text).not.toContain("etwas geändert");
+    expect(text).toContain("nimmt der Assistent auf Wunsch zurück");
+    expect(wirkungsHinweis(A("x", { werkzeuge_mit_wirkung: ["set_slot_topics"] }))).toContain("über den Verlauf der Planung bzw. in der Werkstatt");
   });
 
   it("schweigt ohne Wirkung", () => {

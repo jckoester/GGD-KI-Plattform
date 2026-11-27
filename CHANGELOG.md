@@ -5,20 +5,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.61.0] – 2026-11-27
+
 ### Neu
 
-- Anlegen aus dem Jahresverlaufsplan: einzelne Abschnitte auslassen und Titel ändern (für den Assistenten); die Antwort
-  nennt die angelegten Einheiten.
-- Jahresplan-Assistent (Funktionen): `get_verlaufsplan` (Plan und Vorschau), `verlaufsplan_einheiten_anlegen` (mit
-  Auslassen und Umbenennen), `verlaufsplan_anlegen_zuruecknehmen`; `get_plan_balance` nennt den Plan der Fachschaft.
-  `undo_last_change` verweist nach einem Anlegen aus dem Plan auf die eigene Rücknahme.
+- Jahresplan-Assistent kennt den Jahresverlaufsplan der Fachschaft: liest ihn, wenn du danach fragst oder die Gruppe
+  noch keine Einheiten hat, legt die Einheiten danach an (auf Wunsch ohne einzelne Abschnitte oder mit eigenen
+  Titeln) und nimmt das Anlegen auf Wunsch zurück. Ein ausdrücklicher Auftrag gilt als Zustimmung.
+- Jahresplan-Assistent: keine Funktionsnamen und Kennungen mehr in den Antworten.
 
 ### Behoben
 
 - Anlegen aus dem Jahresverlaufsplan: Ein Abschnitt, der schon begonnen hat und keinen Termin mehr ab heute hat,
   gilt als vorbei — vorher entstand eine Einheit ohne Stunden.
-- Planungsassistent: Mehrfaches Rückgängig im Chat geht jetzt Schritt für Schritt zurück, statt zwischen zwei
-  Ständen zu pendeln.
+- Planungsassistent: Mehrfaches Rückgängig im Chat geht Schritt für Schritt zurück, statt zwischen zwei Ständen
+  zu pendeln.
+
+### Nach dem Update
+
+- Den Prompt der „Jahresplanung“ im Editor durch `config/prompts/jahresplan_assistent.md` ersetzen — der Seed
+  überschreibt einen vorhandenen Assistenten nicht.
 
 ## [0.60.0] – 2026-11-26
 

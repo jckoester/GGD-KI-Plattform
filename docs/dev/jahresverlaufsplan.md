@@ -166,18 +166,50 @@ und der Export: `app/context/verlaufsplan_export.py` (`aufbereiten` rein; PDF mi
 `templates/verlaufsplan_pdf.html`, DOCX/ODT über den Pandoc-AST, beide quer, die Bilanz nach
 `office.SEITENUMBRUCH` auf eigener Seite). Der Jahresplan-Assistent soll `kompakt` in 0.61 lesen.
 
+## Jahresplan-Assistent (0.61)
+
+Fähigkeit `planning` (`app/planning/assistant_tools.py`), derselbe Dienst wie der Knopf:
+
+| Funktion | schreibt | Was |
+|---|---|---|
+| `get_verlaufsplan` | nein | `vp.kompakt` (mit `alte_titel`) und eine kompakte Vorschau je `nr` (`anlegen`, `grund`, `stunden`) |
+| `verlaufsplan_einheiten_anlegen` | ja | `vg.anlegen(…, auslassen=[nr], titel={nr: titel})` — der Server rechnet neu; Antwort mit `lauf_id`, `angelegt`, Bilanz |
+| `verlaufsplan_anlegen_zuruecknehmen` | ja | `vg.rueckgaengig(lauf_id)`, ohne `lauf_id` das jüngste Anlegen der Gruppe |
+
+`get_plan_balance` trägt `verlaufsplan: {titel, status}` oder `null` — der Prompt liest den Plan
+nur, wenn die Lehrkraft danach fragt oder die Gruppe noch keine Einheiten hat (F4, gemessen).
+
+**`undo_last_change` geht Schritt für Schritt zurück (seit 0.61).** `restore_snapshot` legt vor
+dem Wiederherstellen einen `restore`-Snapshot an; bis 0.60 nahm `undo_last_change` immer den
+jüngsten Snapshot und pendelte deshalb zwischen zwei Ständen. Jetzt zählen `restore`-Snapshots
+nicht, und ein zurückgenommener trägt `payload.zurueckgenommen`. Erreicht es den Snapshot „Vor:
+Einheiten aus dem Jahresverlaufsplan“, solange dessen Einheiten noch da sind, stellt es ihn nicht
+her, sondern verweist mit `lauf_id` auf die eigene Rücknahme — ein Snapshot löscht keine Einheiten.
+
+**Prompt** `config/prompts/jahresplan_assistent.md` (gemessen, siehe unten). Ein ausdrücklicher
+Auftrag gilt als Zustimmung (Jan, 26.11.2026). Der Seed überschreibt einen vorhandenen Assistenten
+nicht — auf Prod im Editor nachziehen.
+
+**Messung:** `backend/scripts/jahresplan_messung.py` mit `scripts/szenarien/jahresplan.yaml` —
+eigene Welt je Lauf (Messfach, Curriculum, Plan, Gruppe 98061, Termine ab der nächsten
+Unterrichtswoche), Messassistent aus der Promptdatei oder `--prompt-rev`, Bewertung an der
+Datenbank, `--vergleich` für die Kosten je Zug, `--selbsttest`, `--trocken`. Ergebnis 0.61:
+`Plaene/Messungen-Jahresplan/befund-lauf2.md`. Den Zuschlag für die Mess-Lehrkraft bucht
+`app.budget.zuschlag.buche_auf` mit `erstellt_von` `dev-messung-…`.
+
 ## Tests
 
 - `tests/unit/test_verlaufsplan_zeit.py` — Zeitrechnung auf dem Kalender 2025/26, Ränder, Bilanz, Ablaufleiste, Puffer
 - `tests/unit/test_kalender_je_schuljahr.py`, `test_verlaufsplan_umrechnen.py`, `test_verlaufsplan_kapitel_abbilden.py`
 - `tests/integration/test_verlaufsplan_typ.py`, `test_verlaufsplan_endpunkte.py` — Rechte, Archiv, gesperrte allgemeine Wege, Planungsart, Übernehmen, Puffer
 - `tests/unit/test_verlaufsplan_gruppe.py`, `test_verlaufsplan_vorlage.py`, `test_verlaufsplan_kompakt.py`,
-  `test_verlaufsplan_export.py`; `tests/integration/test_verlaufsplan_gruppe.py` (Plan der Gruppe, Vorschau,
-  Anlegen, Rückgängig, Wettläufe), `test_mcp_werkzeuge.py`
+  `test_verlaufsplan_export.py`, `test_jahresplan_messung.py` (Kriterien der Messung);
+  `tests/integration/test_verlaufsplan_gruppe.py` (Plan der Gruppe, Vorschau, Anlegen, Rückgängig,
+  Wettläufe), `test_verlaufsplan_werkzeuge.py` (Funktionen des Assistenten), `test_reflow_tools.py`
+  (`undo_last_change` Schritt für Schritt), `test_mcp_werkzeuge.py`
 - `frontend/src/lib/verlaufsplan.test.js`, `ablaufleiste.test.js`
 
 ## Ausblick
 
-0.61: Der Jahresplan-Assistent liest den Plan (`kompakt`) und legt Einheiten über denselben Weg
-an wie der Knopf (Vorschau, Anlegen, Rückgängig) — mit Messung. Später: Varianten eines Plans
-für Fächer, die nicht parallel unterrichten können (Todo).
+Varianten eines Plans für Fächer, die nicht parallel unterrichten können (Todo); die Wahl steht
+in `plan_der_gruppe`.

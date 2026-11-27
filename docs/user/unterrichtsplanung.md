@@ -88,6 +88,9 @@ zeigt dir eine Vorschau je Abschnitt, was geschieht:
 - Hat ein Abschnitt noch keine Termine — etwa weil das zweite Halbjahr noch nicht erzeugt ist —,
   entsteht die Einheit trotzdem, noch ohne Stunden.
 
+Dasselbe kann der [Jahresplan-Assistent](#mit-dem-jahresplan-assistenten-planen) im Chat — dort
+auch ohne einzelne Abschnitte oder mit eigenen Titeln.
+
 Nach dem Anlegen steht oben „5 Einheiten aus dem Jahresverlaufsplan angelegt, 38 Stunden
 belegt.“ mit **Rückgängig**. Das löscht genau diese Einheiten wieder und gibt ihre Stunden frei
 — solange du in ihnen noch keine Stunde angelegt hast. Danach löschst du einzelne Einheiten wie
@@ -240,6 +243,26 @@ zu suchen, die es nicht gibt.
 > verschwinden.
 
 ---
+
+### Mit dem Jahresplan-Assistenten planen
+
+**Assistent** in der Kopfzeile des Planers öffnet einen Chat mit der **Jahresplanung**, bezogen
+auf diese Gruppe. Der Assistent liest die Termine, die Kapitel des Curriculums und die
+Stundenbilanz, schlägt eine Verteilung der Einheiten vor und trägt sie erst ein, wenn du
+zustimmst („Ja, mach das so“). Sagst du ihm ausdrücklich, was er tun soll („Trag am 17.12. eine
+Klassenarbeit ein“), führt er es gleich aus.
+
+Hat deine Fachschaft einen [Jahresverlaufsplan](jahresverlaufsplan.md), kennt ihn der
+Assistent: Fragst du danach („Was sieht der Plan der Fachschaft für den Dezember vor?“) oder hat
+die Gruppe noch keine Einheiten, liest er ihn und richtet sich nach seiner Reihenfolge. Mit „Leg
+die Einheiten nach dem Jahresverlaufsplan an“ legt er sie an wie der Knopf
+[Einheiten anlegen …](#einheiten-aus-dem-plan-anlegen) — auf Wunsch ohne einzelne Abschnitte
+oder mit anderen Titeln („ohne Ähnlichkeit, und nenn die Einheit zum Pythagoras ‚Pythagoras und
+Anwendungen‘“). Andere Wochen oder eine andere Reihenfolge ordnet er danach. „Mach das
+rückgängig“ nimmt das Anlegen wieder zurück, auch wenn ihr danach noch anderes geändert habt.
+
+Was der Assistent ändert, siehst du im Planer, wenn du zu ihm zurückkehrst. Jede Änderung steht
+im **Verlauf**.
 
 ## Stundenentwurf
 

@@ -47,8 +47,13 @@ export function wirkungsHinweis(antwort) {
   if (antwort.images?.length && !teile.includes(WIRKUNGEN.generate_image)) teile.push(WIRKUNGEN.generate_image);
   const eindeutig = [...new Set(teile)];
   if (!eindeutig.length) return null;
-  return `Die bisherige Antwort hat ${eindeutig.join(" und ")}. Das bleibt bestehen — `
-    + "zurücknehmen lässt es sich über den Verlauf der Planung bzw. in der Werkstatt.";
+  // Einheiten aus dem Jahresverlaufsplan löscht der Verlauf nicht (0.61) — die nimmt der Assistent zurück.
+  const ausPlan = (antwort.werkzeuge_mit_wirkung ?? []).includes("verlaufsplan_einheiten_anlegen");
+  const zurueck = ausPlan
+    ? "angelegte Einheiten aus dem Jahresverlaufsplan nimmt der Assistent auf Wunsch zurück („Mach das rückgängig“), "
+      + "anderes über den Verlauf der Planung."
+    : "zurücknehmen lässt es sich über den Verlauf der Planung bzw. in der Werkstatt.";
+  return `Die bisherige Antwort hat ${eindeutig.join(" und ")}. Das bleibt bestehen — ${zurueck}`;
 }
 
 /** Hatte die Nachricht Anhänge? Deren Inhalt lebt nur im Browser und muss neu hinzu. */

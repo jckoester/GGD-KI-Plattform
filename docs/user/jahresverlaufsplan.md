@@ -142,7 +142,8 @@ gespeichert.
 Im [Planer](unterrichtsplanung.md#der-jahresverlaufsplan-der-fachschaft) einer Gruppe steht der
 Plan ihres Fachs und ihrer Klassenstufe über der Jahresübersicht, und das Thema jeder Woche
 steht im Kopf der Woche. Von dort legst du auch die Einheiten der Gruppe nach dem Plan an —
-mit Vorschau und Rückgängig.
+mit Vorschau und Rückgängig —, per Knopf oder mit dem
+[Jahresplan-Assistenten](unterrichtsplanung.md#mit-dem-jahresplan-assistenten-planen).
 
 ## Häufige Fragen
 
