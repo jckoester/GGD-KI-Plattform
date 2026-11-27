@@ -140,7 +140,11 @@ def _verplant(tree: dict) -> int:
 
 
 async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
+    from app.context.absprachen import absprachen_des_curriculums, fach_kompakt, kapitel_kompakt
+
     tree = await load_curriculum_tree(db, cur.id)
+    # Absprachen mit anderen Fächern (0.65, AY Teil 2 C): je Kapitel, nur wo es welche gibt
+    abspr = await absprachen_des_curriculums(db, cur, user)
     ziele = await verweisziele(db)
     aufl = await begriffe_aufloesen(db, tree, user)
     zustand = {(a["name"], a.get("fassung")): a["zustand"] for a in aufl}
@@ -159,6 +163,8 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
         kapitel.append({"id": str(k["id"]), "position": k_pos, "titel": k.get("title") or "",
                         "std": sum(x["std"] or 0 for x in lss),
                         **({"einleitung": km["einleitung"]} if km.get("einleitung") else {}),
+                        **({"absprachen": a} if (a := kapitel_kompakt(abspr["kapitel"].get(str(k["id"]), {})))
+                           else {}),
                         "lernsequenzen": lss})
     return {
         "curriculum_id": str(cur.id), "titel": tree.get("title"), "status": tree.get("status"),
@@ -167,6 +173,7 @@ async def entwurf_lesen(db: AsyncSession, user, cur: ContextNode) -> dict:
         "jahrgangsstufe": meta.get("jahrgangsstufe"),
         "bp_version": meta.get("bp_version"), "rahmen": meta.get("rahmen") or {},
         "verplant": _verplant(tree), "kapitel": kapitel,
+        **({"absprachen_an_das_fach": f} if (f := fach_kompakt(abspr)) else {}),
         # Worauf Einträge verweisen können (0.50, AT): Kürzel für `leitperspektiven` und
         # `leitlinien` der Operationen. Leitlinien nur, wenn die Schule welche hat.
         # Nur die Köpfe; ihre Aspekte („BNE_03“) holt das Modell mit get_bp_competences, typ='lp'.

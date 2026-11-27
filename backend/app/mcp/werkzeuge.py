@@ -164,7 +164,6 @@ async def _curriculum_fuer_werkzeug(db: AsyncSession, user, curriculum_id: str):
 async def lies_curriculum(db: AsyncSession, user, curriculum_id: str) -> dict:
     from app.context.curriculum_assistent import entwurf_lesen
 
-    from app.context.absprachen import absprachen_des_curriculums, kompakt
     from app.context.querverweise import ik_ids_im_baum, querverweise, verweise_kompakt
     from app.context.service import load_curriculum_tree
 
@@ -182,11 +181,8 @@ async def lies_curriculum(db: AsyncSession, user, curriculum_id: str) -> dict:
     if qv:
         aus["querverweise"] = [{"ik": nr_je_id.get(kid), "verweise": verweise_kompakt(liste)}
                                for kid, liste in qv.items()]
-    # Absprachen mit anderen Fächern (0.63, AY Teil 2), beide Richtungen, mit dem Leserecht der Person.
-    abspr = kompakt(await absprachen_des_curriculums(db, cur, user),
-                    {str(k["id"]): k.get("title") or "" for k in tree.get("kapitel") or []})
-    if abspr:
-        aus["absprachen"] = abspr
+    # Absprachen mit anderen Fächern (seit 0.63) stehen seit 0.65 je Kapitel (`absprachen`) und als
+    # `absprachen_an_das_fach` schon in `entwurf_lesen`.
     return aus
 
 
@@ -409,9 +405,9 @@ def registrieren(server: MCPServer, sitzung: Callable[[], AsyncSession] | None =
         "(ik, ik_teilweise, pk), Begriffe, Hinweise mit Verweisen auf Leitperspektiven und Leitlinien als "
         "Kürzel. Die Texte der Kompetenzen liefert bildungsplan_kompetenzen. Unter querverweise: wo der "
         "Bildungsplan an den verknüpften Kompetenzen auf ein anderes Fach verweist (Kompetenz oder Bereich) "
-        "und in welchem Curriculum dieses Fach die Stelle behandelt. Unter absprachen: was die Fachschaften "
-        "je Kapitel mit anderen Fächern vereinbart haben (eigene und von anderen Fächern eingetragene; art "
-        "aus Sicht dieses Curriculums: vorher = das andere Kapitel kommt zuerst)."))
+        "und in welchem Curriculum dieses Fach die Stelle behandelt. Je Kapitel unter absprachen: was die "
+        "Fachschaft mit anderen Fächern vereinbart hat (eigene und von anderen Fächern eingetragene; art aus "
+        "Sicht dieses Kapitels: vorher = das andere Kapitel kommt zuerst), absprachen_an_das_fach ohne Kapitel."))
     async def curriculum_lesen(
         curriculum_id: Annotated[str, Field(description="Kennung aus curricula_finden.")],
     ) -> dict:

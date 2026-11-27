@@ -101,6 +101,45 @@ _registriere(
 )
 
 
+async def _get_subject_chapters(args: dict, ctx: ToolContext) -> dict:
+    """Kapitel eines anderen Fachs — Ziele für Absprachen (0.65, AY Teil 2 C, F3)."""
+    from app.context.absprachen import kapitel_eines_fachs
+
+    cur = await _curriculum(args, ctx, schreiben=False)
+    if isinstance(cur, str):
+        return {"error": cur}
+    return await kapitel_eines_fachs(ctx.db, ctx.user, args.get("fach") or "", cur.subject_id,
+                                     (cur.min_grade, cur.max_grade))
+
+
+_registriere(
+    "get_subject_chapters", _get_subject_chapters,
+    "Die Kapitel der Curricula eines anderen Fachs mit kapitel_id — Ziele für absprache_anlegen. "
+    "Curricula der eigenen Stufen stehen vorn; entwurf = noch nicht veröffentlicht.",
+    {"fach": {"type": "string", "description": "Name oder Kürzel des anderen Fachs, etwa 'Physik' oder 'PH'."}},
+    ["fach"],
+)
+
+
+async def _get_cross_subject_references(args: dict, ctx: ToolContext) -> dict:
+    """Querverweise des Bildungsplans je Kapitel, mit Fundstellen (0.65, F4)."""
+    from app.context.absprachen import querverweise_je_kapitel
+
+    cur = await _curriculum(args, ctx, schreiben=False)
+    if isinstance(cur, str):
+        return {"error": cur}
+    return await querverweise_je_kapitel(ctx.db, ctx.user, cur)
+
+
+_registriere(
+    "get_cross_subject_references", _get_cross_subject_references,
+    "Wo der Bildungsplan an den verknüpften Kompetenzen eines Kapitels auf ein anderes Fach verweist "
+    "(Kompetenz oder Bereich), und in welchem Kapitel welches Curriculums das andere Fach die Stelle "
+    "behandelt (behandelt_in, mit kapitel_id). Nur aufrufen, wenn die Lehrkraft nach Bezügen oder "
+    "möglichen Absprachen mit anderen Fächern fragt.",
+)
+
+
 async def _get_curriculum_coverage(args: dict, ctx: ToolContext) -> dict:
     cur = await _curriculum(args, ctx, schreiben=False)
     if isinstance(cur, str):

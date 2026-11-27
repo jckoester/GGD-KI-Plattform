@@ -334,13 +334,14 @@ async def test_absprachen_in_curriculum_lesen(db, welt):
     async with _verbunden(db) as rpc:
         aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(cur.id))
         assert not fehler
-        [k] = aus["absprachen"]["kapitel"]
-        assert k["kapitel"] == kap.title
-        assert k["eigene"][0]["art"] == "vorher" and k["eigene"][0]["ziel"]["kapitel"] == ph_kap.title
+        [k] = [x for x in aus["kapitel"] if x.get("absprachen")]
+        assert k["titel"] == kap.title
+        [e] = k["absprachen"]["eigene"]
+        assert (e["nr"], e["art"], e["ziel"]["kapitel"]) == (1, "vorher", ph_kap.title)
         aus, fehler = await _ruf(rpc, "curriculum_lesen", curriculum_id=str(welt["aktiv"].id))
         assert not fehler
-        [k] = aus["absprachen"]["kapitel"]
-        [a] = k["von_anderen_faechern"]
+        [k] = [x for x in aus["kapitel"] if x.get("absprachen")]
+        [a] = k["absprachen"]["von_anderen_faechern"]
         assert (a["fach"], a["art"], a["text"]) == (chemie.name, "nachher", "Optik zuerst")
         assert a["eingetragen_in"]["curriculum"] == cur.title
 

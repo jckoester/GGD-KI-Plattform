@@ -32,7 +32,9 @@ DIREKT = {"_check_read_permission", "_curriculum_lesen", "_lesbare_curricula",
           # MCP-Server für KI-Abos (0.54, AW): Liste der Curricula, liest nur.
           "lies_curricula",
           # Absprachen zwischen Fächern (0.63, AY Teil 2): Entwürfe anderer Fächer gekennzeichnet, liest nur.
-          "absprachen_des_curriculums"}
+          "absprachen_des_curriculums",
+          # 0.65 (AY Teil 2 C): Kapitel eines anderen Fachs für den Curriculum-Assistenten, liest nur.
+          "kapitel_eines_fachs"}
 
 #: Lesende Hilfsfunktionen ohne eigene Route.
 LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
@@ -59,6 +61,10 @@ ERLAUBT = {
     "_fundstellen_anhaengen": ("liest nur Fundstellen über `leitlinien_fundstellen`", None),
     # AY Teil 2, Teil B (0.64): Absprachen zur Anzeige am Jahresverlaufsplan und an den Einheiten —
     # liest nur; die Schreibwege des Plans rufen `voll` erst nach ihrer eigenen Rechteprüfung.
+    # 0.65 (AY Teil 2 C): Der Curriculum-Assistent liest die Absprachen mit — `entwurf_lesen` rufen
+    # auch Werkzeuge, die danach schreiben; sie prüfen ihr Recht selbst, die Absprachen lesen nur.
+    "absprachen_des_curriculums": ("liest nur Absprachen beider Richtungen", None),
+    "kapitel_eines_fachs": ("liest nur Kapitel eines anderen Fachs", None),
     "_absprachen_der_kapitel": ("liest nur Absprachen für die Anzeige am Jahresverlaufsplan", None),
     "absprachen_der_kapitel": ("liest nur Absprachen für den Planer", None),
     "create_edge": ("Kante in einen Entwurf braucht danach das Bearbeitungsrecht",

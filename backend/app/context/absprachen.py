@@ -487,39 +487,42 @@ async def export_zeilen(db, tree: dict) -> dict[str, list[str]]:
     return aus
 
 
-def kompakt(daten: dict, kapitel_titel: dict[str, str]) -> dict:
-    """Absprachen für Programme (MCP, 0.63): je Kapitel mit Titel statt Kennung, beidseitige nur
-    einmal (als eigene), die Art immer aus Sicht dieses Curriculums. Leere Teile fallen weg."""
-    def ort(o):
-        return {"kapitel": o["kapitel"], "curriculum": o["curriculum"], "curriculum_id": o["curriculum_id"],
-                **({"entwurf": True} if o.get("status") == "draft" else {})} if o else None
+def _ort(o):
+    return {"kapitel": o["kapitel"], "curriculum": o["curriculum"], "curriculum_id": o["curriculum_id"],
+            "kapitel_id": o["kapitel_id"], **({"entwurf": True} if o.get("status") == "draft" else {})} if o else None
 
-    def zeit(a):
-        """Ergebnis der Zeitprüfung mit den Jahresverlaufsplänen, wenn es eines gibt."""
-        p = a.get("pruefung")
-        if not p or p["ergebnis"] == "offen":
-            return {}
-        return {"jahresverlaufsplaene": {"ergebnis": p["ergebnis"], "dieses_kapitel": p["hier"],
-                                         "anderes_kapitel": p["dort"]}}
 
-    kapitel = []
-    for kid, k in (daten.get("kapitel") or {}).items():
-        eigene = [{"fach": a.get("fach"), "art": a["art"], "text": a.get("text") or "",
-                   **({"ziel": ort(a["ziel"])} if a.get("ziel") else
-                      {"ziel_kapitel": a.get("kapitel_titel") or "ganzes Fach"}),
-                   **({"beidseitig": True} if a.get("beidseitig") else {}),
-                   **({"text_gegenseite": a["text_gegenseite"]} if a.get("text_gegenseite") else {}),
-                   **zeit(a)}
-                  for a in k.get("eigene") or []]
-        aussen = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
-                   "eingetragen_in": ort(a["quelle"]), **zeit(a)}
-                  for a in k.get("von_aussen") or [] if not a.get("beidseitig")]
-        if eigene or aussen:
-            kapitel.append({"kapitel": kapitel_titel.get(kid, ""), **({"eigene": eigene} if eigene else {}),
-                            **({"von_anderen_faechern": aussen} if aussen else {})})
-    fach = [{"fach": a.get("fach"), "art": a["art_hier"], "text": a.get("text") or "",
-             "eingetragen_in": ort(a["quelle"])} for a in daten.get("fach") or []]
-    return {**({"kapitel": kapitel} if kapitel else {}), **({"an_das_fach": fach} if fach else {})}
+def _zeit(a):
+    """Ergebnis der Zeitprüfung mit den Jahresverlaufsplänen, wenn es eines gibt."""
+    p = a.get("pruefung")
+    if not p or p["ergebnis"] == "offen":
+        return {}
+    return {"jahresverlaufsplaene": {"ergebnis": p["ergebnis"], "dieses_kapitel": p["hier"],
+                                     "anderes_kapitel": p["dort"]}}
+
+
+def kapitel_kompakt(k: dict) -> dict:
+    """Die Absprachen eines Kapitels für ein Modell oder Programm: `eigene` mit Nummer (für
+    `absprache_aendern`/`_loeschen`, 0.65), `von_anderen_faechern` ohne die beidseitigen (sie
+    stehen als eigene da). Art immer aus Sicht dieses Kapitels. Leer → {}."""
+    eigene = [{"nr": i, "fach": a.get("fach"), "fach_code": a.get("fach_code"), "art": a["art"],
+               "text": a.get("text") or "",
+               **({"ziel": _ort(a["ziel"])} if a.get("ziel") else
+                  {"ziel_kapitel": a.get("kapitel_titel") or "ganzes Fach"}),
+               **({"beidseitig": True} if a.get("beidseitig") else {}),
+               **({"text_gegenseite": a["text_gegenseite"]} if a.get("text_gegenseite") else {}),
+               **_zeit(a)}
+              for i, a in enumerate(k.get("eigene") or [], 1)]
+    aussen = [{"fach": a.get("fach"), "fach_code": a.get("fach_code"), "art": a["art_hier"],
+               "text": a.get("text") or "", "eingetragen_in": _ort(a["quelle"]), **_zeit(a)}
+              for a in k.get("von_aussen") or [] if not a.get("beidseitig")]
+    return {**({"eigene": eigene} if eigene else {}), **({"von_anderen_faechern": aussen} if aussen else {})}
+
+
+def fach_kompakt(daten: dict) -> list[dict]:
+    """Absprachen anderer Fächer an das ganze Fach (ohne Kapitel)."""
+    return [{"fach": a.get("fach"), "fach_code": a.get("fach_code"), "art": a["art_hier"],
+             "text": a.get("text") or "", "eingetragen_in": _ort(a["quelle"])} for a in daten.get("fach") or []]
 
 
 # ── Zeitprüfung mit den Jahresverlaufsplänen (Teil B, Schritt 8) ─────────────
@@ -622,3 +625,97 @@ async def absprachen_der_kapitel(db, kapitel_ids: set[str], user) -> dict[str, d
         if k and (k["eigene"] or k["von_aussen"]):
             aus[alt] = k
     return aus
+
+
+# ── Für den Curriculum-Assistenten (Teil C, 0.65, F3/F4) ─────────────────────
+
+async def faecher_zu(db, angabe: str) -> list:
+    """Fächer zu einer Angabe: erst genau (Name, Slug, Kürzel), nur ohne Treffer als Teil des
+    Namens — wie beim MCP-Server, sonst träfe „M“ auch Musik und Chemie."""
+    import sqlalchemy as sa
+
+    from app.db.models import Subject
+
+    f = (angabe or "").strip()
+    if not f:
+        return []
+    genau = list((await db.execute(sa.select(Subject).where(sa.or_(
+        Subject.name.ilike(f), Subject.slug.ilike(f), Subject.fach_code.ilike(f))))).scalars())
+    if genau:
+        return genau
+    return list((await db.execute(sa.select(Subject).where(sa.or_(
+        Subject.name.ilike(f"%{f}%"), Subject.slug.ilike(f"%{f}%"))))).scalars())
+
+
+async def kapitel_eines_fachs(db, user, fach: str, eigenes_subject_id: int | None,
+                              stufen: tuple[int | None, int | None] = (None, None)) -> dict:
+    """Die Kapitel der Curricula eines anderen Fachs — Ziele für `absprache_anlegen` (F3).
+    Curricula mit überschneidenden Stufen zuerst; Entwürfe nur für Lehrkräfte, gekennzeichnet."""
+    import sqlalchemy as sa
+
+    from app.auth.vorschau import eigenes_zaehlt
+    from app.context.curriculum_entwurf import ENTWURF, darf_entwurf_lesen
+    from app.db.models import ContextNode
+
+    treffer = [s for s in await faecher_zu(db, fach) if s.id != eigenes_subject_id and s.fach_code]
+    if not treffer:
+        return {"error": f"Ein anderes Fach „{fach}“ gibt es hier nicht."}
+    if len(treffer) > 1:
+        return {"error": f"„{fach}“ passt auf mehrere Fächer: {', '.join(s.name for s in treffer)}. Nenn eines genauer."}
+    s = treffer[0]
+    status = ("active", ENTWURF) if darf_entwurf_lesen(user) else ("active",)
+    curricula = list((await db.execute(sa.select(ContextNode).where(
+        ContextNode.content_type == "curriculum", ContextNode.subject_id == s.id, ContextNode.status.in_(status),
+        sa.or_(ContextNode.read_scope.in_(_OFFEN),
+               sa.and_(sa.literal(eigenes_zaehlt(user.sub)), ContextNode.owner_pseudonym == user.sub))))).scalars())
+    lo, hi = stufen
+
+    def passt(c):
+        return lo is not None and c.min_grade is not None and c.min_grade <= (hi or lo) and lo <= (c.max_grade or c.min_grade)
+
+    curricula.sort(key=lambda c: (not passt(c), c.min_grade or 0, c.status != "active", c.title))
+    aus = []
+    for c in curricula:
+        kap = await _kapitel_des_curriculums(db, c)
+        m = c.metadata_ or {}
+        aus.append({"curriculum_id": str(c.id), "titel": c.title, "jahrgangsstufe": m.get("jahrgangsstufe"),
+                    "bp_version": m.get("bp_version"), **({"entwurf": True} if c.status == ENTWURF else {}),
+                    "kapitel": [{"kapitel_id": str(k.id), "titel": k.title} for k in kap]})
+    return {"fach": s.name, "fach_code": s.fach_code, "curricula": aus}
+
+
+async def querverweise_je_kapitel(db, user, curriculum) -> dict:
+    """Die Querverweise des Bildungsplans in andere Fächer je Kapitel dieses Curriculums, mit
+    Fundstellen im anderen Fach (Curriculum, Kapitel mit Kennung) — Anlass für Absprachen (F4)."""
+    from app.context.querverweise import fach_kuerzel, querverweise
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum.id)
+    je_kapitel = []
+    for kap in tree.get("kapitel") or []:
+        nr_je_id = {}
+        for ls in kap.get("lernsequenzen") or []:
+            for e in (ls.get("metadata") or {}).get("eintraege") or []:
+                for ik in (e.get("ik") if isinstance(e, dict) else None) or []:
+                    if isinstance(ik, dict) and ik.get("node_id"):
+                        nr_je_id.setdefault(str(ik["node_id"]), ik.get("nr"))
+        if not nr_je_id:
+            continue
+        try:
+            ids = [uuid.UUID(i) for i in nr_je_id]
+        except ValueError:
+            continue
+        qv = await querverweise(db, ids, user)
+        verweise = []
+        for kid, liste in qv.items():
+            for e in liste:
+                verweise.append({
+                    "ik": nr_je_id.get(kid), "fach": e["fach"], "fach_code": fach_kuerzel(e),
+                    "art": "Bereich" if e["typ"] == "bereich" else "Kompetenz", "nr": e.get("nr"),
+                    "titel": e.get("titel"),
+                    "behandelt_in": [{"curriculum": f["curriculum"], "kapitel": f["kapitel"],
+                                      "kapitel_id": f["kapitel_id"], **({"entwurf": True} if f["status"] == "draft" else {})}
+                                     for f in e.get("fundstellen") or []]})
+        if verweise:
+            je_kapitel.append({"kapitel_id": str(kap["id"]), "kapitel": kap.get("title") or "", "verweise": verweise})
+    return {"kapitel": je_kapitel}

@@ -304,3 +304,72 @@ async def test_verlaufsplan_zeigt_absprachen_der_kapitel(db_session, w):
     await db_session.flush()
     v = await vp.voll(db_session, plan, LEHRKRAFT)
     assert v["absprachen"][str(w.dichte.id)]["eigene"][0]["art"] == "vorher"
+
+
+async def test_curriculum_assistent_liest_absprachen_je_kapitel(db_session, w):
+    """Teil C (0.65, F1): `get_curriculum_draft` trägt die Absprachen je Kapitel, mit Nummer."""
+    from app.context.curriculum_assistent import entwurf_lesen
+
+    aus = await entwurf_lesen(db_session, LEHRKRAFT, w.m8)
+    [k] = aus["kapitel"]
+    a = k["absprachen"]
+    assert a["eigene"] == [{"nr": 1, "fach": "Physik", "fach_code": "PHAY", "art": "nachher", "text": "",
+                            "ziel": {"kapitel": "Dichte", "curriculum": "Physik Kl. 8",
+                                     "curriculum_id": str(w.ph8.id), "kapitel_id": str(w.dichte.id)},
+                            "beidseitig": True, "text_gegenseite": "Bruchrechnung zuerst"}]
+    assert "von_anderen_faechern" not in a          # die beidseitige steht nur einmal
+    assert aus["absprachen_an_das_fach"][0]["text"] == "Einheiten gleich"
+    # Ohne Absprachen kein Feld
+    ph = await entwurf_lesen(db_session, LEHRKRAFT, w.ph8)
+    assert "absprachen_an_das_fach" not in ph
+
+
+async def test_kapitel_eines_fachs_fuer_den_assistenten(db_session, w):
+    """Teil C (F3): Ziele im anderen Fach mit Kennung; das eigene Fach ist kein Ziel."""
+    from app.context.absprachen import kapitel_eines_fachs
+
+    m5 = await w.curriculum(w.ph, "Physik Kl. 5", (5, 5))
+    await w.kapitel(m5, "Magnete")
+    r = await kapitel_eines_fachs(db_session, LEHRKRAFT, "phay", w.m, (8, 8))
+    assert r["fach_code"] == "PHAY"
+    assert [c["titel"] for c in r["curricula"]] == ["Physik Kl. 8", "Physik Kl. 5"]   # eigene Stufe vorn
+    assert r["curricula"][0]["kapitel"] == [{"kapitel_id": str(w.dichte.id), "titel": "Dichte"}]
+    assert "error" in await kapitel_eines_fachs(db_session, LEHRKRAFT, "MAY", w.m)
+    assert "gibt es hier nicht" in (await kapitel_eines_fachs(db_session, LEHRKRAFT, "Gibtsnicht", w.m))["error"]
+
+
+async def test_querverweise_je_kapitel_fuer_den_assistenten(db_session, w):
+    """Teil C (F4): Querverweise des Bildungsplans je Kapitel, mit Fundstelle samt kapitel_id."""
+    from app.context.absprachen import querverweise_je_kapitel
+
+    def bp(typ, titel, fach, bp_id):
+        return ContextNode(id=uuid.uuid4(), category="knowledge", content_type=typ, title=titel, status="active",
+                           subject_id=fach, bp_version="2016.V3", min_grade=7, max_grade=8, read_scope="global",
+                           write_scope="private", owner_pseudonym="system",
+                           metadata_={"bp_id": bp_id, "kompetenz_nr": titel.split(" ", 1)[0]})
+    m_ik = bp("ik_kompetenz", "3.2.1(1) Brüche rechnen", w.m, "BP_AY2_M.V3_IK_7-8_01_00_01")
+    ph_ik = bp("ik_kompetenz", "3.2.1(3) Dichte bestimmen", w.ph, "BP_AY2_PH.V3_IK_7-8_01_00_03")
+    db_session.add_all([m_ik, ph_ik])
+    await db_session.flush()
+    m_ls = ContextNode(id=uuid.uuid4(), category="knowledge", content_type="lernsequenz", title="LS Brüche",
+                       status="active", owner_pseudonym="system", read_scope="school", write_scope="school",
+                       subject_id=w.m, metadata_={"eintraege": [{"ik": [{"node_id": str(m_ik.id), "nr": "3.2.1(1)"}]}]})
+    ph_ls = ContextNode(id=uuid.uuid4(), category="knowledge", content_type="lernsequenz", title="LS Dichte",
+                        status="active", owner_pseudonym="system", read_scope="school", write_scope="school",
+                        subject_id=w.ph, metadata_={"eintraege": []})
+    db_session.add_all([m_ls, ph_ls])
+    await db_session.flush()
+    db_session.add_all([
+        ContextEdge(from_node_id=m_ls.id, to_node_id=w.brueche.id, relation="part_of"),
+        ContextEdge(from_node_id=ph_ls.id, to_node_id=w.dichte.id, relation="part_of"),
+        ContextEdge(from_node_id=m_ik.id, to_node_id=ph_ik.id, relation="related_to"),
+        ContextEdge(from_node_id=ph_ls.id, to_node_id=ph_ik.id, relation="references"),
+    ])
+    await db_session.flush()
+
+    r = await querverweise_je_kapitel(db_session, LEHRKRAFT, w.m8)
+    [k] = r["kapitel"]
+    assert k["kapitel"] == "Brüche"
+    [v] = k["verweise"]
+    assert (v["ik"], v["fach_code"], v["nr"]) == ("3.2.1(1)", "PHAY", "3.2.1(3)")
+    assert v["behandelt_in"] == [{"curriculum": "Physik Kl. 8", "kapitel": "Dichte", "kapitel_id": str(w.dichte.id)}]
