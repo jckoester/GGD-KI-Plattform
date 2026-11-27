@@ -89,12 +89,25 @@ export function faecherZurAuswahl(faecher, eigenesFachId) {
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 }
 
-/** Curricula eines Fachs zur Auswahl: gleiche Stufen zuerst, Entwürfe gekennzeichnet. */
+/**
+ * Fachfarbe als Rahmen und leichte Tönung (wie die Marken der Querverweise) — die Schrift bleibt
+ * in den Text-Tokens, damit sie auf jeder Fachfarbe und in beiden Modi lesbar ist.
+ */
+export function fachToenung(farbe) {
+  if (!farbe) return ''
+  const hex = /^#[0-9a-f]{6}$/i.test(farbe) ? ` background-color: ${farbe}1f;` : ''
+  return `border-color: ${farbe};${hex}`
+}
+
+/** Curricula eines Fachs zur Auswahl: gleiche Stufen zuerst; Fassung und Entwurf in Klammern. */
 export function curriculaZurAuswahl(curricula, stufe = null) {
   const passt = (c) => stufe != null && c.min_grade != null && c.min_grade <= stufe && stufe <= (c.max_grade ?? c.min_grade)
   return [...(curricula ?? [])]
     .sort((a, b) => (passt(b) - passt(a)) || (a.min_grade ?? 0) - (b.min_grade ?? 0) || a.title.localeCompare(b.title, 'de'))
-    .map((c) => ({ id: c.id, text: c.status === 'draft' ? `${c.title} (Entwurf)` : c.title }))
+    .map((c) => {
+      const zusatz = [c.metadata?.bp_version ?? c.bp_version, c.status === 'draft' ? 'Entwurf' : null].filter(Boolean)
+      return { id: c.id, text: zusatz.length ? `${c.title} (${zusatz.join(', ')})` : c.title }
+    })
 }
 
 /** „Physik · Dichte“ oder „Physik · ganzes Fach“ — für die Zeile in der Liste. */

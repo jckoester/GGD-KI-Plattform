@@ -16,9 +16,11 @@
     import { Pencil, Plus, Trash2 } from "@lucide/svelte";
     import { getCurriculaBySubject, getCurriculum } from "$lib/api.js";
     import { subjects } from "$lib/stores/subjects.js";
+    import FachWahl from "$lib/components/FachWahl.svelte";
+    import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import {
-        ARTEN, ART_AUSWAHL, ART_KURZ, ausFormular, curriculaZurAuswahl, faecherZurAuswahl, formular,
-        formularFehler, uebernehmen, zielText,
+        ARTEN, ART_AUSWAHL, ART_KURZ, ausFormular, curriculaZurAuswahl, fachToenung, faecherZurAuswahl,
+        formular, formularFehler, uebernehmen,
     } from "$lib/absprachen.js";
 
     let { absprachen = [], eigenesFachId = null, stufe = null, vorbelegung = null, onchange = () => {} } = $props();
@@ -95,10 +97,17 @@
     {#if absprachen?.length}
         <ul class="space-y-1">
             {#each absprachen as a (a.id ?? a)}
+                {@const fach = jeCode[a.fach_code]}
                 <li class="flex items-start gap-2 text-sm text-light-tx dark:text-dark-tx">
                     <span class="shrink-0 rounded border border-light-ui-3 dark:border-dark-ui-3 px-1 text-[11px] text-light-tx-2 dark:text-dark-tx-2">{ART_KURZ[a.art] ?? a.art}</span>
+                    <span class="shrink-0 inline-flex items-center gap-1 rounded border px-1 text-[11px] leading-4
+                                 text-light-tx-2 dark:text-dark-tx-2 border-light-ui-3 dark:border-dark-ui-3"
+                          style={fachToenung(fach?.color)}>
+                        <SubjectIcon name={fach?.icon} size={11} color={fach?.color} />
+                        {fach?.name ?? a.fach_code}
+                    </span>
                     <span class="flex-1">
-                        <span class="font-medium">{zielText(a, jeCode)}</span>{#if a.text}: {a.text}{/if}
+                        <span class="font-medium">{a.kapitel_titel ?? "ganzes Fach"}</span>{#if a.text}: {a.text}{/if}
                     </span>
                     <button type="button" class={knopf} onclick={() => oeffnen(formular({ ...a, curriculum_id: "" }))} aria-label="Absprache bearbeiten">
                         <Pencil class="w-3 h-3" />
@@ -117,14 +126,11 @@
                 {form.id ? "Absprache bearbeiten" : "Neue Absprache"}
             </div>
             <div class="grid gap-2 sm:grid-cols-3">
-                <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    Fach
-                    <select class={feld} value={form.fach_code}
-                            onchange={(e) => { form.fach_code = e.target.value; fachGewaehlt(); }}>
-                        <option value="">– wählen –</option>
-                        {#each faecher as s (s.id)}<option value={s.fach_code}>{s.name}</option>{/each}
-                    </select>
-                </label>
+                <div class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    <label for="{formId}-fach">Fach</label>
+                    <FachWahl id="{formId}-fach" {faecher} wert={form.fach_code}
+                              onwahl={(code) => { form.fach_code = code; fachGewaehlt(); }} />
+                </div>
                 <label class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                     Curriculum (wahlweise)
                     <select class={feld} value={form.curriculum_id}

@@ -606,7 +606,7 @@
 
 {#if fehlListe.fehlend.length || fehlListe.mehrdeutig.length}
     <details
-        class="mb-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
+        class="mt-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
         data-uebersicht="begriffe"
     >
         <summary class="cursor-pointer text-light-tx dark:text-dark-tx">
@@ -668,9 +668,14 @@
 {/if}
 
 <div class="overflow-x-auto" role="presentation" onclick={hideMenu}>
-    <table class="w-full text-left border-collapse text-sm">
+    <table class="kapitel-tabelle w-full text-left border-collapse text-sm">
         <thead>
-            <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
+            <!-- Abstand zu den Kästen darüber (Abdeckung, Begriffe), wie zwischen den Kapiteln -->
+            <tr aria-hidden="true" class="abstand">
+                <th colspan={editMode ? 5 : 4}
+                    class="h-4 p-0 border-0 border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2"></th>
+            </tr>
+            <tr class="border-y border-light-ui-3 dark:border-dark-ui-3">
                 <th
                     class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2 w-1/6"
                 >
@@ -698,6 +703,14 @@
         </thead>
         <tbody>
             {#each curriculum?.kapitel || [] as kap, kapIndex (kap.id)}
+                <!-- Abstand zwischen den Kapiteln (0.63): Die Kapitel setzen sich ab, auch wenn
+                     Einleitung und Absprachen im Editor viel Raum einnehmen. -->
+                {#if kapIndex > 0}
+                    <tr aria-hidden="true" class="abstand">
+                        <td colspan={editMode ? 5 : 4}
+                            class="h-6 p-0 border-y border-x-0 border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2"></td>
+                    </tr>
+                {/if}
                 <!-- Kapitel-Kopfzeile; `id` als Sprungziel (Leitlinien-Übersicht, 0.53) -->
                 <tr
                     id="kapitel-{kap.id}"
@@ -811,7 +824,7 @@
                                         onchange();
                                     }}
                                     class="w-full text-sm text-light-tx-2 dark:text-dark-tx-2 bg-transparent border-none focus:outline-none resize-none"
-                                    rows="2"
+                                    rows="4"
 ></textarea>
                             {:else}
                                 {kap.metadata.einleitung}
@@ -1386,6 +1399,21 @@
 </div>
 
 <style>
+    /* Rand links und rechts an jeder Zeile außer den Abstandszeilen zwischen den Kapiteln (0.63):
+       So wirkt jedes Kapitel als Kasten, und die Abstände bleiben offen. */
+    .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):first-child {
+        border-left: 1px solid var(--color-light-ui-3);
+    }
+    .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):last-child {
+        border-right: 1px solid var(--color-light-ui-3);
+    }
+    :global(.dark) .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):first-child {
+        border-left-color: var(--color-dark-ui-3);
+    }
+    :global(.dark) .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):last-child {
+        border-right-color: var(--color-dark-ui-3);
+    }
+
     .vertical-align-top {
         vertical-align: top;
     }

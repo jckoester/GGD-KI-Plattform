@@ -323,7 +323,7 @@
 
             <!-- Curriculum-Tabelle -->
             <div
-                class="bg-white dark:bg-dark-bg rounded-lg border border-light-ui-3 dark:border-dark-ui-3"
+                class="bg-white dark:bg-dark-bg rounded-lg"
             >
                 <CurriculumTable {curriculum} editMode={false} />
             </div>

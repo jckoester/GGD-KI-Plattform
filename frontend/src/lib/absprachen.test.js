@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ARTEN, GEGENART, ausFormular, curriculaZurAuswahl, faecherZurAuswahl, formular, formularFehler,
-  gegenabsprache, uebernehmen, zielText,
+  fachToenung, gegenabsprache, uebernehmen, zielText,
 } from './absprachen.js'
 
 describe('Formular (0.63, AY Teil 2)', () => {
@@ -45,8 +45,13 @@ describe('Auswahl und Anzeige', () => {
   it('Curricula: gleiche Stufe zuerst, Entwurf gekennzeichnet', () => {
     const c = curriculaZurAuswahl([
       { id: 'a', title: 'Physik Kl. 7/8', min_grade: 7, max_grade: 8 },
-      { id: 'b', title: 'Physik Kl. 9/10', min_grade: 9, max_grade: 10, status: 'draft' }], 9)
-    expect(c).toEqual([{ id: 'b', text: 'Physik Kl. 9/10 (Entwurf)' }, { id: 'a', text: 'Physik Kl. 7/8' }])
+      { id: 'b', title: 'Physik Kl. 9/10', min_grade: 9, max_grade: 10, status: 'draft', metadata: { bp_version: '2016.V3' } }], 9)
+    expect(c).toEqual([{ id: 'b', text: 'Physik Kl. 9/10 (2016.V3, Entwurf)' }, { id: 'a', text: 'Physik Kl. 7/8' }])
+  })
+  it('fachToenung', () => {
+    expect(fachToenung('#aabbcc')).toBe('border-color: #aabbcc; background-color: #aabbcc1f;')
+    expect(fachToenung('red')).toBe('border-color: red;')
+    expect(fachToenung(null)).toBe('')
   })
   it('zielText', () => {
     const je = { PH: { name: 'Physik' } }

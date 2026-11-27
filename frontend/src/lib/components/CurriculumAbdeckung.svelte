@@ -41,7 +41,7 @@
     <p class="mb-3 text-xs text-light-re dark:text-dark-re">{fehler}</p>
 {:else if abdeckung}
     <details
-        class="mb-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
+        class="rounded-md border border-light-ui-3 dark:border-dark-ui-3 px-3 py-2 text-sm"
         data-uebersicht="abdeckung"
     >
         <summary class="cursor-pointer text-light-tx dark:text-dark-tx">
