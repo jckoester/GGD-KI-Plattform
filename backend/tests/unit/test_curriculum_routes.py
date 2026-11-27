@@ -71,6 +71,10 @@ def test_die_genutzten_endpunkte_sind_vollstaendig():
         # Importdialog in der Curriculum-Übersicht des Fachs.
         ("POST", "/context/curricula/import/pruefen"),
         ("POST", "/context/curricula/import"),
+        # 0.62 (BH): Sammelimport von Vorlagen, nur Admins — je Datei derselbe Durchlauf wie oben,
+        # immer ein Entwurf. Aufrufer: „Vorlagen einspielen“ auf `/knowledge/curricula`.
+        ("POST", "/context/curricula/import/stapel/pruefen"),
+        ("POST", "/context/curricula/import/stapel"),
         # 0.46 (AP Teil B): Rückgängig — Verlauf lesen, Stand sichern (Editor vor dem Speichern),
         # zurücknehmen; Aufrufer der Curriculum-Editor.
         ("GET", "/context/curricula/{curriculum_id}/history"),

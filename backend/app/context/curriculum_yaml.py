@@ -422,7 +422,8 @@ class KeinRecht(Exception):
     """Die Person darf in diesem Fach keine Entwürfe anlegen."""
 
 
-async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, speichern: bool = False) -> dict:
+async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, titel_zusatz: str | None = None,
+                    speichern: bool = False) -> dict:
     """Einlesen, bereinigen, als Entwurf importieren — und ohne `speichern` zurückrollen (F4 a).
 
     Die Vorschau ist also der echte Import: dieselbe Auflösung von Fach, Fachplan und
@@ -433,6 +434,8 @@ async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, speichern: boo
     `kapitel` (Titel, Stunden, Zahl der Lernsequenzen und Einträge, ob es ein Kapitel des
     Originals ersetzt), `summen`, `vorhanden` (veröffentlichte Curricula gleichen Fachs,
     Jahrgangs und Edition, je mit offenem Entwurf, F2), `ersetzen`; nach dem Speichern `id`.
+    `titel_zusatz` hängt der Sammelimport an den Titel, wenn es schon einen Entwurf gibt
+    („Chemie Kl. 8 (Import 27.11.2026)“, 0.62, BH).
     `KeinRecht`, wenn die Person in dem Fach keine Entwürfe anlegen darf (F1).
     """
     import sqlalchemy as sa
@@ -490,6 +493,10 @@ async def durchlauf(db, roh: bytes | str, user, *, ersetzen=None, speichern: boo
         await sicherung.rollback()
         p.fehler.append(str(fehler))
         return aus
+    if titel_zusatz:
+        knoten = await db.get(ContextNode, cid)
+        knoten.title = f"{knoten.title} ({titel_zusatz})"
+        await db.flush()
     for w in stats.warnings:
         if w not in p.warnungen:
             p.warnungen.append(w)

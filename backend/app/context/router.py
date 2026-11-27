@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import sqlalchemy as sa
 
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.auth.dependencies import get_current_user, require_any_role, require_role
 from app.auth.jwt import JwtPayload
@@ -2703,6 +2703,68 @@ async def curriculum_yaml_importieren(
         raise HTTPException(status_code=422, detail=ergebnis)
     await db.commit()
     return ergebnis
+
+
+# ── Curriculum-Vorlagen gesammelt (0.62, Päckchen BH) ─────────────────────────
+
+
+class CurriculumStapelDatei(BaseModel):
+    name: str = Field(..., max_length=255)
+    yaml: str = Field(..., max_length=200_000)
+
+
+class CurriculumStapelEingabe(BaseModel):
+    """Viele Curriculum-YAMLs auf einmal — höchstens 60, zusammen höchstens 12 MB."""
+    dateien: list[CurriculumStapelDatei] = Field(..., min_length=1, max_length=60)
+
+    @field_validator("dateien")
+    @classmethod
+    def _gesamt(cls, v):
+        from app.context.curriculum_stapel import MAX_BYTES_GESAMT
+
+        if sum(len(d.yaml.encode("utf-8")) for d in v) > MAX_BYTES_GESAMT:
+            raise ValueError("Die Dateien sind zusammen größer als 12 MB — bitte in mehreren Durchgängen.")
+        return v
+
+
+async def _stapel_nutzer(user: JwtPayload = Depends(require_role("admin"))) -> JwtPayload:
+    """Nur Admins (F2) — und gedrosselt mit eigenem Eimer `curriculum_stapel` (F6)."""
+    from app.ratelimit.drossel import pruefe
+
+    pruefe("curriculum_stapel", user.sub, user.roles)
+    return user
+
+
+async def _stapel(eingabe: CurriculumStapelEingabe, db: AsyncSession, user: JwtPayload, speichern: bool) -> dict:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.context.curriculum_stapel import stapel
+
+    return await stapel(db, [(d.name, d.yaml) for d in eingabe.dateien], user, speichern=speichern,
+                        tag=datetime.now(ZoneInfo("Europe/Berlin")).date())
+
+
+@router.post("/curricula/import/stapel/pruefen")
+async def curriculum_stapel_pruefen(
+    eingabe: CurriculumStapelEingabe,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_stapel_nutzer),
+) -> dict:
+    """Vorschau eines Sammelimports: je Datei die Vorschau des Einzelimports und `art` — was
+    entstünde (`neu`, `ersetzt`, `zusaetzlich`). Nichts bleibt in der Datenbank."""
+    return await _stapel(eingabe, db, user, speichern=False)
+
+
+@router.post("/curricula/import/stapel")
+async def curriculum_stapel_importieren(
+    eingabe: CurriculumStapelEingabe,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_stapel_nutzer),
+) -> dict:
+    """Legt aus jeder fehlerfreien Datei einen **Entwurf** an, jede für sich; Dateien mit
+    Fehlern bleiben liegen und stehen mit ihren Fehlern in der Antwort (immer `200`)."""
+    return await _stapel(eingabe, db, user, speichern=True)
 
 
 # ── Fach-Code Lookup ─────────────────────────────────────────────────────────

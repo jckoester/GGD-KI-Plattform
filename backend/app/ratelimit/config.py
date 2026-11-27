@@ -54,6 +54,9 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # Curriculum aus YAML (0.56, BA): Prüfen und Anlegen sind je ein ganzer Import (das Prüfen
     # rollt nur zurück). Wie beim Fachbegriff-Import: genug zum Korrigieren, nicht für eine Schleife.
     "curriculum_import": (20, 300.0),
+    # Curriculum-Vorlagen gesammelt (0.62, BH): ein Lauf sind bis zu 60 Importe, Prüfen und
+    # Anlegen je ein Aufruf — zehn Aufrufe in zehn Minuten sind fünf Läufe.
+    "curriculum_stapel": (10, 600.0),
 }
 _FALLBACK = (60, 60.0)
 

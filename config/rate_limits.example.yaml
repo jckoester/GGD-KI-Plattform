@@ -34,6 +34,8 @@ buckets:
   fachbegriffe_import: { limit: 20, window: 300 }
   # Curriculum aus YAML (0.56): Prüfen und Anlegen zusammen
   curriculum_import: { limit: 20, window: 300 }
+  # Curriculum-Vorlagen gesammelt (0.62): Prüfen und Anlegen je ein Aufruf, bis zu 60 Dateien
+  curriculum_stapel: { limit: 10, window: 600 }
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

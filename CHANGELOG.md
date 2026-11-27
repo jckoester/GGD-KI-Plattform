@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Curriculum-Vorlagen gesammelt einspielen (Admins, Backend): bis zu 60 YAML-Dateien je Lauf, mit Vorschau; aus jeder
+  Datei wird ein Entwurf. Gibt es zur Stufe schon einen Entwurf, trägt der neue das Importdatum im Titel.
+
 ## [0.61.0] – 2026-11-27
 
 ### Neu
