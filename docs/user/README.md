@@ -37,7 +37,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt dir Zugang zu Künstlicher In
 - [KI-Ergebnisse zitieren](zitieren.md) — Modell, Datum und Eingabe für GFS, Seminarkurs, Facharbeit
 - [Schulcurriculum](curriculum.md) — *(Lehrkräfte)* Kapitel & Lernsequenzen, Kompetenzen verknüpfen, Fassungswechsel, Export
 - [Jahresverlaufsplan](jahresverlaufsplan.md) — *(Lehrkräfte)* Abschnitte der Fachschaft auf dem Schuljahr, Puffer, Stundenbilanz, Übernehmen
-- [Vernetzung der Fächer](vernetzung.md) — *(Lehrkräfte)* Zeitachse über die Klassenstufen: Absprachen, Querverweise, Leitperspektiven, Weg einer Klasse, PDF
+- [Vernetzung der Fächer](vernetzung.md) — *(Lehrkräfte)* Übersicht Fach × Fach je Klassenstufe und Zeitachse über die Klassenstufen: Absprachen, Querverweise, Leitperspektiven, Weg einer Klasse, PDF
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
 - [Bibliothek](bibliothek.md) — Bausteine suchen und gezielt in den Chat einbinden

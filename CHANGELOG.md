@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.67.0] – 2026-11-28
+
+### Neu
+
+- Vernetzung der Fächer: Reiter **Übersicht** mit einer Tabelle Fach × Fach je Klassenstufe — je Fächerpaar die
+  Zahl der verbundenen Kapitel nach Absprachen und Querverweisen, nicht eingehaltene Absprachen markiert, auch für
+  das kommende Schuljahr. Ohne gewähltes Fach beginnt die Vernetzung hier.
+- Ein Klick auf eine Zelle öffnet die Zeitachse mit den beiden Fächern an dieser Stufe.
+
 ## [0.66.0] – 2026-11-28
 
 ### Neu

@@ -3,11 +3,16 @@
 *(nur für Lehrkräfte)*
 
 Die Vernetzung zeigt, **was in anderen Fächern parallel läuft** und **worauf ein Kapitel
-aufbaut**. Ein Fach steht in der Mitte einer Zeitachse, die von oben nach unten durch die
-Klassenstufen läuft. Links und rechts stehen die Fächer, mit denen es verbunden ist. Ganz außen
-siehst du die Leitlinien der Schule und die Leitperspektiven des Bildungsplans.
+aufbaut**. Sie hat zwei Reiter:
 
-Du erreichst sie in der Bibliothek über **Vernetzung der Fächer** und von hier aus:
+- Die **Übersicht** zeigt für eine Klassenstufe, welche Fächer miteinander verbunden sind und wie
+  stark.
+- Die **Zeitachse** läuft von oben nach unten durch die Klassenstufen, mit einem Fach in der Mitte.
+  Links und rechts stehen die Fächer, mit denen es verbunden ist. Ganz außen siehst du die
+  Leitlinien der Schule und die Leitperspektiven des Bildungsplans.
+
+Du erreichst sie in der Bibliothek über **Vernetzung der Fächer**; ohne gewähltes Fach beginnt
+sie mit der Übersicht. Mit einem Fach kommst du von hier aus direkt in die Zeitachse:
 
 - aus einem **Curriculum**: oben über „Vernetzung der Fächer“ oder an jedem Kapitel über
   „Vernetzung“ (dann ist das Kapitel gleich gewählt);
@@ -28,11 +33,35 @@ Benachbarte Kapitel desselben Curriculums zählen im eigenen Fach nicht, dort w�
 selbstverständlich. Gezeigt werden nur Bezüge zum Fach in der Mitte. Willst du sehen, was zwei
 andere Fächer verbindet, nimm eines davon in die Mitte.
 
-## Die Ansicht
+## Übersicht
+
+Die Übersicht ist eine Tabelle Fach × Fach für eine **Klassenstufe**. Oben wählst du die Stufe
+und das Schuljahr (laufendes oder kommendes) und, was mitzählt: Querverweise des Bildungsplans,
+Bezüge auf ganze Bereiche und Entwürfe.
+
+- Jede **Zelle** nennt, wie viele Kapitel der beiden Fächer verbunden sind: **A** Absprachen
+  (auch die mit dem ganzen Fach), **Q** Querverweise, **B** Bezüge über ganze Bereiche. Je
+  dunkler die Zelle (im dunklen Modus: je heller), desto mehr Bezüge; die Stufen stehen in der
+  Legende. Ein rotes Warnzeichen heißt, dass eine Absprache nicht eingehalten ist.
+- Fährst du über eine Zelle, steht der ganze Satz da, etwa „Mathematik und Physik: 2 Absprachen,
+  3 Querverweise“.
+- Die **Diagonale** zählt die Bezüge im eigenen Fach. Sie ist nicht gefärbt, sonst überstrahlte
+  sie die Paare.
+- Hinter dem Fachnamen steht die Zahl seiner Kapitel in dieser Stufe.
+
+Gezählt werden Kapitel, die laut Jahresverlaufsplan (oder geschätzt) in der gewählten Stufe
+liegen. Bezüge in eine andere Klassenstufe zeigt nur die Zeitachse.
+
+**Ein Klick auf eine Zelle** öffnet die Zeitachse: das Fach der Zeile in der Mitte, das Fach der
+Spalte als einzige Spur daneben, an der gewählten Stufe. Deine gemerkte Wahl der Spuren bleibt
+dabei unverändert. Leitlinien und Leitperspektiven zeigt die Übersicht nicht; dafür gibt es die
+[Übersicht der Leitlinien und Leitperspektiven](bibliothek.md#wo-kommt-eine-leitperspektive-im-unterricht-vor).
+
+## Die Zeitachse
 
 **Oben** stehen die Werkzeuge:
 
-- das **Fach** in der Mitte (× setzt die Ansicht zurück);
+- das **Fach** in der Mitte (× führt zurück zur Übersicht);
 - der **Zeitraum** (siehe unten);
 - **Springe zu** einer Klassenstufe;
 - **Tafel** ein- und ausblenden, **Liste** statt Zeitachse und **PDF**.

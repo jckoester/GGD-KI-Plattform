@@ -1,20 +1,23 @@
-# Vernetzung der Fächer (seit 0.66)
+# Vernetzung der Fächer (seit 0.66, Übersicht seit 0.67)
 
-Päckchen BE, Teil A. Plan `Plaene/Vernetzung-Zeitachse-BE-Plan.md` (F1–F14), Messungen in
-`Plaene/Messungen-Vernetzung/`. Eine Zeitachse über die Klassenstufen mit einem Fach in der
-Mitte und den vernetzten Fächern als Spuren. Nur für Lehrkräfte, nur lesend.
+Päckchen BE. Plan `Plaene/Vernetzung-Zeitachse-BE-Plan.md` (F1–F14), Messungen in
+`Plaene/Messungen-Vernetzung/`. Nur für Lehrkräfte, nur lesend. Zwei Teile:
+- **Teil A (0.66):** eine Zeitachse über die Klassenstufen mit einem Fach in der Mitte und den
+  vernetzten Fächern als Spuren.
+- **Teil B (0.67):** die Übersicht Fach × Fach je Klassenstufe als Einstieg in die Zeitachse.
 
 ## Überblick
 
 | Teil | Ort |
 |---|---|
-| Dienst | `app/context/vernetzung.py` — `vernetzung(db, user, fach_id, *, modus, schuljahr, bezugsstufe, entwuerfe)` |
+| Dienst | `app/context/vernetzung.py` — `vernetzung(db, user, fach_id, *, modus, schuljahr, bezugsstufe, entwuerfe)`, `matrix(db, user, stufe, *, schuljahr, entwuerfe)`; gemeinsam `_welt` und `_bezuege` |
 | Zeit (rein) | `app/context/vernetzung_zeit.py` — Schuljahr je Stufe, Lage aus Plänen ohne Kalender, Schätzung, `als_spanne` |
-| Endpunkte | `app/context/vernetzung_router.py` — `GET /context/vernetzung`, `POST /context/vernetzung/pdf` |
+| Endpunkte | `app/context/vernetzung_router.py` — `GET /context/vernetzung`, `GET /context/vernetzung/matrix`, `POST /context/vernetzung/pdf` |
 | PDF | `app/context/vernetzung_export.py`, Vorlage `templates/vernetzung_pdf.html` |
 | Anordnung (rein) | `frontend/src/lib/zeitachse.js` — Achse, Spuren, Spalten, Blöcke, Kurven, Klammern, Liste, Adresse |
 | PDF-Zeichnung (rein) | `frontend/src/lib/zeitachse_svg.js` — je Stufe ein SVG, `pdfAnfrage()` |
-| Ansicht | `routes/(app)/knowledge/connections/+page.svelte`, `VernetzungZeitachse.svelte`, `VernetzungTafel.svelte`, `VernetzungListe.svelte` |
+| Übersicht (rein) | `frontend/src/lib/vernetzung_matrix.js` — Stärke, Kurzform, Satz, symmetrische Tabelle |
+| Ansicht | `routes/(app)/knowledge/connections/+page.svelte`, `VernetzungZeitachse.svelte`, `VernetzungTafel.svelte`, `VernetzungListe.svelte`, `VernetzungMatrix.svelte` |
 | Testwelt | `backend/scripts/vernetzung_testwelt.py` (nur Dev) |
 
 `lib/vernetzung.js` ist etwas anderes: die Nachbarschaft eines Bausteins als Liste.
@@ -56,6 +59,16 @@ verbunden sind.
 `leitperspektive*`, `lfdb_*` und `leitbild*`. Aspekte werden über `verweisziele` zu ihrer
 Leitperspektive bzw. Leitlinie zusammengefasst.
 
+**Gemeinsamer Kern:** `_welt` liefert für Stufen und ihre Schuljahre die Curricula der geltenden
+Fassung, Kapitel und Lage. `_bezuege` liefert die Bezüge, mit Fach in der Mitte (Zeitachse) oder
+ohne (Matrix).
+
+**Matrix (Teil B):**
+- Kapitel zählen zu der Stufe, in der sie laut Plan oder Schätzung liegen; Kapitel ohne Lage zählen mit. Ein Bezug von Kl. 7 nach Kl. 8 erscheint deshalb in keiner Matrix.
+- Je Fächerpaar (`a` ≤ `b`): `absprachen`, `verletzt`, `kompetenz`, `bereich` und `ganzes_fach` (Absprachen an das ganze Fach). Die Diagonale zählt die Bezüge im eigenen Fach.
+- `stufen`: alle Stufen mit lesbarem Curriculum, für die Wahl der Stufe.
+- Gemessen mit der Testwelt: rund 100–135 ms, rund 4 KB.
+
 Die eigene Variante der Querverweise ist nötig, weil `querverweise()` Bezüge im eigenen Fach
 ausdrücklich übergeht. Gemessen mit der Testwelt: 180–380 ms, bis 77 KB je Antwort.
 
@@ -63,6 +76,8 @@ ausdrücklich übergeht. Gemessen mit der Testwelt: 180–380 ms, bis 77 KB je A
 
 - `GET /context/vernetzung?fach=&schuljahr=&weg=&entwuerfe=` — `fach` als Kürzel (Groß- und
   Kleinschreibung egal) oder Kennung. `schuljahr` und `weg` schließen sich aus (422). Nur
+  `teacher`/`admin`.
+- `GET /context/vernetzung/matrix?stufe=&schuljahr=&entwuerfe=` — `stufe` Pflicht. Nur
   `teacher`/`admin`.
 - `POST /context/vernetzung/pdf` — die Anfrage aus `pdfAnfrage()`:
   - `seiten[]` mit `titel`, `svg`, `kuerzel`, `hinweise`, `nicht_gezeichnet`; dazu `liste` und `ohne_lage`.
@@ -80,8 +95,15 @@ ausdrücklich übergeht. Gemessen mit der Testwelt: 180–380 ms, bis 77 KB je A
   - Mit `fuellen` wachsen die Spuren bis `SPUR_MAX`, den Rest bekommt die Mitte.
 - Weitere Bausteine: `bloecke`, `kurve` (S-Kurve), `klammer` (endet waagerecht, damit der Pfeil stimmt), `rinnenTiefen` (Intervallzuteilung), `stil`, `sichtbar`, `marken`, `randmarken`.
 
+**Übersicht** (`VernetzungMatrix.svelte`, `vernetzung_matrix.js`):
+- Reiter „Übersicht“ und „Zeitachse“; ohne Fach ist die Übersicht der Einstieg.
+- Eine `<table>`, symmetrisch, damit jede Zeile vollständig ist. Text in der Zelle („A 2 · Q 3“), der Satz in `title` und `aria-label`.
+- Gefüllte Zellen mit den Mengenstufen der Leitlinien-Übersicht (`--diagramm-stufe-1…5`, `heatmap_stufen.js`), mit `validate_palette.js --ordinal` auch gegen `bg` geprüft. Schrift je Stufe `--diagramm-stufe-n-tx` (nach APCA), die Warnmarke mit `--diagramm-marke-*`. Zurück zum Farbfeld neben der Zahl: `GEFUELLT = false`.
+- Die Diagonale bleibt ungefärbt, sonst überstrahlt sie die Paare.
+- Die Zelle ist ein Link `?fach=<Zeile>&spur=<Spalte>&stufe=`. `spur` gilt nur beim Laden und wird nicht gemerkt.
+
 **Zustand:**
-- In der Adresse: `?fach=&kapitel=&schuljahr=&weg=&stufe=&entwuerfe=1`.
+- In der Adresse: `?ansicht=uebersicht&fach=&spur=&kapitel=&schuljahr=&weg=&stufe=&entwuerfe=1`. `stufe` ist in der Zeitachse das Sprungziel, in der Übersicht die gezeigte Stufe.
 - Gewählte Spuren je Fach in der Einstellung `vernetzung_spuren`.
 - Hervorgehoben wird `hover ?? gewaehlt`.
 
@@ -101,9 +123,9 @@ ausdrücklich übergeht. Gemessen mit der Testwelt: 180–380 ms, bis 77 KB je A
 
 - **Backend:**
   - `tests/unit/test_vernetzung_zeit.py`;
-  - `tests/integration/test_vernetzung.py`: Übergangsjahr V2/V3, Weg einer Klasse, Entwürfe, Leserecht, Endpunkt;
+  - `tests/integration/test_vernetzung.py`: Übergangsjahr V2/V3, Weg einer Klasse, Entwürfe, Leserecht, Endpunkte, Matrix je Stufe;
   - `tests/unit/test_vernetzung_export.py` mit einem SVG aus dem Frontend als Testdatei: `tests/unit/fixtures/vernetzung_zeitachse.svg`.
-- **Frontend:** `zeitachse.test.js` mit Belastungstest (16 Fächer, 576 Kapitel, rund 1.900 Bezüge) und `zeitachse_svg.test.js`.
+- **Frontend:** `zeitachse.test.js` mit Belastungstest (16 Fächer, 576 Kapitel, rund 1.900 Bezüge), `zeitachse_svg.test.js` und `vernetzung_matrix.test.js`.
 
 ## Testwelt (Dev)
 
@@ -121,4 +143,4 @@ Die Bezüge entstehen aus den echten Querverweisen des Bildungsplans. Alles trä
 - Bezüge zwischen zwei Spurfächern zeigt die Ansicht nicht; dafür das eine Fach in die Mitte nehmen.
 - Bezüge im eigenen Fach über eine Fassungsgrenze gibt es nicht, weil die Kanten innerhalb einer Fassung liegen. Der Stufenkopf sagt es.
 - Querverweise auf prozessbezogene Kompetenzen zählen nicht, weil sie für das ganze Fach gelten.
-- Teil B (Matrix Fach × Fach) folgt mit 0.67.
+- Die Übersicht zählt Bezüge nur innerhalb einer Stufe.

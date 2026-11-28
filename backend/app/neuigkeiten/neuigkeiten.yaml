@@ -707,3 +707,16 @@
     es über Absprachen und den Bildungsplan verbunden ist. Du siehst sie auch für das kommende
     Schuljahr oder als Weg einer Klasse, als Liste oder als PDF.
   link: /help/vernetzung
+
+- id: "0.67-vernetzung-uebersicht"
+  version: "0.67.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-28
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Vernetzung: Übersicht je Klassenstufe"
+  text: >-
+    Welche Fächer einer Klassenstufe arbeiten zusammen, und wo laufen sie nebeneinander her? Die
+    Vernetzung der Fächer hat jetzt eine Übersicht: eine Tabelle Fach × Fach mit Absprachen und
+    Querverweisen. Ein Klick auf eine Zelle öffnet die Zeitachse der beiden Fächer.
+  link: /help/vernetzung#übersicht
