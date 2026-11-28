@@ -33,7 +33,9 @@ Beginn, Ende, Halbjahreswechsel, Ferien, Feiertage, bewegliche Ferientage.
 > Bindestrich). Die Jahresverlaufspläne vergangener Schuljahre zeigen sonst nur noch
 > Wochennummern statt Daten. Ebenso gilt: Liegt `config/school_year_2027-28.yaml` schon vor
 > Schuljahresbeginn bereit, können die Fachschaften ihre Pläne für das kommende Jahr mit
-> echten Daten schreiben. Diese Jahresdateien wirken ohne Neustart; eine Datei, deren
+> echten Daten schreiben. Auch die Vernetzung der Fächer (seit 0.66) zeigt das kommende
+> Schuljahr und den Weg einer Klasse erst mit dieser Datei mit Kalenderwochen und Ferien, sonst
+> nur mit Unterrichtswochen. Diese Jahresdateien wirken ohne Neustart; eine Datei, deren
 > `schuljahr` nicht zum Namen passt, wird ignoriert.
 
 Der Ferienimport nimmt Arbeit ab (`/settings` → Ferien übernehmen). Er **ergänzt und

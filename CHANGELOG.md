@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.66.0] – 2026-11-28
+
+### Neu
+
+- Vernetzung der Fächer (Bibliothek): eine Zeitachse über die Klassenstufen mit einem Fach in der Mitte, daneben
+  die Fächer, mit denen es über Absprachen oder Querverweise des Bildungsplans verbunden ist, dazu die Bezüge im
+  eigenen Fach sowie Leitperspektiven und Leitlinien. Die Lage kommt aus den Jahresverlaufsplänen, sonst ist sie
+  aus dem Curriculum geschätzt.
+- Zeitraum wählbar: laufendes oder kommendes Schuljahr, oder der Weg einer Klasse durch die Stufen; je Stufe gilt
+  die Bildungsplan-Fassung des jeweiligen Schuljahrs.
+- Ansicht als Liste und als PDF (je Klassenstufe eine Seite, dazu Legende und Liste der Bezüge).
+- Einstiege aus Curriculum (oben und je Kapitel), Jahresverlaufsplan und Planer; der Jahresverlaufsplan verlinkt
+  sein Curriculum.
+
+### Nach dem Update
+
+- Für das kommende Schuljahr `config/school_year_2027-28.yaml` anlegen, sobald die Ferien feststehen — sonst zeigt
+  die Vernetzung dieses Jahr nur in Unterrichtswochen (Runbook `schuljahreswechsel.md`).
+
 ### Behoben
 
 - Curriculum: Eine lange Adresse in Material oder Hinweisen machte die Tabelle breiter als die Seite; die letzte Spalte

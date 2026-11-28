@@ -693,3 +693,17 @@
     Absprachen an, übernimmt eine Gegenabsprache oder macht aus Hinweisen wie „in Absprache mit der
     Fachschaft Chemie …“ eine Absprache. Frag ihn auch: „Wo wären Absprachen sinnvoll?“
   link: /help/curriculum#mit-dem-assistenten-arbeiten
+
+- id: "0.66-vernetzung"
+  version: "0.66.0"
+  # ⚠️ Beim Ausrollen auf den Tag des Ausrollens setzen (docs/dev/neuigkeiten.md).
+  datum: 2026-11-28
+  rollen: [teacher]
+  eintrag: curricula
+  titel: "Vernetzung der Fächer"
+  text: >-
+    Was läuft in den anderen Fächern zur selben Zeit, und worauf baut ein Kapitel auf? Die neue
+    Zeitachse in der Bibliothek zeigt ein Fach über alle Klassenstufen, daneben die Fächer, mit denen
+    es über Absprachen und den Bildungsplan verbunden ist. Du siehst sie auch für das kommende
+    Schuljahr oder als Weg einer Klasse, als Liste oder als PDF.
+  link: /help/vernetzung

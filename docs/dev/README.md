@@ -62,6 +62,7 @@ cd frontend && npm install && npm run dev
 - [Fachbegriffe einspielen](fachbegriffe-import.md) — Schnittstelle des Seed-Skripts, Idempotenz, Bericht
 - [Planung: Archiv, Rechte, Kopieren](planung-archiv-kopieren.md) — wer lesen und ändern darf, Archiv, was eine Kopie mitnimmt
 - [Jahresverlaufsplan](jahresverlaufsplan.md) — Knotentyp `verlaufsplan`, eigener Schreibweg, Zeitrechnung, Kalender je Schuljahr, Übernehmen, Puffer (seit 0.59)
+- [Vernetzung der Fächer](vernetzung.md) — Zeitachse über die Stufen: Dienst, Fassung je Stufe und Schuljahr, Schätzung, Bezüge, Anordnung, PDF, Testwelt (seit 0.66)
 - [Begriffsvorschlag](begriffsvorschlag.md) — Begriffe aus den Phasentexten: Ablauf, Fallen, Konfiguration
 - [Begriffe im Curriculum](curriculum-begriffe.md) — Begriffe und Fachmethoden am Eintrag: Format, Abgleich, Auflösung, Gerüste, Planung
 - [Entwürfe von Curricula](curriculum-entwurf.md) — Status `draft`, eine Rechteregel mit Fachvorsitz, Veröffentlichen und Ersetzen, Abdeckung; seit 0.46 kommende Fassung, Rückgängig, Rahmen, Funktionen des Curriculum-Assistenten, Bänder des Bildungsplans und Abdeckung über Band und Fassung

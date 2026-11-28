@@ -273,6 +273,10 @@ Eigene Bezüge, die der Bildungsplan nicht nennt, trägst du weiter in den **Hin
 
 ### Absprachen mit anderen Fächern
 
+> Wie die Fächer über alle Klassenstufen zusammenhängen, mit Absprachen, Querverweisen und den
+> Jahresverlaufsplänen, zeigt die [Vernetzung der Fächer](vernetzung.md). Du erreichst sie oben
+> im Curriculum und an jedem Kapitel über „Vernetzung“.
+
 Am Kapitel hältst du fest, was deine Fachschaft mit einer anderen vereinbart hat, etwa
 „Bruchrechnung in Mathematik vor Dichte in Physik“. Im Editor steht unter der Einleitung jedes
 Kapitels **Absprachen mit anderen Fächern** → **Absprache hinzufügen**:

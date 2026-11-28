@@ -11,7 +11,9 @@ Schuljahr; für jedes Fach, jede Klassenstufe und jedes Schuljahr gibt es höchs
 > Unterrichtswochen, mit den Ferien der Schule.
 
 Du erreichst die Pläne in der Bibliothek über **Jahresverlaufspläne** (über den Curricula) oder
-vom Curriculum aus: Oben verlinkt es den Plan seiner Stufe im laufenden Schuljahr.
+vom Curriculum aus: Oben verlinkt es den Plan seiner Stufe im laufenden Schuljahr. Umgekehrt
+verlinkt der Plan oben sein **Curriculum** und die [Vernetzung der Fächer](vernetzung.md), die
+zeigt, was in den anderen Fächern zur selben Zeit läuft.
 
 ## Die Liste
 
@@ -147,6 +149,9 @@ Kapitel. Exportieren kann jede Lehrkraft, die den Plan lesen kann. Im Editor wir
 gespeichert.
 
 ## Im Planer deiner Gruppe
+
+Was andere Fächer derselben Stufe zur selben Zeit unterrichten, zeigt dir der Knopf
+**Vernetzung** im Kopf des Planers ([Vernetzung der Fächer](vernetzung.md)).
 
 Im [Planer](unterrichtsplanung.md#der-jahresverlaufsplan-der-fachschaft) einer Gruppe steht der
 Plan ihres Fachs und ihrer Klassenstufe über der Jahresübersicht, und das Thema jeder Woche
