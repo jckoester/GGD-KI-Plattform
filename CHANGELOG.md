@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Curriculum: Eine lange Adresse in Material oder Hinweisen machte die Tabelle breiter als die Seite; die letzte Spalte
+  war erst nach waagerechtem Scrollen zu sehen.
+
 ## [0.65.0] – 2026-11-27
 
 ### Neu

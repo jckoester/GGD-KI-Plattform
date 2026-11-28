@@ -846,7 +846,8 @@
                                         ({kapitelStd(kap)} Stunden)
                                     </span>
                                 {/if}
-                                <!-- Einstieg in die Vernetzung der Fächer (BE, Schritt 6) -->
+                                <!-- Einstieg in die Vernetzung der Fächer (BE, Schritt 6), am rechten Rand (Jan 28.11.2026: neben dem
+                                     Titel verwirrend). In einer zu breiten Tabelle liegt er außer Sicht — in Kauf genommen. -->
                                 {#if (subjectId ?? curriculum?.subject_id) && istLehrkraft}
                                     <a href={vernetzungPfad({ fach: subjectId ?? curriculum.subject_id, kapitel: kap.id,
                                                               stufe: grade ?? null,
@@ -1488,6 +1489,12 @@
 <style>
     /* Rand links und rechts an jeder Zeile außer den Abstandszeilen zwischen den Kapiteln (0.63):
        So wirkt jedes Kapitel als Kasten, und die Abstände bleiben offen. */
+    /* Lange Adressen in Material und Hinweisen (etwa 180 Zeichen zu schule-bw.de) dürfen umbrechen.
+       `anywhere` statt `break-word`: Nur so sinkt auch die Mindestbreite der Spalte, und die Tabelle
+       wird nicht breiter als der Platz (Mathematik-Curriculum, Jan 28.11.2026). */
+    .kapitel-tabelle :global(a) {
+        overflow-wrap: anywhere;
+    }
     .kapitel-tabelle > :is(thead, tbody) > tr:not(.abstand) > :is(td, th):first-child {
         border-left: 1px solid var(--color-light-ui-3);
     }

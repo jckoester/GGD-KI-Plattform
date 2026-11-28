@@ -18,7 +18,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
-    import { FileDown, Pencil, RefreshCw, Trash2, X } from "@lucide/svelte";
+    import { ChartGantt, FileDown, Network, Pencil, RefreshCw, Trash2, X } from "@lucide/svelte";
     import { vernetzungPfad } from "$lib/zeitachse.js";
     import { getVerlaufsplaene } from "$lib/api.js";
     import { planVerweise } from "$lib/verlaufsplan.js";
@@ -221,17 +221,27 @@
                         {#if totalStd > 0}
                             · Gesamt: {totalStd} Std.
                         {/if}
-                        {#each planLinks as l (l.href)}
-                            · <a href={l.href} class="text-light-bl dark:text-dark-bl hover:underline">{l.text}</a>
-                        {/each}
-                        <!-- Vernetzung der Fächer (BE, 0.66), neben den Jahresverlaufsplänen (Jan 28.11.2026) -->
-                        {#if lehrkraft && curriculum.subject_id}
-                            · <a href={vernetzungPfad({ fach: curriculum.subject_id,
-                                                        stufe: bandStufen(curriculum.metadata?.jahrgangsstufe)[0] ?? null,
-                                                        entwuerfe: curriculum.status === "draft" })}
-                                 class="text-light-bl dark:text-dark-bl hover:underline">Vernetzung der Fächer</a>
-                        {/if}
                     </p>
+                    <!-- Jahresverlaufspläne und Vernetzung der Fächer: eigene Zeile mit Icons, wie im
+                         Jahresverlaufsplan (Jan 28.11.2026) -->
+                    {#if planLinks.length || (lehrkraft && curriculum.subject_id)}
+                        <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                            {#each planLinks as l (l.href)}
+                                <a href={l.href}
+                                   class="inline-flex items-center gap-1 underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark">
+                                    <ChartGantt class="w-4 h-4" /> {l.text}
+                                </a>
+                            {/each}
+                            {#if lehrkraft && curriculum.subject_id}
+                                <a href={vernetzungPfad({ fach: curriculum.subject_id,
+                                                          stufe: bandStufen(curriculum.metadata?.jahrgangsstufe)[0] ?? null,
+                                                          entwuerfe: curriculum.status === "draft" })}
+                                   class="inline-flex items-center gap-1 underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark">
+                                    <Network class="w-4 h-4" /> Vernetzung der Fächer
+                                </a>
+                            {/if}
+                        </div>
+                    {/if}
                     {#if quelleText(curriculum)}
                         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">Quelle: {quelleText(curriculum)}</p>
                     {/if}
