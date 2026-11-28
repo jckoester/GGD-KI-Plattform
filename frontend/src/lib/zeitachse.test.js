@@ -236,3 +236,32 @@ describe('Einstiege (Schritt 6)', () => {
       .toBe('/knowledge/connections?fach=3&schuljahr=2027%2F28&stufe=9')
   })
 })
+
+describe('Kurze Einträge (Sichtprobe)', () => {
+  it('Text erst ab zwei Wochen', async () => {
+    const { mitText, PX_WOCHE } = await import('./zeitachse.js')
+    expect(mitText({ h: PX_WOCHE - 3 })).toBe(false)
+    expect(mitText({ h: 2 * PX_WOCHE - 3 })).toBe(true)
+    expect(mitText({ h: 17 }, 20)).toBe(false)
+  })
+})
+
+describe('Anmerkungen zur Stufe (Sichtprobe)', () => {
+  it('eigene Zeile: Kopf wird höher, Text mit Leerzeichen', async () => {
+    const { achse, hinweisHoehe, stufenHinweise, STUFENKOPF } = await import('./zeitachse.js')
+    const st = [
+      { stufe: 5, wochen: 10, fassung: '2016.V3', curricula: [{}], kalender: true },
+      { stufe: 9, wochen: 10, fassung: '2016.V2', curricula: [], kalender: false },
+    ]
+    expect(stufenHinweise(st[1], st[0], 'Mathematik')).toEqual([
+      'ohne Kalender, nur Unterrichtswochen',
+      'kein Curriculum Mathematik in der Fassung V2',
+      'Fassung wechselt: Bezüge zu Kl. 5 im eigenen Fach fehlen',
+    ])
+    const a = achse(st, { px: 10, fachName: 'Mathematik' })
+    expect(a.je[5].start - a.je[5].oben).toBe(STUFENKOPF)
+    expect(a.je[9].start - a.je[9].oben).toBe(STUFENKOPF + hinweisHoehe(3))
+    expect(hinweisHoehe(3)).toBeGreaterThan(hinweisHoehe(1))
+    expect(a.je[9].hinweise).toHaveLength(3)
+  })
+})

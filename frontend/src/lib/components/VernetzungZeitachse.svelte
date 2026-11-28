@@ -18,7 +18,7 @@
     import { fachToenung, ART_SATZ } from '$lib/absprachen.js'
     import {
         STUFENKOPF, ACHSE, anker, artAusSicht, fassungKurz, frueher, klammer, kurve, kurvenEnden,
-        lageQuelleText, marken, mittelY, randmarken, rinnenTiefen, sichtbar, stil, verbunden, wocheY,
+        lageQuelleText, marken, mitText, mittelY, randmarken, rinnenTiefen, sichtbar, stil, verbunden, wocheY,
         kalenderwoche,
     } from '$lib/zeitachse.js'
 
@@ -86,25 +86,23 @@
     <!-- Stufen: Kopf, Wochen, Ferien, heute -->
     {#each a.stufen as s (s.stufe)}
         {@const info = stufenJe[s.stufe]}
-        {@const vorher = daten.stufen[daten.stufen.indexOf(info) - 1]}
-        <div id="stufe-{s.stufe}" class="absolute left-0 flex flex-wrap items-baseline gap-x-3 px-2 pt-1.5 border-t
-                    border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx"
-             style="top: {s.oben}px; height: {STUFENKOPF - 4}px; width: {lay.breite}px">
-            <span class="font-bold">Klasse {s.stufe}</span>
-            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                {info.schuljahr}{#if info.fassung} · Bildungsplan {fassungKurz(info.fassung)}{/if} · {lageQuelleText(info)}
-                {#if !info.kalender} · ohne Kalender, nur Unterrichtswochen{/if}
+        <div id="stufe-{s.stufe}" class="absolute left-0 flex flex-wrap items-center content-center gap-x-3 gap-y-0.5 px-3 py-1.5 rounded
+                    border-l-4 bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx"
+             style="top: {s.oben}px; height: {STUFENKOPF - 8}px; width: {lay.breite}px; border-left-color: {fachFarbe ?? 'currentColor'}">
+            <span class="text-base font-bold">Klasse {s.stufe}</span>
+            <span class="text-xs text-light-tx dark:text-dark-tx">
+                {[info.schuljahr, info.fassung && `Bildungsplan ${fassungKurz(info.fassung)}`, lageQuelleText(info)].filter(Boolean).join(' · ')}
             </span>
-            {#if !info.curricula.length}
-                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">— kein Curriculum {daten.fach.name}{#if info.fassung} in der Fassung {fassungKurz(info.fassung)}{/if}</span>
-            {/if}
-            {#if vorher && vorher.fassung && info.fassung && vorher.fassung !== info.fassung}
-                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
-                      title="Querverweise des Bildungsplans verbinden nur Kompetenzen derselben Fassung.">
-                    — Fassung wechselt: Bezüge zu Kl. {vorher.stufe} im Fach fehlen
-                </span>
-            {/if}
         </div>
+        <!-- Anmerkungen: je eine Zeile, als Aufzählung im Rahmen unter dem Kopf (Jan 28.11.2026) -->
+        {#if s.hinweise.length}
+            <ul class="absolute left-0 list-disc pl-7 pr-3 py-0.5 rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg dark:bg-dark-bg text-xs leading-4 text-light-tx dark:text-dark-tx"
+                style="top: {s.oben + STUFENKOPF - 6}px; width: {lay.breite}px"
+                aria-label="Anmerkungen zu Klasse {s.stufe}">
+                {#each s.hinweise as h (h)}<li>{h}</li>{/each}
+            </ul>
+        {/if}
         {#each Array.from({ length: Math.ceil(s.wochen / 4) }, (_, i) => 1 + i * 4) as w (w)}
             <div class="absolute text-[10px] text-light-tx-2 dark:text-dark-tx-2 text-right"
                  style="top: {wocheY(a, s.stufe, w) - 6}px; left: 0; width: {ACHSE - 6}px">
@@ -151,7 +149,7 @@
                 onblur={() => ontipp(null, null)}
             >
                 {#if blk.quelle === 'geschaetzt'}<span class="schraffur" aria-hidden="true"></span>{/if}
-                {#if mitte || !lay.schmal}
+                {#if (mitte || !lay.schmal) && mitText(blk, a.px)}
                     <span class="relative block font-semibold leading-tight {mitte ? 'text-sm' : 'text-xs'} line-clamp-2">
                         {k.titel}{#if i}<span class="font-normal"> (Forts.)</span>{/if}
                     </span>

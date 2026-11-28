@@ -30,6 +30,8 @@ class Seite(BaseModel):
     titel: str = Field(max_length=300)
     svg: str = Field(max_length=400_000)
     kuerzel: list[Kuerzel] = Field(default_factory=list, max_length=300)
+    #: Anmerkungen zur Stufe (kein Curriculum, Fassungswechsel, kein Kalender) — Liste über der Zeichnung
+    hinweise: list[str] = Field(default_factory=list, max_length=10)
 
 
 class ListeKapitel(BaseModel):
@@ -58,6 +60,9 @@ class UngueltigesSvg(ValueError):
 
 def pruefen(anfrage: PdfAnfrage) -> None:
     """Jede Zeile der Liste höchstens 2.000 Zeichen; jedes SVG muss `pruefe_svg` bestehen."""
+    for s in anfrage.seiten:
+        if any(len(h) > 300 for h in s.hinweise):
+            raise UngueltigesSvg(f"{s.titel}: eine Anmerkung ist zu lang")
     for stufe in anfrage.liste:
         for k in stufe.kapitel:
             if any(len(z) > 2000 for z in k.zeilen):
@@ -89,7 +94,7 @@ def pdf_html(anfrage: PdfAnfrage, *, heute: Optional[date] = None) -> str:
     from app.config import settings
 
     env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=select_autoescape(["html"]))
-    seiten = [{"titel": s.titel, "kuerzel": [k.model_dump() for k in s.kuerzel],
+    seiten = [{"titel": s.titel, "kuerzel": [k.model_dump() for k in s.kuerzel], "hinweise": s.hinweise,
                "bild": "data:image/svg+xml;base64," + base64.b64encode(s.svg.encode()).decode()}
               for s in anfrage.seiten]
     return env.get_template("vernetzung_pdf.html").render(

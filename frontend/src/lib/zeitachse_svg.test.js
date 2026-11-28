@@ -70,8 +70,9 @@ describe('Anfrage für das PDF', () => {
     expect(a.titel).toBe('Vernetzung der Fächer: Mathematik')
     expect(a.seiten.map((s) => s.titel)).toEqual([
       'Klasse 7 · 2026/27 · Bildungsplan V2 · ohne Jahresverlaufsplan: Lage geschätzt',
-      'Klasse 8 · 2026/27 · Bildungsplan V2 · ohne Jahresverlaufsplan: Lage geschätzt · ohne Kalender, nur Unterrichtswochen',
+      'Klasse 8 · 2026/27 · Bildungsplan V2 · ohne Jahresverlaufsplan: Lage geschätzt',
     ])
+    expect(a.seiten.map((s) => s.hinweise)).toEqual([[], ['ohne Kalender, nur Unterrichtswochen']])
     expect(a.liste[0].kapitel.map((k) => k.titel)).toEqual(['Proportionale & antiproportionale <Zuordnungen>', 'Terme'])
     expect(a.liste[0].kapitel[0].zeilen).toContain('Wird aufgegriffen in — Mathematik: Terme (Kl. 7, KW 45–50)')
   })

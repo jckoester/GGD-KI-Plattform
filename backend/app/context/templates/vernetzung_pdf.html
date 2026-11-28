@@ -24,7 +24,9 @@
   .legende img { width: 9mm; height: 2.4mm; vertical-align: middle; margin-right: 1mm; }
   h2 { font-size: 10pt; font-weight: bold; color: #1e3a5f; border-bottom: 0.5pt solid #1e3a5f; margin: 4mm 0 2mm 0; }
   h2.neue-seite { page-break-before: always; margin-top: 0; }
-  img.zeitachse { width: 100%; max-height: 235mm; object-fit: contain; object-position: top left; }
+  ul.hinweise { margin: 0 0 2mm 0; padding: 1.2mm 2mm 1.2mm 6mm; border: 0.5pt solid #b0bec8; border-radius: 1mm;
+                font-size: 8pt; }
+  img.zeitachse { width: 100%; max-height: 225mm; object-fit: contain; object-position: top left; }
   .kuerzel { font-size: 7.5pt; color: #555; margin-top: 1mm; }
   .kuerzel span { margin-right: 3mm; white-space: nowrap; }
   .kapitel { margin: 0 0 2.5mm 0; page-break-inside: avoid; }
@@ -38,6 +40,20 @@
 {% if schule %}<div class="school-header">{{ schule }}</div>{% endif %}
 <div class="doc-title">{{ titel }}</div>
 <div class="doc-meta">{{ untertitel }}{% if untertitel %} · {% endif %}Stand {{ stand }}</div>
+
+{% for s in seiten %}
+<h2 class="{{ 'neue-seite' if not loop.first else '' }}">{{ s.titel }}</h2>
+{% if s.hinweise %}
+<ul class="hinweise">{% for h in s.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>
+{% endif %}
+<img class="zeitachse" src="{{ s.bild }}" alt="Zeitachse {{ s.titel }}">
+{% if s.kuerzel %}
+<div class="kuerzel">{% for k in s.kuerzel %}<span><b>{{ k.kuerzel }}</b> {{ k.titel }}</span>{% endfor %}</div>
+{% endif %}
+{% endfor %}
+
+<!-- Legende hinter den Klassenseiten, vor der Liste (Jan 28.11.2026: allein auf Seite 1 sah sie verloren aus) -->
+<h2 class="neue-seite">Legende</h2>
 <div class="legende">
   {% for bild, text in legende %}<span><img src="{{ bild }}" alt="">{{ text }}</span>{% endfor %}
   <span>Klammer links der Mitte: Bezug im eigenen Fach, Pfeil zum späteren Kapitel</span>
@@ -46,16 +62,8 @@
 </div>
 <div class="klein">Bezüge über die Grenze einer Klassenstufe stehen nur in der Liste am Ende.</div>
 
-{% for s in seiten %}
-<h2 class="{{ 'neue-seite' if not loop.first else '' }}">{{ s.titel }}</h2>
-<img class="zeitachse" src="{{ s.bild }}" alt="Zeitachse {{ s.titel }}">
-{% if s.kuerzel %}
-<div class="kuerzel">{% for k in s.kuerzel %}<span><b>{{ k.kuerzel }}</b> {{ k.titel }}</span>{% endfor %}</div>
-{% endif %}
-{% endfor %}
-
 {% if liste %}
-<h2 class="neue-seite">Liste der Bezüge</h2>
+<h2>Liste der Bezüge</h2>
 {% for st in liste %}
 <h2>{{ st.titel }}</h2>
 {% for k in st.kapitel %}

@@ -20,9 +20,17 @@
 import { ART_SATZ, pruefungText } from './absprachen.js'
 
 export const PX_WOCHE = 13
-export const STUFENKOPF = 34
+export const STUFENKOPF = 42
 export const STUFENABSTAND = 10
 export const OBEN = 8
+/** Anmerkungen zur Stufe: je eine Zeile als Aufzählung in einem Rahmen unter dem Kopf (Jan 28.11.2026). */
+export const HINWEISZEILE = 16
+export const HINWEISRAHMEN = 14
+
+/** Zusätzliche Höhe einer Stufe für `n` Anmerkungen (Zeilen, Rahmen, Abstand). */
+export function hinweisHoehe(n) {
+  return n ? n * HINWEISZEILE + HINWEISRAHMEN : 0
+}
 
 export const MITTE = 220
 export const RINNE = 64
@@ -44,17 +52,37 @@ export const STIL = {
 
 // ── Achse ────────────────────────────────────────────────────────────────────
 
-/** Je Stufe ihr Platz: `oben` (Kopf), `start` (erste Woche), `hoehe`. Dazu die Gesamthöhe. */
-export function achse(stufen, { px = PX_WOCHE } = {}) {
+/**
+ * Je Stufe ihr Platz: `oben` (Kopf), `start` (erste Woche), `hoehe`, `hinweise` (Anmerkungen in
+ * eigener Zeile unter dem Kopf, `stufenHinweise`). Dazu die Gesamthöhe.
+ */
+export function achse(stufen, { px = PX_WOCHE, fachName = '' } = {}) {
   let y = OBEN
   const je = {}
-  const liste = (stufen ?? []).map((s) => {
-    const eintrag = { stufe: s.stufe, oben: y, start: y + STUFENKOPF, wochen: s.wochen, hoehe: STUFENKOPF + s.wochen * px }
+  const liste = (stufen ?? []).map((s, i) => {
+    const hinweise = stufenHinweise(s, stufen[i - 1], fachName)
+    const kopf = STUFENKOPF + hinweisHoehe(hinweise.length)
+    const eintrag = { stufe: s.stufe, oben: y, start: y + kopf, wochen: s.wochen, hoehe: kopf + s.wochen * px, hinweise }
     je[s.stufe] = eintrag
     y += eintrag.hoehe + STUFENABSTAND
     return eintrag
   })
   return { stufen: liste, je, hoehe: y, px }
+}
+
+/**
+ * Anmerkungen zu einer Stufe: kein Kalender, kein Curriculum in der geltenden Fassung,
+ * Fassungswechsel gegenüber der Stufe davor (dann fehlen Bezüge im eigenen Fach).
+ */
+export function stufenHinweise(info, vorher = null, fachName = '') {
+  const kurz = (f) => (f ? String(f).split('.')[1] ?? String(f) : '')
+  return [
+    info?.kalender === false && 'ohne Kalender, nur Unterrichtswochen',
+    info?.curricula && !info.curricula.length
+      && `kein Curriculum ${fachName}${info.fassung ? ` in der Fassung ${kurz(info.fassung)}` : ''}`.replace('  ', ' '),
+    vorher?.fassung && info?.fassung && vorher.fassung !== info.fassung
+      && `Fassung wechselt: Bezüge zu Kl. ${vorher.stufe} im eigenen Fach fehlen`,
+  ].filter(Boolean)
 }
 
 /** Oberkante einer Unterrichtswoche (1-basiert) in einer Stufe. */
@@ -159,6 +187,11 @@ export function bloecke(kapitel, a, sp, fachId) {
 
 export function anker(je, id) {
   return je.get(id)?.[0] ?? null
+}
+
+/** Ob ein Block Text trägt: erst ab zwei Wochen — in einer Woche ist er nicht lesbar (Jan 28.11.2026). */
+export function mitText(blk, px = PX_WOCHE) {
+  return blk.h >= 2 * px - 3
 }
 
 /** Senkrechte Mitte eines Blocks, bei langen Blöcken nahe am Kopf (Titel). */
