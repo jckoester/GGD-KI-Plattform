@@ -180,7 +180,19 @@ export function seiten(daten, { kandidaten, bezuege, leitlinien = true }) {
     const spurKapitel = [...je.keys()].filter((id) => kapitelFach.get(id) !== fachId && lay.schmal)
       .map((id) => ({ kuerzel: kuerzel.get(id), titel: kapitel.find((k) => k.id === id)?.titel }))
       .sort((x, y) => x.kuerzel.localeCompare(y.kuerzel, 'de', { numeric: true }))
-    return { stufe: info.stufe, svg, kuerzel: spurKapitel }
+    // Vernetzte Fächer dieser Stufe ohne Spur — sonst fehlten sie stumm (Jan 28.11.2026)
+    const hierIds = new Set(kapitel.map((k) => k.id))
+    const ohneSpur = new Set()
+    for (const b of bezuege) {
+      if (!hierIds.has(b.a) && !hierIds.has(b.b)) continue
+      const fa = kapitelFach.get(b.a)
+      const fb = kapitelFach.get(b.b)
+      if (fa === fb || (fa !== fachId && fb !== fachId)) continue
+      const ander = fa === fachId ? fb : fa
+      if (!spurIds.has(ander)) ohneSpur.add(ander)
+    }
+    const nichtGezeichnet = [...ohneSpur].map((id) => faecherJe[id]?.name).filter(Boolean).sort((x, y) => x.localeCompare(y, 'de'))
+    return { stufe: info.stufe, svg, kuerzel: spurKapitel, nicht_gezeichnet: nichtGezeichnet }
   })
 }
 
@@ -200,6 +212,7 @@ export function pdfAnfrage(daten, { kandidaten, bezuege, leitlinien = true, zeit
       const info = daten.stufen[i]
       // Anmerkungen als Liste über der Zeichnung, nicht im Titel (Jan 28.11.2026)
       return { titel: `Klasse ${x.stufe} · ${stufenZeile(info)}`, svg: x.svg, kuerzel: x.kuerzel,
+        nicht_gezeichnet: x.nicht_gezeichnet,
         hinweise: stufenHinweise(info, daten.stufen[i - 1], daten.fach.name) }
     }),
     liste: l.stufen.map(({ stufe, kapitel }) => ({

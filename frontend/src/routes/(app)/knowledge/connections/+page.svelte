@@ -8,7 +8,7 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { tick } from 'svelte'
-    import { ChartGantt, FileDown, List, Plus, X } from '@lucide/svelte'
+    import { ChartGantt, FileDown, List, PanelRight, Plus, X } from '@lucide/svelte'
     import { getPreferences, getVernetzung, ladeVernetzungPdf, patchPreferences } from '$lib/api.js'
     import { pdfAnfrage } from '$lib/zeitachse_svg.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
@@ -52,7 +52,9 @@
     // Tafel rechts, wenn neben Mitte und einer Spur Platz ist; sonst unten (Befund Sichtprobe:
     // vorher an der Fensterbreite `lg` festgemacht, Tafel landete unten links)
     const TAFEL = 320
-    const tafelRechts = $derived(zeileBreite >= 900 + TAFEL)
+    let tafelZu = $state(false)      // Tafel geschlossen: die Tabelle bekommt die ganze Breite (Jan 28.11.2026)
+    let hover = $state(null)         // Kapitel unter dem Zeiger: hebt schon vor dem Klick hervor
+    const tafelRechts = $derived(!tafelZu && zeileBreite >= 900 + TAFEL)
     const breite = $derived(tafelRechts ? zeileBreite - TAFEL - 16 : zeileBreite)
 
     $effect(() => {
@@ -96,7 +98,7 @@
     // Spuren und Anordnung
     const gemerkt = $derived(daten ? gemerkteSpuren(einstellungen, daten.fach.id) : null)
     const kandidaten = $derived(daten ? spurenWaehlen(daten.faecher, { gewaehlt: wahl ?? gemerkt }).spuren : [])
-    const lay = $derived(spalten(breite, kandidaten, { leitlinien: schalter.leitlinien }))
+    const lay = $derived(spalten(breite, kandidaten, { leitlinien: schalter.leitlinien, fuellen: true }))
     const genutzt = $derived(lay.genutzt)
     const spurIds = $derived(new Set(genutzt.map((f) => f.id)))
     const weitere = $derived((daten?.faecher ?? []).filter((f) => !spurIds.has(f.id)))
@@ -169,9 +171,10 @@
     }
     function waehle(id) {
         gewaehlt = id
+        if (id) tafelZu = false      // ein gewähltes Kapitel öffnet die Tafel wieder
     }
     function waehleUndZeige(id) {
-        gewaehlt = id
+        waehle(id)
         zuKapitel(id)
     }
     function inDieMitte(fachId) {
@@ -191,6 +194,7 @@
     })
 
     function zeigeTipp(e, k) {
+        hover = k?.id ?? null
         if (!e || !k) { tipp = null; return }
         const rect = e.currentTarget?.getBoundingClientRect?.()
         const x = e.clientX ?? (rect ? rect.right : 0)
@@ -273,6 +277,11 @@
                 </div>
             {/if}
             <div class="flex items-center gap-2 pb-1 ml-auto">
+                {#if !schalter.liste}
+                    <button type="button" class={knopf} aria-pressed={!tafelZu} onclick={() => (tafelZu = !tafelZu)}>
+                        <PanelRight class="w-3.5 h-3.5" /> {tafelZu ? 'Tafel zeigen' : 'Tafel ausblenden'}
+                    </button>
+                {/if}
                 <button type="button" class={knopf} aria-pressed={schalter.liste} onclick={() => (schalter.liste = !schalter.liste)}>
                     {#if schalter.liste}<ChartGantt class="w-3.5 h-3.5" /> Zeitachse{:else}<List class="w-3.5 h-3.5" /> Liste{/if}
                 </button>
@@ -417,7 +426,7 @@
                         {#if lay.mobil}
                             <p class="mb-2 text-xs text-light-tx-2 dark:text-dark-tx-2">Auf diesem schmalen Bildschirm steht nur das Fach in der Mitte; die Bezüge stehen beim gewählten Kapitel.</p>
                         {/if}
-                        <VernetzungZeitachse {daten} {lay} {a} {je} {bezuege} {kapitelFach} {spurIds} {gewaehlt}
+                        <VernetzungZeitachse {daten} {lay} {a} {je} {bezuege} {kapitelFach} {spurIds} {gewaehlt} {hover}
                                              alle={schalter.alle} onwaehle={waehle} ontipp={zeigeTipp} />
                         {#if ohneLage.length}
                             <p class="mt-3 text-xs text-light-tx-2 dark:text-dark-tx-2">
@@ -429,6 +438,8 @@
                         <aside class="sticky self-start overflow-y-auto rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 p-3"
                                style="width: {TAFEL}px; top: {kopfHoehe - 8}px; max-height: calc(100vh - {kopfHoehe + (leisteUnten ? 220 : 110)}px)"
                                aria-label="Bezüge des Kapitels">
+                            <button type="button" class="float-right {knopf}" onclick={() => { tafelZu = true; gewaehlt = null }}
+                                    aria-label="Tafel schließen" title="Tafel schließen"><X class="w-3 h-3" /></button>
                             <VernetzungTafel {daten} {gewaehlt} {bezuege} {kapitelFach} {vergleich} onwaehle={waehleUndZeige} onmitte={inDieMitte} />
                         </aside>
                     {/if}
@@ -438,11 +449,11 @@
     </div>
 
     <!-- Unten: Tafel (wenn rechts kein Platz) und die Werkzeugleiste, sobald die obere weggescrollt ist -->
-    {#if (daten && gewaehlt && !tafelRechts && !schalter.liste) || (daten && leisteUnten)}
+    {#if (daten && gewaehlt && !tafelRechts && !tafelZu && !schalter.liste) || (daten && leisteUnten)}
         <div class="absolute bottom-0 inset-x-0 z-50 border-t border-light-ui-3 dark:border-dark-ui-3 bg-light-bg/95 dark:bg-dark-bg/95 backdrop-blur">
-            {#if daten && gewaehlt && !tafelRechts && !schalter.liste}
+            {#if daten && gewaehlt && !tafelRechts && !tafelZu && !schalter.liste}
                 <div class="max-h-[40vh] overflow-y-auto px-6 py-3 border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2" aria-label="Bezüge des Kapitels">
-                    <button type="button" class="float-right {knopf}" onclick={() => (gewaehlt = null)} aria-label="Schließen"><X class="w-3 h-3" /></button>
+                    <button type="button" class="float-right {knopf}" onclick={() => { tafelZu = true; gewaehlt = null }} aria-label="Tafel schließen"><X class="w-3 h-3" /></button>
                     <VernetzungTafel {daten} {gewaehlt} {bezuege} {kapitelFach} {vergleich} onwaehle={waehleUndZeige} onmitte={inDieMitte} />
                 </div>
             {/if}

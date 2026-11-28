@@ -29,7 +29,7 @@ def _anfrage(**extra):
     return {
         "fach": "Mathematik", "titel": "Vernetzung der Fächer: Mathematik", "untertitel": "Schuljahr 2026/27",
         "seiten": [{"titel": "Klasse 8 · 2026/27", "svg": SVG, "kuerzel": [{"kuerzel": "PH 1", "titel": "Dichte"}],
-                    "hinweise": ["kein Curriculum Mathematik in der Fassung V3"]}],
+                    "hinweise": ["kein Curriculum Mathematik in der Fassung V3"], "nicht_gezeichnet": ["Musik", "Deutsch"]}],
         "liste": [{"titel": "Klasse 8", "kapitel": [
             {"titel": "Lineare Funktionen", "lage": "Kl. 8, KW 37–45", "zeilen": ["Absprache — Physik: Bewegungen <b>"]}]}],
         "ohne_lage": ["Körper"], **extra,
@@ -61,6 +61,7 @@ def test_html_bild_als_daten_uri_und_text_maskiert():
     assert "<svg" not in html.split("<body>", 1)[1].split('class="legende"')[0]   # kein eingebettetes SVG-Markup
     assert "Bewegungen &lt;b&gt;" in html and "Stand 28.11.2026" in html
     assert "<b>PH 1</b> Dichte" in html and "Nicht im Jahresverlaufsplan" in html
+    assert "nicht gezeichnet (siehe Liste): Musik, Deutsch" in html
     assert '<ul class="hinweise"><li>kein Curriculum Mathematik in der Fassung V3</li></ul>' in html
     assert ex.dateiname("Ästhetik/Kunst", date(2026, 11, 28)) == "vernetzung_AesthetikKunst_2026-11-28.pdf"
 

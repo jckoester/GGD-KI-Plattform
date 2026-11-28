@@ -59,6 +59,15 @@ describe('SVG der PDF-Seiten (BE, Schritt 7)', () => {
     const s8 = seiten(daten, { kandidaten: daten.faecher, bezuege: BEZUEGE })[1]
     expect(s8.svg).toContain('>PH 1<')
     expect(s8.kuerzel).toEqual([{ kuerzel: 'PH 1', titel: 'Dichte' }, { kuerzel: 'PH 2', titel: 'Kraft' }])
+    expect(s8.nicht_gezeichnet).toEqual([])
+  })
+  it('vernetzte Fächer ohne Spur werden je Seite genannt', () => {
+    const daten = { ...DATEN, faecher: [...DATEN.faecher, F(3, 'CH', { name: 'Chemie' })],
+      kapitel: [...DATEN.kapitel, { id: 'c1', titel: 'Stoffe', fach_id: 3, lage: [{ stufe: 8, von_woche: 1, bis_woche: 4, quelle: 'plan' }] }] }
+    const bz = [...BEZUEGE, { typ: 'kompetenz', a: 'm2', b: 'c1', eigenes_fach: false, beispiele: [] }]
+    const [s7, s8] = seiten(daten, { kandidaten: [DATEN.faecher[0]], bezuege: bz })
+    expect(s8.nicht_gezeichnet).toEqual(['Chemie'])
+    expect(s7.nicht_gezeichnet).toEqual([])
   })
 })
 

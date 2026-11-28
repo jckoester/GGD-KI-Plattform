@@ -38,6 +38,8 @@ export const ACHSE = 58
 export const RANDSPALTE = 112
 export const LUECKE = 18
 export const SPUR_STANDARD = 150
+/** Breiter wird eine Spur nicht; was dann noch frei ist, bekommt die Mitte (Jan 28.11.2026: Tabelle immer volle Breite). */
+export const SPUR_MAX = 260
 export const SCHMAL = 110
 export const MIN_SPUR = 28
 export const MOBIL = 700
@@ -134,9 +136,9 @@ export function seiten(spuren) {
  * passen, steht in `passen`. Rückgabe: `spalten` (Schlüssel → {x, b}), `spurBreite`,
  * `schmal`, `mobil`, `passen`, `breite` (tatsächlich belegt).
  */
-export const BILDSCHIRM = { ACHSE, RANDSPALTE, RINNE, MITTE, LUECKE, SPUR_STANDARD, SCHMAL, MIN_SPUR, MOBIL }
+export const BILDSCHIRM = { ACHSE, RANDSPALTE, RINNE, MITTE, LUECKE, SPUR_STANDARD, SCHMAL, MIN_SPUR, MOBIL, SPUR_MAX }
 
-export function spalten(breite, spurFaecher, { leitlinien = true, masse = BILDSCHIRM } = {}) {
+export function spalten(breite, spurFaecher, { leitlinien = true, masse = BILDSCHIRM, fuellen = false } = {}) {
   const m = { ...BILDSCHIRM, ...masse }
   const mobil = breite < m.MOBIL
   const rand = leitlinien && !mobil ? m.RANDSPALTE : 0
@@ -145,7 +147,13 @@ export function spalten(breite, spurFaecher, { leitlinien = true, masse = BILDSC
   const passen = mobil ? 0 : Math.floor(frei / (m.MIN_SPUR + m.LUECKE))
   const n = Math.min(spurFaecher.length, passen)
   const genutzt = spurFaecher.slice(0, n)
-  const spurBreite = n ? Math.min(m.SPUR_STANDARD, Math.floor(frei / n) - m.LUECKE) : 0
+  let spurBreite = n ? Math.min(m.SPUR_STANDARD, Math.floor(frei / n) - m.LUECKE) : 0
+  let mitte = m.MITTE
+  if (fuellen && !mobil) {
+    // Volle Breite: Spuren wachsen bis SPUR_MAX, der Rest geht an die Mitte
+    spurBreite = n ? Math.min(m.SPUR_MAX, Math.floor(frei / n) - m.LUECKE) : 0
+    mitte += Math.max(0, frei - n * (spurBreite + m.LUECKE))
+  }
   const { rechts, links } = seiten(genutzt)
 
   const sp = {}
@@ -154,8 +162,8 @@ export function spalten(breite, spurFaecher, { leitlinien = true, masse = BILDSC
   for (const f of [...links].reverse()) { sp[f.id] = { x, b: spurBreite, seite: 'links' }; x += spurBreite + m.LUECKE }
   sp.rinne = { x, b: m.RINNE }
   x += m.RINNE
-  sp.mitte = { x, b: m.MITTE, seite: 'mitte' }
-  x += m.MITTE + m.LUECKE
+  sp.mitte = { x, b: mitte, seite: 'mitte' }
+  x += mitte + m.LUECKE
   for (const f of rechts) { sp[f.id] = { x, b: spurBreite, seite: 'rechts' }; x += spurBreite + m.LUECKE }
   if (rand) { sp.leitperspektiven = { x, b: rand }; x += rand }
   return { spalten: sp, spurBreite, schmal: n > 0 && spurBreite < m.SCHMAL, mobil, passen, genutzt, breite: x }

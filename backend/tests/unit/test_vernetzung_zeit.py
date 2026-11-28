@@ -58,3 +58,12 @@ def test_als_spanne_nutzt_schaetzung_nicht_fuer_wochen():
     assert vz.als_spanne(geschaetzt) == Spanne(7, 8)
     assert vz.als_spanne([], (9, None)) == Spanne(9, 9)
     assert vz.als_spanne([]) is None
+
+
+def test_schaetzen_halbe_wochen_ueberlappen_nicht():
+    """9 Stunden bei 2 Wochenstunden = 4,5 Wochen: Nachbarn teilen sich keine Woche (Testwelt, 28.11.2026)."""
+    l = vz.schaetzen([(k, 9) for k in "abcdefg"], [8], {8: 2}, {8: 38})
+    wochen = [(x.von_woche, x.bis_woche) for k in "abcdefg" for x in l[k]]
+    assert wochen[0][0] == 1
+    assert all(b < v for (_, b), (v, _) in zip(wochen, wochen[1:]))
+    assert all(v <= b for v, b in wochen)

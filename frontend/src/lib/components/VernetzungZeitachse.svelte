@@ -11,6 +11,7 @@
      * - kapitelFach: Map Kapitel → Fach
      * - spurIds: Set der Fächer mit Spur
      * - gewaehlt: Kennung des gewählten Kapitels oder null
+     * - hover: Kapitel unter dem Mauszeiger oder mit Tastaturfokus — hebt schon vor dem Klick hervor
      * - alle: „alle Linien zeigen“
      * - onwaehle(id | null), ontipp(event, kapitel | null)
      */
@@ -23,7 +24,7 @@
     } from '$lib/zeitachse.js'
 
     let {
-        daten, lay, a, je, bezuege, kapitelFach, spurIds, gewaehlt = null, alle = false,
+        daten, lay, a, je, bezuege, kapitelFach, spurIds, gewaehlt = null, hover = null, alle = false,
         onwaehle = () => {}, ontipp = () => {},
     } = $props()
 
@@ -32,9 +33,11 @@
     const faecherJe = $derived(Object.fromEntries([[daten.fach.id, daten.fach], ...daten.faecher.map((f) => [f.id, f])]))
     const kapitelJe = $derived(new Map(daten.kapitel.map((k) => [k.id, k])))
     const stufenJe = $derived(Object.fromEntries(daten.stufen.map((s) => [s.stufe, s])))
-    const nah = $derived(gewaehlt ? verbunden(bezuege, gewaehlt, { bereiche: true }) : null)
+    // Hervorgehoben wird das Kapitel unter dem Zeiger, sonst das gewählte (Jan 28.11.2026)
+    const aktiv = $derived(hover ?? gewaehlt)
+    const nah = $derived(aktiv ? verbunden(bezuege, aktiv, { bereiche: true }) : null)
 
-    const zeichnen = $derived(sichtbar(bezuege, { gewaehlt, alle, bereiche: true, kapitelFach, fachId, spurIds }))
+    const zeichnen = $derived(sichtbar(bezuege, { gewaehlt: aktiv, alle, bereiche: true, kapitelFach, fachId, spurIds }))
     const linien = $derived.by(() => {
         const eigen = []
         const kurven = []
@@ -59,7 +62,7 @@
     const rand = $derived(randmarken(daten.leitlinien, je, lay.spalten))
 
     function pille(k) {
-        if (!gewaehlt || k.b.typ !== 'absprache') return null
+        if (!aktiv || k.b.typ !== 'absprache') return null
         const mitteId = kapitelFach.get(k.b.a) === fachId ? k.b.a : k.b.b
         const anderId = mitteId === k.b.a ? k.b.b : k.b.a
         const art = artAusSicht(k.b, mitteId)
@@ -197,12 +200,12 @@
         </defs>
         {#each linien.eigen as k (k.schluessel)}
             <path d={k.d} fill="none" stroke={fachFarbe ?? 'currentColor'} stroke-width={stil(k.b).breite}
-                  opacity={gewaehlt ? 1 : 0.6} marker-end="url(#{pfeilId})" />
+                  opacity={aktiv ? 1 : 0.6} marker-end="url(#{pfeilId})" />
         {/each}
         {#each linien.kurven as k (`${k.b.typ}-${k.b.a}-${k.b.b}`)}
             {@const s = stil(k.b)}
             <path d={k.d} fill="none" class={linienKlasse(s)} stroke="currentColor" stroke-width={s.breite}
-                  stroke-dasharray={s.strich ?? undefined} opacity={gewaehlt ? 1 : 0.55} />
+                  stroke-dasharray={s.strich ?? undefined} opacity={aktiv ? 1 : 0.55} />
         {/each}
     </svg>
     {#each linien.kurven as k (`p-${k.b.typ}-${k.b.a}-${k.b.b}`)}

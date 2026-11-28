@@ -47,8 +47,11 @@
 <ul class="hinweise">{% for h in s.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>
 {% endif %}
 <img class="zeitachse" src="{{ s.bild }}" alt="Zeitachse {{ s.titel }}">
+{% if s.nicht_gezeichnet %}
+<div class="kuerzel">Weitere vernetzte Fächer, nicht gezeichnet (siehe Liste): {{ s.nicht_gezeichnet | join(', ') }}</div>
+{% endif %}
 {% if s.kuerzel %}
-<div class="kuerzel">{% for k in s.kuerzel %}<span><b>{{ k.kuerzel }}</b> {{ k.titel }}</span>{% endfor %}</div>
+<div class="kuerzel">{% for k in s.kuerzel %}<span><b>{{ k.kuerzel }}</b> {{ k.titel }}</span> {% endfor %}</div>
 {% endif %}
 {% endfor %}
 

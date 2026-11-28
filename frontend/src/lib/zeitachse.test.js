@@ -265,3 +265,58 @@ describe('Anmerkungen zur Stufe (Sichtprobe)', () => {
     expect(a.je[9].hinweise).toHaveLength(3)
   })
 })
+
+describe('Belastung (Testwelt, Schritt 8)', () => {
+  it('15 Fächer, 600 Kapitel, 2.000 Bezüge: Anordnung und Rinne gehen auf, schnell genug', async () => {
+    const z = await import('./zeitachse.js')
+    const faecher = Array.from({ length: 15 }, (_, i) => ({ id: i + 2, code: `F${i}`, name: `Fach ${i}`, nur_bereich: i > 10 }))
+    const stufen = [7, 8, 9].map((stufe) => ({ stufe, wochen: 38 }))
+    const kapitel = []
+    for (let f = 1; f <= 16; f++) {
+      for (const { stufe } of stufen) {
+        for (let n = 0; n < 12; n++) {
+          kapitel.push({ id: `k${f}-${stufe}-${n}`, fach_id: f, lage: [{ stufe, von_woche: 1 + n * 3, bis_woche: Math.min(38, 3 + n * 3), quelle: 'plan' }] })
+        }
+      }
+    }
+    const mitte = kapitel.filter((k) => k.fach_id === 1)
+    const bezuege = Array.from({ length: 2000 }, (_, i) => {
+      const a = mitte[i % mitte.length]
+      const b = kapitel[(i * 41) % kapitel.length]
+      return { typ: i % 7 ? 'kompetenz' : 'absprache', a: a.id, b: b.id, eigenes_fach: b.fach_id === 1 }
+    }).filter((b) => b.a !== b.b)
+    const t0 = performance.now()
+    const a = z.achse(stufen)
+    const { spuren } = z.spurenWaehlen(faecher)
+    const lay = z.spalten(1400, spuren)
+    const je = z.bloecke(kapitel, a, lay.spalten, 1)
+    const kapitelFach = new Map(kapitel.map((k) => [k.id, k.fach_id]))
+    const alle = z.sichtbar(bezuege, { alle: true, bereiche: true, kapitelFach, fachId: 1, spurIds: new Set(lay.genutzt.map((f) => f.id)) })
+    const eigen = alle.filter((b) => kapitelFach.get(b.a) === kapitelFach.get(b.b))
+      .map((b, i) => ({ schluessel: i, y1: z.mittelY(z.anker(je, b.a)), y2: z.mittelY(z.anker(je, b.b)) }))
+    const tiefen = z.rinnenTiefen(eigen)
+    for (const k of mitte) z.marken(bezuege, k.id, kapitelFach)
+    const dauer = performance.now() - t0
+    expect(lay.breite).toBeLessThanOrEqual(1400)
+    expect(lay.genutzt.length).toBe(Math.min(spuren.length, lay.passen))
+    expect(eigen.length).toBeGreaterThan(50)
+    expect(Math.max(...tiefen.values())).toBeLessThanOrEqual(z.RINNE - 6)
+    expect(dauer).toBeLessThan(500)
+  })
+})
+
+describe('Volle Breite (Sichtprobe)', () => {
+  it('Spuren wachsen bis SPUR_MAX, den Rest bekommt die Mitte; belegt ist die ganze Breite', async () => {
+    const z = await import('./zeitachse.js')
+    const zwei = [F(1), F(2)]
+    const r = z.spalten(2000, zwei, { fuellen: true })
+    expect(r.spurBreite).toBe(z.SPUR_MAX)
+    expect(r.spalten.mitte.b).toBeGreaterThan(z.MITTE)
+    expect(r.breite).toBeGreaterThanOrEqual(2000 - z.LUECKE)
+    expect(r.breite).toBeLessThanOrEqual(2000)
+    const viele = z.spalten(1200, Array.from({ length: 6 }, (_, i) => F(i + 1)), { fuellen: true })
+    expect(viele.spalten.mitte.b).toBeGreaterThanOrEqual(z.MITTE)
+    expect(viele.breite).toBeLessThanOrEqual(1200)
+    expect(z.spalten(2000, zwei).spurBreite).toBe(z.SPUR_STANDARD)   // ohne fuellen wie bisher
+  })
+})

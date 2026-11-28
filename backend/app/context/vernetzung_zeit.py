@@ -114,20 +114,24 @@ def schaetzen(kapitel: list[tuple[str, Optional[float]]], stufen: list[int],
 
     aus: dict[str, list[Lage]] = {}
     t = 0.0
+    letzt = 0   # letzte belegte Woche (fortlaufend über die Stufen) — kein Kapitel beginnt davor
     for kid, std in kapitel:
-        if t >= gesamt:
+        if t >= gesamt or letzt >= gesamt:
             break
         dauer = std / wochenstunden[stufe_bei(t)] if mit_stunden else gesamt / len(kapitel)
         anfang, ende = t, min(t + max(dauer, 0.5), gesamt)
         t = anfang + max(dauer, 0.5)
+        # Ganze Wochen: Anfang und Ende gleich gerundet, sonst teilen sich Nachbarn eine Woche
+        # (4,5 Wochen je Kapitel: 1–5 und 5–9; Testwelt, 28.11.2026)
+        w_von = max(int(anfang + 0.5) + 1, letzt + 1)
+        w_bis = max(w_von, min(int(ende + 0.5), int(gesamt)))
+        letzt = w_bis
         for s in stufen:
-            lo, hi = versatz[s], versatz[s] + wochen[s]
-            a, e = max(anfang, lo), min(ende, hi)
-            if e - a <= 0:
+            lo, hi = versatz[s] + 1, versatz[s] + wochen[s]
+            v, b = max(w_von, lo), min(w_bis, hi)
+            if b < v:
                 continue
-            von = int(a - lo) + 1
-            bis = max(von, int(-(-(e - lo) // 1)))   # aufrunden
-            aus.setdefault(kid, []).append(Lage(s, von, min(bis, wochen[s]), GESCHAETZT))
+            aus.setdefault(kid, []).append(Lage(s, v - versatz[s], b - versatz[s], GESCHAETZT))
     return aus
 
 
