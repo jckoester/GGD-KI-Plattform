@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ titel }}</title>
+<!-- Vernetzung der Fächer (BE, Teil A, Schritt 7) — Stil wie verlaufsplan_pdf.html, A4 hoch -->
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 12mm 12mm;
+    @top-left  { content: string(school-running); font-size: 8pt; color: #777; }
+    @top-right { content: "Seite " counter(page) " / " counter(pages); font-size: 8pt; color: #777; }
+  }
+  body { font-family: "Liberation Sans", Arial, sans-serif; font-size: 9pt; color: #1a1a1a; line-height: 1.35; }
+  .school-header {
+    string-set: school-running content();
+    font-size: 12pt; font-weight: bold; color: #1e3a5f;
+    border-bottom: 1pt solid #1e3a5f; padding-bottom: 1.5mm; margin-bottom: 3mm;
+  }
+  .doc-title { font-size: 14pt; font-weight: bold; margin-bottom: 1mm; }
+  .doc-meta { font-size: 8pt; color: #555; margin-bottom: 2mm; }
+  .legende { font-size: 8pt; color: #555; margin-bottom: 2mm; }
+  .legende span { margin-right: 5mm; white-space: nowrap; }
+  .legende img { width: 9mm; height: 2.4mm; vertical-align: middle; margin-right: 1mm; }
+  h2 { font-size: 10pt; font-weight: bold; color: #1e3a5f; border-bottom: 0.5pt solid #1e3a5f; margin: 4mm 0 2mm 0; }
+  h2.neue-seite { page-break-before: always; margin-top: 0; }
+  img.zeitachse { width: 100%; max-height: 235mm; object-fit: contain; object-position: top left; }
+  .kuerzel { font-size: 7.5pt; color: #555; margin-top: 1mm; }
+  .kuerzel span { margin-right: 3mm; white-space: nowrap; }
+  .kapitel { margin: 0 0 2.5mm 0; page-break-inside: avoid; }
+  .kapitel .titel { font-weight: bold; }
+  .kapitel .lage { color: #555; font-size: 8pt; }
+  .kapitel ul { margin: 0.5mm 0 0 0; padding-left: 4mm; font-size: 8pt; color: #333; }
+  .klein { color: #555; font-size: 8pt; }
+</style>
+</head>
+<body>
+{% if schule %}<div class="school-header">{{ schule }}</div>{% endif %}
+<div class="doc-title">{{ titel }}</div>
+<div class="doc-meta">{{ untertitel }}{% if untertitel %} · {% endif %}Stand {{ stand }}</div>
+<div class="legende">
+  {% for bild, text in legende %}<span><img src="{{ bild }}" alt="">{{ text }}</span>{% endfor %}
+  <span>Klammer links der Mitte: Bezug im eigenen Fach, Pfeil zum späteren Kapitel</span>
+  <span>Schraffiert, gestrichelter Rand: Lage geschätzt</span>
+  <span>↔ Bezüge zu anderen Fächern · ↕ im eigenen Fach · ! nicht eingehalten</span>
+</div>
+<div class="klein">Bezüge über die Grenze einer Klassenstufe stehen nur in der Liste am Ende.</div>
+
+{% for s in seiten %}
+<h2 class="{{ 'neue-seite' if not loop.first else '' }}">{{ s.titel }}</h2>
+<img class="zeitachse" src="{{ s.bild }}" alt="Zeitachse {{ s.titel }}">
+{% if s.kuerzel %}
+<div class="kuerzel">{% for k in s.kuerzel %}<span><b>{{ k.kuerzel }}</b> {{ k.titel }}</span>{% endfor %}</div>
+{% endif %}
+{% endfor %}
+
+{% if liste %}
+<h2 class="neue-seite">Liste der Bezüge</h2>
+{% for st in liste %}
+<h2>{{ st.titel }}</h2>
+{% for k in st.kapitel %}
+<div class="kapitel">
+  <span class="titel">{{ k.titel }}</span> <span class="lage">· {{ k.lage }}</span>
+  {% if k.zeilen %}<ul>{% for z in k.zeilen %}<li>{{ z }}</li>{% endfor %}</ul>{% else %}<div class="klein">keine Bezüge</div>{% endif %}
+</div>
+{% else %}
+<div class="klein">Keine Kapitel in dieser Stufe.</div>
+{% endfor %}
+{% endfor %}
+{% if ohne_lage %}
+<h2>Nicht im Jahresverlaufsplan</h2>
+<div class="klein">{{ ohne_lage | join(', ') }}</div>
+{% endif %}
+{% endif %}
+</body>
+</html>

@@ -2315,6 +2315,24 @@ export async function getVernetzung({ fach, schuljahr = null, weg = null, entwue
   return res.json()
 }
 
+/** Die Zeitachse als PDF (BE, Schritt 7): `anfrage` aus `pdfAnfrage()` in `$lib/zeitachse_svg.js`. */
+export async function ladeVernetzungPdf(anfrage) {
+  const res = await fetch(`${BASE}/context/vernetzung/pdf`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(anfrage),
+  })
+  if (!res.ok) {
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'PDF konnte nicht erstellt werden')
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'vernetzung.pdf'
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /** Absprachen mit anderen Fächern (0.63, AY Teil 2): je Kapitel `eigene` und `von_aussen`, dazu `fach`. */
 export async function getCurriculumAbsprachen(curriculumId) {
   const res = await fetch(`${BASE}/context/curricula/${curriculumId}/absprachen`, { credentials: 'include' })

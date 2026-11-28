@@ -17,6 +17,8 @@
  *   Bereiche sind wählbar und schalten die Bereich-Bezüge ein.
  */
 
+import { ART_SATZ, pruefungText } from './absprachen.js'
+
 export const PX_WOCHE = 13
 export const STUFENKOPF = 34
 export const STUFENABSTAND = 10
@@ -104,28 +106,31 @@ export function seiten(spuren) {
  * passen, steht in `passen`. Rückgabe: `spalten` (Schlüssel → {x, b}), `spurBreite`,
  * `schmal`, `mobil`, `passen`, `breite` (tatsächlich belegt).
  */
-export function spalten(breite, spurFaecher, { leitlinien = true } = {}) {
-  const mobil = breite < MOBIL
-  const rand = leitlinien && !mobil ? RANDSPALTE : 0
-  const fest = ACHSE + 2 * rand + RINNE + MITTE + (rand ? 2 * LUECKE : 0)
+export const BILDSCHIRM = { ACHSE, RANDSPALTE, RINNE, MITTE, LUECKE, SPUR_STANDARD, SCHMAL, MIN_SPUR, MOBIL }
+
+export function spalten(breite, spurFaecher, { leitlinien = true, masse = BILDSCHIRM } = {}) {
+  const m = { ...BILDSCHIRM, ...masse }
+  const mobil = breite < m.MOBIL
+  const rand = leitlinien && !mobil ? m.RANDSPALTE : 0
+  const fest = m.ACHSE + 2 * rand + m.RINNE + m.MITTE + (rand ? 2 * m.LUECKE : 0)
   const frei = Math.max(0, breite - fest)
-  const passen = mobil ? 0 : Math.floor(frei / (MIN_SPUR + LUECKE))
+  const passen = mobil ? 0 : Math.floor(frei / (m.MIN_SPUR + m.LUECKE))
   const n = Math.min(spurFaecher.length, passen)
   const genutzt = spurFaecher.slice(0, n)
-  const spurBreite = n ? Math.min(SPUR_STANDARD, Math.floor(frei / n) - LUECKE) : 0
+  const spurBreite = n ? Math.min(m.SPUR_STANDARD, Math.floor(frei / n) - m.LUECKE) : 0
   const { rechts, links } = seiten(genutzt)
 
   const sp = {}
-  let x = ACHSE
-  if (rand) { sp.leitlinien = { x, b: rand }; x += rand + LUECKE }
-  for (const f of [...links].reverse()) { sp[f.id] = { x, b: spurBreite, seite: 'links' }; x += spurBreite + LUECKE }
-  sp.rinne = { x, b: RINNE }
-  x += RINNE
-  sp.mitte = { x, b: MITTE, seite: 'mitte' }
-  x += MITTE + LUECKE
-  for (const f of rechts) { sp[f.id] = { x, b: spurBreite, seite: 'rechts' }; x += spurBreite + LUECKE }
+  let x = m.ACHSE
+  if (rand) { sp.leitlinien = { x, b: rand }; x += rand + m.LUECKE }
+  for (const f of [...links].reverse()) { sp[f.id] = { x, b: spurBreite, seite: 'links' }; x += spurBreite + m.LUECKE }
+  sp.rinne = { x, b: m.RINNE }
+  x += m.RINNE
+  sp.mitte = { x, b: m.MITTE, seite: 'mitte' }
+  x += m.MITTE + m.LUECKE
+  for (const f of rechts) { sp[f.id] = { x, b: spurBreite, seite: 'rechts' }; x += spurBreite + m.LUECKE }
   if (rand) { sp.leitperspektiven = { x, b: rand }; x += rand }
-  return { spalten: sp, spurBreite, schmal: n > 0 && spurBreite < SCHMAL, mobil, passen, genutzt, breite: x }
+  return { spalten: sp, spurBreite, schmal: n > 0 && spurBreite < m.SCHMAL, mobil, passen, genutzt, breite: x }
 }
 
 // ── Kapitel ──────────────────────────────────────────────────────────────────
@@ -401,4 +406,59 @@ export function gemerkteSpuren(einstellungen, fachId) {
 export function vernetzungPfad({ fach, kapitel = null, stufe = null, schuljahr = null, aktuelles = null, entwuerfe = false }) {
   const sj = schuljahr && schuljahr !== aktuelles ? schuljahr : null
   return `/knowledge/connections?${adresse({ fach: fach != null ? String(fach) : '', kapitel, schuljahr: sj, weg: null, stufe, entwuerfe })}`
+}
+
+
+// ── Liste (F9) — Bildschirm und PDF ─────────────────────────────────────────
+
+/** Vergleich zweier Kapitel nach ihrer ersten Lage (Stufe, Woche); ohne Lage 0. */
+export function nachLage(kapitelJe) {
+  return (x, y) => {
+    const lx = kapitelJe.get(x)?.lage?.[0]
+    const ly = kapitelJe.get(y)?.lage?.[0]
+    if (!lx || !ly) return 0
+    return lx.stufe - ly.stufe || lx.von_woche - ly.von_woche
+  }
+}
+
+/**
+ * Die Vernetzung als Text: je Stufe die Kapitel des Fachs in der Mitte (nach Lage) mit ihren
+ * Bezügen in Sätzen, dazu die Kapitel ohne Lage. `bezuege`: die aktiven (Schalter angewandt).
+ */
+export function liste(daten, bezuege) {
+  const faecherJe = Object.fromEntries([[daten.fach.id, daten.fach], ...daten.faecher.map((f) => [f.id, f])])
+  const faecherCode = Object.fromEntries(Object.values(faecherJe).map((f) => [f.code, f]))
+  const kapitelJe = new Map(daten.kapitel.map((k) => [k.id, k]))
+  const kapitelFach = new Map(daten.kapitel.map((k) => [k.id, k.fach_id]))
+  const stufenJe = Object.fromEntries(daten.stufen.map((s) => [s.stufe, s]))
+  const vergleich = nachLage(kapitelJe)
+  const anderes = (id) => {
+    const k = kapitelJe.get(id)
+    return `${faecherJe[k?.fach_id]?.name ?? ''}: ${k?.titel ?? '?'} (${lageText(k, stufenJe)})`
+  }
+  const zeilen = (id) => {
+    const g = bezuegeDesKapitels({ ...daten, bezuege }, id, { kapitelFach, vergleich, bereiche: true })
+    return [
+      ...g.absprachen.map((b) => {
+        const texte = b.texte.filter(Boolean)
+        const p = pruefungText(b.pruefung)
+        return `Absprache — ${anderes(b.ander)} ${ART_SATZ[b.art_hier] ?? b.art_hier}${texte.length ? `: ${texte.join(' / ')}` : ''}${p ? ` ${p}` : ''}`
+      }),
+      ...g.fach.map((f) => `Absprache — ${faecherCode[f.fach_code]?.name ?? f.fach_code}: ${f.kapitel_titel ?? 'ganzes Fach'}${f.text ? `: ${f.text}` : ''}`),
+      ...g.fremd.map((b) => `Bildungsplan — ${anderes(b.ander)}${b.typ === 'bereich' ? ', über einen Bereich' : ''} (${b.beispiele.join(', ')})`),
+      ...g.baut_auf.map((b) => `Baut auf — ${anderes(b.ander)}`),
+      ...g.aufgegriffen.map((b) => `Wird aufgegriffen in — ${anderes(b.ander)}`),
+      ...(daten.leitlinien?.[id] ?? []).map((l) => `${l.art === 'll' ? 'Leitlinie' : 'Leitperspektive'} — ${l.titel}${l.aspekte.length ? ` (${l.aspekte.join(', ')})` : ''}`),
+    ]
+  }
+  const eigene = daten.kapitel.filter((k) => k.fach_id === daten.fach.id)
+  return {
+    stufen: daten.stufen.map((s) => ({
+      stufe: s,
+      kapitel: eigene.filter((k) => (k.lage[0]?.stufe ?? null) === s.stufe)
+        .sort((x, y) => (x.lage[0]?.von_woche ?? 0) - (y.lage[0]?.von_woche ?? 0))
+        .map((k) => ({ id: k.id, titel: k.titel, lage: lageText(k, stufenJe), zeilen: zeilen(k.id) })),
+    })),
+    ohne_lage: eigene.filter((k) => !k.lage.length).map((k) => k.titel),
+  }
 }

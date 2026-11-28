@@ -8,8 +8,9 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { tick } from 'svelte'
-    import { Plus, X } from '@lucide/svelte'
-    import { getPreferences, getVernetzung, patchPreferences } from '$lib/api.js'
+    import { FileDown, Plus, X } from '@lucide/svelte'
+    import { getPreferences, getVernetzung, ladeVernetzungPdf, patchPreferences } from '$lib/api.js'
+    import { pdfAnfrage } from '$lib/zeitachse_svg.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
@@ -181,6 +182,29 @@
         tipp = { x, y, k }
     }
 
+    // PDF (Schritt 7, F14 a): je Stufe eine Seite, dazu die Liste
+    let pdfLaeuft = $state(false)
+    let pdfFehler = $state(null)
+    async function pdf() {
+        pdfLaeuft = true
+        pdfFehler = null
+        const zeitraumText = zustand.weg != null
+            ? `Weg der Klasse, die ${aktuelles} in Kl. ${zustand.weg} ist`
+            : `Schuljahr ${zustand.schuljahr ?? aktuelles}`
+        const zusatz = [zustand.entwuerfe && 'mit Entwürfen', !schalter.querverweise && 'ohne Querverweise des Bildungsplans',
+            bereicheAn && 'mit Bezügen auf ganze Bereiche'].filter(Boolean)
+        try {
+            await ladeVernetzungPdf(pdfAnfrage(daten, {
+                kandidaten, bezuege, leitlinien: schalter.leitlinien,
+                zeitraum: [zeitraumText, ...zusatz].join(' · '),
+            }))
+        } catch (e) {
+            pdfFehler = e.message
+        } finally {
+            pdfLaeuft = false
+        }
+    }
+
     function taste(e) {
         if (e.key === 'Escape' && gewaehlt) gewaehlt = null
     }
@@ -247,6 +271,10 @@
                     <label class="inline-flex items-center gap-1"><input type="checkbox" checked={zustand.entwuerfe}
                            onchange={(e) => (zustand = { ...zustand, entwuerfe: e.target.checked })} /> mit Entwürfen</label>
                     <label class="inline-flex items-center gap-1"><input type="checkbox" bind:checked={schalter.liste} /> als Liste</label>
+                    <button type="button" class={knopf} onclick={pdf} disabled={pdfLaeuft || !daten.stufen.length}>
+                        <FileDown class="w-3.5 h-3.5" /> {pdfLaeuft ? 'PDF wird erstellt…' : 'PDF'}
+                    </button>
+                    {#if pdfFehler}<span class="text-light-re dark:text-dark-re">{pdfFehler}</span>{/if}
                 </div>
                 <!-- Legende der Linienarten -->
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-light-tx-2 dark:text-dark-tx-2" aria-label="Legende der Linien">
@@ -349,7 +377,7 @@
                     {#if !zustand.entwuerfe}Mit „mit Entwürfen“ siehst du auch Curricula, die noch entstehen.{/if}
                 </p>
             {:else if daten && schalter.liste}
-                <VernetzungListe {daten} {bezuege} {kapitelFach} {vergleich} onwaehle={waehle} />
+                <VernetzungListe {daten} {bezuege} onwaehle={waehle} />
             {:else if daten}
                 {#if lay.mobil}
                     <p class="mb-2 text-xs text-light-tx-2 dark:text-dark-tx-2">Auf diesem schmalen Bildschirm steht nur das Fach in der Mitte; die Bezüge stehen beim gewählten Kapitel.</p>

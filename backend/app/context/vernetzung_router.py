@@ -58,3 +58,27 @@ async def get_vernetzung(
                                 schuljahr=schuljahr, bezugsstufe=weg, entwuerfe=entwuerfe)
     except LookupError:
         raise HTTPException(status_code=404, detail="Fach nicht gefunden")
+
+
+@router.post("/pdf")
+async def vernetzung_pdf(
+    anfrage: dict,
+    user: JwtPayload = Depends(lehrkraft),
+):
+    """Die Zeitachse als PDF (Schritt 7, F14 a): je Stufe ein SVG aus dem Browser, geprüft mit
+    `pruefe_svg`, und die Liste als Text. Liest und schreibt nichts in der Datenbank."""
+    from fastapi import Response
+    from pydantic import ValidationError
+
+    from app.context import vernetzung_export as ex
+
+    try:
+        a = ex.PdfAnfrage.model_validate(anfrage)
+        ex.pruefen(a)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=f"Ungültige Anfrage: {e.errors()[0].get('msg')}") from None
+    except ex.UngueltigesSvg as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    daten = await ex.render_pdf(a)
+    return Response(content=daten, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{ex.dateiname(a.fach)}"'})
