@@ -29,8 +29,9 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -149,6 +150,124 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
     sj = vz.schuljahre(stufen, aktuelles, modus=modus, schuljahr=schuljahr, bezugsstufe=bezugsstufe)
     leer["zeitraum"]["bezugsstufe"] = bezugsstufe if modus == vz.WEG else None
 
+    w = await _welt(db, user, stufen, sj, status, aktuelles)
+    kapitel, auswahl, geltend_je, jahre, plan_je = w.kapitel, w.auswahl, w.geltend_je, w.jahre, w.plan_je
+    bz = await _bezuege(db, w, status, fach_id=fach_id, fach_code=fach.fach_code)
+    bezuege, fach_absprachen, codes = bz["bezuege"], bz["fach_absprachen"], bz["codes"]
+
+    # ── Spuren: vernetzte Fächer ──────────────────────────────────────────────
+    zahl: dict[int, dict] = defaultdict(lambda: {"absprachen": 0, "kompetenz": 0, "bereich": 0})
+    for b in bezuege:
+        fa, fb = kapitel[b["a"]]["fach_id"], kapitel[b["b"]]["fach_id"]
+        if fa == fb:
+            continue
+        ander = fb if fa == fach_id else fa
+        zahl[ander]["absprachen" if b["typ"] == "absprache" else b["typ"]] += 1
+    for fa in fach_absprachen:
+        ander = next((f for f, c in codes.items() if c == fa["fach_code"]), None) \
+            if kapitel[fa["kapitel"]]["fach_id"] == fach_id else kapitel[fa["kapitel"]]["fach_id"]
+        if ander is not None and ander != fach_id:
+            zahl[ander]["absprachen"] += 1
+    faecher = {s.id: s for s in (await db.execute(sa.select(Subject).where(Subject.id.in_(set(zahl))))).scalars()} \
+        if zahl else {}
+    spuren = sorted(
+        ({**_fach_dict(faecher[f]), **z, "nur_bereich": not z["absprachen"] and not z["kompetenz"]}
+         for f, z in zahl.items() if f in faecher),
+        key=lambda d: (-d["absprachen"], -d["kompetenz"], -d["bereich"], d["name"]))
+
+    # ── Leitperspektiven und Leitlinien der Kapitel des Fachs ─────────────────
+    leitlinien = await _leitlinien_der_kapitel(db, [k for k, v in kapitel.items() if v["fach_id"] == fach_id], status)
+
+    # ── Antwort ───────────────────────────────────────────────────────────────
+    sichtbar = {fach_id} | {d["id"] for d in spuren}
+    stufen_aus = []
+    for s in stufen:
+        eigene_c = auswahl.get((fach_id, s), [])
+        stufen_aus.append({
+            "stufe": s, **jahre[s], "fassung": geltend_je.get((fach_id, s)) or next(
+                ((c.metadata_ or {}).get("bp_version") for c in eigene_c), None),
+            "curricula": [{"id": str(c.id), "titel": c.title, "status": c.status} for c in eigene_c],
+            "plan": (lambda p: {"id": str(p.id), "status": p.status} if p else None)(plan_je.get((fach_id, s))),
+        })
+    return {
+        **leer,
+        "stufen": stufen_aus,
+        "faecher": spuren,
+        "kapitel": [_kapitel_dict(k) for k in sorted(kapitel.values(),
+                    key=lambda k: (k["fach_id"], k["curriculum_id"], k["reihe"] or 0)) if k["fach_id"] in sichtbar],
+        "bezuege": bezuege,
+        "fach_absprachen": fach_absprachen,
+        "leitlinien": leitlinien,
+    }
+
+
+async def matrix(db: AsyncSession, user, stufe: int, *, schuljahr: Optional[str] = None,
+                 entwuerfe: bool = False) -> dict:
+    """Teil B (0.67, F10): je Stufe die Fächer × Fächer mit der Zahl verbundener Kapitelpaare —
+    Absprachen (davon laut Plänen verletzt), Querverweise über Kompetenzen und über Bereiche,
+    Absprachen an ein ganzes Fach. Die Diagonale zählt die Bezüge im eigenen Fach. Dieselbe
+    Grundlage wie die Zeitachse (`_welt`, `_bezuege`), ohne Fach in der Mitte und ohne Kapitel
+    in der Antwort."""
+    entwuerfe = entwuerfe and darf_entwurf_lesen(user)
+    status = ("active", ENTWURF) if entwuerfe else ("active",)
+    aktuelles = vp.aktuelles_schuljahr()
+    sj = {stufe: schuljahr or aktuelles}
+    w = await _welt(db, user, [stufe], sj, status, aktuelles)
+    # Kapitel dieser Stufe: mit Lage in ihr; ohne Lage (nicht im Plan) zählen sie mit
+    hier = {kid for kid, k in w.kapitel.items() if not k["lage"] or any(l.stufe == stufe for l in k["lage"])}
+    bz = await _bezuege(db, w, status)
+    leer = lambda: {"absprachen": 0, "verletzt": 0, "kompetenz": 0, "bereich": 0, "ganzes_fach": 0}  # noqa: E731
+    zellen: dict[tuple[int, int], dict] = defaultdict(leer)
+    for b in bz["bezuege"]:
+        if b["a"] not in hier or b["b"] not in hier:
+            continue
+        fa, fb = sorted((w.kapitel[b["a"]]["fach_id"], w.kapitel[b["b"]]["fach_id"]))
+        z = zellen[(fa, fb)]
+        if b["typ"] == "absprache":
+            z["absprachen"] += 1
+            z["verletzt"] += (b.get("pruefung") or {}).get("ergebnis") == "verletzt"
+        else:
+            z[b["typ"]] += 1
+    nach_code = {c: f for f, c in bz["codes"].items() if c}
+    for fa in bz["fach_absprachen"]:
+        if fa["kapitel"] not in hier or (ander := nach_code.get(fa["fach_code"])) is None:
+            continue
+        eigen = w.kapitel[fa["kapitel"]]["fach_id"]
+        if ander != eigen:
+            zellen[tuple(sorted((eigen, ander)))]["ganzes_fach"] += 1
+
+    ids = {f for f, _ in w.auswahl}
+    kapitel_je = defaultdict(int)
+    for kid in hier:
+        kapitel_je[w.kapitel[kid]["fach_id"]] += 1
+    faecher = sorted((await db.execute(sa.select(Subject).where(Subject.id.in_(ids)))).scalars(),
+                     key=lambda f: (f.sort_order or 0, f.name)) if ids else []
+    return {
+        "stufe": stufe, "schuljahr": sj[stufe], "aktuelles_schuljahr": aktuelles, "entwuerfe": entwuerfe,
+        "faecher": [{**_fach_dict(f), "kapitel": kapitel_je.get(f.id, 0),
+                     "fassung": w.geltend_je.get((f.id, stufe))} for f in faecher],
+        "zellen": [{"a": a, "b": b, **z} for (a, b), z in sorted(zellen.items()) if a in ids and b in ids],
+    }
+
+
+@dataclass
+class _Welt:
+    """Curricula, Kapitel (mit Lage) und Pläne für Stufen und ihre Schuljahre — gemeinsam für
+    Zeitachse (Teil A) und Matrix (Teil B)."""
+    curricula: dict
+    auswahl: dict
+    geltend_je: dict
+    cur_stufen: dict
+    kapitel: dict
+    je_cur: dict
+    jahre: dict
+    plan_je: dict
+    faecher_ids: set
+    abbilden: Callable
+    spanne: Callable
+
+
+async def _welt(db: AsyncSession, user, stufen: list[int], sj: dict[int, str], status, aktuelles: str) -> _Welt:
     # ── Curricula je Fach und Stufe ─────────────────────────────────────────
     alle = await _curricula(db, user, status, stufen=(stufen[0], stufen[-1]))
     faecher_ids = {c.subject_id for c in alle if c.subject_id is not None}
@@ -268,6 +387,16 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
         c = curricula[k["curriculum_id"]]
         return vz.als_spanne(k["lage"], (c.min_grade, c.max_grade))
 
+    return _Welt(curricula, auswahl, geltend_je, cur_stufen, kapitel, je_cur, jahre, plan_je, faecher_ids,
+                 abbilden, spanne)
+
+
+async def _bezuege(db: AsyncSession, w: _Welt, status, *, fach_id: Optional[int] = None,
+                   fach_code: Optional[str] = None) -> dict:
+    """Bezüge zwischen den Kapiteln der Welt: Querverweise (Kompetenz, Bereich, eigene Verweise)
+    und Absprachen mit Zeitprüfung. Mit `fach_id` nur die mit diesem Fach (Zeitachse), ohne alle
+    (Matrix)."""
+    kapitel, faecher_ids, abbilden, spanne = w.kapitel, w.faecher_ids, w.abbilden, w.spanne
     # ── Kompetenzen der Kapitel ───────────────────────────────────────────────
     ik_alias = aliased(ContextNode)
     ls_alias = aliased(ContextNode)
@@ -305,7 +434,7 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
         if a == b:
             return
         ka, kb = kapitel[a], kapitel[b]
-        if fach_id not in (ka["fach_id"], kb["fach_id"]):
+        if fach_id is not None and fach_id not in (ka["fach_id"], kb["fach_id"]):
             return
         eigen = ka["fach_id"] == kb["fach_id"]
         if eigen and ka["curriculum_id"] == kb["curriculum_id"] and ka["reihe"] is not None \
@@ -354,7 +483,7 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
 
     # ── Absprachen ────────────────────────────────────────────────────────────
     codes = {s.id: s.fach_code for s in (await db.execute(sa.select(Subject).where(
-        Subject.id.in_(faecher_ids | {fach_id})))).scalars()}
+        Subject.id.in_(faecher_ids | ({fach_id} if fach_id else set()))))).scalars()}
     roh_abspr = [(kid, a) for kid, k in kapitel.items() for a in k["absprachen"] if isinstance(a, dict)]
     ziel_abb = await abbilden({str(a["kapitel_id"]) for _, a in roh_abspr if a.get("kapitel_id")})
     absprachen: dict[tuple[str, str], dict] = {}
@@ -363,12 +492,12 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
         k = kapitel[kid]
         ziel = ziel_abb.get(str(a.get("kapitel_id"))) if a.get("kapitel_id") else None
         if ziel is None:
-            if k["fach_id"] == fach_id or a.get("fach_code") == fach.fach_code:
+            if fach_id is None or k["fach_id"] == fach_id or a.get("fach_code") == fach_code:
                 fach_absprachen.append({"kapitel": kid, "fach_code": a.get("fach_code"), "art": a.get("art"),
                                         "text": a.get("text") or "", "kapitel_titel": a.get("kapitel_titel"),
                                         "ausserhalb": bool(a.get("kapitel_id"))})
             continue
-        if fach_id not in (k["fach_id"], kapitel[ziel]["fach_id"]):
+        if fach_id is not None and fach_id not in (k["fach_id"], kapitel[ziel]["fach_id"]):
             continue
         x, y = sorted((kid, ziel))
         art_x = a.get("art") if kid == x else GEGENART.get(a.get("art"), a.get("art"))
@@ -388,50 +517,7 @@ async def vernetzung(db: AsyncSession, user, fach_id: int, *, modus: str = vz.SC
     bezuege += [{"typ": p["art"], "a": p["a"], "b": p["b"], "eigenes_fach": p["eigenes_fach"],
                  "beispiele": p["beispiele"]} for p in paare.values()]
 
-    # ── Spuren: vernetzte Fächer ──────────────────────────────────────────────
-    zahl: dict[int, dict] = defaultdict(lambda: {"absprachen": 0, "kompetenz": 0, "bereich": 0})
-    for b in bezuege:
-        fa, fb = kapitel[b["a"]]["fach_id"], kapitel[b["b"]]["fach_id"]
-        if fa == fb:
-            continue
-        ander = fb if fa == fach_id else fa
-        zahl[ander]["absprachen" if b["typ"] == "absprache" else b["typ"]] += 1
-    for fa in fach_absprachen:
-        ander = next((f for f, c in codes.items() if c == fa["fach_code"]), None) \
-            if kapitel[fa["kapitel"]]["fach_id"] == fach_id else kapitel[fa["kapitel"]]["fach_id"]
-        if ander is not None and ander != fach_id:
-            zahl[ander]["absprachen"] += 1
-    faecher = {s.id: s for s in (await db.execute(sa.select(Subject).where(Subject.id.in_(set(zahl))))).scalars()} \
-        if zahl else {}
-    spuren = sorted(
-        ({**_fach_dict(faecher[f]), **z, "nur_bereich": not z["absprachen"] and not z["kompetenz"]}
-         for f, z in zahl.items() if f in faecher),
-        key=lambda d: (-d["absprachen"], -d["kompetenz"], -d["bereich"], d["name"]))
-
-    # ── Leitperspektiven und Leitlinien der Kapitel des Fachs ─────────────────
-    leitlinien = await _leitlinien_der_kapitel(db, [k for k, v in kapitel.items() if v["fach_id"] == fach_id], status)
-
-    # ── Antwort ───────────────────────────────────────────────────────────────
-    sichtbar = {fach_id} | {d["id"] for d in spuren}
-    stufen_aus = []
-    for s in stufen:
-        eigene_c = auswahl.get((fach_id, s), [])
-        stufen_aus.append({
-            "stufe": s, **jahre[s], "fassung": geltend_je.get((fach_id, s)) or next(
-                ((c.metadata_ or {}).get("bp_version") for c in eigene_c), None),
-            "curricula": [{"id": str(c.id), "titel": c.title, "status": c.status} for c in eigene_c],
-            "plan": (lambda p: {"id": str(p.id), "status": p.status} if p else None)(plan_je.get((fach_id, s))),
-        })
-    return {
-        **leer,
-        "stufen": stufen_aus,
-        "faecher": spuren,
-        "kapitel": [_kapitel_dict(k) for k in sorted(kapitel.values(),
-                    key=lambda k: (k["fach_id"], k["curriculum_id"], k["reihe"] or 0)) if k["fach_id"] in sichtbar],
-        "bezuege": bezuege,
-        "fach_absprachen": fach_absprachen,
-        "leitlinien": leitlinien,
-    }
+    return {"bezuege": bezuege, "fach_absprachen": fach_absprachen, "codes": codes}
 
 
 def _kapitel_dict(k: dict) -> dict:

@@ -36,7 +36,9 @@ DIREKT = {"_check_read_permission", "_curriculum_lesen", "_lesbare_curricula",
           # 0.65 (AY Teil 2 C): Kapitel eines anderen Fachs für den Curriculum-Assistenten, liest nur.
           "kapitel_eines_fachs",
           # 0.66 (BE Teil A): Vernetzung der Fächer — Entwürfe nur mit Schalter, liest nur.
-          "vernetzung"}
+          "vernetzung",
+          # 0.67 (BE Teil B): Matrix Fach × Fach, dieselbe Grundlage, liest nur.
+          "matrix"}
 
 #: Lesende Hilfsfunktionen ohne eigene Route.
 LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
@@ -48,8 +50,8 @@ LESEND = {"_check_read_permission", "_curriculum_lesen", "_lesbares_curriculum",
           "lies_curriculum_yaml",
           # 0.63 (AY Teil 2): Absprachen in beide Richtungen.
           "absprachen_des_curriculums",
-          # 0.66 (BE Teil A): Zeitachse der Vernetzung.
-          "vernetzung"}
+          # 0.66 (BE Teil A): Zeitachse der Vernetzung; 0.67 (Teil B): Matrix.
+          "vernetzung", "matrix"}
 
 #: Nicht lesende Stellen, die die Leseregel benutzen: Grund und die Prüfung, die sie danach
 #: aufrufen müssen (``None``: ändert nichts an einem Entwurf).

@@ -60,6 +60,22 @@ async def get_vernetzung(
         raise HTTPException(status_code=404, detail="Fach nicht gefunden")
 
 
+@router.get("/matrix")
+async def get_vernetzung_matrix(
+    stufe: int = Query(..., ge=1, le=13),
+    schuljahr: Optional[str] = Query(None, description="etwa 2027/28; Vorgabe: das laufende"),
+    entwuerfe: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(lehrkraft),
+) -> dict:
+    """Teil B (0.67, F10): Fach × Fach einer Klassenstufe mit der Zahl verbundener Kapitelpaare."""
+    from app.context.vernetzung import matrix
+
+    if schuljahr is not None and not ist_schuljahr(schuljahr):
+        raise HTTPException(status_code=422, detail="Schuljahr wie 2027/28 angeben.")
+    return await matrix(db, user, stufe, schuljahr=schuljahr, entwuerfe=entwuerfe)
+
+
 @router.post("/pdf")
 async def vernetzung_pdf(
     anfrage: dict,

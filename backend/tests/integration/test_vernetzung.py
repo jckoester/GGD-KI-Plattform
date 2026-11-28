@@ -284,3 +284,40 @@ async def test_endpunkt_fach_zeitraum_und_rechte(db_session, w):
             assert (await c.get("/context/vernetzung", params=params)).status_code == status, params
     async with _client(db_session, SCHUELER) as c:
         assert (await c.get("/context/vernetzung", params={"fach": "MBE"})).status_code == 403
+
+
+# ── Matrix (Teil B, Schritt 10) ───────────────────────────────────────────────
+
+async def test_matrix_je_stufe(db_session, w):
+    from app.context.vernetzung import matrix
+
+    await w.kante(w.m8alt, w.ph8b, "related_to")                       # Querverweis M ↔ PH in Kl. 8
+    w.kraft.metadata_ = {**w.kraft.metadata_, "absprachen": [_abspr("MBE", w.funktionen_alt, "vorher", "x")]}
+    w.funktionen_alt.metadata_ = {**w.funktionen_alt.metadata_,
+                                  "absprachen": [_abspr("BIOBE", art="abgestimmt", text="Diagramme")]}
+    await db_session.flush()
+    r = await matrix(db_session, LEHRKRAFT, 8)
+    codes = {f["id"]: f["code"] for f in r["faecher"]}
+    assert set(codes.values()) == {"MBE", "PHBE", "BIOBE"} and r["schuljahr"] == "2026/27"
+    assert {f["code"]: f["fassung"] for f in r["faecher"]}["MBE"] == "2016.V2"
+    zelle = {frozenset((codes[z["a"]], codes[z["b"]])): z for z in r["zellen"]}
+    mp = zelle[frozenset(("MBE", "PHBE"))]
+    assert (mp["kompetenz"], mp["absprachen"], mp["verletzt"]) == (1, 1, 0)   # geschätzte Lage beweist nichts
+    assert zelle[frozenset(("MBE", "BIOBE"))]["ganzes_fach"] == 1
+    # Kl. 7 (Zuordnungen) gehört nicht zur Stufe 8: der Bezug Zuordnungen ↔ Dichte zählt hier nicht
+    assert mp["kompetenz"] == 1
+
+    # Kommendes Jahr: Kl. 8 in V3 — andere Curricula, andere Bezüge
+    r = await matrix(db_session, LEHRKRAFT, 8, schuljahr="2027/28")
+    assert {f["code"]: f["fassung"] for f in r["faecher"]}["MBE"] == "2016.V3"
+    assert all(z["absprachen"] == 0 for z in r["zellen"])
+
+
+async def test_matrix_endpunkt(db_session, w):
+    async with _client(db_session, LEHRKRAFT) as c:
+        r = await c.get("/context/vernetzung/matrix", params={"stufe": 8})
+        assert r.status_code == 200 and r.json()["stufe"] == 8
+        assert (await c.get("/context/vernetzung/matrix", params={"stufe": 8, "schuljahr": "2027"})).status_code == 422
+        assert (await c.get("/context/vernetzung/matrix")).status_code == 422
+    async with _client(db_session, SCHUELER) as c:
+        assert (await c.get("/context/vernetzung/matrix", params={"stufe": 8})).status_code == 403
