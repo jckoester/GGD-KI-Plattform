@@ -299,6 +299,7 @@ async def test_matrix_je_stufe(db_session, w):
     r = await matrix(db_session, LEHRKRAFT, 8)
     codes = {f["id"]: f["code"] for f in r["faecher"]}
     assert set(codes.values()) == {"MBE", "PHBE", "BIOBE"} and r["schuljahr"] == "2026/27"
+    assert {7, 8} <= set(r["stufen"])
     assert {f["code"]: f["fassung"] for f in r["faecher"]}["MBE"] == "2016.V2"
     zelle = {frozenset((codes[z["a"]], codes[z["b"]])): z for z in r["zellen"]}
     mp = zelle[frozenset(("MBE", "PHBE"))]

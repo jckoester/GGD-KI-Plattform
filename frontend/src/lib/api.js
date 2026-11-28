@@ -2315,6 +2315,19 @@ export async function getVernetzung({ fach, schuljahr = null, weg = null, entwue
   return res.json()
 }
 
+/** Vernetzung, Teil B (0.67): Fach × Fach einer Klassenstufe; `schuljahr` wie bei der Zeitachse. */
+export async function getVernetzungMatrix({ stufe, schuljahr = null, entwuerfe = false }) {
+  const params = new URLSearchParams({ stufe: String(stufe) })
+  if (schuljahr) params.set('schuljahr', schuljahr)
+  if (entwuerfe) params.set('entwuerfe', 'true')
+  const res = await fetch(`${BASE}/context/vernetzung/matrix?${params}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Übersicht konnte nicht geladen werden')
+  }
+  return res.json()
+}
+
 /** Die Zeitachse als PDF (BE, Schritt 7): `anfrage` aus `pdfAnfrage()` in `$lib/zeitachse_svg.js`. */
 export async function ladeVernetzungPdf(anfrage) {
   const res = await fetch(`${BASE}/context/vernetzung/pdf`, {

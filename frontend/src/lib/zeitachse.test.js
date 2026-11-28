@@ -217,8 +217,11 @@ describe('Texte und Adresse (Schritt 5)', () => {
   })
   it('Adresse hin und zurück, gemerkte Spuren', async () => {
     const z = await import('./zeitachse.js')
-    const zustand = { fach: 'PH', kapitel: 'k1', schuljahr: null, weg: 7, stufe: 8, entwuerfe: true }
+    const zustand = { fach: 'PH', kapitel: 'k1', schuljahr: null, weg: 7, stufe: 8, entwuerfe: true, spur: null, ansicht: null }
     expect(z.ausAdresse(new URLSearchParams(z.adresse(zustand)))).toEqual(zustand)
+    const matrix = { ...zustand, fach: '', kapitel: null, weg: null, ansicht: 'uebersicht', spur: 12 }
+    expect(z.ausAdresse(new URLSearchParams(z.adresse(matrix)))).toEqual(matrix)
+    expect(z.ausAdresse(new URLSearchParams('ansicht=quatsch&spur=x'))).toMatchObject({ ansicht: null, spur: null })
     expect(z.ausAdresse(new URLSearchParams('fach=M&weg=x')).weg).toBeNull()
     expect(z.gemerkteSpuren({ vernetzung_spuren: { 3: [5, 'x', 7] } }, 3)).toEqual([5, 7])
     expect(z.gemerkteSpuren({}, 3)).toBeNull()

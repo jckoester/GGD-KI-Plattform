@@ -416,13 +416,17 @@ export function ausAdresse(params) {
     weg: weg && /^\d+$/.test(weg) ? Number(weg) : null,
     stufe: params.get('stufe') && /^\d+$/.test(params.get('stufe')) ? Number(params.get('stufe')) : null,
     entwuerfe: params.get('entwuerfe') === '1',
+    spur: params.get('spur') && /^\d+$/.test(params.get('spur')) ? Number(params.get('spur')) : null,
+    ansicht: params.get('ansicht') === 'uebersicht' ? 'uebersicht' : null,
   }
 }
 
 /** Und zurück — nur, was gesetzt ist. */
-export function adresse({ fach, kapitel, schuljahr, weg, stufe, entwuerfe }) {
+export function adresse({ fach, kapitel, schuljahr, weg, stufe, entwuerfe, spur = null, ansicht = null }) {
   const p = new URLSearchParams()
+  if (ansicht) p.set('ansicht', ansicht)
   if (fach) p.set('fach', fach)
+  if (spur != null) p.set('spur', String(spur))
   if (kapitel) p.set('kapitel', kapitel)
   if (schuljahr) p.set('schuljahr', schuljahr)
   if (weg != null) p.set('weg', String(weg))
@@ -444,9 +448,9 @@ export function gemerkteSpuren(einstellungen, fachId) {
  * Jahresverlaufsplan mit Stufe und Schuljahr, aus dem Planer mit Stufe. `aktuelles`: das
  * laufende Schuljahr — dann bleibt `schuljahr` weg.
  */
-export function vernetzungPfad({ fach, kapitel = null, stufe = null, schuljahr = null, aktuelles = null, entwuerfe = false }) {
+export function vernetzungPfad({ fach, kapitel = null, stufe = null, schuljahr = null, aktuelles = null, entwuerfe = false, spur = null }) {
   const sj = schuljahr && schuljahr !== aktuelles ? schuljahr : null
-  return `/knowledge/connections?${adresse({ fach: fach != null ? String(fach) : '', kapitel, schuljahr: sj, weg: null, stufe, entwuerfe })}`
+  return `/knowledge/connections?${adresse({ fach: fach != null ? String(fach) : '', kapitel, schuljahr: sj, weg: null, stufe, entwuerfe, spur })}`
 }
 
 

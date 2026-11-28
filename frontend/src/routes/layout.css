@@ -328,6 +328,18 @@ html.dark {
     --diagramm-stufe-3: var(--color-blue-600);
     --diagramm-stufe-4: var(--color-blue-800);
     --diagramm-stufe-5: var(--color-blue-900);
+    /* Schrift auf gefüllten Stufen (Matrix der Vernetzung, 0.67), nach APCA gewählt
+       (28.11.2026): hell überall Weiß, Lc 59–105. */
+    --diagramm-stufe-1-tx: var(--color-on-fill);
+    --diagramm-stufe-2-tx: var(--color-on-fill);
+    --diagramm-stufe-3-tx: var(--color-on-fill);
+    --diagramm-stufe-4-tx: var(--color-on-fill);
+    --diagramm-stufe-5-tx: var(--color-on-fill);
+    /* Marke „nicht eingehalten“ auf gefüllten Stufen: Grund wie die Zelle hell oder dunkel */
+    --diagramm-marke-dunkel-bg: var(--color-light-bg);
+    --diagramm-marke-dunkel-tx: var(--color-light-re);
+    --diagramm-marke-hell-bg: var(--color-light-bg);
+    --diagramm-marke-hell-tx: var(--color-light-re);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
@@ -362,6 +374,16 @@ html.dark {
     --diagramm-stufe-3: var(--color-blue-300);
     --diagramm-stufe-4: var(--color-blue-200);
     --diagramm-stufe-5: var(--color-blue-100);
+    /* dunkel: Stufe 1–3 Weiß (Lc 59–87), 4–5 Schwarz (Lc 66–83) */
+    --diagramm-stufe-1-tx: var(--color-on-fill);
+    --diagramm-stufe-2-tx: var(--color-on-fill);
+    --diagramm-stufe-3-tx: var(--color-on-fill);
+    --diagramm-stufe-4-tx: var(--color-black);
+    --diagramm-stufe-5-tx: var(--color-black);
+    --diagramm-marke-dunkel-bg: var(--color-dark-bg);
+    --diagramm-marke-dunkel-tx: var(--color-dark-re);
+    --diagramm-marke-hell-bg: var(--color-light-bg);
+    --diagramm-marke-hell-tx: var(--color-light-re);
 }
 
 .planner-ferien-band {

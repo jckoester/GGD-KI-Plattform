@@ -242,8 +242,11 @@ async def matrix(db: AsyncSession, user, stufe: int, *, schuljahr: Optional[str]
         kapitel_je[w.kapitel[kid]["fach_id"]] += 1
     faecher = sorted((await db.execute(sa.select(Subject).where(Subject.id.in_(ids)))).scalars(),
                      key=lambda f: (f.sort_order or 0, f.name)) if ids else []
+    # Für die Wahl der Stufe: alle Stufen, die ein lesbares Curriculum umfasst
+    stufen = sorted({s for c in await _curricula(db, user, status) for s in _stufen_von(c)})
     return {
         "stufe": stufe, "schuljahr": sj[stufe], "aktuelles_schuljahr": aktuelles, "entwuerfe": entwuerfe,
+        "stufen": stufen,
         "faecher": [{**_fach_dict(f), "kapitel": kapitel_je.get(f.id, 0),
                      "fassung": w.geltend_je.get((f.id, stufe))} for f in faecher],
         "zellen": [{"a": a, "b": b, **z} for (a, b), z in sorted(zellen.items()) if a in ids and b in ids],

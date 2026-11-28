@@ -1,23 +1,26 @@
 <script>
     /**
-     * Vernetzung der Fächer (BE, Teil A, Schritt 5): ein Fach in der Mitte einer Zeitachse über
-     * die Stufen, die vernetzten Fächer als Spuren daneben (Plan `Vernetzung-Zeitachse-BE-Plan`).
-     * Nur für Lehrkräfte. Zustand in der Adresse (`?fach=&kapitel=&schuljahr=&weg=&stufe=&entwuerfe=1`),
-     * die gewählten Spuren je Fach in den Einstellungen (`vernetzung_spuren`).
+     * Vernetzung der Fächer (BE, Plan `Vernetzung-Zeitachse-BE-Plan`). Zwei Reiter:
+     * - **Übersicht** (Teil B, 0.67): Fach × Fach einer Stufe; Einstieg, solange kein Fach gewählt ist.
+     * - **Zeitachse** (Teil A, 0.66): ein Fach in der Mitte, die vernetzten Fächer als Spuren daneben.
+     * Nur für Lehrkräfte. Zustand in der Adresse (`?ansicht=uebersicht&fach=&spur=&kapitel=&schuljahr=&weg=&stufe=&entwuerfe=1`;
+     * `spur` gilt nur beim Laden), die gewählten Spuren je Fach in den Einstellungen (`vernetzung_spuren`).
      */
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { tick } from 'svelte'
-    import { ChartGantt, FileDown, List, PanelRight, Plus, X } from '@lucide/svelte'
-    import { getPreferences, getVernetzung, ladeVernetzungPdf, patchPreferences } from '$lib/api.js'
+    import { ArrowDownUp, ChartGantt, FileDown, Grid3x3, List, PanelRight, Plus, TriangleAlert, X } from '@lucide/svelte'
+    import { getPreferences, getVernetzung, getVernetzungMatrix, ladeVernetzungPdf, patchPreferences } from '$lib/api.js'
+    import { ohneBezug, tabelle } from '$lib/vernetzung_matrix.js'
     import { pdfAnfrage } from '$lib/zeitachse_svg.js'
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import { fachToenung } from '$lib/absprachen.js'
+    import { bereichText, stufenBereiche } from '$lib/heatmap_stufen.js'
     import {
         SPUREN_SCHLUESSEL, STIL, achse, adresse, ausAdresse, bloecke, gemerkteSpuren, naechstesSchuljahr, spalten,
-        spurenWaehlen,
+        spurenWaehlen, vernetzungPfad,
     } from '$lib/zeitachse.js'
     import FachWahl from '$lib/components/FachWahl.svelte'
     import SubjectIcon from '$lib/components/SubjectIcon.svelte'
@@ -27,6 +30,7 @@
     import VernetzungZeitachse from '$lib/components/VernetzungZeitachse.svelte'
     import VernetzungTafel from '$lib/components/VernetzungTafel.svelte'
     import VernetzungListe from '$lib/components/VernetzungListe.svelte'
+    import VernetzungMatrix from '$lib/components/VernetzungMatrix.svelte'
 
     pageTitle.set('Vernetzung der Fächer')
 
@@ -35,13 +39,14 @@
     })
 
     const start = ausAdresse($page.url.searchParams)
-    let zustand = $state(start)
+    let zustand = $state({ ...start, spur: null })   // `spur` nur beim Laden (Einstieg aus der Übersicht)
     let gewaehlt = $state(start.kapitel)
     let daten = $state(null)
     let fehler = $state(null)
     let laedt = $state(false)
     let einstellungen = $state({})
-    let wahl = $state(null)          // gewählte Spuren (Kennungen); null = gemerkt oder Vorgabe
+    let wahl = $state(start.spur != null ? [start.spur] : null)   // gewählte Spuren (Kennungen); null = gemerkt oder Vorgabe
+    const ansicht = $derived(zustand.ansicht === 'uebersicht' || !zustand.fach ? 'uebersicht' : 'zeitachse')
     let schalter = $state({ querverweise: true, bereiche: false, alle: false, leitlinien: true, liste: false })
     let zeileBreite = $state(1000)   // Platz für Zeitachse und Tafel (gemessen)
     let kopfHoehe = $state(0)        // Höhe der stehenbleibenden Spaltenköpfe
@@ -68,9 +73,10 @@
 
     getPreferences().then((e) => (einstellungen = e ?? {}))
 
-    // Laden, wenn Fach oder Zeitraum wechseln
+    // Laden, wenn Fach oder Zeitraum wechseln (nur im Reiter Zeitachse)
     $effect(() => {
         const { fach, schuljahr, weg, entwuerfe } = zustand
+        if (ansicht !== 'zeitachse') return
         if (!fach) {
             daten = null
             return
@@ -82,6 +88,47 @@
             .catch((e) => { fehler = e.message; daten = null })
             .finally(() => (laedt = false))
     })
+
+    // Übersicht (Teil B): je Stufe; die Stufe teilt sie mit dem Sprungziel der Zeitachse
+    let matrixDaten = $state(null)
+    let matrixFehler = $state(null)
+    let matrixLaedt = $state(false)
+    const matrixStufe = $derived(zustand.stufe ?? 7)
+    $effect(() => {
+        if (ansicht !== 'uebersicht') return
+        const stufe = matrixStufe
+        const { schuljahr, entwuerfe } = zustand
+        matrixLaedt = true
+        matrixFehler = null
+        getVernetzungMatrix({ stufe, schuljahr, entwuerfe })
+            .then((d) => {
+                matrixDaten = d
+                // Keine Curricula in dieser Stufe, aber in anderen: zur nächstgelegenen
+                if (!d.faecher.length && d.stufen.length && !d.stufen.includes(stufe)) {
+                    const naechste = d.stufen.reduce((x, y) => (Math.abs(y - stufe) < Math.abs(x - stufe) ? y : x))
+                    zustand = { ...zustand, stufe: naechste }
+                }
+            })
+            .catch((e) => { matrixFehler = e.message; matrixDaten = null })
+            .finally(() => (matrixLaedt = false))
+    })
+    const tab = $derived(matrixDaten ? tabelle(matrixDaten, schalter) : null)
+    const hervor = $derived(matrixDaten?.faecher.find((f) => f.code === zustand.fach || String(f.id) === zustand.fach)?.id ?? null)
+    const matrixAktuelles = $derived(matrixDaten?.aktuelles_schuljahr ?? aktuelles)
+
+    function zelleOeffnen(zeile, spalte) {
+        zustand = { ...zustand, ansicht: null, fach: zeile.code, weg: null, stufe: matrixStufe }
+        gewaehlt = null
+        wahl = zeile.id === spalte.id ? [] : [spalte.id]
+        sprungZiel = { stufe: matrixStufe }
+    }
+    function zellePfad(zeile, spalte) {
+        return vernetzungPfad({ fach: zeile.code, stufe: matrixStufe, schuljahr: zustand.schuljahr, aktuelles: matrixAktuelles,
+            entwuerfe: zustand.entwuerfe, spur: zeile.id === spalte.id ? null : spalte.id })
+    }
+    function reiter(wert) {
+        zustand = { ...zustand, ansicht: wert === 'uebersicht' ? 'uebersicht' : null, weg: wert === 'uebersicht' ? null : zustand.weg }
+    }
 
     // Adresse nachführen
     $effect(() => {
@@ -122,7 +169,8 @@
     function fachWaehlen(code) {
         if (code && code === fachCode) return
         // Leeren (× an der Fachmarke) setzt die Ansicht zurück
-        zustand = { ...zustand, fach: code ?? '', weg: null, schuljahr: code ? zustand.schuljahr : null }
+        // Ein Fach öffnet die Zeitachse; ohne Fach zeigt die Seite die Übersicht
+        zustand = { ...zustand, ansicht: null, fach: code ?? '', weg: null, schuljahr: code ? zustand.schuljahr : null }
         gewaehlt = null
         wahl = null
     }
@@ -244,6 +292,38 @@
 {/snippet}
 
 <!-- Block 2: Werkzeugleiste (oben und, weggescrollt, unten) -->
+{#snippet werkzeugeMatrix()}
+    <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+        <label class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex flex-col">
+            Klassenstufe
+            <select class={feld} value={matrixStufe} onchange={(e) => (zustand = { ...zustand, stufe: Number(e.target.value) })}>
+                {#each matrixDaten?.stufen?.length ? matrixDaten.stufen : [matrixStufe] as st (st)}<option value={st}>Kl. {st}</option>{/each}
+            </select>
+        </label>
+        {#if matrixAktuelles}
+            <label class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex flex-col">
+                Zeitraum
+                <select class={feld} value={zustand.schuljahr && zustand.schuljahr !== matrixAktuelles ? 'kommend' : 'laufend'}
+                        onchange={(e) => (zustand = { ...zustand, schuljahr: e.target.value === 'kommend' ? naechstesSchuljahr(matrixAktuelles) : null })}>
+                    <option value="laufend">Schuljahr {matrixAktuelles}</option>
+                    <option value="kommend">Schuljahr {naechstesSchuljahr(matrixAktuelles)}</option>
+                </select>
+            </label>
+        {/if}
+        <div class="w-56 text-xs text-light-tx-2 dark:text-dark-tx-2">
+            <label for="vernetzung-fach-matrix">Zeitachse eines Fachs</label>
+            <FachWahl id="vernetzung-fach-matrix" faecher={faecherAuswahl} wert={null} onwahl={fachWaehlen} />
+        </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+        <span class="font-medium">Zählen:</span>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" bind:checked={schalter.querverweise} /> Querverweise des Bildungsplans</label>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" bind:checked={schalter.bereiche} disabled={!schalter.querverweise} /> auch Bezüge auf ganze Bereiche</label>
+        <label class="inline-flex items-center gap-1"><input type="checkbox" checked={zustand.entwuerfe}
+               onchange={(e) => (zustand = { ...zustand, entwuerfe: e.target.checked })} /> mit Entwürfen</label>
+    </div>
+{/snippet}
+
 {#snippet werkzeuge(wo)}
     <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
         <div class="w-56 text-xs text-light-tx-2 dark:text-dark-tx-2">
@@ -312,7 +392,12 @@
         <!-- Block 1: Überschrift (scrollt weg) -->
         <ZurueckLink href="/knowledge" label="Bibliothek" />
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">Vernetzung der Fächer</h1>
-        {#if daten}
+        {#if ansicht === 'uebersicht'}
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Welche Fächer einer Klassenstufe miteinander vernetzt sind: je Fächerpaar die Zahl der verbundenen Kapitel.
+                Ein Klick auf eine Zelle öffnet die Zeitachse der beiden Fächer.
+            </p>
+        {:else if daten}
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                 {#if zustand.weg != null}
                     Weg der Klasse, die {aktuelles} in Kl. {zustand.weg} ist — jede Stufe mit dem Plan ihres Schuljahrs.
@@ -322,8 +407,67 @@
             </p>
         {/if}
 
+        <div class="mt-4 flex gap-1 border-b border-light-ui-3 dark:border-dark-ui-3" role="tablist" aria-label="Ansicht">
+            {#each [['uebersicht', 'Übersicht', Grid3x3], ['zeitachse', 'Zeitachse', ChartGantt]] as [wert, name, Icon] (wert)}
+                <button type="button" role="tab" aria-selected={ansicht === wert} disabled={wert === 'zeitachse' && !zustand.fach}
+                        title={wert === 'zeitachse' && !zustand.fach ? 'Erst ein Fach wählen' : undefined}
+                        class="inline-flex items-center gap-1.5 -mb-px px-3 py-1.5 text-sm border-b-2 disabled:opacity-50
+                               {ansicht === wert ? 'border-primary dark:border-primary-dark text-light-tx dark:text-dark-tx font-medium'
+                                                 : 'border-transparent text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx'}"
+                        onclick={() => reiter(wert)}>
+                    <Icon class="w-4 h-4" /> {name}{wert === 'zeitachse' && fachCode ? ` ${faecherAuswahl.find((f) => f.fach_code === fachCode)?.name ?? fachCode}` : ''}
+                </button>
+            {/each}
+        </div>
+
+        {#if ansicht === 'uebersicht'}
+            <div class="mt-3 space-y-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2">
+                {@render werkzeugeMatrix()}
+            </div>
+            <div class="mt-5">
+                {#if matrixFehler}
+                    <ErrorBanner message={matrixFehler} />
+                {:else if matrixLaedt && !matrixDaten}
+                    <LoadingBanner />
+                {:else if tab && !tab.faecher.length}
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                        Für Kl. {matrixStufe} gibt es {zustand.entwuerfe ? 'kein Curriculum' : 'kein veröffentlichtes Curriculum'}.
+                        {#if !zustand.entwuerfe}Mit „mit Entwürfen“ siehst du auch Curricula, die noch entstehen.{/if}
+                    </p>
+                {:else if tab}
+                    <div class={matrixLaedt ? 'opacity-60' : ''}>
+                        {#if ohneBezug(tab)}
+                            <p class="mb-2 text-sm text-light-tx-2 dark:text-dark-tx-2">In Kl. {matrixStufe} sind die Fächer noch nicht miteinander verbunden.</p>
+                        {/if}
+                        <VernetzungMatrix t={tab} {schalter} {hervor} pfad={zellePfad} onzelle={zelleOeffnen} />
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-light-tx-2 dark:text-dark-tx-2" aria-label="Legende">
+                        <span><b>A</b> Absprachen, <b>Q</b> Querverweise{#if schalter.bereiche}, <b>B</b> über ganze Bereiche{/if}</span>
+                        <span class="inline-flex items-center gap-1"><TriangleAlert class="w-3.5 h-3.5 text-light-re dark:text-dark-re" /> Absprache nicht eingehalten</span>
+                        <span class="inline-flex items-center gap-1"><ArrowDownUp class="w-3.5 h-3.5" /> im eigenen Fach (ohne Farbe)</span>
+                        <span>(n) Kapitel in Kl. {matrixStufe}</span>
+                    </div>
+                    {#if tab.max}
+                        <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-light-tx-2 dark:text-dark-tx-2" aria-label="Legende der Farben">
+                            <span>Bezüge je Zelle:</span>
+                            {#each stufenBereiche(tab.max) as b (b.stufe)}
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="inline-block w-3 h-3 rounded-sm" style="background-color: var(--diagramm-stufe-{b.stufe})"></span>
+                                    {bereichText(b)}
+                                </span>
+                            {/each}
+                        </div>
+                    {/if}
+                    <p class="mt-2 text-xs text-light-tx-2 dark:text-dark-tx-2 max-w-3xl">
+                        Gezählt werden Kapitel, die laut Jahresverlaufsplan oder Schätzung in Kl. {matrixStufe} liegen. Bezüge in eine
+                        andere Klassenstufe zeigt die Zeitachse. Leitlinien und Leitperspektiven stehen in der
+                        <a href="/knowledge/cross-cutting-themes" class="text-light-bl dark:text-dark-bl hover:underline">Übersicht der Leitlinien und Leitperspektiven</a>.
+                    </p>
+                {/if}
+            </div>
+        {:else}
         <!-- Block 2 und 3 -->
-        <div bind:this={werkzeugEl} class="mt-4 space-y-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2">
+        <div bind:this={werkzeugEl} class="mt-3 space-y-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2">
             {@render werkzeuge('oben')}
             {#if daten}{@render auswahl()}{/if}
         </div>
@@ -334,11 +478,6 @@
                 <ErrorBanner message={fehler} />
             {:else if laedt && !daten}
                 <LoadingBanner />
-            {:else if !zustand.fach}
-                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-xl">
-                    Wähle ein Fach. Es steht dann in der Mitte, über alle Klassenstufen, für die es ein Curriculum hat; daneben
-                    die Fächer, mit denen es über Absprachen oder den Bildungsplan verbunden ist.
-                </p>
             {:else if daten && !daten.stufen.length}
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
                     Für {daten.fach.name} gibt es {zustand.entwuerfe ? 'kein Curriculum' : 'kein veröffentlichtes Curriculum'}.
@@ -446,10 +585,11 @@
                 </div>
             {/if}
         </div>
+        {/if}
     </div>
 
     <!-- Unten: Tafel (wenn rechts kein Platz) und die Werkzeugleiste, sobald die obere weggescrollt ist -->
-    {#if (daten && gewaehlt && !tafelRechts && !tafelZu && !schalter.liste) || (daten && leisteUnten)}
+    {#if ansicht === 'zeitachse' && ((daten && gewaehlt && !tafelRechts && !tafelZu && !schalter.liste) || (daten && leisteUnten))}
         <div class="absolute bottom-0 inset-x-0 z-50 border-t border-light-ui-3 dark:border-dark-ui-3 bg-light-bg/95 dark:bg-dark-bg/95 backdrop-blur">
             {#if daten && gewaehlt && !tafelRechts && !tafelZu && !schalter.liste}
                 <div class="max-h-[40vh] overflow-y-auto px-6 py-3 border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2" aria-label="Bezüge des Kapitels">
