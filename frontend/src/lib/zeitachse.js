@@ -294,3 +294,101 @@ export function randmarken(leitlinien, je, sp, { abstand = 15 } = {}) {
   }
   return aus
 }
+
+// ── Texte und Adresse (Schritt 5) ────────────────────────────────────────────
+
+const GEGEN = { vorher: 'nachher', nachher: 'vorher', gleichzeitig: 'gleichzeitig', abgestimmt: 'abgestimmt' }
+
+/** „2026/27“ → „2027/28“. */
+export function naechstesSchuljahr(sj) {
+  const start = Number(String(sj ?? '').slice(0, 4))
+  if (!start) return null
+  return `${start + 1}/${String((start + 2) % 100).padStart(2, '0')}`
+}
+
+/** „2016.V3“ → „V3“; ohne Zusatz die Jahreszahl. */
+export function fassungKurz(f) {
+  if (!f) return ''
+  const [, zusatz] = String(f).split('.')
+  return zusatz ?? String(f)
+}
+
+/** Woher die Lage einer Stufe kommt — für den Stufenkopf. */
+export function lageQuelleText(stufe) {
+  if (stufe.plan?.status === 'active') return 'Jahresverlaufsplan'
+  if (stufe.plan) return 'Jahresverlaufsplan (Entwurf)'
+  return 'ohne Jahresverlaufsplan: Lage geschätzt'
+}
+
+/** „KW 38–41“ mit Kalender, sonst „Woche 1–4“. */
+export function wochenText(stufeInfo, von, bis) {
+  const kv = kalenderwoche(stufeInfo, von)
+  const kb = kalenderwoche(stufeInfo, bis)
+  if (kv != null && kb != null) return kv === kb ? `KW ${kv}` : `KW ${kv}–${kb}`
+  return von === bis ? `Woche ${von}` : `Woche ${von}–${bis}`
+}
+
+/** „Kl. 8, KW 38–41“ für die ganze Lage eines Kapitels; geschätzt gekennzeichnet. */
+export function lageText(kapitel, stufenJe) {
+  const teile = (kapitel?.lage ?? []).map((l) => `Kl. ${l.stufe}, ${wochenText(stufenJe[l.stufe], l.von_woche, l.bis_woche)}`)
+  if (!teile.length) return 'nicht im Jahresverlaufsplan'
+  const geschaetzt = kapitel.lage.some((l) => l.quelle === 'geschaetzt')
+  const entwurf = kapitel.lage.some((l) => l.quelle === 'entwurf')
+  return `${teile.join(' und ')}${geschaetzt ? ' (geschätzt)' : entwurf ? ' (Plan-Entwurf)' : ''}`
+}
+
+/** Die Art einer Absprache aus Sicht des Kapitels `id`: vorher heißt „das andere kommt zuerst“. */
+export function artAusSicht(bezug, id) {
+  return bezug.a === id ? bezug.art : GEGEN[bezug.art] ?? bezug.art
+}
+
+/**
+ * Bezüge eines Kapitels für die Tafel, gruppiert. `frueher(a, b)` < 0 heißt a liegt vor b.
+ * Rückgabe: absprachen, fremd (Querverweise), baut_auf, aufgegriffen, fach (an ein ganzes Fach).
+ */
+export function bezuegeDesKapitels(daten, id, { kapitelFach, vergleich, bereiche = false }) {
+  const aus = { absprachen: [], fremd: [], baut_auf: [], aufgegriffen: [], fach: [] }
+  for (const b of daten?.bezuege ?? []) {
+    if (b.a !== id && b.b !== id) continue
+    if (b.typ === 'bereich' && !bereiche) continue
+    const ander = b.a === id ? b.b : b.a
+    if (b.typ === 'absprache') aus.absprachen.push({ ...b, ander, art_hier: artAusSicht(b, id) })
+    else if (kapitelFach.get(ander) !== kapitelFach.get(id)) aus.fremd.push({ ...b, ander })
+    else (vergleich(ander, id) < 0 ? aus.baut_auf : aus.aufgegriffen).push({ ...b, ander })
+  }
+  aus.fach = (daten?.fach_absprachen ?? []).filter((f) => f.kapitel === id)
+  return aus
+}
+
+/** Zustand aus der Adresse: fach, kapitel, schuljahr, weg, entwuerfe. */
+export function ausAdresse(params) {
+  const weg = params.get('weg')
+  return {
+    fach: params.get('fach') ?? '',
+    kapitel: params.get('kapitel') ?? null,
+    schuljahr: params.get('schuljahr') ?? null,
+    weg: weg && /^\d+$/.test(weg) ? Number(weg) : null,
+    stufe: params.get('stufe') && /^\d+$/.test(params.get('stufe')) ? Number(params.get('stufe')) : null,
+    entwuerfe: params.get('entwuerfe') === '1',
+  }
+}
+
+/** Und zurück — nur, was gesetzt ist. */
+export function adresse({ fach, kapitel, schuljahr, weg, stufe, entwuerfe }) {
+  const p = new URLSearchParams()
+  if (fach) p.set('fach', fach)
+  if (kapitel) p.set('kapitel', kapitel)
+  if (schuljahr) p.set('schuljahr', schuljahr)
+  if (weg != null) p.set('weg', String(weg))
+  if (stufe != null) p.set('stufe', String(stufe))
+  if (entwuerfe) p.set('entwuerfe', '1')
+  return p.toString()
+}
+
+/** Einstellung, unter der je Fach die gewählten Spuren gemerkt werden. */
+export const SPUREN_SCHLUESSEL = 'vernetzung_spuren'
+
+export function gemerkteSpuren(einstellungen, fachId) {
+  const roh = einstellungen?.[SPUREN_SCHLUESSEL]?.[String(fachId)]
+  return Array.isArray(roh) ? roh.filter((x) => Number.isInteger(x)) : null
+}

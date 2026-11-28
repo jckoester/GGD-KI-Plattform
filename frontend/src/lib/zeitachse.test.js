@@ -175,3 +175,52 @@ describe('Randmarken (F6)', () => {
     expect(we.y).toBe(bne.y)
   })
 })
+
+describe('Texte und Adresse (Schritt 5)', () => {
+  it('Schuljahr, Fassung, Lage', async () => {
+    const z = await import('./zeitachse.js')
+    expect(z.naechstesSchuljahr('2026/27')).toBe('2027/28')
+    expect(z.naechstesSchuljahr('2099/00')).toBe('2100/01')
+    expect(z.fassungKurz('2016.V3')).toBe('V3')
+    expect(z.fassungKurz('2016')).toBe('2016')
+    expect(z.lageQuelleText({ plan: { status: 'active' } })).toBe('Jahresverlaufsplan')
+    expect(z.lageQuelleText({ plan: { status: 'draft' } })).toContain('Entwurf')
+    expect(z.lageQuelleText({ plan: null })).toContain('geschätzt')
+    const je = { 7: { kalenderwochen: [37, 38, 39] }, 8: {} }
+    expect(z.wochenText(je[7], 1, 3)).toBe('KW 37–39')
+    expect(z.wochenText(je[8], 2, 2)).toBe('Woche 2')
+    expect(z.lageText({ lage: [{ stufe: 7, von_woche: 2, bis_woche: 3, quelle: 'geschaetzt' },
+      { stufe: 8, von_woche: 1, bis_woche: 2, quelle: 'geschaetzt' }] }, je)).toBe('Kl. 7, KW 38–39 und Kl. 8, Woche 1–2 (geschätzt)')
+    expect(z.lageText({ lage: [] }, je)).toBe('nicht im Jahresverlaufsplan')
+  })
+  it('Bezüge eines Kapitels gruppiert, Art aus seiner Sicht', async () => {
+    const z = await import('./zeitachse.js')
+    const kapitelFach = new Map([['m7', 1], ['m8', 1], ['m9', 1], ['p8', 2]])
+    const ort = { m7: 1, m8: 2, m9: 3, p8: 2 }
+    const daten = {
+      bezuege: [
+        { typ: 'absprache', a: 'm8', b: 'p8', art: 'vorher' },
+        { typ: 'kompetenz', a: 'm7', b: 'm8', eigenes_fach: true },
+        { typ: 'kompetenz', a: 'm8', b: 'm9', eigenes_fach: true },
+        { typ: 'bereich', a: 'm8', b: 'p8', eigenes_fach: false },
+      ],
+      fach_absprachen: [{ kapitel: 'm8', fach_code: 'BIO', text: 'x' }],
+    }
+    const r = z.bezuegeDesKapitels(daten, 'm8', { kapitelFach, vergleich: (a, b) => ort[a] - ort[b] })
+    expect(r.absprachen.map((b) => [b.ander, b.art_hier])).toEqual([['p8', 'vorher']])
+    expect(r.baut_auf.map((b) => b.ander)).toEqual(['m7'])
+    expect(r.aufgegriffen.map((b) => b.ander)).toEqual(['m9'])
+    expect(r.fremd).toEqual([])
+    expect(r.fach).toHaveLength(1)
+    expect(z.bezuegeDesKapitels(daten, 'p8', { kapitelFach, vergleich: () => 0, bereiche: true }).absprachen[0].art_hier).toBe('nachher')
+    expect(z.bezuegeDesKapitels(daten, 'p8', { kapitelFach, vergleich: () => 0, bereiche: true }).fremd).toHaveLength(1)
+  })
+  it('Adresse hin und zurück, gemerkte Spuren', async () => {
+    const z = await import('./zeitachse.js')
+    const zustand = { fach: 'PH', kapitel: 'k1', schuljahr: null, weg: 7, stufe: 8, entwuerfe: true }
+    expect(z.ausAdresse(new URLSearchParams(z.adresse(zustand)))).toEqual(zustand)
+    expect(z.ausAdresse(new URLSearchParams('fach=M&weg=x')).weg).toBeNull()
+    expect(z.gemerkteSpuren({ vernetzung_spuren: { 3: [5, 'x', 7] } }, 3)).toEqual([5, 7])
+    expect(z.gemerkteSpuren({}, 3)).toBeNull()
+  })
+})
