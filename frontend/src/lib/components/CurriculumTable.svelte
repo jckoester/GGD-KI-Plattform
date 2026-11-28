@@ -47,7 +47,11 @@
         ChevronRight,
         FileDown,
         Plus,
+        Network,
     } from "@lucide/svelte";
+    import { vernetzungPfad } from "$lib/zeitachse.js";
+    import { user, userHasAnyRole } from "$lib/stores/user.js";
+    const istLehrkraft = $derived(!!$user && userHasAnyRole($user, ["teacher", "admin"]));
 
     // Tooltip für als „veraltet" markierte Kompetenzen (nach BP-Migration ohne Zwilling).
     const VERALTET_HINT =
@@ -841,6 +845,17 @@
                                     >
                                         ({kapitelStd(kap)} Stunden)
                                     </span>
+                                {/if}
+                                <!-- Einstieg in die Vernetzung der Fächer (BE, Schritt 6) -->
+                                {#if (subjectId ?? curriculum?.subject_id) && istLehrkraft}
+                                    <a href={vernetzungPfad({ fach: subjectId ?? curriculum.subject_id, kapitel: kap.id,
+                                                              stufe: grade ?? null,
+                                                              entwuerfe: curriculum?.status === "draft" })}
+                                       class="ml-auto inline-flex items-center gap-1 text-xs font-normal text-light-tx-2 dark:text-dark-tx-2
+                                              hover:text-light-tx dark:hover:text-dark-tx"
+                                       title="Dieses Kapitel in der Vernetzung der Fächer zeigen">
+                                        <Network class="w-3.5 h-3.5" /> Vernetzung
+                                    </a>
                                 {/if}
                             </div>
                         {/if}

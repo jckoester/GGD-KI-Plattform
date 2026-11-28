@@ -19,6 +19,7 @@
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import CurriculumFreigabe from "$lib/components/CurriculumFreigabe.svelte";
     import { FileDown, Pencil, RefreshCw, Trash2, X } from "@lucide/svelte";
+    import { vernetzungPfad } from "$lib/zeitachse.js";
     import { getVerlaufsplaene } from "$lib/api.js";
     import { planVerweise } from "$lib/verlaufsplan.js";
     import { stufen as bandStufen } from "$lib/curriculum_rahmen.js";
@@ -223,6 +224,13 @@
                         {#each planLinks as l (l.href)}
                             · <a href={l.href} class="text-light-bl dark:text-dark-bl hover:underline">{l.text}</a>
                         {/each}
+                        <!-- Vernetzung der Fächer (BE, 0.66), neben den Jahresverlaufsplänen (Jan 28.11.2026) -->
+                        {#if lehrkraft && curriculum.subject_id}
+                            · <a href={vernetzungPfad({ fach: curriculum.subject_id,
+                                                        stufe: bandStufen(curriculum.metadata?.jahrgangsstufe)[0] ?? null,
+                                                        entwuerfe: curriculum.status === "draft" })}
+                                 class="text-light-bl dark:text-dark-bl hover:underline">Vernetzung der Fächer</a>
+                        {/if}
                     </p>
                     {#if quelleText(curriculum)}
                         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">Quelle: {quelleText(curriculum)}</p>

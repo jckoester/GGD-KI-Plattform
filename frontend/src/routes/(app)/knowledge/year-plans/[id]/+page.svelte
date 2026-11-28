@@ -9,7 +9,7 @@
     import { absprachenJeAbschnitt, hatAbsprachen } from '$lib/absprachen.js'
     import { page } from '$app/stores'
     import { onDestroy } from 'svelte'
-    import { Check, CopyPlus, FileDown, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
+    import { BookOpen, Check, CopyPlus, FileDown, Network, Pencil, Stamp, Trash2, Undo2 } from '@lucide/svelte'
     import {
         beschliesseVerlaufsplan, deleteVerlaufsplan, exportVerlaufsplan, getVerlaufsplan, saveVerlaufsplan, uebernehmeVerlaufsplan,
     } from '$lib/api.js'
@@ -20,6 +20,7 @@
     import { pageTitle } from '$lib/stores/pageTitle.js'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import PageBody from '$lib/components/PageBody.svelte'
+    import { vernetzungPfad } from '$lib/zeitachse.js'
     import ZurueckLink from '$lib/components/ZurueckLink.svelte'
     import { rueckwegAus } from '$lib/rueckweg.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -235,6 +236,21 @@
                 {#if kopfzeile}
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">{kopfzeile}</p>
                 {/if}
+                <!-- Einstieg in die Vernetzung der Fächer (BE, Schritt 6): Fach, Stufe, Schuljahr des Plans -->
+                <!-- Curriculum (Jan 28.11.2026) und Vernetzung der Fächer (BE, Schritt 6) nebeneinander -->
+                <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    {#each plan.curricula ?? [] as c (c.id)}
+                        <a href="/knowledge/curriculum/{c.id}"
+                           class="inline-flex items-center gap-1 underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark">
+                            <BookOpen class="w-4 h-4" /> {(plan.curricula ?? []).length > 1 ? c.titel : 'Curriculum'}
+                        </a>
+                    {/each}
+                    <a href={vernetzungPfad({ fach: plan.subject_id, stufe: plan.stufe, schuljahr: plan.schuljahr,
+                                              aktuelles: plan.aktuelles_schuljahr })}
+                       class="inline-flex items-center gap-1 underline text-light-bl dark:text-dark-bl hover:text-primary dark:hover:text-primary-dark">
+                        <Network class="w-4 h-4" /> Vernetzung der Fächer
+                    </a>
+                </div>
             </div>
             {#if plan.darf_bearbeiten}
                 <div class="flex flex-wrap items-center gap-2">

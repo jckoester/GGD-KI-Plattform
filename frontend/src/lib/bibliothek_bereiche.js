@@ -6,7 +6,7 @@
  * Bis 0.47 lag unter `/knowledge` die Liste aller Bausteine; sie steht jetzt unter
  * `/knowledge/all`.
  */
-import { Archive, BookOpen, ChartGantt, Database, FolderHeart, ShieldCheck } from '@lucide/svelte'
+import { Archive, BookOpen, ChartGantt, Database, FolderHeart, Network, ShieldCheck } from '@lucide/svelte'
 
 /**
  * @param {{ istLehrkraft: boolean, zeigt: (eintrag: string) => boolean }} p
@@ -41,6 +41,13 @@ export function bibliothekBereiche({ istLehrkraft, zeigt }) {
             titel: 'Curricula',
             text: 'Die Schulcurricula der Fachschaften, nach Bildungsplan und Band.',
             icon: BookOpen,
+        })
+        // BE (0.66): hinter den Curricula, auf ihrer Darstellungsstufe — sie zeigt deren Kapitel.
+        bereiche.push({
+            href: '/knowledge/connections',
+            titel: 'Vernetzung der Fächer',
+            text: 'Was in anderen Fächern parallel läuft und worauf ein Kapitel aufbaut — über alle Klassenstufen.',
+            icon: Network,
         })
     }
     if (zeigt('education_plans')) {

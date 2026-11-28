@@ -392,3 +392,13 @@ export function gemerkteSpuren(einstellungen, fachId) {
   const roh = einstellungen?.[SPUREN_SCHLUESSEL]?.[String(fachId)]
   return Array.isArray(roh) ? roh.filter((x) => Number.isInteger(x)) : null
 }
+
+/**
+ * Einstieg in die Vernetzung (Schritt 6, F7): aus dem Curriculum mit Kapitel, aus dem
+ * Jahresverlaufsplan mit Stufe und Schuljahr, aus dem Planer mit Stufe. `aktuelles`: das
+ * laufende Schuljahr — dann bleibt `schuljahr` weg.
+ */
+export function vernetzungPfad({ fach, kapitel = null, stufe = null, schuljahr = null, aktuelles = null, entwuerfe = false }) {
+  const sj = schuljahr && schuljahr !== aktuelles ? schuljahr : null
+  return `/knowledge/connections?${adresse({ fach: fach != null ? String(fach) : '', kapitel, schuljahr: sj, weg: null, stufe, entwuerfe })}`
+}

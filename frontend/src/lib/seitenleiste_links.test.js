@@ -92,6 +92,16 @@ describe('Übersicht der Bibliothek (0.48)', () => {
         expect(kacheln.indexOf('/knowledge/curricula')).toBeLessThan(kacheln.indexOf('/knowledge/education-plans'))
     })
 
+    it('Vernetzung der Fächer (0.66): hinter den Curricula, auf ihrer Stufe', () => {
+        const kacheln = alle.map((b) => b.href)
+        expect(kacheln.indexOf('/knowledge/connections')).toBe(kacheln.indexOf('/knowledge/curricula') + 1)
+        const ohneCurricula = bibliothekBereiche({ istLehrkraft: true, zeigt: (e) => e !== 'curricula' })
+        expect(ohneCurricula.map((b) => b.href)).not.toContain('/knowledge/connections')
+        const sidebar = lies('Sidebar.svelte')
+        const block = sidebar.slice(sidebar.indexOf("$zeigtEintrag('curricula')"), sidebar.indexOf("$zeigtEintrag('education_plans')"))
+        expect(block).toContain('href="/knowledge/connections"')
+    })
+
     it('der Kopf „Bibliothek“ führt auf die Übersicht', () => {
         expect(lies('Sidebar.svelte')).toMatch(/<SidebarBereich\s+href="\/knowledge"\s+label="Bibliothek"/)
     })

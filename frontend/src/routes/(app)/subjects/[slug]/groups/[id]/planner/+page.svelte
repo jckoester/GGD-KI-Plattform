@@ -44,6 +44,8 @@
     EINHEITEN, JAHR, PLANUNGS_ANSICHT_SCHLUESSEL, planerAnsichtPfad, planungsAnsichtAusAdresse,
     planungsAnsichtAusEinstellungen, stundenOhneTermin,
   } from '$lib/planung_archiv.js'
+  import { Network } from '@lucide/svelte'
+  import { vernetzungPfad } from '$lib/zeitachse.js'
   import ArchivAnsicht from '$lib/components/planner/ArchivAnsicht.svelte'
   import EinheitenAnsicht from '$lib/components/planner/EinheitenAnsicht.svelte'
   import EinplanenDialog from '$lib/components/planner/EinplanenDialog.svelte'
@@ -627,6 +629,16 @@
           >{name}</button>
         {/each}
       </div>
+
+      <!-- Einstieg in die Vernetzung der Fächer (BE, Schritt 6): Fach und Stufe der Gruppe -->
+      {#if group?.subject_id}
+        <a href={vernetzungPfad({ fach: group.subject_id, stufe: group.jahrgang_wirksam ?? null })}
+           class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                  text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+           title="Was in anderen Fächern parallel läuft">
+          <Network class="w-4 h-4" /> Vernetzung
+        </a>
+      {/if}
 
       <!-- Assistent-Link -->
       <a

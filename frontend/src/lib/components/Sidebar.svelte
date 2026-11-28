@@ -24,6 +24,7 @@
         Archive,
     Check,
         ChartGantt,
+        Network,
     } from "@lucide/svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -391,6 +392,12 @@
                             aktiv={$page.url.pathname === '/knowledge/curricula'}>
                             <BookOpen class="w-4 h-4" />
                             Curricula
+                        </SidebarLink>
+                        <!-- Vernetzung der Fächer (BE, 0.66): Stufe der Curricula, deren Kapitel sie zeigt -->
+                        <SidebarLink href="/knowledge/connections"
+                            aktiv={$page.url.pathname.startsWith('/knowledge/connections')}>
+                            <Network class="w-4 h-4" />
+                            Vernetzung
                         </SidebarLink>
                         {/if}
                         {#if $zeigtEintrag('education_plans')}

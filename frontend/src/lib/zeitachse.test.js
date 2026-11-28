@@ -224,3 +224,15 @@ describe('Texte und Adresse (Schritt 5)', () => {
     expect(z.gemerkteSpuren({}, 3)).toBeNull()
   })
 })
+
+describe('Einstiege (Schritt 6)', () => {
+  it('Pfad mit Kapitel, Stufe, Schuljahr nur wenn nicht das laufende, Entwürfe', async () => {
+    const { vernetzungPfad } = await import('./zeitachse.js')
+    expect(vernetzungPfad({ fach: 3, kapitel: 'k1', stufe: 8, entwuerfe: true }))
+      .toBe('/knowledge/connections?fach=3&kapitel=k1&stufe=8&entwuerfe=1')
+    expect(vernetzungPfad({ fach: 3, stufe: 9, schuljahr: '2026/27', aktuelles: '2026/27' }))
+      .toBe('/knowledge/connections?fach=3&stufe=9')
+    expect(vernetzungPfad({ fach: 3, stufe: 9, schuljahr: '2027/28', aktuelles: '2026/27' }))
+      .toBe('/knowledge/connections?fach=3&schuljahr=2027%2F28&stufe=9')
+  })
+})
