@@ -34,6 +34,7 @@ from app.api.admin.router import router as admin_router
 from app.api.assistants import router as assistants_router
 from app.api.archiv import router as archiv_router
 from app.context.verlaufsplan_router import router as verlaufsplan_router
+from app.context.vernetzung_router import router as vernetzung_router
 from app.api.groups import router as groups_router
 from app.api.subjects import router as subjects_router
 from app.site_texts.router import router as site_texts_router
@@ -303,6 +304,8 @@ app.include_router(groups_router)
 app.include_router(archiv_router)
 # Vor dem allgemeinen Kontext-Router: eigener Präfix /context/verlaufsplaene (BD)
 app.include_router(verlaufsplan_router)
+# Vernetzung der Fächer (BE): eigener Präfix /context/vernetzung
+app.include_router(vernetzung_router)
 app.include_router(context_router)
 app.include_router(planning_router)
 app.include_router(verlaufsplan_gruppe_router)

@@ -246,3 +246,41 @@ async def test_fach_ohne_curricula_und_unbekanntes_fach(db_session, w):
     assert r["stufen"] == [] and r["kapitel"] == []
     with pytest.raises(LookupError):
         await vernetzung(db_session, LEHRKRAFT, 987654)
+
+
+# ── Endpunkt (Schritt 3) ───────────────────────────────────────────────────────
+
+def _client(db, user):
+    import httpx
+    from fastapi import FastAPI
+
+    from app.auth.dependencies import get_current_user
+    from app.context.vernetzung_router import router
+    from app.db.session import get_db
+
+    app = FastAPI()
+    app.include_router(router)
+
+    async def _db():
+        yield db
+
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = lambda: user
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+
+
+async def test_endpunkt_fach_zeitraum_und_rechte(db_session, w):
+    async with _client(db_session, LEHRKRAFT) as c:
+        r = await c.get("/context/vernetzung", params={"fach": "mbe"})
+        assert r.status_code == 200
+        assert r.json()["fach"]["code"] == "MBE" and [f["code"] for f in r.json()["faecher"]] == ["PHBE"]
+        r = await c.get("/context/vernetzung", params={"fach": str(w.m), "weg": 7})
+        assert [s["schuljahr"] for s in r.json()["stufen"]] == ["2026/27", "2027/28"]
+        r = await c.get("/context/vernetzung", params={"fach": "MBE", "schuljahr": "2027/28"})
+        assert r.json()["stufen"][1]["fassung"] == "2016.V3"
+        for params, status in (({"fach": "MBE", "schuljahr": "2027/28", "weg": 7}, 422),
+                               ({"fach": "MBE", "schuljahr": "2027"}, 422),
+                               ({"fach": "XYZBE"}, 404), ({"fach": "987654"}, 404), ({}, 422)):
+            assert (await c.get("/context/vernetzung", params=params)).status_code == status, params
+    async with _client(db_session, SCHUELER) as c:
+        assert (await c.get("/context/vernetzung", params={"fach": "MBE"})).status_code == 403
